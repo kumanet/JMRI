@@ -1,5 +1,6 @@
 package jmri.jmrit.operations.trains;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * @author Daniel Boudreau Copyright (C) 2008, 2009, 2010, 2011, 2012, 2013,
  *         2014, 2015
  */
-@edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
+@SuppressFBWarnings(value = "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
         justification = "CarManager only provides Car Objects")
 public class TrainBuilder extends TrainCommon {
 
@@ -98,6 +99,7 @@ public class TrainBuilder extends TrainCommon {
      * </ol>
      *
      * @param train the train that is to be built
+     * @return True if successful.
      *
      */
     public boolean build(Train train) {
@@ -509,6 +511,8 @@ public class TrainBuilder extends TrainCommon {
                                     Integer.toString(track.getNumberCars())}));
                     // is the departure track available?
                     if (!checkDepartureStagingTrack(track)) {
+                        addLine(_buildReport, SEVEN, MessageFormat.format(Bundle.getMessage("buildStagingTrackRestriction"),
+                                new Object[]{track.getName(), _train.getName()}));
                         continue;
                     }
                     _departStageTrack = track;
@@ -606,8 +610,8 @@ public class TrainBuilder extends TrainCommon {
                     Integer.toString(requested), _train.getName(), Integer.toString(_carList.size())}));
         }
 
-        // remove unwanted cars
-        removeCars();
+        // remove unwanted cars and list available cars by location
+        removeAndListCars();
 
         // Do caboose changes in reverse order in case there isn't enough track space
         // second caboose change?
@@ -1382,7 +1386,7 @@ public class TrainBuilder extends TrainCommon {
                 }
             }
         }
-        // second pass, take a caboose with a road name that is "similar" to the engine road name
+        // second pass, take a caboose with a road name that is "similar" (hyphen feature) to the engine road name
         if (requiresCaboose && !foundCaboose && roadCaboose.equals(Train.NONE)) {
             log.debug("Second pass looking for caboose");
             for (Car car : _carList) {
@@ -1475,7 +1479,7 @@ public class TrainBuilder extends TrainCommon {
      * track assignment, and check that the car can be serviced by this train.
      * Lists all cars available to train by location.
      */
-    private void removeCars() throws BuildFailedException {
+    private void removeAndListCars() throws BuildFailedException {
         addLine(_buildReport, SEVEN, BLANK_LINE); // add line when in very detailed report mode
         addLine(_buildReport, SEVEN, Bundle.getMessage("buildRemoveCars"));
         boolean showCar = true;
@@ -1648,7 +1652,9 @@ public class TrainBuilder extends TrainCommon {
                     car.setWait(car.getWait() - 1); // decrement wait count
                     // a car's load changes when the wait count reaches 0
                     String oldLoad = car.getLoadName();
-                    car.updateLoad(); // has the wait count reached 0?
+                    if (car.getTrack().getTrackType().equals(Track.SPUR)) {
+                        car.updateLoad(); // has the wait count reached 0?
+                    }
                     String newLoad = car.getLoadName();
                     if (!oldLoad.equals(newLoad)) {
                         addLine(_buildReport, SEVEN, MessageFormat.format(Bundle.getMessage("buildCarLoadChangedWait"),
@@ -2493,9 +2499,7 @@ public class TrainBuilder extends TrainCommon {
      * @param rl the planned origin for this car
      * @param rld the planned destination for this car
      * @param track the final destination for car
-     * @return true if car was successfully added to train. Also makes the
-     *         boolean "success" true if location doesn't need any more pick
-     *         ups.
+     * 
      */
     private void addCarToTrain(Car car, RouteLocation rl, RouteLocation rld, Track track) {
         addLine(_buildReport, THREE, MessageFormat.format(Bundle.getMessage("buildCarAssignedDest"), new Object[]{
@@ -3016,6 +3020,8 @@ public class TrainBuilder extends TrainCommon {
             return true;
         }
         if (!checkTerminateStagingTrackRestrictions(terminateStageTrack)) {
+            addLine(_buildReport, SEVEN, MessageFormat.format(Bundle.getMessage("buildStagingTrackRestriction"),
+                    new Object[]{terminateStageTrack.getName(), _train.getName()}));
             addLine(_buildReport, SEVEN, Bundle.getMessage("buildOptionRestrictStaging"));
             return false;
         }
@@ -4932,7 +4938,7 @@ public class TrainBuilder extends TrainCommon {
                         new Object[]{_train.getName(), _train.getDescription()}), JOptionPane.ERROR_MESSAGE);
             } else {
                 // build error, could not find destinations for cars departing staging
-                Object[] options = {Bundle.getMessage("buttonRemoveCars"), "OK"};
+                Object[] options = {Bundle.getMessage("buttonRemoveCars"), Bundle.getMessage("ButtonOK")};
                 int results = JOptionPane.showOptionDialog(null, msg, MessageFormat.format(Bundle
                         .getMessage("buildErrorMsg"), new Object[]{_train.getName(), _train.getDescription()}),
                         JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[1]);

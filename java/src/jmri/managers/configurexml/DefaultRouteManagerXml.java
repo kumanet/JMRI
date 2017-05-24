@@ -29,6 +29,7 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
      * @param o Object to store, of type RouteManager
      * @return Element containing the complete info
      */
+    @Override
     public Element store(Object o) {
         Element routes = new Element("routes");
         setStoreElementClass(routes);
@@ -56,8 +57,7 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
                 boolean routeLocked = r.getLocked();
                 String cLockTurnout = r.getLockControlTurnout();
 
-                Element elem = new Element("route")
-                        .setAttribute("systemName", sname);
+                Element elem = new Element("route");
                 elem.addContent(new Element("systemName").addContent(sname));
 
                 // store common parts
@@ -204,6 +204,7 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
         routes.setAttribute("class", this.getClass().getName());
     }
 
+    @Override
     public void load(Element element, Object o) {
         log.error("Invalid method called");
     }
@@ -246,7 +247,7 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
                 break;
             }
 
-            String userName = null;
+            String userName = getUserName(routeList.get(i));
             String cTurnout = null;
             String cTurnoutState = null;
             String addedDelayTxt = null;
@@ -254,9 +255,6 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
             String cLockTurnout = null;
             String cLockTurnoutState = null;
             int addedDelay = 0;
-            if (routeList.get(i).getAttribute("userName") != null) {
-                userName = routeList.get(i).getAttribute("userName").getValue();
-            }
 
             if (routeList.get(i).getAttribute("controlTurnout") != null) {
                 cTurnout = routeList.get(i).getAttribute("controlTurnout").getValue();
@@ -511,6 +509,7 @@ public class DefaultRouteManagerXml extends jmri.managers.configurexml.AbstractN
         InstanceManager.getDefault(jmri.ConfigureManager.class).registerConfig(pManager, jmri.Manager.ROUTES);
     }
 
+    @Override
     public int loadOrder() {
         return InstanceManager.getDefault(jmri.RouteManager.class).getXMLOrder();
     }

@@ -123,7 +123,7 @@ public class TrainPrintUtilities {
                 }
                 break;
             }
-            //			log.debug("Line: {}", line.toString());
+            //   log.debug("Line: {}", line.toString());
             // check for build report print level
             if (isBuildReport) {
                 line = filterBuildReport(line, false); // no indent
@@ -337,6 +337,7 @@ public class TrainPrintUtilities {
 
     /**
      * This method uses Desktop which is supported in Java 1.6.
+     * @param file The File to be opened using an editor.
      */
     public static void openDesktopEditor(File file) {
         if (!java.awt.Desktop.isDesktopSupported()) {

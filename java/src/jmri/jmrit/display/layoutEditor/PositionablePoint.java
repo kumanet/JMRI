@@ -7,14 +7,20 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
+import javax.annotation.CheckForNull;
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRootPane;
 import javax.swing.JSeparator;
+import javax.swing.SwingUtilities;
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.Path;
@@ -23,11 +29,6 @@ import jmri.SignalHead;
 import jmri.SignalMast;
 import jmri.jmrit.signalling.SignallingGuiTools;
 import jmri.util.swing.JCBHandle;
-
-import javax.annotation.CheckForNull;
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * @author Dave Duchamp Copyright (c) 2004-2007
  * @author Bob Jacobsen Copyright (2) 2014
  */
-public class PositionablePoint {
+public class PositionablePoint extends LayoutTrack {
 
     // Defined text resource
     ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.display.layoutEditor.LayoutEditorBundle");
@@ -68,7 +69,6 @@ public class PositionablePoint {
     private LayoutEditor layoutEditor = null;
 
     // persistent instances variables (saved between sessions)
-    private String ident = "";
     private int type = 0;
     private TrackSegment connect1 = null;
     private TrackSegment connect2 = null;
@@ -79,7 +79,7 @@ public class PositionablePoint {
 
     private NamedBeanHandle<SignalMast> eastBoundSignalMastNamed = null;
     private NamedBeanHandle<SignalMast> westBoundSignalMastNamed = null;
-    /* We use a namedbeanhandle for the the sensors, even though we only store the name here, 
+    /* We use a namedbeanhandle for the the sensors, even though we only store the name here,
      this is so that we can keep up with moves and changes of userNames */
     private NamedBeanHandle<Sensor> eastBoundSensorNamed = null;
     private NamedBeanHandle<Sensor> westBoundSensorNamed = null;
@@ -97,12 +97,14 @@ public class PositionablePoint {
         coords = p;
     }
 
+    // this should only be used for debugging…
+    public String toString() {
+        return "PositionablePoint " + ident;
+    }
+
     /**
      * Accessor methods
      */
-    public String getID() {
-        return ident;
-    }
 
     public int getType() {
         return type;
@@ -194,7 +196,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getEastBoundSignal() {
+    @Nonnull
+    public String getEastBoundSignal() {
         SignalHead h = getEastBoundSignalHead();
         if (h != null) {
             return h.getDisplayName();
@@ -262,7 +265,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getWestBoundSignal() {
+    @Nonnull
+    public String getWestBoundSignal() {
         SignalHead h = getWestBoundSignalHead();
         if (h != null) {
             return h.getDisplayName();
@@ -330,7 +334,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getEastBoundSensorName() {
+    @Nonnull
+    public String getEastBoundSensorName() {
         if (eastBoundSensorNamed != null) {
             return eastBoundSensorNamed.getName();
         }
@@ -360,7 +365,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getWestBoundSensorName() {
+    @Nonnull
+    public String getWestBoundSensorName() {
         if (westBoundSensorNamed != null) {
             return westBoundSensorNamed.getName();
         }
@@ -389,7 +395,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getEastBoundSignalMastName() {
+    @Nonnull
+    public String getEastBoundSignalMastName() {
         if (getEastBoundSignalMastNamed() != null) {
             return getEastBoundSignalMastNamed().getName();
         }
@@ -428,6 +435,9 @@ public class PositionablePoint {
                 log.error("Unable to find Signal Mast " + signalMast);
                 return;
             }
+        } else {
+            eastBoundSignalMastNamed = null;
+            return;
         }
         if (getType() == EDGE_CONNECTOR) {
             int dir = getConnect1Dir();
@@ -449,7 +459,8 @@ public class PositionablePoint {
     }
 
     @CheckReturnValue
-    public @Nonnull String getWestBoundSignalMastName() {
+    @Nonnull
+    public String getWestBoundSignalMastName() {
         if (getWestBoundSignalMastNamed() != null) {
             return getWestBoundSignalMastNamed().getName();
         }
@@ -488,6 +499,9 @@ public class PositionablePoint {
                 log.error("Unable to find Signal Mast " + signalMast);
                 return;
             }
+        } else {
+            westBoundSignalMastNamed = null;
+            return;
         }
         if (getType() == EDGE_CONNECTOR) {
             int dir = getConnect1Dir();
@@ -692,9 +706,11 @@ public class PositionablePoint {
         }
         boolean blockBoundary = false;
         boolean endBumper = false;
+        JMenuItem jmi = null;
         switch (getType()) {
             case ANCHOR:
-                popup.add(rb.getString("Anchor"));
+                jmi = popup.add(rb.getString("Anchor"));
+                jmi.setEnabled(false);
                 LayoutBlock block1 = null;
                 LayoutBlock block2 = null;
                 if (connect1 != null) {
@@ -704,32 +720,42 @@ public class PositionablePoint {
                     block2 = connect2.getLayoutBlock();
                 }
                 if ((block1 != null) && (block1 == block2)) {
-                    popup.add(Bundle.getMessage("BeanNameBlock") + ": " + block1.getID());
+                    jmi = popup.add(Bundle.getMessage("BeanNameBlock") + ": " + block1.getID());
                 } else if ((block1 != null) && (block2 != null) && (block1 != block2)) {
-                    popup.add(rb.getString("BlockDivider"));
-                    popup.add(" " + Bundle.getMessage("Block_ID", 1) + ": " + block1.getID());
-                    popup.add(" " + Bundle.getMessage("Block_ID", 2) + ": " + block2.getID());
+                    jmi = popup.add(rb.getString("BlockDivider"));
+                    jmi.setEnabled(false);
+                    jmi = popup.add(" " + Bundle.getMessage("Block_ID", 1) + ": " + block1.getID());
+                    jmi.setEnabled(false);
+                    jmi = popup.add(" " + Bundle.getMessage("Block_ID", 2) + ": " + block2.getID());
                     blockBoundary = true;
                 }
+                jmi.setEnabled(false);
                 break;
             case END_BUMPER:
-                popup.add(rb.getString("EndBumper"));
+                jmi = popup.add(rb.getString("EndBumper"));
+                jmi.setEnabled(false);
+
                 LayoutBlock blockEnd = null;
                 if (connect1 != null) {
                     blockEnd = connect1.getLayoutBlock();
                 }
                 if (blockEnd != null) {
-                    popup.add(rb.getString("BlockID") + ": " + blockEnd.getID());
+                    jmi = popup.add(rb.getString("BlockID") + ": " + blockEnd.getID());
+                    jmi.setEnabled(false);
                 }
                 endBumper = true;
                 break;
             case EDGE_CONNECTOR:
-                popup.add(rb.getString("EdgeConnector"));
+                jmi = popup.add(rb.getString("EdgeConnector"));
+                jmi.setEnabled(false);
+
                 if (getLinkedEditor() != null) {
-                    popup.add(getLinkEditorName());
+                    jmi = popup.add(getLinkEditorName());
                 } else {
-                    popup.add(rb.getString("EdgeNotLinked"));
+                    jmi = popup.add(rb.getString("EdgeNotLinked"));
                 }
+                jmi.setEnabled(false);
+
                 block1 = null;
                 block2 = null;
                 if (connect1 != null) {
@@ -739,10 +765,12 @@ public class PositionablePoint {
                     block2 = getConnect2().getLayoutBlock();
                 }
                 if ((block1 != null) && (block2 != null) && (block1 != block2)) {
-                    popup.add(rb.getString("BlockDivider"));
-                    popup.add(" " + Bundle.getMessage("Block_ID", 1) + ": " + block1.getID());
-                    popup.add(" " + Bundle.getMessage("Block_ID", 2) + ": " + block2.getID());
-
+                    jmi = popup.add(rb.getString("BlockDivider"));
+                    jmi.setEnabled(false);
+                    jmi = popup.add(" " + Bundle.getMessage("Block_ID", 1) + ": " + block1.getID());
+                    jmi.setEnabled(false);
+                    jmi = popup.add(" " + Bundle.getMessage("Block_ID", 2) + ": " + block2.getID());
+                    jmi.setEnabled(false);
                 }
                 blockBoundary = true;
                 break;
@@ -751,11 +779,7 @@ public class PositionablePoint {
         }
         popup.add(new JSeparator(JSeparator.HORIZONTAL));
         popup.add(new AbstractAction(Bundle.getMessage("ButtonDelete")) {
-            /**
-             *
-             */
-            private static final long serialVersionUID = -5879151659812492830L;
-
+            @Override
             public void actionPerformed(ActionEvent e) {
                 if (layoutEditor.removePositionablePoint(instance)) {
                     // user is serious about removing this point from the panel
@@ -767,21 +791,13 @@ public class PositionablePoint {
         if (blockBoundary) {
             if (getType() == EDGE_CONNECTOR) {
                 popup.add(new AbstractAction(rb.getString("EdgeEditLink")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = 7417712706336145182L;
-
+                    @Override
                     public void actionPerformed(ActionEvent e) {
                         setLink();
                     }
                 });
                 popup.add(new AbstractAction(rb.getString("SetSignals")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = 7790296058732429696L;
-
+                    @Override
                     public void actionPerformed(ActionEvent e) {
                         tools = new LayoutEditorTools(layoutEditor);
                         // bring up signals at level crossing tool dialog
@@ -790,11 +806,7 @@ public class PositionablePoint {
                     }
                 });
                 popup.add(new AbstractAction(rb.getString("SetSignalMasts")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = 4141089902371028010L;
-
+                    @Override
                     public void actionPerformed(ActionEvent event) {
                         if (tools == null) {
                             tools = new LayoutEditorTools(layoutEditor);
@@ -805,11 +817,7 @@ public class PositionablePoint {
                 });
             } else {
                 popup.add(new AbstractAction(rb.getString("SetSignals")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = -4724061827365861420L;
-
+                    @Override
                     public void actionPerformed(ActionEvent e) {
                         if (tools == null) {
                             tools = new LayoutEditorTools(layoutEditor);
@@ -820,11 +828,7 @@ public class PositionablePoint {
                     }
                 });
                 popup.add(new AbstractAction(rb.getString("SetSensors")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = 2796713739016080440L;
-
+                    @Override
                     public void actionPerformed(ActionEvent event) {
                         if (tools == null) {
                             tools = new LayoutEditorTools(layoutEditor);
@@ -835,11 +839,7 @@ public class PositionablePoint {
                     }
                 });
                 popup.add(new AbstractAction(rb.getString("SetSignalMasts")) {
-                    /**
-                     *
-                     */
-                    private static final long serialVersionUID = -7773588998817362490L;
-
+                    @Override
                     public void actionPerformed(ActionEvent event) {
                         if (tools == null) {
                             tools = new LayoutEditorTools(layoutEditor);
@@ -852,11 +852,7 @@ public class PositionablePoint {
         }
         if (endBumper) {
             popup.add(new AbstractAction(rb.getString("SetSensors")) {
-                /**
-                 *
-                 */
-                private static final long serialVersionUID = -7476420955847740957L;
-
+                @Override
                 public void actionPerformed(ActionEvent event) {
                     if (tools == null) {
                         tools = new LayoutEditorTools(layoutEditor);
@@ -867,11 +863,7 @@ public class PositionablePoint {
                 }
             });
             popup.add(new AbstractAction(rb.getString("SetSignalMasts")) {
-                /**
-                 *
-                 */
-                private static final long serialVersionUID = -7043861591726586142L;
-
+                @Override
                 public void actionPerformed(ActionEvent event) {
                     if (tools == null) {
                         tools = new LayoutEditorTools(layoutEditor);
@@ -1000,12 +992,17 @@ public class PositionablePoint {
 
         JButton done = new JButton(Bundle.getMessage("ButtonDone"));
         done.addActionListener(
-                new ActionListener() {
-                    public void actionPerformed(ActionEvent e) {
-                        updateLink();
-                    }
-                }
-        );
+                (ActionEvent a) -> {
+            updateLink();
+        });
+
+        // make this button the default button (return or enter activates)
+        // Note: We have to invoke this later because we don't currently have a root pane
+        SwingUtilities.invokeLater(() -> {
+            JRootPane rootPane = SwingUtilities.getRootPane(done);
+            rootPane.setDefaultButton(done);
+        });
+
         container.add(getLinkPanel(), BorderLayout.NORTH);
         container.add(done, BorderLayout.SOUTH);
         container.revalidate();
@@ -1033,10 +1030,8 @@ public class PositionablePoint {
             }
         }
 
-        ActionListener selectPanelListener = new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                updatePointBox();
-            }
+        ActionListener selectPanelListener = (ActionEvent a) -> {
+            updatePointBox();
         };
 
         editorCombo.addActionListener(selectPanelListener);

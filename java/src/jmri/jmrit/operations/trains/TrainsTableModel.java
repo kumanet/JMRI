@@ -346,7 +346,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
 
     public Color getRowColor(int row) {
         Train train = sysList.get(row);
-        //		log.debug("Row: {} train: {} color: {}", row, train.getName(), train.getTableRowColorName());
+        //  log.debug("Row: {} train: {} color: {}", row, train.getName(), train.getTableRowColorName());
         return train.getTableRowColor();
     }
 
@@ -401,7 +401,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
                     train.build();
                 }
             });
-            build.setName("Build Train"); // NOI18N
+            build.setName("Build Train (train.getName())"); // NOI18N
             build.start();
             // print build report, print manifest, run or open file
         } else {
@@ -413,7 +413,18 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
             } else if (Setup.isGenerateCsvManifestEnabled() && trainManager.isRunFileEnabled()) {
                 train.runFile();
             } else {
-                train.printManifestIfBuilt();
+                if (!train.printManifestIfBuilt()) {
+                    log.debug("Manifest file for train ({}) not found", train.getName());
+                    int result = JOptionPane.showConfirmDialog(null, MessageFormat.format(Bundle.getMessage("TrainManifestFileMissing"),
+                            new Object[]{train.getName()}), Bundle.getMessage("TrainManifestFileError"),
+                            JOptionPane.YES_NO_OPTION);
+                    if (result == JOptionPane.YES_OPTION) {
+                        train.setModified(true);
+                        if (!train.printManifestIfBuilt()) {
+                            log.error("Not able to create manifest for train ({})", train.getName());
+                        }
+                    }
+                }
             }
         }
     }
@@ -521,11 +532,12 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
                 log.debug("Update train table row: {} name: {}", row, train.getName());
             }
             if (row >= 0) {
+                int viewRow = _table.convertRowIndexToView(row);
                 // if there are issues with thread locking here, this needs to
                 // be refactored so the panel holding the table is listening for
                 // this changes so it can instruct the table to scroll
-                // adding "synchronized" to this propertyChange can lock up thread
-                _table.scrollRectToVisible(_table.getCellRect(row, 0, true));
+                // adding "synchronized" to this propertyChange can lock up thread                
+                _table.scrollRectToVisible(_table.getCellRect(viewRow, 0, true));
                 fireTableRowsUpdated(row, row);
             }
         }
@@ -560,7 +572,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
             Component component = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
             if (!isSelected) {
                 int modelRow = table.convertRowIndexToModel(row);
-                //				log.debug("View row: {} Column: {} Model row: {}", row, column, modelRow);
+                //    log.debug("View row: {} Column: {} Model row: {}", row, column, modelRow);
                 Color background = getRowColor(modelRow);
                 component.setBackground(background);
                 component.setForeground(getForegroundColor(background));

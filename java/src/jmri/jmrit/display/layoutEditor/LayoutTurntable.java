@@ -5,12 +5,15 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.FlowLayout;
+import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
@@ -21,18 +24,22 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.Turnout;
 import jmri.util.JmriJFrame;
+import jmri.util.MathUtil;
 import jmri.util.swing.BeanSelectCreatePanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,12 +74,12 @@ import org.slf4j.LoggerFactory;
  *
  * @author Dave Duchamp Copyright (c) 2007
  */
-public class LayoutTurntable {
+public class LayoutTurntable extends LayoutTrack {
 
     // Defined text resource
     ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.display.layoutEditor.LayoutEditorBundle");
 
-    // defined constants 
+    // defined constants
     // operational instance variables (not saved between sessions)
     private LayoutTurntable instance = null;
     private LayoutEditor layoutEditor = null;
@@ -80,7 +87,6 @@ public class LayoutTurntable {
     private boolean dccControlledTurnTable = false;
 
     // persistent instance variables (saved between sessions)
-    private String ident = "";
     private double radius = 25.0;
     private Point2D center = new Point2D.Double(50.0, 50.0);
     private ArrayList<RayTrack> rayList = new ArrayList<RayTrack>(); // list of Ray Track objects.
@@ -97,12 +103,15 @@ public class LayoutTurntable {
         radius = 25.0;
     }
 
+    // this should only be used for debugging…
+    public String toString() {
+        return "LayoutTurntable " + ident;
+    }
+
+
     /**
      * Accessor methods
      */
-    public String getID() {
-        return ident;
-    }
 
     public Point2D getCoordsCenter() {
         return center;
@@ -312,6 +321,35 @@ public class LayoutTurntable {
     }
 
     /**
+     * return the coordinates for a specified connection type
+     * @param connectionType the connection type
+     * @return the coordinates for the specified connection type
+     */
+    public Point2D getCoordsForConnectionType(int connectionType) {
+        Point2D result = getCoordsCenter();
+        if (TURNTABLE_CENTER == connectionType) {
+            // nothing to do here… move along…
+            // (results are already correct)
+        } else if (connectionType >= TURNTABLE_RAY_OFFSET) {
+            result = getRayCoordsIndexed(connectionType - TURNTABLE_RAY_OFFSET);
+        } else {
+            log.error("Invalid connection type " + connectionType); //I18IN
+        }
+        return result;
+    }
+
+    public Object getConnection(int connection) throws jmri.JmriException {
+        Point2D result = null;
+        if (connection >= TURNTABLE_RAY_OFFSET) {
+            result = getRayCoordsIndexed(connection - TURNTABLE_RAY_OFFSET);
+        } else {
+            log.error("Invalid Turntable connection type " + connection); //I18IN
+            throw new jmri.JmriException("Invalid Point");
+        }
+        return result;
+    }
+
+    /**
      * Methods to test if ray is a mainline track or not Returns true if
      * connecting track segment is mainline Defaults to not mainline if
      * connecting track segment is missing
@@ -363,6 +401,36 @@ public class LayoutTurntable {
     }
 
     /**
+     * return the connection type for a point
+     * @param p the point
+     * @param useRectangles use hit rectangle (false: use hit circles)
+     * @param requireUnconnected (only hit disconnected connections)
+     * @return value representing the point connection type
+     * @since 7.4.?
+     */
+    public int hitTestPoint(Point2D p, boolean useRectangles, boolean requireUnconnected) {
+        int result = NONE;  // assume point not on connection
+
+        Rectangle2D r = layoutEditor.trackControlCircleRectAt(p);
+
+        if (!requireUnconnected) {
+            //check the center point
+            if (r.contains(getCoordsCenter())) {
+                result = LayoutTrack.TURNTABLE_CENTER;
+            }
+        }
+
+        for (int k = 0; k < getNumberRays(); k++) {
+            if (!requireUnconnected || (getRayConnectOrdered(k) == null)) {
+                if (r.contains(getRayCoordsOrdered(k))) {
+                    result = LayoutTrack.TURNTABLE_RAY_OFFSET + getRayIndex(k);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
      * Initialization method The name of each track segment connected to a ray
      * track is initialized by by LayoutTurntableXml, then the following method
      * is called after the entire LayoutEditor is loaded to set the specific
@@ -394,24 +462,17 @@ public class LayoutTurntable {
         } else {
             popup = new JPopupMenu();
         }
-        popup.add(rb.getString("Turntable"));
+        JMenuItem jmi = popup.add(rb.getString("Turntable"));
+        jmi.setEnabled(false);
         popup.add(new JSeparator(JSeparator.HORIZONTAL));
         popup.add(new AbstractAction(Bundle.getMessage("ButtonEdit")) {
-            /**
-             *
-             */
-            private static final long serialVersionUID = 3697868897248094986L;
-
+            @Override
             public void actionPerformed(ActionEvent e) {
                 editTurntable(instance);
             }
         });
         popup.add(new AbstractAction(Bundle.getMessage("ButtonDelete")) {
-            /**
-             *
-             */
-            private static final long serialVersionUID = -5542663629950241682L;
-
+            @Override
             public void actionPerformed(ActionEvent e) {
                 if (layoutEditor.removeTurntable(instance)) {
                     // Returned true if user did not cancel
@@ -443,9 +504,11 @@ public class LayoutTurntable {
             //log.error("Attempt to set the position on a non-existant ray track");
             return;
         }
-        rayPopup.add("Turntable Ray " + index);
+        JMenuItem jmi = rayPopup.add("Turntable Ray " + index);
+        jmi.setEnabled(false);
         if (ray.getTurnout() != null) {
-            rayPopup.add(ray.getTurnout().getDisplayName() + " (" + ray.getTurnoutState() + ")");
+            jmi = rayPopup.add(ray.getTurnout().getDisplayName() + " (" + ray.getTurnoutState() + ")");
+            jmi.setEnabled(false);
         }
         rayPopup.show(e.getComponent(), e.getX(), e.getY());
     }
@@ -532,41 +595,41 @@ public class LayoutTurntable {
             panel3.setLayout(new FlowLayout());
             panel3.add(addRayTrack = new JButton(rb.getString("AddRayTrack")));
             addRayTrack.setToolTipText(rb.getString("AddRayTrackHint"));
-            addRayTrack.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    addRayTrackPressed(e);
-                    updateRayPanel();
-                }
+            addRayTrack.addActionListener((ActionEvent e) -> {
+                addRayTrackPressed(e);
+                updateRayPanel();
             });
 
             panel3.add(dccControlled = new JCheckBox(rb.getString("TurntableDCCControlled")));
             dccControlled.setSelected(isTurnoutControlled());
-            dccControlled.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    setTurnoutControlled(dccControlled.isSelected());
-                    for (RayTrack ray : rayList) {
-                        ray.showTurnoutDetails();
-                    }
-                    editTurntableFrame.pack();
+            dccControlled.addActionListener((ActionEvent e) -> {
+                setTurnoutControlled(dccControlled.isSelected());
+                for (RayTrack ray : rayList) {
+                    ray.showTurnoutDetails();
                 }
+                editTurntableFrame.pack();
             });
             headerPane.add(panel3);
             // set up Done and Cancel buttons
             JPanel panel5 = new JPanel();
             panel5.setLayout(new FlowLayout());
             panel5.add(turntableEditDone = new JButton(Bundle.getMessage("ButtonDone")));
-            turntableEditDone.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    turntableEditDonePressed(e);
-                }
+            turntableEditDone.addActionListener((ActionEvent e) -> {
+                turntableEditDonePressed(e);
             });
+
+            // make this button the default button (return or enter activates)
+            // Note: We have to invoke this later because we don't currently have a root pane
+            SwingUtilities.invokeLater(() -> {
+                JRootPane rootPane = SwingUtilities.getRootPane(turntableEditDone);
+                rootPane.setDefaultButton(turntableEditDone);
+            });
+
             turntableEditDone.setToolTipText(Bundle.getMessage("DoneHint", Bundle.getMessage("ButtonDone")));
             // Cancel
             panel5.add(turntableEditCancel = new JButton(Bundle.getMessage("ButtonCancel")));
-            turntableEditCancel.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    turntableEditCancelPressed(e);
-                }
+            turntableEditCancel.addActionListener((ActionEvent e) -> {
+                turntableEditCancelPressed(e);
             });
             turntableEditCancel.setToolTipText(Bundle.getMessage("CancelHint", Bundle.getMessage("ButtonCancel")));
             footerPane.add(panel5);
@@ -586,6 +649,7 @@ public class LayoutTurntable {
         oldRadius = radiusField.getText();
         angleField.setText("0");
         editTurntableFrame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
                 turntableEditCancelPressed(null);
             }
@@ -646,7 +710,7 @@ public class LayoutTurntable {
         RayTrack closest = null;
         double bestDel = 360.0;
         for (int i = 0; i < rayList.size(); i++) {
-            double del = diffAngle((rayList.get(i)).getAngle(), ang);
+            double del = MathUtil.diffAngle(rayList.get(i).getAngle(), ang);
             if (del < bestDel) {
                 bestDel = del;
                 closest = rayList.get(i);
@@ -695,7 +759,7 @@ public class LayoutTurntable {
             radius = rad;
             needsRedraw = true;
         }
-        // clean up	
+        // clean up
         editOpen = false;
         editTurntableFrame.setVisible(false);
         editTurntableFrame.dispose();
@@ -752,7 +816,7 @@ public class LayoutTurntable {
     class RayTrack {
 
         public RayTrack(double angle, int index) {
-            rayAngle = normalizeAngle(angle);
+            rayAngle = MathUtil.normalizeAngle(angle);
             connect = null;
             connectionIndex = index;
         }
@@ -776,7 +840,7 @@ public class LayoutTurntable {
         }
 
         public void setAngle(double an) {
-            rayAngle = normalizeAngle(an);
+            rayAngle = MathUtil.normalizeAngle(an);
         }
 
         public int getConnectionIndex() {
@@ -786,35 +850,6 @@ public class LayoutTurntable {
         // initialization instance variable (used when loading a LayoutEditor)
         public String connectName = "";
 
-        public double normalizeAngle(double a) {
-            double angle = a;
-            while (angle < 0.0) {
-                angle += 360.0;
-            }
-            while (angle >= 360.0) {
-                angle -= 360.0;
-            }
-            return angle;
-        }
-
-        public double diffAngle(double a, double b) {
-            double anA = normalizeAngle(a);
-            double anB = normalizeAngle(b);
-            if (anA >= anB) {
-                if ((anA - anB) <= 180.0) {
-                    return (anA - anB);
-                } else {
-                    return (anB + 360.0 - anA);
-                }
-            } else {
-                if ((anB - anA) <= 180.0) {
-                    return (anB - anA);
-                } else {
-                    return (anA + 360.0 - anB);
-                }
-            }
-        }
-
         NamedBeanHandle<Turnout> namedTurnout;
         //Turnout t;
         int turnoutState;
@@ -823,13 +858,11 @@ public class LayoutTurntable {
         public void setTurnout(String turnoutName, int state) {
             Turnout turnout = null;
             if (mTurnoutListener == null) {
-                mTurnoutListener = new java.beans.PropertyChangeListener() {
-                    public void propertyChange(java.beans.PropertyChangeEvent e) {
-                        if (getTurnout().getKnownState() == turnoutState) {
-                            lastKnownIndex = connectionIndex;
-                            layoutEditor.redrawPanel();
-                            layoutEditor.setDirty();
-                        }
+                mTurnoutListener = (java.beans.PropertyChangeEvent e) -> {
+                    if (getTurnout().getKnownState() == turnoutState) {
+                        lastKnownIndex = connectionIndex;
+                        layoutEditor.redrawPanel();
+                        layoutEditor.setDirty();
                     }
                 };
             }
@@ -898,20 +931,22 @@ public class LayoutTurntable {
                 top.add(angle = new JTextField(5));
                 angle.addFocusListener(
                         new FocusListener() {
-                            public void focusGained(FocusEvent e) {
-                            }
+                    @Override
+                    public void focusGained(FocusEvent e) {
+                    }
 
-                            public void focusLost(FocusEvent e) {
-                                try {
-                                    Float.parseFloat(angle.getText());
-                                } catch (Exception ex) {
-                                    JOptionPane.showMessageDialog(editTurntableFrame, rb.getString("EntryError") + ": "
-                                            + ex + rb.getString("TryAgain"), Bundle.getMessage("ErrorTitle"),
-                                            JOptionPane.ERROR_MESSAGE);
-                                    return;
-                                }
-                            }
+                    @Override
+                    public void focusLost(FocusEvent e) {
+                        try {
+                            Float.parseFloat(angle.getText());
+                        } catch (Exception ex) {
+                            JOptionPane.showMessageDialog(editTurntableFrame, rb.getString("EntryError") + ": "
+                                    + ex + rb.getString("TryAgain"), Bundle.getMessage("ErrorTitle"),
+                                    JOptionPane.ERROR_MESSAGE);
+                            return;
                         }
+                    }
+                }
                 );
                 panel = new JPanel();
                 panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
@@ -940,11 +975,9 @@ public class LayoutTurntable {
                 JButton deleteRayButton;
                 top.add(deleteRayButton = new JButton(Bundle.getMessage("ButtonDelete")));
                 deleteRayButton.setToolTipText(rb.getString("DeleteRayTrack"));
-                deleteRayButton.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent e) {
-                        delete();
-                        updateRayPanel();
-                    }
+                deleteRayButton.addActionListener((ActionEvent e) -> {
+                    delete();
+                    updateRayPanel();
                 });
                 border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.black));
 
@@ -1006,32 +1039,39 @@ public class LayoutTurntable {
         }
     }
 
-    public double normalizeAngle(double a) {
-        double angle = a;
-        while (angle < 0.0) {
-            angle += 360.0;
-        }
-        while (angle >= 360.0) {
-            angle -= 360.0;
-        }
-        return angle;
-    }
-
-    public double diffAngle(double a, double b) {
-        double anA = normalizeAngle(a);
-        double anB = normalizeAngle(b);
-        if (anA >= anB) {
-            if ((anA - anB) <= 180.0) {
-                return (anA - anB);
+    private void draw(Graphics2D g2) {
+        // drawHidden turntable circle - default track color, side track width
+        layoutEditor.setTrackStrokeWidth(g2, false);
+        double r = getRadius();
+        g2.setColor(defaultTrackColor);
+        g2.draw(new Ellipse2D.Double(
+                center.getX() - r, center.getY() - r, r + r, r + r));
+        // drawHidden ray tracks
+        for (int j = 0; j < getNumberRays(); j++) {
+            Point2D pt = getRayCoordsOrdered(j);
+            TrackSegment t = getRayConnectOrdered(j);
+            if (t != null) {
+                layoutEditor.setTrackStrokeWidth(g2, t.getMainline());
+                LayoutBlock b = t.getLayoutBlock();
+                if (b != null) {
+                    g2.setColor(b.getBlockColor());
+                } else {
+                    g2.setColor(defaultTrackColor);
+                }
             } else {
-                return (anB + 360.0 - anA);
+                layoutEditor.setTrackStrokeWidth(g2, false);
+                g2.setColor(defaultTrackColor);
             }
-        } else {
-            if ((anB - anA) <= 180.0) {
-                return (anB - anA);
-            } else {
-                return (anA + 360.0 - anB);
-            }
+            g2.draw(new Line2D.Double(new Point2D.Double(
+                    pt.getX() - ((pt.getX() - center.getX()) * 0.2),
+                    pt.getY() - ((pt.getY() - center.getY()) * 0.2)), pt));
+        }
+        if (isTurnoutControlled() && getPosition() != -1) {
+            Point2D pt = getRayCoordsIndexed(getPosition());
+            g2.draw(new Line2D.Double(new Point2D.Double(
+                    pt.getX() - ((pt.getX() - center.getX()) * 1.8/* 2 */),
+                    pt.getY() - ((pt.getY() - center.getY()) * 1.8/* * * 2 */
+                    )), pt));
         }
     }
 

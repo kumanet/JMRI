@@ -35,7 +35,7 @@ import jmri.util.swing.SwingSettings;
  * <P>
  * Provides GUI configuration for SWING LAF by displaying radio buttons for each
  * LAF implementation available. This information is then persisted separately
- * (e.g. by {@link apps.configurexml.GuiLafConfigPaneXml})
+ * by {@link apps.configurexml.GuiLafConfigPaneXml}
  * <P>
  * Locale default language and country is also considered a GUI (and perhaps
  * LAF) configuration item.
@@ -67,9 +67,8 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
     private final HashMap<String, Locale> locale = new HashMap<>();
     private final ButtonGroup LAFGroup = new ButtonGroup();
     public JCheckBox mouseEvent;
-    private boolean dirty = false;
-    private boolean restartRequired = false;
     private JComboBox<Integer> fontSizeComboBox;
+    public JCheckBox graphicStateDisplay;
 
     public GuiLafConfigPane() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -79,6 +78,8 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         doFontSize(p = new JPanel());
         add(p);
         doClickSelection(p = new JPanel());
+        add(p);
+        doGraphicState(p = new JPanel());
         add(p);
         doToolTipDismissDelay(p = new JPanel());
         add(p);
@@ -90,10 +91,18 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         mouseEvent.setSelected(SwingSettings.getNonStandardMouseEvent());
         mouseEvent.addItemListener((ItemEvent e) -> {
             InstanceManager.getDefault(GuiLafPreferencesManager.class).setNonStandardMouseEvent(mouseEvent.isSelected());
-            this.dirty = true;
-            this.restartRequired = true;
         });
         panel.add(mouseEvent);
+    }
+
+    void doGraphicState(JPanel panel) {
+        panel.setLayout(new FlowLayout());
+        graphicStateDisplay = new JCheckBox(ConfigBundle.getMessage("GUIGraphicTableState"));
+        graphicStateDisplay.setSelected(InstanceManager.getDefault(GuiLafPreferencesManager.class).isGraphicTableState());
+        graphicStateDisplay.addItemListener((ItemEvent e) -> {
+            InstanceManager.getDefault(GuiLafPreferencesManager.class).setGraphicTableState(graphicStateDisplay.isSelected());
+        });
+        panel.add(graphicStateDisplay);
     }
 
     void doLAF(JPanel panel) {
@@ -112,8 +121,6 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
             jmi.setActionCommand(name);
             jmi.addActionListener((ActionEvent e) -> {
                 InstanceManager.getDefault(GuiLafPreferencesManager.class).setLookAndFeel(name);
-                this.dirty = true;
-                this.restartRequired = true;
             });
             if (installedLAFs.get(name).equals(UIManager.getLookAndFeel().getClass().getName())) {
                 jmi.setSelected(true);
@@ -195,8 +202,6 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
 
         fontSizeComboBox.addActionListener((ActionEvent e) -> {
             manager.setFontSize((int) fontSizeComboBox.getSelectedItem());
-            this.dirty = true;
-            this.restartRequired = true;
         });
         resetButton.addActionListener((ActionEvent e) -> {
             if ((int) fontSizeComboBox.getSelectedItem() != manager.getDefaultFontSize()) {
@@ -213,7 +218,6 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         toolTipDismissDelaySpinner = new JSpinner(new SpinnerNumberModel(manager.getToolTipDismissDelay() / 1000, MIN_TOOLTIP_TIME, MAX_TOOLTIP_TIME, 1));
         this.toolTipDismissDelaySpinner.addChangeListener((ChangeEvent e) -> {
             manager.setToolTipDismissDelay((int) toolTipDismissDelaySpinner.getValue() * 1000); // convert to milliseconds from seconds
-            this.dirty = true;
         });
         this.toolTipDismissDelaySpinner.setToolTipText(MessageFormat.format(ConfigBundle.getMessage("GUIToolTipDismissDelayToolTip"), MIN_TOOLTIP_TIME, MAX_TOOLTIP_TIME));
         toolTipDismissDelayLabel.setToolTipText(this.toolTipDismissDelaySpinner.getToolTipText());
@@ -228,6 +232,7 @@ public class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         return LAFGroup.getSelection().getActionCommand();
 
     }
+
     @Override
     public String getPreferencesItem() {
         return "DISPLAY"; // NOI18N

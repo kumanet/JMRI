@@ -1,4 +1,3 @@
-// TrainsEditFrame.java
 package jmri.jmrit.operations.trains;
 
 import java.awt.Color;
@@ -85,7 +84,7 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
     JLabel textEngine = new JLabel(Bundle.getMessage("Engines"));
 
     // major buttons
-    JButton editButton = new JButton(Bundle.getMessage("ButtonEdit"));	// edit route
+    JButton editButton = new JButton(Bundle.getMessage("ButtonEdit")); // edit route
     JButton clearButton = new JButton(Bundle.getMessage("ClearAll"));
     JButton setButton = new JButton(Bundle.getMessage("SelectAll"));
     JButton resetButton = new JButton(Bundle.getMessage("ResetTrain"));
@@ -192,7 +191,7 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
         }
         hourBox.setMinimumSize(new Dimension(100, 25));
 
-        for (int i = 0; i < 60; i += 5) {
+        for (int i = 0; i < 60; i += 1) {
             if (i < 10) {
                 minuteBox.addItem("0" + Integer.toString(i));
             } else {
@@ -371,6 +370,7 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
         if (_train != null) {
             toolMenu.add(new TrainConductorAction(Bundle.getMessage("TitleTrainConductor"), _train));
         }
+        toolMenu.addSeparator();
         toolMenu.add(new PrintTrainAction(Bundle.getMessage("MenuItemPrint"), new Frame(), false, this));
         toolMenu.add(new PrintTrainAction(Bundle.getMessage("MenuItemPreview"), new Frame(), true, this));
         toolMenu.add(new PrintTrainManifestAction(Bundle.getMessage("MenuItemPrintManifest"), false, this));
@@ -721,6 +721,16 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
         if (b.isSelected()) {
             _train.deleteTrainSkipsLocation(id);
         } else {
+            // check to see if skipped location is staging
+            if (_train.getRoute().getLocationById(id).getLocation().isStaging()) {
+                int result = JOptionPane.showConfirmDialog(this, MessageFormat.format(Bundle.getMessage("TrainRouteStaging"),
+                        new Object[]{_train.getName(), _train.getRoute().getLocationById(id).getName()}),
+                        Bundle.getMessage("TrainRouteNotStaging"), JOptionPane.OK_CANCEL_OPTION);
+                if (result == JOptionPane.CANCEL_OPTION) {
+                    b.setSelected(true);
+                    return; // don't skip staging
+                }
+            }
             _train.addTrainSkipsLocation(id);
         }
     }
@@ -744,7 +754,7 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
     }
 
     private void loadCarTypes() {
-        int numberOfCheckboxes = getNumberOfCheckboxesPerLine();	// number per line
+        int numberOfCheckboxes = getNumberOfCheckboxesPerLine(); // number per line
         int x = 0;
         int y = 1; // vertical position in panel
         for (String type : CarTypes.instance().getNames()) {
@@ -782,7 +792,7 @@ public class TrainEditFrame extends OperationsFrame implements java.beans.Proper
     }
 
     private void loadEngineTypes() {
-        int numberOfCheckboxes = getNumberOfCheckboxesPerLine();	// number per line
+        int numberOfCheckboxes = getNumberOfCheckboxesPerLine(); // number per line
         int x = 0;
         int y = 1;
         for (String type : EngineTypes.instance().getNames()) {
