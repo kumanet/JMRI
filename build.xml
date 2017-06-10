@@ -158,8 +158,7 @@
          packages. Does not include JMRI itself.
     -->
     <path id="runtime.class.path">
-        <pathelement location="${libdir}/RXTXcomm.jar"/>
-        <pathelement location="${libdir}/Serialio.jar"/>
+        <pathelement location="${libdir}/purejavacomm-1.0.1.jar"/>
         <pathelement location="${libdir}/ch.ntb.usb.jar"/>
         <pathelement location="${libdir}/xercesImpl.jar"/>
         <pathelement location="${libdir}/gluegen-rt.jar"/>
@@ -260,7 +259,10 @@
         <pathelement location="${target}/"/>  <!-- after declared jars to check for name collisions -->
         <pathelement location="${testtarget}"/> <!-- test resources in classpath that collide with stock resources -->
     </path>
-
+    
+    <!-- PureJavaComm default log level - override in local.properties or Ant command line -->
+    <property name="purejavacomm.loglevel" value="0"/>
+    
     <macrodef name="quiet">
         <element name="body" implicit="yes"/>
         <sequential>
@@ -548,6 +550,7 @@
                    debug="${java.debugging}">
                 <classpath refid="@{javac.classpath}"/>
                 <compilerarg value="-Xlint:-unchecked"/>  <!-- off during 1.8 migration -->
+                <compilerarg value="-Xmaxerrs"/><compilerarg value="1000"/><!-- change from default 100 errors -->
             </javac>
         </sequential>
     </macrodef>
@@ -589,7 +592,6 @@
             <compilerarg value="-Xmaxwarns"/><compilerarg value="2000"/><!-- change from default 100 warnings -->
         </javac>
     </target>
-
 
     <!-- Note if modifying the debug target, please be sure to up date the -->
     <!-- NetBeans IDE debug target in nbproject/ide-targets.xml -->
@@ -831,6 +833,7 @@
                          path=".:${arch.lib.path}:${libdir}"/>
             <sysproperty key="jinput.plugins"
                          path="net.bobis.jinput.hidraw.HidRawEnvironmentPlugin"/>
+            <sysproperty key="purejavacomm.loglevel" value="${purejavacomm.loglevel}"/>
             <jvmarg value="-Xms256m"/>
             <jvmarg value="-Xmx640m"/>
             <!-- <jvmarg value="-verbose"/> -->
@@ -862,6 +865,7 @@
                          path=".:${arch.lib.path}:${libdir}"/>
             <sysproperty key="jinput.plugins"
                          path="net.bobis.jinput.hidraw.HidRawEnvironmentPlugin"/>
+            <sysproperty key="purejavacomm.loglevel" value="${purejavacomm.loglevel}"/>
 
             <jvmarg value="-Xdebug"/>
             <jvmarg value="-Xrunjdwp:transport=dt_socket,server=${jdpa.server},suspend=${jdpa.suspend},address=${jpda.address}"/>
@@ -1571,7 +1575,7 @@
             </packageset>
             <arg value="-Xdoclint:all,-missing"/><!-- remove -missing to get warnings about missing javadoc tags -->
             <arg value="-Xmaxwarns"/>
-            <arg value="2375"/><!-- change from default 100 warnings -->
+            <arg value="2350"/><!-- change from default 100 warnings -->
             <arg value="-quiet"/>
             <arg value="-splitindex"/>
             <!-- disable output of custom @navassoc tag - used for UML image generation -->
@@ -1638,7 +1642,7 @@
             </packageset>
             <arg value="-Xdoclint:all"/><!-- remove -missing to get warnings about missing javadoc tags -->
             <arg value="-Xmaxwarns"/>
-            <arg value="2375"/><!-- change from default 100 warnings -->
+            <arg value="2350"/><!-- change from default 100 warnings -->
             <arg value="-quiet"/>
             <arg value="-splitindex"/>
             <!-- disable output of custom @navassoc tag - used for UML image generation -->
