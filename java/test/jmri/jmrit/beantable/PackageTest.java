@@ -27,6 +27,7 @@ public class PackageTest extends TestCase {
     public static Test suite() {
         TestSuite suite = new TestSuite(PackageTest.class.getName());
         suite.addTest(new JUnit4TestAdapter(BlockTableActionTest.class));
+        suite.addTest(LightTableWindowTest.suite());
         suite.addTest(LogixTableActionTest.suite());
         suite.addTest(LRouteTableActionTest.suite());
         suite.addTest(OBlockTableActionTest.suite());
@@ -64,6 +65,8 @@ public class PackageTest extends TestCase {
         suite.addTest(new JUnit4TestAdapter(TurnoutTableActionTest.class));
         suite.addTest(new JUnit4TestAdapter(TurnoutTableTabActionTest.class));
         suite.addTest(new JUnit4TestAdapter(SetPhysicalLocationActionTest.class));
+        suite.addTest(new JUnit4TestAdapter(AudioTablePanelTest.class));
+        suite.addTest(new JUnit4TestAdapter(AudioTableFrameTest.class));
         return suite;
     }
 

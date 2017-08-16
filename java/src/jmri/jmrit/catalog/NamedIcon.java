@@ -336,8 +336,8 @@ public class NamedIcon extends ImageIcon {
                 RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION,
                 RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+//         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,   // Turned off due to poor performance, see Issue #3850 and PR #3855 for background
+//                 RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g2d.drawImage(getImage(), t, comp);
         setImage(bufIm);
         g2d.dispose();
@@ -398,7 +398,7 @@ public class NamedIcon extends ImageIcon {
         int heigth = (int) Math.ceil(Math.abs(h * Math.cos(rad)) + Math.abs(w * Math.sin(rad)));
         AffineTransform t;
         if (false) {
-            //TODO: Test to see if the "else" case is necessary…
+            // TODO: Test to see if the "else" case is necessary
             t = AffineTransform.getTranslateInstance(
                 h * Math.sin(rad) - w * Math.cos(rad),
                 -w * Math.sin(rad) - h * Math.cos(rad));
