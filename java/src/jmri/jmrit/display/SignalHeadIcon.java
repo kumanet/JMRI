@@ -87,7 +87,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
      * @param pName Used as a system/user name to lookup the SignalHead object
      */
     public void setSignalHead(String pName) {
-        SignalHead mHead = (SignalHead) InstanceManager.getDefault(jmri.SignalHeadManager.class).getNamedBean(pName);
+        SignalHead mHead = InstanceManager.getDefault(jmri.SignalHeadManager.class).getNamedBean(pName);
         if (mHead == null) {
             log.warn("did not find a SignalHead named " + pName);
         } else {
@@ -645,5 +645,5 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SignalHeadIcon.class.getName());
+    private final static Logger log = LoggerFactory.getLogger(SignalHeadIcon.class);
 }
