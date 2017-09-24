@@ -590,6 +590,7 @@ public class LightTableAction extends AbstractTableAction {
             hardwareAddressTextField.setText(""); // reset from possible previous use
             hardwareAddressTextField.setBackground(Color.white); // reset after possible error notification
             hardwareAddressTextField.setToolTipText(Bundle.getMessage("LightHardwareAddressHint"));
+            hardwareAddressTextField.setName("hwAddressTextField"); // for GUI test NOI18N
             // tooltip and entry mask for sysNameTextField will be assigned later by prefixChanged()
             panel1a.add(labelNumToAdd);
             panel1a.add(numberToAdd);
@@ -601,9 +602,8 @@ public class LightTableAction extends AbstractTableAction {
             panel2.add(userName);
             userName.setText(""); // reset from possible previous use
             userName.setToolTipText(Bundle.getMessage("LightUserNameHint"));
-            hardwareAddressTextField.setName("hwAddressTextField"); // for jfcUnit test NOI18N
-            userName.setName("userName"); // for jfcUnit test NOI18N
-            prefixBox.setName("prefixBox"); // for jfcUnit test NOI18N
+            userName.setName("userName"); // for GUI test NOI18N
+            prefixBox.setName("prefixBox"); // for GUI test NOI18N
             contentPane.add(panel2);
             // items for variable intensity lights
             varPanel = new JPanel();
@@ -742,7 +742,7 @@ public class LightTableAction extends AbstractTableAction {
         jmri.UserPreferencesManager p = jmri.InstanceManager.getDefault(jmri.UserPreferencesManager.class);
         if (jmri.InstanceManager.getDefault(LightManager.class) instanceof jmri.managers.AbstractProxyManager) {
             jmri.managers.ProxyLightManager proxy = (jmri.managers.ProxyLightManager) jmri.InstanceManager.getDefault(LightManager.class);
-            List<Manager> managerList = proxy.getManagerList();
+            List<Manager<Light>> managerList = proxy.getManagerList();
             for (int i = 0; i < managerList.size(); i++) {
                 String manuName = ConnectionNameFromSystemName.getConnectionName(managerList.get(i).getSystemPrefix());
                 prefixBox.addItem(manuName);
@@ -783,7 +783,7 @@ public class LightTableAction extends AbstractTableAction {
         // get tooltip from ProxyLightManager
         if (lightManager.getClass().getName().contains("ProxyLightManager")) {
             jmri.managers.ProxyLightManager proxy = (jmri.managers.ProxyLightManager) lightManager;
-            List<Manager> managerList = proxy.getManagerList();
+            List<Manager<Light>> managerList = proxy.getManagerList();
             String systemPrefix = ConnectionNameFromSystemName.getPrefixFromName(connectionChoice);
             for (int x = 0; x < managerList.size(); x++) {
                 jmri.LightManager mgr = (jmri.LightManager) managerList.get(x);
@@ -822,6 +822,9 @@ public class LightTableAction extends AbstractTableAction {
         }
     }
 
+    /**
+     * Activate Add a range option if manager accepts adding more than 1 Light.
+     */
     private boolean canAddRange() {
         String testSysName = ConnectionNameFromSystemName.getPrefixFromName((String) prefixBox.getSelectedItem()) + "L11";
         return InstanceManager.getDefault(LightManager.class).allowMultipleAdditions(testSysName);
@@ -2307,7 +2310,8 @@ public class LightTableAction extends AbstractTableAction {
             } else if ((allow0Length == true) && (value.length() == 0)) {
                 return true;
             } else {
-                return InstanceManager.getDefault(LightManager.class).validSystemNameFormat(prefix + "L" + value); // get prefixSelectedItem
+                return true; // TODO temporarily disabled checking format while adding user feedbac
+                // return InstanceManager.getDefault(LightManager.class).validSystemNameFormat(prefix + "L" + value); // get prefixSelectedItem
             }
         }
 
