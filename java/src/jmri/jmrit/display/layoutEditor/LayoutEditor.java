@@ -41,6 +41,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -187,12 +188,6 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     private JPanel helpBarPanel = null;
     private JPanel helpBar = new JPanel();
 
-    protected boolean skipIncludedTurnout = false;
-
-    //TODO: @deprecated // now private; use public getLEAuxTools() accessor instead
-    private transient LayoutEditorAuxTools auxTools = null;
-    private transient ConnectivityUtil conTools = null;
-
     private transient Font toolBarFont = null;
 
     private transient ButtonGroup itemGroup = null;
@@ -309,6 +304,8 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     private transient JRadioButtonMenuItem zoom40Item = new JRadioButtonMenuItem("x 4.0");
     private transient JRadioButtonMenuItem zoom50Item = new JRadioButtonMenuItem("x 5.0");
     private transient JRadioButtonMenuItem zoom60Item = new JRadioButtonMenuItem("x 6.0");
+    private transient JRadioButtonMenuItem zoom70Item = new JRadioButtonMenuItem("x 7.0");
+    private transient JRadioButtonMenuItem zoom80Item = new JRadioButtonMenuItem("x 8.0");
 
     private transient JPanel locationPanel = new JPanel();
 
@@ -558,7 +555,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     private boolean savedShowHelpBar = true;
 
     //zoom
-    private double maxZoom = 6.0;
+    private double maxZoom = 8.0;
     private double minZoom = 0.25;
 
     //Special sub group for color treatment when active
@@ -932,7 +929,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             }
         });
 
-        setupComboBox(blockSensorComboBox, true, true);
+        setupComboBox(blockSensorComboBox, false, true);
         blockSensorComboBox.setToolTipText(Bundle.getMessage("OccupancySensorToolTip"));
 
         //third row of edit tool bar items
@@ -1182,8 +1179,23 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
                             panelWidth, panelHeight, true);
                 }
             }); //InstanceManager.getOptionalDefault(UserPreferencesManager.class).ifPresent((prefsMgr)
+
+            // make sure that the layoutEditorComponent is in the _targetPanel components
+            List componentList = Arrays.asList(_targetPanel.getComponents());
+            if (!componentList.contains((Component) layoutEditorComponent)) {
+                try {
+                    Component c = (Component) layoutEditorComponent;
+                    _targetPanel.remove(c);
+                    _targetPanel.add(c, Integer.valueOf(3));
+                    _targetPanel.moveToFront(c);
+                } catch (Exception e) {
+                    log.warn("paintTargetPanelBefore: Exception {}", e);
+                }
+            }
         });
     } //LayoutEditor (constructor)
+
+    private LayoutEditorComponent layoutEditorComponent = new LayoutEditorComponent(this);
 
     private void createFloatingEditToolBox() {
         if (floatingEditToolBox == null) {
@@ -1194,7 +1206,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
 
             if (isEditable() && floatingEditToolBox == null) {
                 //Create the window and add the toolbox content
-                floatingEditToolBox = new JmriJFrame(Bundle.getMessage("ToolBox", layoutName));
+                floatingEditToolBox = new JmriJFrame(Bundle.getMessage("ToolBox", getLayoutName()));
                 floatingEditToolBox.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
                 floatingEditToolBox.setContentPane(floatingEditContent);
                 floatingEditToolBox.pack();
@@ -2130,8 +2142,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         }
     } //initStringsToVTCodes
 
-    private transient LayoutEditorTools tools = null;
-    private AddEntryExitPairAction entryExit = null;
+    private transient AddEntryExitPairAction entryExit = null;
 
     protected void setupToolsMenu(@Nonnull JMenuBar menuBar) {
         JMenu toolsMenu = new JMenu(Bundle.getMessage("MenuTools"));
@@ -2176,9 +2187,9 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         skipTurnoutCheckBoxMenuItem = new JCheckBoxMenuItem(Bundle.getMessage("SkipInternalTurnout"));
         toolsMenu.add(skipTurnoutCheckBoxMenuItem);
         skipTurnoutCheckBoxMenuItem.addActionListener((ActionEvent event) -> {
-            skipIncludedTurnout = skipTurnoutCheckBoxMenuItem.isSelected();
+            setIncludedTurnoutSkipped(skipTurnoutCheckBoxMenuItem.isSelected());
         });
-        skipTurnoutCheckBoxMenuItem.setSelected(skipIncludedTurnout);
+        skipTurnoutCheckBoxMenuItem.setSelected(isIncludedTurnoutSkipped());
 
         //set signals at turnout
         JMenuItem turnoutItem = new JMenuItem(Bundle.getMessage("SignalsAtTurnout") + "...");
@@ -2707,16 +2718,16 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             String newName = (String) JOptionPane.showInputDialog(getTargetFrame(),
                     Bundle.getMessage("MakeLabel", Bundle.getMessage("EnterTitle")),
                     Bundle.getMessage("EditTitleMessageTitle"),
-                    JOptionPane.PLAIN_MESSAGE, null, null, layoutName);
+                    JOptionPane.PLAIN_MESSAGE, null, null, getLayoutName());
 
             if (newName != null) {
-                if (!newName.equals(layoutName)) {
+                if (!newName.equals(getLayoutName())) {
                     if (InstanceManager.getDefault(PanelMenu.class).isPanelNameUsed(newName)) {
                         JOptionPane.showMessageDialog(null, Bundle.getMessage("CanNotRename"), Bundle.getMessage("PanelExist"),
                                 JOptionPane.ERROR_MESSAGE);
                     } else {
                         setTitle(newName);
-                        layoutName = newName;
+                        setLayoutName(newName);
                         InstanceManager.getDefault(PanelMenu.class).renameEditorPanel(LayoutEditor.this);
                         setDirty();
 
@@ -3278,6 +3289,18 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         });
         zoomButtonGroup.add(zoom60Item);
 
+        zoomMenu.add(zoom70Item);
+        zoom70Item.addActionListener((ActionEvent event) -> {
+            setZoom(7.0);
+        });
+        zoomButtonGroup.add(zoom70Item);
+
+        zoomMenu.add(zoom80Item);
+        zoom80Item.addActionListener((ActionEvent event) -> {
+            setZoom(8.0);
+        });
+        zoomButtonGroup.add(zoom80Item);
+
         //note: because this LayoutEditor object was just instantiated its
         //zoom attribute is 1.0; if it's being instantiated from an XML file
         //that has a zoom attribute for this object then setZoom will be
@@ -3439,6 +3462,8 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         zoom40Item.setSelected(newZoomFactor == 400);
         zoom50Item.setSelected(newZoomFactor == 500);
         zoom60Item.setSelected(newZoomFactor == 600);
+        zoom70Item.setSelected(newZoomFactor == 700);
+        zoom80Item.setSelected(newZoomFactor == 800);
 
         //this will put zoomFactor on 50% increments
         //(so it will more likely match one of these values)
@@ -3545,7 +3570,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         result = MathUtil.inset(result, -gridSize1st * gridSize2nd);
 
         return result;
-    } // calculateMinimumPanelBounds
+    } // calculateMinimumLayoutBounds
 
     /**
      * resize panel bounds
@@ -3672,6 +3697,19 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         });
         menuBar.add(dispMenu);
     } //setupDispatcherMenu
+
+    //
+    //
+    //
+    private boolean includedTurnoutSkipped = false;
+
+    public boolean isIncludedTurnoutSkipped() {
+        return includedTurnoutSkipped;
+    }
+
+    public void setIncludedTurnoutSkipped(Boolean boo) {
+        includedTurnoutSkipped = boo;
+    }
 
     //
     //
@@ -5083,6 +5121,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         _lastY = _anchorY;
         calcLocation(event);
 
+        //TODO: Add command-click on nothing to pan view?
         if (isEditable()) {
             boolean prevSelectionActive = selectionActive;
             selectionActive = false;
@@ -5181,11 +5220,9 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
                     beginObject = foundObject;
                     beginPointType = foundPointType;
                     beginLocation = foundLocation;
-                    //TODO: highlight all free connection points?
                     layoutEditorMode = LayoutEditorMode.EDIT_ADDING_TRACK_SEGMENT;
                 } else {
                     //TODO: auto-add anchor point?
-                    foundObject = null;
                     beginObject = null;
                 }
             } else if (!event.isShiftDown() && !event.isControlDown() && !event.isPopupTrigger()) {
@@ -5329,6 +5366,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             boolean requireUnconnected, @Nullable Object avoid) {
         boolean result = false; // assume failure (pessimist!)
 
+        foundObject = null;
         foundPointType = LayoutTrack.NONE;
         Optional<LayoutTrack> opt = layoutTrackList.stream().filter(o -> {
             LayoutTrack layoutTrack = (LayoutTrack) o;
@@ -6124,7 +6162,6 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             }
         }
         beginObject = null;
-        foundObject = null;
     } //checkPointOfPositionable
 
     // We just dropped a turnout... see if it will connect to anything
@@ -8785,12 +8822,16 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     //
     // singleton (one per-LayoutEditor) accessors
     //
+    private transient ConnectivityUtil conTools = null;
+
     public ConnectivityUtil getConnectivityUtil() {
         if (conTools == null) {
             conTools = new ConnectivityUtil(this);
         }
         return conTools;
     } //getConnectivityUtil
+
+    private transient LayoutEditorTools tools = null;
 
     public LayoutEditorTools getLETools() {
         if (tools == null) {
@@ -8799,12 +8840,23 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         return tools;
     } //getLETools
 
+    private transient LayoutEditorAuxTools auxTools = null;
+
     public LayoutEditorAuxTools getLEAuxTools() {
         if (auxTools == null) {
             auxTools = new LayoutEditorAuxTools(this);
         }
         return auxTools;
     } //getLEAuxTools
+
+    private transient LayoutTrackEditors layoutTrackEditors = null;
+
+    public LayoutTrackEditors getLayoutTrackEditors() {
+        if (layoutTrackEditors == null) {
+            layoutTrackEditors = new LayoutTrackEditors(this);
+        }
+        return layoutTrackEditors;
+    }   // getLayoutTrackEditors
 
     /**
      * Invoked by DeletePanel menu item Validate user intent before deleting
@@ -9418,7 +9470,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             lt.setObjects(this);
         }
         getLEAuxTools().initializeBlockConnectivity();
-        log.debug("Initializing Block Connectivity for {}", layoutName);
+        log.debug("Initializing Block Connectivity for {}", getLayoutName());
 
         //reset the panel changed bit
         resetDirty();
@@ -9450,7 +9502,15 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
      */
     @Override
     protected void paintTargetPanel(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g;
+        // Nothing to do here 
+        // All drawing has been moved into LayoutEditorComponent
+        // which calls draw (next method below this one)
+        // This is so the layout is drawn at level three
+        // (above or below the Positionables)
+    }
+
+    // this is called by the layoutEditorComponent
+    protected void draw(Graphics2D g2) {
 
         //drawPositionableLabelBorder(g2);
         //Optional antialising, to eliminate (reduce) staircase on diagonal lines
@@ -9470,7 +9530,6 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         drawTrackSegments(g2, trackSegments, true, true);      //dashed, mainline
         drawTrackSegments(g2, trackSegments, false, false);    //non-dashed, non-mainline
         drawTrackSegments(g2, trackSegments, false, true);     //non-dashed, mainline
-
         drawLayoutTracks(g2);
 
         // things that only get drawn in edit mode
@@ -9492,7 +9551,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
                 drawTurnoutControls(g2);
             }
         }
-    } //paintTargetPanel
+    }   // draw
 
     boolean main = true;
     float trackWidth = sideTrackWidth;
@@ -9549,6 +9608,23 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
             g2.setColor(defaultTrackColor);
             setTrackStrokeWidth(g2, false);
             g2.draw(new Line2D.Double(beginLocation, currentLocation));
+
+            // highlight unconnected endpoints of all tracks
+            Color highlightColor = ColorUtil.setAlpha(Color.yellow, 0.75);
+            Color connectColor = ColorUtil.setAlpha(Color.green, 0.5);
+            g2.setColor(highlightColor);
+            g2.setStroke(new BasicStroke(1.0F, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            for (LayoutTrack lt : getLayoutTracks()) {
+                if (lt != beginObject) {
+                    if (lt == foundObject) {
+                        g2.setColor(connectColor);
+                        lt.drawUnconnected(g2);
+                        g2.setColor(highlightColor);
+                    } else {
+                        lt.drawUnconnected(g2);
+                    }
+                }
+            }
         }
     } //drawTrackInProgress
 
@@ -9642,6 +9718,8 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         double maxX = MathUtil.granulize(panelWidth + upperLeftX, gridSize1st);
         double maxY = MathUtil.granulize(panelHeight + upperLeftY, gridSize1st);
 
+        log.debug("drawPanelGrid: minX: {}, minY: {}, maxX: {}, maxY: {}", minX, minY, maxX, maxY);
+        
         Point2D startPt = new Point2D.Double();
         Point2D stopPt = new Point2D.Double();
         BasicStroke narrow = new BasicStroke(1.0F, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
@@ -9653,7 +9731,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         //draw horizontal lines
         double pix = gridSize1st;
 
-        while (pix < maxY) {
+        while (pix <= maxY) {
             startPt.setLocation(minX, pix);
             stopPt.setLocation(maxX, pix);
 
@@ -9670,7 +9748,7 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
         //draw vertical lines
         pix = gridSize1st;
 
-        while (pix < maxX) {
+        while (pix <= maxX) {
             startPt.setLocation(pix, minY);
             stopPt.setLocation(pix, maxY);
 
@@ -9718,19 +9796,22 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     }
 
     public List<PositionablePoint> getPositionablePoints() {
-        return getLayoutTracksOfClass(PositionablePoint.class)
+        return getLayoutTracksOfClass(PositionablePoint.class
+        )
                 .map(PositionablePoint.class::cast)
                 .collect(Collectors.toCollection(ArrayList<PositionablePoint>::new));
     }
 
     public List<LayoutSlip> getLayoutSlips() {
-        return getLayoutTracksOfClass(LayoutSlip.class)
+        return getLayoutTracksOfClass(LayoutSlip.class
+        )
                 .map(LayoutSlip.class::cast)
                 .collect(Collectors.toCollection(ArrayList<LayoutSlip>::new));
     }
 
     public List<TrackSegment> getTrackSegments() {
-        return getLayoutTracksOfClass(TrackSegment.class).map(TrackSegment.class::cast)
+        return getLayoutTracksOfClass(TrackSegment.class)
+        		.map(TrackSegment.class::cast)
                 .collect(Collectors.toCollection(ArrayList<TrackSegment>::new));
     }
 
@@ -9742,13 +9823,15 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     }
 
     public List<LayoutTurntable> getLayoutTurntables() {
-        return getLayoutTracksOfClass(LayoutTurntable.class)
+        return getLayoutTracksOfClass(LayoutTurntable.class
+        )
                 .map(LayoutTurntable.class::cast)
                 .collect(Collectors.toCollection(ArrayList<LayoutTurntable>::new));
     }
 
     public List<LevelXing> getLevelXings() {
-        return getLayoutTracksOfClass(LevelXing.class)
+        return getLayoutTracksOfClass(LevelXing.class
+        )
                 .map(LevelXing.class::cast)
                 .collect(Collectors.toCollection(ArrayList<LevelXing>::new));
     }
@@ -9758,7 +9841,8 @@ public class LayoutEditor extends PanelEditor implements VetoableChangeListener,
     }
 
     public List<LayoutTurnout> getLayoutTurnoutsAndSlips() {
-        return getLayoutTracksOfClass(LayoutTurnout.class)
+        return getLayoutTracksOfClass(LayoutTurnout.class
+        )
                 .map(LayoutTurnout.class::cast)
                 .collect(Collectors.toCollection(ArrayList<LayoutTurnout>::new));
     }

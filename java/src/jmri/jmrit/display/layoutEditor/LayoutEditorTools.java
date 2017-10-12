@@ -15,7 +15,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ResourceBundle;
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -80,7 +79,7 @@ import org.slf4j.LoggerFactory;
 public class LayoutEditorTools {
 
     // Defined text resource, should be called by Bundle.getMessage() to allow reuse of shared keys via path
-    static final ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.display.layoutEditor.LayoutEditorBundle");
+    //static final ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.display.layoutEditor.LayoutEditorBundle");
 
     // constants
     private int NONE = 0;  // Signal at Turnout Positions
@@ -1591,7 +1590,7 @@ public class LayoutEditorTools {
                 }
                 signalName = to.getSignalA1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(to, type);
@@ -1619,7 +1618,7 @@ public class LayoutEditorTools {
                     signalName = to.getSignalC1Name();
                 }
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(to, type);
@@ -1647,7 +1646,7 @@ public class LayoutEditorTools {
                     signalName = to.getSignalB1Name();
                 }
                 if ((signalName == null) || signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(to, type);
@@ -1668,7 +1667,7 @@ public class LayoutEditorTools {
                 }
                 signalName = to.getSignalD1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(to, type);
@@ -1748,7 +1747,7 @@ public class LayoutEditorTools {
                 }
                 signalName = sl.getSignalA1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(sl, type);
@@ -1771,7 +1770,7 @@ public class LayoutEditorTools {
                 }
                 signalName = sl.getSignalB1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(sl, type);
@@ -1794,7 +1793,7 @@ public class LayoutEditorTools {
                 }
                 signalName = sl.getSignalC1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(sl, type);
@@ -1814,7 +1813,7 @@ public class LayoutEditorTools {
                 }
                 signalName = sl.getSignalD1Name();
                 if (signalName.isEmpty()) {
-                    if (!layoutEditor.skipIncludedTurnout) {
+                    if (!layoutEditor.isIncludedTurnoutSkipped()) {
                         return null;
                     }
                     t = getContinuingTrack(sl, type);
