@@ -97,11 +97,9 @@ public class SRCPBusConnectionMemo extends jmri.jmrix.SystemConnectionMemo imple
 
     /*
      * Provides access to the Throttle Manager for this particular connection.
+     * NOTE: Throttle Manager defaults to null
      */
     public ThrottleManager getThrottleManager() {
-        if (throttleManager == null) {
-            throttleManager = new SRCPThrottleManager(this);
-        }
         return throttleManager;
 
     }
@@ -195,11 +193,11 @@ public class SRCPBusConnectionMemo extends jmri.jmrix.SystemConnectionMemo imple
         if (T.equals(jmri.ClockControl.class)) {
             return (T) getClockControl();
         }
-        return null; // nothing, by default
+        return super.get(T);
     }
 
     /**
-     * Tells which managers this provides by class
+     * Tells which managers this class provides.
      */
     @Override
     public boolean provides(Class<?> type) {
@@ -224,7 +222,7 @@ public class SRCPBusConnectionMemo extends jmri.jmrix.SystemConnectionMemo imple
         if (type.equals(jmri.ClockControl.class)) {
             return (null != clockControl);
         }
-        return false; // nothing, by default
+        return super.provides(type); 
     }
 
     @Override

@@ -1,12 +1,9 @@
 package jmri.implementation;
 
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.lang.reflect.InvocationTargetException;
 import javax.swing.SwingUtilities;
 import jmri.InstanceManager;
@@ -15,6 +12,8 @@ import jmri.SignalHead;
 import jmri.Turnout;
 import jmri.TurnoutManager;
 import jmri.util.JUnitUtil;
+import jmri.util.MockPropertyChangeListener;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -27,24 +26,7 @@ import org.junit.Test;
  */
 public class DoubleTurnoutSignalHeadTest extends AbstractSignalHeadTestBase {
 
-    interface MockablePropertyChangeListener {
-        void onChange(String property, Object newValue);
-    }
-
-    class FakePropertyChangeListener implements PropertyChangeListener {
-        MockablePropertyChangeListener m;
-
-        FakePropertyChangeListener() {
-            m = mock(MockablePropertyChangeListener.class);
-        }
-
-        @Override
-        public void propertyChange(PropertyChangeEvent propertyChangeEvent) {
-            m.onChange(propertyChangeEvent.getPropertyName(), propertyChangeEvent.getNewValue());
-        }
-    }
-
-    protected FakePropertyChangeListener l = new FakePropertyChangeListener();
+    protected MockPropertyChangeListener l = new MockPropertyChangeListener();
 
     @Test
     public void testCTor() {

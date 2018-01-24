@@ -10,25 +10,26 @@ import org.junit.Test;
  *
  * @author Paul Bender Copyright (C) 2017	
  */
-public class LnThrottleManagerTest {
+public class LnThrottleManagerTest extends jmri.managers.AbstractThrottleManagerTestBase {
 
     @Test
     public void testCTor() {
-        LnTrafficController lnis = new LocoNetInterfaceScaffold();
-        SlotManager slotmanager = new SlotManager(lnis);
-        LocoNetSystemConnectionMemo memo = new LocoNetSystemConnectionMemo(lnis,slotmanager);
-        LnThrottleManager t = new LnThrottleManager(memo);
-        Assert.assertNotNull("exists",t);
+        Assert.assertNotNull("exists",tm);
     }
 
     // The minimal setup for log4J
     @Before
     public void setUp() {
         JUnitUtil.setUp();
+        LnTrafficController lnis = new LocoNetInterfaceScaffold();
+        SlotManager slotmanager = new SlotManager(lnis);
+        LocoNetSystemConnectionMemo memo = new LocoNetSystemConnectionMemo(lnis,slotmanager);
+        tm = new LnThrottleManager(memo);
     }
 
     @After
     public void tearDown() {
+        ((LnThrottleManager)tm).dispose();
         JUnitUtil.tearDown();
     }
 

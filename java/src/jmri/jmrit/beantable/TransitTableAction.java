@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Dave Duchamp Copyright (C) 2008, 2010, 2011
  */
-public class TransitTableAction extends AbstractTableAction {
+public class TransitTableAction extends AbstractTableAction<Transit> {
 
     /**
      * Create an action with a specific title.
@@ -100,7 +100,7 @@ public class TransitTableAction extends AbstractTableAction {
      */
     @Override
     protected void createModel() {
-        m = new BeanTableDataModel() {
+        m = new BeanTableDataModel<Transit>() {
 
             static public final int EDITCOL = NUMCOLUMN;
             static public final int DUPLICATECOL = EDITCOL + 1;
@@ -120,17 +120,17 @@ public class TransitTableAction extends AbstractTableAction {
             }
 
             @Override
-            public Manager getManager() {
+            public TransitManager getManager() {
                 return InstanceManager.getDefault(jmri.TransitManager.class);
             }
 
             @Override
-            public NamedBean getBySystemName(String name) {
+            public Transit getBySystemName(String name) {
                 return InstanceManager.getDefault(jmri.TransitManager.class).getBySystemName(name);
             }
 
             @Override
-            public NamedBean getByUserName(String name) {
+            public Transit getByUserName(String name) {
                 return InstanceManager.getDefault(jmri.TransitManager.class).getByUserName(name);
             }
 
@@ -140,7 +140,7 @@ public class TransitTableAction extends AbstractTableAction {
             }
 
             @Override
-            public void clickOn(NamedBean t) {
+            public void clickOn(Transit t) {
             }
 
             @Override
@@ -156,7 +156,7 @@ public class TransitTableAction extends AbstractTableAction {
                         log.debug("row is greater than name list");
                         return "";
                     }
-                    Transit z = (Transit) getBySystemName(sysNameList.get(row));
+                    Transit z = getBySystemName(sysNameList.get(row));
                     if (z == null) {
                         return "";
                     } else {
@@ -190,7 +190,7 @@ public class TransitTableAction extends AbstractTableAction {
 
                         @Override
                         public void run() {
-                            String sName = (String) getValueAt(row, SYSNAMECOL);
+                            String sName = ((Transit) getValueAt(row, SYSNAMECOL)).getSystemName();
                             editPressed(sName);
                         }
                     }
@@ -208,7 +208,7 @@ public class TransitTableAction extends AbstractTableAction {
 
                         @Override
                         public void run() {
-                            String sName = (String) getValueAt(row, SYSNAMECOL);
+                            String sName = ((Transit) getValueAt(row, SYSNAMECOL)).getSystemName();
                             duplicatePressed(sName);
                         }
                     }
@@ -332,6 +332,7 @@ public class TransitTableAction extends AbstractTableAction {
     @SuppressWarnings("unchecked")
     private List<TransitSectionAction>[] action = new ArrayList[150];
     private boolean[] alternate = new boolean[150];
+    private boolean[] safe = new boolean[150];
     private int maxSections = 150;  // must be equal to the dimension of the above arrays
     private List<Section> primarySectionBoxList = new ArrayList<>();
     private int[] priSectionDirection = new int[150];
@@ -357,6 +358,7 @@ public class TransitTableAction extends AbstractTableAction {
     JButton deleteSections = null;
     JComboBox<String> primarySectionBox = new JComboBox<>();
     JButton addNextSection = null;
+    JCheckBox addAsSafe = null;
     JButton removeLastSection = null;
     JButton removeFirstSection = null;
     JButton insertAtBeginning = null;
@@ -487,6 +489,8 @@ public class TransitTableAction extends AbstractTableAction {
             p13.add(primarySectionBox);
             primarySectionBox.setToolTipText(rbx.getString("PrimarySectionBoxHint"));
             p13.add(addNextSection = new JButton(rbx.getString("AddPrimaryButton")));
+            p13.add(addAsSafe = new JCheckBox(Bundle.getMessage("TransitSectionIsSafe")));
+            addAsSafe.setToolTipText(Bundle.getMessage("TransitSectionIsSafeHint"));
             addNextSection.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -670,6 +674,7 @@ public class TransitTableAction extends AbstractTableAction {
                     direction[i] = ts.getDirection();
                     action[i] = ts.getTransitSectionActionList();
                     alternate[i] = ts.isAlternate();
+                    safe[i] = ts.isSafe();
                 }
             }
             int index = sectionList.size() - 1;
@@ -702,6 +707,7 @@ public class TransitTableAction extends AbstractTableAction {
             sequence[i] = 0;
             action[i] = null;
             alternate[i] = false;
+            safe[i] = false;
         }
         curSection = null;
         curSectionDirection = 0;
@@ -734,6 +740,7 @@ public class TransitTableAction extends AbstractTableAction {
             direction[j] = priSectionDirection[index];
             curSequenceNum++;
             sequence[j] = curSequenceNum;
+            safe[j] = addAsSafe.isSelected();
             action[j] = new ArrayList<>();
             alternate[j] = false;
             if ((sectionList.size() == 2) && (curSection != null)) {
@@ -763,12 +770,19 @@ public class TransitTableAction extends AbstractTableAction {
                 curSequenceNum--;
                 curSection = sectionList.get(j - 1);
                 curSectionDirection = direction[j - 1];
+                // delete alternate if present
                 int k = j - 2;
                 while ((k >= 0) && alternate[k]) {
                     k--;
                 }
-                prevSection = sectionList.get(k);
-                prevSectionDirection = direction[k];
+                // After this delete we need the new previous section, if there is one.
+                if (k < 0) {
+                    // There is no previous section
+                    prevSection = null;
+                } else {
+                    prevSection = sectionList.get(k);
+                    prevSectionDirection = direction[k];
+                }
             }
             sectionList.remove(j);
             initializeSectionCombos();
@@ -799,11 +813,13 @@ public class TransitTableAction extends AbstractTableAction {
                 alternate[i + 1] = alternate[i];
                 action[i + 1] = action[i];
                 sequence[i + 1] = sequence[i] + 1;
+                safe[i + 1] = safe[i];
             }
             direction[0] = insertAtBeginningDirection[index];
             curSequenceNum++;
             sequence[0] = 1;
             alternate[0] = false;
+            safe[0] = addAsSafe.isSelected();
             action[0] = new ArrayList<>();
             if (curSequenceNum == 2) {
                 prevSectionDirection = direction[0];
@@ -828,6 +844,7 @@ public class TransitTableAction extends AbstractTableAction {
                 direction[j] = direction[i];
                 action[j] = action[i];
                 alternate[j] = alternate[i];
+                safe[j] = safe[i];
             }
             for (int k = 0; k < keep; k++) {
                 sectionList.remove(0);
@@ -1035,6 +1052,7 @@ public class TransitTableAction extends AbstractTableAction {
                         direction[j] = direction[j + 1];
                         action[j] = action[j + 1];
                         alternate[j] = alternate[j + 1];
+                        safe[j] = safe[j + 1];
                     }
                     sectionList.remove(i);
                 }
@@ -1185,10 +1203,12 @@ public class TransitTableAction extends AbstractTableAction {
             alternate[i + 1] = alternate[i];
             action[i + 1] = action[i];
             sequence[i + 1] = sequence[i];
+            safe[i + 1] = safe[i];
         }
         direction[index] = possiblesDirection[k];
         sequence[index] = sequence[index - 1];
         alternate[index] = true;
+        safe[index] = addAsSafe.isSelected();
         action[index] = new ArrayList<>();
         initializeSectionCombos();
         updateSeqNum();
@@ -1217,6 +1237,7 @@ public class TransitTableAction extends AbstractTableAction {
             sequence[j] = curSequenceNum;
             action[j] = new ArrayList<>();
             alternate[j] = true;
+            safe[j] = addAsSafe.isSelected();
             initializeSectionCombos();
         }
         updateSeqNum();
@@ -1236,7 +1257,7 @@ public class TransitTableAction extends AbstractTableAction {
         if (_autoSystemName.isSelected()) {
             curTransit = transitManager.createNewTransit(uName);
         } else {
-            String sName = sysName.getText().toUpperCase();
+            String sName = InstanceManager.getDefault(jmri.TransitManager.class).normalizeSystemName(sysName.getText());
             curTransit = transitManager.createNewTransit(sName, uName);
         }
         if (curTransit == null) {
@@ -1302,7 +1323,7 @@ public class TransitTableAction extends AbstractTableAction {
         curTransit.removeAllSections();
         for (int i = 0; i < sectionList.size(); i++) {
             TransitSection ts = new TransitSection(sectionList.get(i),
-                    sequence[i], direction[i], alternate[i]);
+                    sequence[i], direction[i], alternate[i], safe[i]);
             List<TransitSectionAction> list = action[i];
             if (list != null) {
                 for (int j = 0; j < list.size(); j++) {
@@ -2221,7 +2242,7 @@ public class TransitTableAction extends AbstractTableAction {
                 whatStringField.setText(tWhatString); // re-enter normalized value in display field
                 break;
             case TransitSectionAction.LOCOFUNCTION:
-                tWhatData1 = (Integer) whatMinuteSpinner1.getValue();
+                tWhatData1 = (Integer) locoFunctionSpinner.getValue();
                 tWhatString = "On"; // NOI18N
                 if (offButton.isSelected()) {
                     tWhatString = "Off"; // NOI18N
@@ -2535,6 +2556,7 @@ public class TransitTableAction extends AbstractTableAction {
         public static final int ACTION_COLUMN = 2;
         public static final int SEC_DIRECTION_COLUMN = 3;
         public static final int ALTERNATE_COLUMN = 4;
+        public static final int SAFE_COLUMN = 5;
 
         public SectionTableModel() {
             super();
@@ -2559,7 +2581,7 @@ public class TransitTableAction extends AbstractTableAction {
 
         @Override
         public int getColumnCount() {
-            return ALTERNATE_COLUMN + 1;
+            return SAFE_COLUMN + 1;
         }
 
         @Override
@@ -2571,6 +2593,8 @@ public class TransitTableAction extends AbstractTableAction {
         public boolean isCellEditable(int r, int c) {
             if (c == ACTION_COLUMN) {
                 return (true);
+            } else if (c == SAFE_COLUMN) {
+                return(true);
             }
             return (false);
         }
@@ -2588,6 +2612,8 @@ public class TransitTableAction extends AbstractTableAction {
                     return rbx.getString("DirectionColName");
                 case ALTERNATE_COLUMN:
                     return rbx.getString("AlternateColName");
+                case SAFE_COLUMN:
+                    return "Safe"; //rbx.getString("SafeColName");
                 default:
                     return "";
             }
@@ -2606,6 +2632,8 @@ public class TransitTableAction extends AbstractTableAction {
                 case SEC_DIRECTION_COLUMN:
                     return new JTextField(12).getPreferredSize().width;
                 case ALTERNATE_COLUMN:
+                    return new JTextField(12).getPreferredSize().width;
+                case SAFE_COLUMN:
                     return new JTextField(12).getPreferredSize().width;
                 default:
                     // fall through
@@ -2639,6 +2667,12 @@ public class TransitTableAction extends AbstractTableAction {
                         return rbx.getString("Alternate");
                     }
                     return rbx.getString("Primary");
+                case SAFE_COLUMN:
+                    if (safe[rx]) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 default:
                     return Bundle.getMessage("BeanStateUnknown");
             }
@@ -2648,6 +2682,12 @@ public class TransitTableAction extends AbstractTableAction {
         public void setValueAt(Object value, int row, int col) {
             if (col == ACTION_COLUMN) {
                 addEditActionsPressed(row);
+            } else if (col == SAFE_COLUMN) {
+                if ( value.equals("true")) {
+                    safe[row] = true;
+                } else if (value.equals("false")) {
+                    safe[row] = false;
+                }
             }
             return;
         }

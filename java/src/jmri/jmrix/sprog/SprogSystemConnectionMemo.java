@@ -19,12 +19,15 @@ import org.slf4j.LoggerFactory;
  * Objects of specific subtypes are registered in the instance manager to
  * activate their particular system.
  *
- * @author	Bob Jacobsen Copyright (C) 2010
+ * @author Bob Jacobsen Copyright (C) 2010
  */
 public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     public SprogSystemConnectionMemo(SprogTrafficController st, SprogMode sm) {
         super(st.getController().getSystemConnectionMemo().getSystemPrefix(), SprogConnectionTypeList.SPROG);
+        if (log.isDebugEnabled()) {
+            log.debug("SprogSystemConnectionMemo, prefix='{}'", st.getController().getSystemConnectionMemo().getSystemPrefix());
+        }
         this.st = st;
         sprogMode = sm;  // static
         sprogVersion = new SprogVersion(new SprogType(SprogType.UNKNOWN));
@@ -55,12 +58,7 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     }
 
     public SprogSystemConnectionMemo() {
-        super("S", SprogConnectionTypeList.SPROG); // default to S
-        register(); // registers general type
-        sprogVersion = new SprogVersion(new SprogType(SprogType.UNKNOWN));
-        InstanceManager.store(this, SprogSystemConnectionMemo.class); // also register as specific type
-        InstanceManager.store(cf = new jmri.jmrix.sprog.swing.SprogComponentFactory(this),
-                jmri.jmrix.swing.ComponentFactory.class);
+        this(SprogMode.OPS);
     }
 
     /**
@@ -125,11 +123,16 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     public void setSprogTrafficController(SprogTrafficController st) {
         this.st = st;
     }
+
     private SprogTrafficController st;
     private SprogCommandStation commandStation;
 
     private Thread slotThread;
 
+    public Thread getSlotThread() {
+        return slotThread;
+    }
+    
     /**
      * Configure the programming manager and "command station" objects.
      */
@@ -175,6 +178,7 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
             return true;
         }
         if (type.equals(jmri.ThrottleManager.class)) {
+            log.debug("SPROG provides throttle. sprogMode: {}", sprogMode);
             return true;
         }
         if (type.equals(jmri.TurnoutManager.class)) {
@@ -194,7 +198,7 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
                     break;
             }
         }
-        return false; // nothing, by default
+        return super.provides(type);
     }
 
     @Override
@@ -209,7 +213,6 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         if (T.equals(jmri.AddressedProgrammerManager.class)) {
             return (T) getProgrammerManager();
         }
-
         if (T.equals(jmri.PowerManager.class)) {
             return (T) getPowerManager();
         }
@@ -222,7 +225,7 @@ public class SprogSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         if (T.equals(jmri.CommandStation.class)) {
             return (T) getCommandStation();
         }
-        return null; // nothing, by default
+        return super.get(T);
     }
 
     /**

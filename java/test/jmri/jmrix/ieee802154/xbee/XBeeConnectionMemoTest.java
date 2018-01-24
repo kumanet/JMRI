@@ -5,6 +5,12 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Ignore;
+import org.junit.runner.RunWith;
+import org.powermock.api.mockito.mockpolicies.Slf4jMockPolicy;
+import org.powermock.core.classloader.annotations.MockPolicy;
+import org.powermock.modules.junit4.PowerMockRunner;
+@MockPolicy(Slf4jMockPolicy.class)
 
 /**
  * XBeeConnectionMemoTest.java
@@ -14,23 +20,44 @@ import org.junit.Test;
  *
  * @author	Paul Bender Copyright (C) 2012,2016
  */
-public class XBeeConnectionMemoTest {
+@RunWith(PowerMockRunner.class)
+public class XBeeConnectionMemoTest extends jmri.jmrix.SystemConnectionMemoTestBase {
 
+    @Override
     @Test
-    public void testCtor() {
-        XBeeConnectionMemo m = new XBeeConnectionMemo();
-        Assert.assertNotNull("exists", m);
+    public void testProvidesConsistManager(){
+       Assert.assertFalse("Provides ConsistManager",scm.provides(jmri.ConsistManager.class));
+    }
+
+    @Override
+    @Test
+    @Ignore("PowerMockRunner treats assumption failure as an error")
+    public void getPowerManager(){
+    }
+
+    @Override
+    @Test
+    @Ignore("PowerMockRunner treats assumption failure as an error")
+    public void getThrottleManager(){
+    }
+
+    @Override
+    @Test
+    @Ignore("PowerMockRunner treats assumption failure as an error")
+    public void getReporterManager(){
     }
 
     // The minimal setup for log4J
     @Before
     public void setUp() {
-        JUnitUtil.setUp();
+        XBeeConnectionMemo memo = new XBeeConnectionMemo();
+        memo.setTrafficController(new XBeeInterfaceScaffold());
+        memo.configureManagers();
+        scm = memo;
     }
 
     @After
     public void tearDown() {
-        JUnitUtil.tearDown();
     }
 
 }

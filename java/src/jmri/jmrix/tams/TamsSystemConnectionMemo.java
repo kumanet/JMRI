@@ -19,7 +19,7 @@ import jmri.InstanceManager;
 public class TamsSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     public TamsSystemConnectionMemo(TamsTrafficController et) {
-        super("TM", "Tams");
+        super("T", "Tams");
         this.et = et;
         et.setAdapterMemo(this);
         register();
@@ -29,7 +29,7 @@ public class TamsSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     }
 
     public TamsSystemConnectionMemo() {
-        super("TM", "Tams");
+        super("T", "Tams");
         register(); // registers general type
         InstanceManager.store(this, TamsSystemConnectionMemo.class); // also register as specific type
         //Needs to be implemented
@@ -118,7 +118,7 @@ public class TamsSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     }
 
     /**
-     * Tells which managers this provides by class
+     * Tells which managers this class provides.
      */
     @Override
     public boolean provides(Class<?> type) {
@@ -144,7 +144,7 @@ public class TamsSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         if (type.equals(jmri.TurnoutManager.class)) {
             return true;
         }
-        return false; // nothing, by default
+        return super.provides(type);
     }
 
     @SuppressWarnings("unchecked")
@@ -172,7 +172,7 @@ public class TamsSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         if (T.equals(jmri.TurnoutManager.class)) {
             return (T) getTurnoutManager();
         }
-        return null; // nothing, by default
+        return super.get(T);
     }
 
     @Override

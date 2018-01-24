@@ -21,14 +21,14 @@ import jmri.managers.DefaultRailComManager;
 public class Dcc4PcSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     public Dcc4PcSystemConnectionMemo(Dcc4PcTrafficController tc) {
-        super("DP", "Dcc4Pc");
+        super("D", "Dcc4Pc");
         this.tc = tc;
         tc.setAdapterMemo(this);
         register();
     }
 
     public Dcc4PcSystemConnectionMemo() {
-        super("DP", "Dcc4Pc");
+        super("D", "Dcc4Pc");
         register(); // registers general type
         InstanceManager.store(this, Dcc4PcSystemConnectionMemo.class); // also register as specific type
         //Needs to be implemented
@@ -71,7 +71,7 @@ public class Dcc4PcSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo 
                 return getProgrammerManager().isAddressedModePossible();
             }
         }
-        return false; // nothing, by default
+        return super.provides(type);
     }
 
     @Override
@@ -92,7 +92,7 @@ public class Dcc4PcSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo 
         if (T.equals(jmri.AddressedProgrammerManager.class)) {
             return (T) getProgrammerManager();
         }
-        return null; // nothing, by default
+        return super.get(T);
     }
 
     /**

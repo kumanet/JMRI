@@ -7,20 +7,15 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Tests for the jmri.jmrix.cmri.CMRISystemConnectionMemo class
+ * Tests for the jmri.jmrix.cmri.CMRISystemConnectionMemo class.
  *
  * @author	Paul Bender Copyright (C) 2016
  */
-public class CMRISystemConnectionMemoTest {
-
-    @Test public void constructorTest() {
-        CMRISystemConnectionMemo m = new CMRISystemConnectionMemo();
-        Assert.assertNotNull(m);
-    }
+public class CMRISystemConnectionMemoTest extends jmri.jmrix.SystemConnectionMemoTestBase {
 
     @Test
     public void testValidSystemNameFormat() {
-        CMRISystemConnectionMemo m = new CMRISystemConnectionMemo();
+        CMRISystemConnectionMemo m = (CMRISystemConnectionMemo)scm;
 
         Assert.assertEquals(NameValidity.VALID, m.validSystemNameFormat("CS2",'S'));
         Assert.assertEquals(NameValidity.VALID, m.validSystemNameFormat("CS21",'S'));
@@ -42,27 +37,33 @@ public class CMRISystemConnectionMemoTest {
         Assert.assertEquals(NameValidity.VALID, m.validSystemNameFormat("CS127B1024",'S'));
 
         Assert.assertEquals(NameValidity.INVALID, m.validSystemNameFormat("CSx",'S'));
-        jmri.util.JUnitAppender.assertWarnMessage("invalid character in number field of CMRI system name: CSx");
+//        jmri.util.JUnitAppender.assertWarnMessage("invalid character in number field of CMRI system name: CSx");
 
-        Assert.assertEquals(NameValidity.INVALID, m.validSystemNameFormat("CS2000",'S'));
-        jmri.util.JUnitAppender.assertWarnMessage("bit number not in range 1 - 999 in CMRI system name: CS2000");
+        Assert.assertEquals(NameValidity.VALID_AS_PREFIX_ONLY, m.validSystemNameFormat("CS2000",'S'));
+//        jmri.util.JUnitAppender.assertWarnMessage("bit number not in range 1 - 999 in CMRI system name: CS2000");
 
         Assert.assertEquals(NameValidity.INVALID, m.validSystemNameFormat("CS",'S'));
-        jmri.util.JUnitAppender.assertWarnMessage("invalid character in number field of CMRI system name: CS");
+//        jmri.util.JUnitAppender.assertWarnMessage("invalid character in number field of CMRI system name: CS");
     }
 
     @Test
     public void systemPrefixTest() {
-        CMRISystemConnectionMemo m = new CMRISystemConnectionMemo();
+        CMRISystemConnectionMemo m = (CMRISystemConnectionMemo)scm;
         Assert.assertEquals("Default System Prefix", "C", m.getSystemPrefix());
     }
 
     @Test
     public void getNodeAddressFromSystemNameTest() {
-        CMRISystemConnectionMemo m = new CMRISystemConnectionMemo();
+        CMRISystemConnectionMemo m = (CMRISystemConnectionMemo)scm;
         Assert.assertEquals("Node Address for CT4",0,m.getNodeAddressFromSystemName("CT4"));
         Assert.assertEquals("Node Address for CT1005",1,m.getNodeAddressFromSystemName("CT1005"));
         Assert.assertEquals("Node Address for CT5B5",5,m.getNodeAddressFromSystemName("CT5B5"));
+    }
+
+    @Override
+    @Test
+    public void testProvidesConsistManager(){
+       Assert.assertFalse("Provides ConsistManager",scm.provides(jmri.ConsistManager.class));
     }
 
     // The minimal setup for log4J
@@ -70,6 +71,7 @@ public class CMRISystemConnectionMemoTest {
     public void setUp() {
         apps.tests.Log4JFixture.setUp();
         jmri.util.JUnitUtil.resetInstanceManager();
+        scm = new CMRISystemConnectionMemo();
     }
    
     @After

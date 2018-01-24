@@ -69,7 +69,7 @@ public class YardmasterByTrackPanel extends CommonConductorYardmasterPanel {
         initComponents();
 
         // this window doesn't use the set button
-        setButton.setVisible(false);
+        modifyButton.setVisible(false);
 
         _location = location;
 
@@ -363,7 +363,7 @@ public class YardmasterByTrackPanel extends CommonConductorYardmasterPanel {
             for (Car rs : rsList) {
                 if (rs.getTrack() != _track || rs.getRouteLocation() != null)
                     continue;
-                carList.add((Car) rs);
+                carList.add(rs);
             }
             JPanel pHoldCars = new JPanel();
             pHoldCars.setLayout(new BoxLayout(pHoldCars, BoxLayout.Y_AXIS));

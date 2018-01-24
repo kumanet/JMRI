@@ -9,6 +9,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JFormattedTextField;
 import javax.swing.JTextField;
 import jmri.InstanceManager;
 
@@ -24,6 +25,28 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
      * subclass setInstance() will fill the adapter member.
      */
     public AbstractConnectionConfig() {
+        try {
+            // systemPrefixField = new JFormattedTextField(new jmri.util.swing.RegexFormatter("[A-Za-z]\\d*"));
+            systemPrefixField = new JFormattedTextField(new SystemPrefixFormatter());
+            
+            systemPrefixField.setPreferredSize(new JTextField("P123").getPreferredSize());
+            systemPrefixField.setFocusLostBehavior(JFormattedTextField.COMMIT_OR_REVERT);
+        } catch (java.util.regex.PatternSyntaxException e) {
+            log.error("unexpected parse exception during setup", e);
+        }
+    }
+
+    static public class SystemPrefixFormatter extends javax.swing.text.DefaultFormatter {
+        public Object stringToValue(String text) throws java.text.ParseException {
+            try {
+                if (jmri.Manager.getSystemPrefixLength(text)!= text.length()) {
+                    throw new java.text.ParseException("Pattern did not match", 0);
+                }
+            } catch (jmri.NamedBean.BadSystemNameException e) {
+                throw new java.text.ParseException("Pattern did not match", 0);
+            }
+            return text;
+        }
     }
 
     abstract protected void checkInitDone();
@@ -36,7 +59,7 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
     protected JCheckBox showAdvanced = new JCheckBox(Bundle.getMessage("AdditionalConnectionSettings"));
     protected JLabel systemPrefixLabel = new JLabel(Bundle.getMessage("ConnectionPrefix"));
     protected JLabel connectionNameLabel = new JLabel(Bundle.getMessage("ConnectionName"));
-    protected JTextField systemPrefixField = new JTextField(10);
+    protected JFormattedTextField systemPrefixField;
     protected JTextField connectionNameField = new JTextField(15);
 
     protected JPanel _details = null;
@@ -128,6 +151,15 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
 
     protected ArrayList<JComponent> additionalItems = new ArrayList<>(0);
 
+    /**
+     * Load the Swing widgets needed to configure this connection into a
+     * specified JPanel. Used during the configuration process to fill out the
+     * preferences window with content specific to this Connection type. The
+     * JPanel contents need to handle their own gets/sets to the underlying
+     * Connection content.
+     *
+     * @param details The specific Swing object to be configured and filled.
+     */
     @Override
     abstract public void loadDetails(final JPanel details);
 
@@ -194,10 +226,7 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
     abstract public void setDisabled(boolean disable);
 
     /**
-     * Register the ConnectionConfig with the running JMRI process. It is
-     * strongly recommended that overriding implementations call
-     * super.register() since this implementation performs all required
-     * registration tasks.
+     * {@inheritDoc}
      */
     @Override
     public void register() {
@@ -217,4 +246,5 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
         }
     }
 
+    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractThrottle.class);
 }

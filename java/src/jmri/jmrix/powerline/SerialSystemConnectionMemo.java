@@ -57,7 +57,7 @@ public class SerialSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo 
     }
 
     /**
-     * Tells which managers this provides by class
+     * Tells which managers this class provides.
      */
     @Override
     public boolean provides(Class<?> type) {
@@ -97,9 +97,9 @@ public class SerialSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo 
         return null; // nothing, by default
     }
 
-    private SerialTurnoutManager turnoutManager;
-    private SerialLightManager lightManager;
-    private SerialSensorManager sensorManager;
+    protected SerialTurnoutManager turnoutManager;
+    protected SerialLightManager lightManager;
+    protected SerialSensorManager sensorManager;
 
     /**
      * Configure the common managers for Powerline connections. This puts the

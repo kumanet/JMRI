@@ -15,7 +15,6 @@ import javax.annotation.CheckReturnValue;
 import javax.swing.ComboBoxEditor;
 import javax.swing.DefaultListSelectionModel;
 import javax.swing.JComboBox;
-import javax.swing.JComboBox.KeySelectionManager;
 import javax.swing.JList;
 import javax.swing.ListSelectionModel;
 import javax.swing.UIManager;
@@ -58,13 +57,12 @@ public class JmriBeanComboBox extends JComboBox<String> implements java.beans.Pr
         _manager = inManager;
         setSelectedBean(inNamedBean);
         //setEditable(true);
-        _manager.addPropertyChangeListener(this);
+        _manager.addPropertyChangeListener(new DedupingPropertyChangeListener(this));
         setKeySelectionManager(new BeanSelectionManager());
 
         //fires when drop down list item is selected
         addItemListener((ItemEvent event) -> {
             if (event.getStateChange() == ItemEvent.SELECTED) {
-                JmriBeanComboBox cb = (JmriBeanComboBox) event.getSource();
                 validateText();
             }
         });
@@ -461,6 +459,7 @@ public class JmriBeanComboBox extends JComboBox<String> implements java.beans.Pr
         String comboBoxText = cbe.getItem().toString();
 
         if (isEditable() && !comboBoxText.isEmpty()) {
+            setOpaque(true);
             if (null != getNamedBean()) {
                 c.setBackground(new Color(0xBDECB6));   //pastel green
             } else if (_validateMode) {
@@ -469,6 +468,7 @@ public class JmriBeanComboBox extends JComboBox<String> implements java.beans.Pr
                 c.setBackground(new Color(0xFDFD96));   //pastel yellow
             }
         } else {
+            setOpaque(false);
             c.setBackground(new Color(0xFFFFFF));   //white (pastel grey?)
         }
     }   //validateText

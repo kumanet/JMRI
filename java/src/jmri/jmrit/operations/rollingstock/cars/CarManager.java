@@ -68,7 +68,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      */
     @Override
     public Car getById(String id) {
-        return (Car) super.getById(id);
+        return super.getById(id);
     }
 
     /**
@@ -80,7 +80,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      */
     @Override
     public Car getByRoadAndNumber(String road, String number) {
-        return (Car) super.getByRoadAndNumber(road, number);
+        return super.getByRoadAndNumber(road, number);
     }
 
     /**
@@ -93,7 +93,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      */
     @Override
     public Car getByTypeAndRoad(String type, String road) {
-        return (Car) super.getByTypeAndRoad(type, road);
+        return super.getByTypeAndRoad(type, road);
     }
 
     /**
@@ -148,7 +148,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
         if (oldKernel != null) {
             Kernel newKernel = newKernel(newName);
             // keep the lead car
-            Car leadCar = (Car) oldKernel.getLead();
+            Car leadCar = oldKernel.getLead();
             if (leadCar != null) {
                 leadCar.setKernel(newKernel);
             }
@@ -192,7 +192,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      */
     public List<String> getKernelNameList() {
         String[] names = new String[_kernelHashTable.size()];
-        List<String> out = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
         Enumeration<String> en = _kernelHashTable.keys();
         int i = 0;
         while (en.hasMoreElements()) {
@@ -411,10 +411,10 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
         List<Car> byLocation = getByList(byFinal, BY_LOCATION);
         List<Car> byDestination = getByList(byLocation, BY_DESTINATION);
         // now place cabooses, cars with FRED, and passenger cars at the rear of the train
-        List<Car> out = new ArrayList<Car>();
+        List<Car> out = new ArrayList<>();
         int lastCarsIndex = 0; // incremented each time a car is added to the end of the list
         for (Car rs : byDestination) {
-            Car car = (Car) rs;
+            Car car = rs;
             if (car.getKernel() != null && !car.getKernel().isLead(car)) {
                 continue; // not the lead car, skip for now.
             }
@@ -496,7 +496,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      * @return List of caboose road names.
      */
     public List<String> getCabooseRoadNames() {
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         Enumeration<String> en = _hashTable.keys();
         while (en.hasMoreElements()) {
             Car car = getById(en.nextElement());
@@ -514,7 +514,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      * @return List of road names of cars with FREDs
      */
     public List<String> getFredRoadNames() {
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         Enumeration<String> en = _hashTable.keys();
         while (en.hasMoreElements()) {
             Car car = getById(en.nextElement());
@@ -535,8 +535,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
      */
     public void replaceLoad(String type, String oldLoadName, String newLoadName) {
         List<Car> cars = getList();
-        for (Car rs : cars) {
-            Car car = (Car) rs;
+        for (Car car : cars) {
             if (car.getTypeName().equals(type) && car.getLoadName().equals(oldLoadName)) {
                 if (newLoadName != null) {
                     car.setLoadName(newLoadName);
@@ -544,14 +543,21 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
                     car.setLoadName(InstanceManager.getDefault(CarLoads.class).getDefaultEmptyName());
                 }
             }
+            if (car.getTypeName().equals(type) && car.getReturnWhenEmptyLoadName().equals(oldLoadName)) {
+                if (newLoadName != null) {
+                    car.setReturnWhenEmptyLoadName(newLoadName);
+                } else {
+                    car.setReturnWhenEmptyLoadName(InstanceManager.getDefault(CarLoads.class).getDefaultEmptyName());
+                }
+            }
         }
     }
 
     public List<Car> getCarsLocationUnknown() {
-        List<Car> mias = new ArrayList<Car>();
+        List<Car> mias = new ArrayList<>();
         List<Car> cars = getByIdList();
         for (Car rs : cars) {
-            Car car = (Car) rs;
+            Car car = rs;
             if (car.isLocationUnknown()) {
                 mias.add(car); // return unknown location car
             }
@@ -624,7 +630,7 @@ public class CarManager extends RollingStockManager<Car> implements InstanceMana
         // add entries
         List<Car> carList = getByIdList();
         for (Car rs : carList) {
-            Car car = (Car) rs;
+            Car car = rs;
             values.addContent(car.store());
         }
     }
