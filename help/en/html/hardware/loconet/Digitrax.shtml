@@ -388,8 +388,15 @@
 
             <li>The <a href="#TurnoutCmdHandling">"Command Station
             Turnout Command Rejection and JMRI Turnout Command
-            Handling"</a> setting is described <a href=
+            Handling"</a> settings are described <a href=
             "#TurnoutCmdHandling">below</a>.</li>
+
+            <li>The "Transponding Present" allows you indicate whether
+                certain special hardware is present and configured.
+                If you have LocoNet-attached boards that configure 
+                in "ops mode", or if you have Digitrax Transponding
+                installed, set this to "Yes". Otherwise, set it to 
+                "No". </li>
 
             <li>The "Connection Uses" selection determines how
             "flow control" is implemented in software. This
@@ -613,7 +620,7 @@
             described above, except that JMRI implements additional
             delay between any switch commands which it sends to
             LocoNet. This should reduce the likelihood that JMRI
-            commands would cause an overflow of the the Digitrax
+            commands would cause an overflow of the Digitrax
             command station switch command buffer, but does not
             have any effect on other LocoNet devices which generate
             LocoNet switch commands. The retry mechanism described

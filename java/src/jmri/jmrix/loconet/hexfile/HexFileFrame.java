@@ -166,7 +166,7 @@ public class HexFileFrame extends JmriJFrame {
 
         // do the common manager config
         port.getSystemConnectionMemo().configureCommandStation(LnCommandStationType.COMMAND_STATION_DCS100, // full featured by default
-                false, false);
+                false, false, false);
         port.getSystemConnectionMemo().configureManagers();
         if (port.getSystemConnectionMemo().getSensorManager() instanceof LnSensorManager) {
             LnSensorManager LnSensorManager = (LnSensorManager) port.getSystemConnectionMemo().getSensorManager();
@@ -180,7 +180,7 @@ public class HexFileFrame extends JmriJFrame {
         port.getSystemConnectionMemo().setProgrammerManager(
                 new jmri.progdebugger.DebugProgrammerManager(port.getSystemConnectionMemo()));
         if (port.getSystemConnectionMemo().getProgrammerManager().isAddressedModePossible()) {
-            jmri.InstanceManager.setAddressedProgrammerManager(port.getSystemConnectionMemo().getProgrammerManager());
+            jmri.InstanceManager.store(port.getSystemConnectionMemo().getProgrammerManager(), jmri.AddressedProgrammerManager.class);
         }
         if (port.getSystemConnectionMemo().getProgrammerManager().isGlobalProgrammerAvailable()) {
             jmri.InstanceManager.store(port.getSystemConnectionMemo().getProgrammerManager(), GlobalProgrammerManager.class);
@@ -195,7 +195,7 @@ public class HexFileFrame extends JmriJFrame {
 
         // start operation of packetizer
         packets.startThreads();
-        sourceThread = new Thread(port);
+        sourceThread = new Thread(port, "LocoNet HexFileFrame");
         sourceThread.start();
     }
 

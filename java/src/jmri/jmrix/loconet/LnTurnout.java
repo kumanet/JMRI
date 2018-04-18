@@ -1,5 +1,6 @@
 package jmri.jmrix.loconet;
 
+import javax.annotation.*;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.NmraPacket;
 import jmri.implementation.AbstractTurnout;
@@ -70,6 +71,26 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
     }
 
     LocoNetInterface controller;
+    
+    /**
+     * True when setFeedbackMode has specified the mode;
+     * false when the mode is just left over from initialization.
+     * This is intended to indicate (when true) that a configuration 
+     * file has set the value; message-created turnouts have it false.
+     */     
+    boolean feedbackDeliberatelySet = false; // package to allow access from LnTurnoutManager
+    
+    @Override
+    public void setFeedbackMode(@Nonnull String mode) throws IllegalArgumentException {
+        feedbackDeliberatelySet = true;
+        super.setFeedbackMode(mode);
+    }
+
+    @Override
+    public void setFeedbackMode(int mode) throws IllegalArgumentException {
+        feedbackDeliberatelySet = true;
+        super.setFeedbackMode(mode);
+    }
 
     @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
             justification = "Only used during creation of 1st turnout") // NOI18N
@@ -115,7 +136,7 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
         sendOpcSwReqMessage(adjustStateForInversion(newstate), true);
         // schedule SWREQ for closed/thrown off, unless in basic mode
         if (!binaryOutput) {
-            meterTimer.schedule(new java.util.TimerTask() {
+            meterTask = new java.util.TimerTask() {
                 int state = newstate;
 
                 @Override
@@ -126,7 +147,8 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
                         log.error("Exception occurred while sending delayed off to turnout: " + e);
                     }
                 }
-            }, METERINTERVAL);
+            };
+            meterTimer.schedule(meterTask, METERINTERVAL);
         }
     }
 
@@ -177,7 +199,7 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
         if (_useOffSwReqAsConfirmation) {
             // Start a timer to resend the command in a couple of seconds in case consistency is not obtained before then
             noConsistencyTimersRunning++;
-            consistencyTimer.schedule(new java.util.TimerTask() {
+            consistencyTask = new java.util.TimerTask() {
                 @Override
                 public void run() {
                     noConsistencyTimersRunning--;
@@ -186,7 +208,8 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
                         forwardCommandChangeToLayout(getCommandedState());
                     }
                 }
-            }, CONSISTENCYTIMER);
+            };
+            consistencyTimer.schedule(consistencyTask, CONSISTENCYTIMER);
         }
     }
 
@@ -236,8 +259,9 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
                         newKnownState(state);
                     }
                 }
-                break;
+                return;
             }
+            
             case LnConstants.OPC_SW_REP: {
                 /* page 9 of Loconet PE */
 
@@ -295,6 +319,10 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
                                 } else if (getFeedbackMode() == INDIRECT) {
                                     // reached closed state
                                     newKnownState(adjustStateForInversion(CLOSED));
+                                } else if (!feedbackDeliberatelySet) {
+                                    // don't have a defined feedback mode, but know we've reached closed state 
+                                    log.debug("setting CLOSED with !feedbackDeliberatelySet");
+                                    newKnownState(adjustStateForInversion(CLOSED));
                                 }
                             } else {
                                 // switch input thrown (input on)
@@ -306,10 +334,22 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
                                 } else if (getFeedbackMode() == INDIRECT) {
                                     // reached thrown state
                                     newKnownState(adjustStateForInversion(THROWN));
+                                } else if (!feedbackDeliberatelySet) {
+                                    // don't have a defined feedback mode, but know we're not in closed state, most likely is actually thrown
+                                    log.debug("setting THROWN with !feedbackDeliberatelySet");
+                                    newKnownState(adjustStateForInversion(THROWN));
                                 }
                             }
                         } else {
                             // Aux input report
+                            
+                            // This is only valid in EXACT mode, so if we encounter it
+                            //  without a feedback mode set, we switch to EXACT
+                            if (!feedbackDeliberatelySet) {
+                                setFeedbackMode(EXACT);
+                                feedbackDeliberatelySet = false; // was set when setting feedback
+                            }
+                            
                             if ((sw2 & LnConstants.OPC_SW_REP_HI) != 0) {
                                 // aux input closed (off)
                                 if (getFeedbackMode() == EXACT) {
@@ -329,12 +369,12 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
 
                     }
                 }
+                return;
             }
-            //$FALL-THROUGH$
+
             default:
                 return;
         }
-        // reach here only in error
     }
 
     @Override
@@ -346,6 +386,12 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
 
     @Override
     public void dispose() {
+        if(meterTask!=null) {
+           meterTask.cancel();
+        }
+        if(consistencyTask != null ) {
+           consistencyTask.cancel();
+        }
         this.controller.removeLocoNetListener(~0, this);
         super.dispose();
     }
@@ -384,11 +430,13 @@ public class LnTurnout extends AbstractTurnout implements LocoNetListener {
     }
 
     static final int METERINTERVAL = 100;  // msec wait before closed
-    static java.util.Timer meterTimer = new java.util.Timer(true);
+    static java.util.Timer meterTimer = new java.util.Timer("LocoNet Turnout Meter Timer",true);
+    private java.util.TimerTask meterTask = null;
 
     static final int CONSISTENCYTIMER = 3000; // msec wait for command to take effect
-    static java.util.Timer consistencyTimer = new java.util.Timer();
+    static java.util.Timer consistencyTimer = new java.util.Timer("LocoNet Turnout Consistency Timer");
     int noConsistencyTimersRunning = 0;
+    private java.util.TimerTask consistencyTask = null;
 
     private final static Logger log = LoggerFactory.getLogger(LnTurnout.class);
 
