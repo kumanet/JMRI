@@ -86,6 +86,9 @@ public class Car extends RollingStock {
         car.setOwner(getOwner());
         car.setRoadName(getRoadName());
         car.setTypeName(getTypeName());
+        car.setCaboose(isCaboose());
+        car.setFred(hasFred());
+        car.setPassenger(isPassenger());
         car.loaded = true;
         return car;
     }
@@ -647,10 +650,10 @@ public class Car extends RollingStock {
         setPickupScheduleId(getNextPickupScheduleId());
         setNextPickupScheduleId(NONE);
         // arrived at spur?
-        if (destTrack != null && destTrack.getTrackType().equals(Track.SPUR)) {
+        if (destTrack != null && destTrack.isSpur()) {
             updateLoad();
         } // update load optionally when car reaches staging
-        else if (destTrack != null && destTrack.getTrackType().equals(Track.STAGING)) {
+        else if (destTrack != null && destTrack.isStaging()) {
             if (destTrack.isLoadSwapEnabled() && getLoadName().equals(carLoads.getDefaultEmptyName())) {
                 setLoadName(carLoads.getDefaultLoadName());
             } else if (destTrack.isLoadSwapEnabled() && getLoadName().equals(carLoads.getDefaultLoadName())) {

@@ -27,7 +27,7 @@
 
 <body>
   <div id="mBody">
-    <!--#include virtual="Sidebar" -->
+    <!--#include virtual="Sidebar.shtml" -->
 
     <div id="mainContent">
       <h1>JMRI Code: Network Access</h1>
@@ -91,6 +91,20 @@
             server</a></li>
           </ul>
         </li>
+        
+        <li>CAN via MERG Network Interface
+         <ul>
+         <li>The network interface can be used for the CANEther, CANGC1e, CANPi and CBUS Server.
+         </li>
+          <li>
+          CBUS Server is a <a href="https://nodejs.org/en/">Node.js</a> program to allow multiple network connections
+          to a MERG CANUSB4.
+          <a href="https://github.com/phillipsnj/mergCbusServer">MERG CBUS Server</a>
+          </li>
+         </ul>
+        </li>
+        
+        
 
         <li>EasyDCC
 

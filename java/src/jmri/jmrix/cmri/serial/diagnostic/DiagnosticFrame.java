@@ -217,7 +217,11 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
 				}
 			});
 	panelTest1.add(haltPollButton);
-        haltpollButtonActionPerformed();
+        SerialTrafficController stc = _memo.getTrafficController();
+         if (stc.getPollNetwork())
+            haltPollButton.setText(Bundle.getMessage("HaltPollButtonText"));
+         else
+            haltPollButton.setText(Bundle.getMessage("ResumePollButtonText"));
         
         panelTest.add(panelTest1);
         
@@ -337,7 +341,6 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         testSelectBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                    SerialTrafficController stc = _memo.getTrafficController();
                     selTestType = testSelectBox.getSelectedIndex(); 
                     switch(selTestType)
                     {
@@ -353,7 +356,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                         stopButton.setEnabled(true);
                         continueButton.setVisible(false);
                         displayNodeInfo(testNodeID);
-                      break;
+                        break;
                       case testType_Wraparound:
                         testEquip.setText(Bundle.getMessage("WrapTestEquipment"));
                         panel21.setVisible(true);
@@ -368,7 +371,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                         continueButton.setVisible(true);
                         invertWrapButton.setSelected(testNodeType == SerialNode.CPNODE);
                         displayNodeInfo(testNodeID);
-                      break;
+                        break;
                       case testType_SendCommand:
                         testEquip.setText(Bundle.getMessage("SendCommandEquipment"));
                         panel21.setVisible(false);
@@ -381,7 +384,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                         stopButton.setEnabled(false);
                         continueButton.setVisible(false);
                         displayNodeInfo(testNodeID);
-                     break;
+                        break;
                       case testType_WriteBytes:
                         testEquip.setText(Bundle.getMessage("WriteBytesEquipment"));
                         panel21.setVisible(false);
@@ -391,7 +394,9 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                         panel24.setVisible(false);
                         panel25.setVisible(true);
                         displayNodeInfo(testNodeID);
-                      break;
+                        break;
+                      default:
+                        log.debug("default case in testSelectBox switch");
                     }
                }
             });
@@ -639,19 +644,21 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             case testType_Outputs:
                 outTest = true;
                 wrapTest= false;
-            break;
+                break;
             case testType_Wraparound:
                 outTest = false;
                 wrapTest= true;
-            break;
+                break;
             case testType_SendCommand:
                 outTest = false;
                 wrapTest= false;
-            break;
+                break;
             case testType_WriteBytes:
                 outTest = false;
                 wrapTest= false;
-            break;
+                break;
+            default:
+                log.debug("default case in testSelectBox switch");
         }
         
         // get the SerialNode corresponding to this node address
@@ -808,11 +815,11 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
      */
     public void haltpollButtonActionPerformed() {
          SerialTrafficController stc = _memo.getTrafficController();
+         stc.setPollNetwork(!stc.getPollNetwork());
          if (stc.getPollNetwork())
             haltPollButton.setText(Bundle.getMessage("HaltPollButtonText"));
          else
             haltPollButton.setText(Bundle.getMessage("ResumePollButtonText"));
-         stc.setPollNetwork(!stc.getPollNetwork());
     }
 /**
      * Initialize an Output Test.
@@ -1246,7 +1253,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             if (!testNode.isOutputCard(outCardNum)) {
              statusText1.setText(Bundle.getMessage("DiagnosticError6"));
              return;                          
-            };
+            }
             begOutByte = (testNode.getOutputCardIndex(outCardNum)) * portsPerCard;
         }
         else

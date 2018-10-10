@@ -25,7 +25,7 @@
 
 <body>
   <div id="mBody">
-    <!--#include virtual="Sidebar" -->
+    <!--#include virtual="Sidebar.shtml" -->
 
     <div id="mainContent">
       <h1>JMRI Code: How to Use the Logging Facilities</h1>
@@ -105,7 +105,7 @@
         <tr>
           <td>TRACE</td>
 
-          <td>log.debug(..)</td>
+          <td>log.trace(..)</td>
 
           <td>Very detailed messages, even more than DEBUG, used
           for voluminous debugging (e.g. every character in a

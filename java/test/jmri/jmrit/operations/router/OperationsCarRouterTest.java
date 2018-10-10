@@ -2474,7 +2474,7 @@ public class OperationsCarRouterTest extends OperationsTestCase {
         rlgulf.setMaxTrainLength(80); // only one car can be carried
         
         trainStagingToFoxboro2.build();
-        Assert.assertFalse(trainStagingToFoxboro2.isBuilt()); // build failed
+        Assert.assertTrue(trainStagingToFoxboro2.isBuilt());
         
         // the Router found a two train route, but gave up using a three train route out of staging
         // TODO should the router use multiple trains just to get the car out of staging?
@@ -4370,7 +4370,7 @@ public class OperationsCarRouterTest extends OperationsTestCase {
 
     // Ensure minimal setup for log4J
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() {
         super.setUp();
         
         // change report level to increase test coverage
@@ -4387,18 +4387,13 @@ public class OperationsCarRouterTest extends OperationsTestCase {
         // register the car and engine types used
         ct.addName("Boxcar");
         ct.addName(Bundle.getMessage("Caboose"));
-        ct.addName("Flat");
-        
-    }
-
-    public OperationsCarRouterTest(String s) {
-        super(s);
+        ct.addName("Flat");   
     }
 
     // The minimal setup for log4J
     @Override
     @After
-    protected void tearDown() throws Exception {
+    public void tearDown() {
         super.tearDown();
     }
 }

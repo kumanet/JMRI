@@ -16,7 +16,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellEditor;
 import jmri.InstanceManager;
 import jmri.jmrit.beantable.EnablingCheckboxRenderer;
-import jmri.jmrit.operations.locations.Track;
 import jmri.jmrit.operations.routes.RouteEditFrame;
 import jmri.jmrit.operations.setup.Control;
 import jmri.jmrit.operations.setup.Setup;
@@ -89,17 +88,19 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
         // first, remove listeners from the individual objects
         removePropertyChangeTrains();
 
-        if (_sort == SORTBYID) {
-            sysList = trainManager.getTrainsByIdList();
-        } else {
-            sysList = trainManager.getTrainsByTimeList();
-        }
+        synchronized (this) {
+            if (_sort == SORTBYID) {
+                sysList = trainManager.getTrainsByIdList();
+            } else {
+                sysList = trainManager.getTrainsByTimeList();
+            }
 
-        if (!isShowAll()) {
-            // filter out trains not checked
-            for (int i = sysList.size() - 1; i >= 0; i--) {
-                if (!sysList.get(i).isBuildEnabled()) {
-                    sysList.remove(i);
+            if (!isShowAll()) {
+                // filter out trains not checked
+                for (int i = sysList.size() - 1; i >= 0; i--) {
+                    if (!sysList.get(i).isBuildEnabled()) {
+                        sysList.remove(i);
+                    }
                 }
             }
         }
@@ -108,7 +109,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
         addPropertyChangeTrains();
     }
 
-    List<Train> sysList = null;
+    List<Train> sysList = trainManager.getTrainsByTimeList();
     JTable _table = null;
     TrainsTableFrame _frame = null;
 
@@ -483,7 +484,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
         return (Setup.isStagingTrackImmediatelyAvail() &&
                 !train.isTrainEnRoute() &&
                 train.getDepartureTrack() != null &&
-                train.getDepartureTrack().getTrackType().equals(Track.STAGING) &&
+                train.getDepartureTrack().isStaging() &&
                 train.getDepartureTrack() != train.getTerminationTrack() &&
                 train.getDepartureTrack().getDropRS() > 0);
     }
@@ -532,7 +533,7 @@ public class TrainsTableModel extends javax.swing.table.AbstractTableModel imple
             if (Control.SHOW_PROPERTY) {
                 log.debug("Update train table row: {} name: {}", row, train.getName());
             }
-            if (row >= 0) {
+            if (row >= 0 && _table != null) {
                 int viewRow = _table.convertRowIndexToView(row);
                 // if there are issues with thread locking here, this needs to
                 // be refactored so the panel holding the table is listening for

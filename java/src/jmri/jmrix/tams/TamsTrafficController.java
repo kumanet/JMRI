@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * @author Jan Boen
  */
 
-// May 2018 - adjust so it works properly in synchronous mode.
+// May/June 2018 - adjust so it works properly in synchronous mode.
 
 public class TamsTrafficController extends AbstractMRTrafficController implements TamsInterface, CommandStation {
 
@@ -38,6 +38,7 @@ public class TamsTrafficController extends AbstractMRTrafficController implement
     public TamsTrafficController() {
         super();
         log.debug("creating a new TamsTrafficController object");
+        log.debug("Just a silly change to force an staged change");        
         // set as command station too
         jmri.InstanceManager.store(this, jmri.CommandStation.class);
         super.setAllowUnexpectedReply(false);        
@@ -66,8 +67,6 @@ public class TamsTrafficController extends AbstractMRTrafficController implement
         return adaptermemo.getSystemPrefix();
     }
     
-
-    
     // The methods to implement the TamsInterface
     @Override
     public synchronized void addTamsListener(TamsListener l) {
@@ -93,8 +92,9 @@ public class TamsTrafficController extends AbstractMRTrafficController implement
      * @param count  ignored, but needed for API compatibility
      */
     @Override
-    public void sendPacket(byte[] packet, int count) {
+    public boolean sendPacket(byte[] packet, int count) {
         log.trace("*** sendPacket ***");
+        return true;
     }
 
     /**
@@ -291,11 +291,6 @@ public class TamsTrafficController extends AbstractMRTrafficController implement
     @Override
     protected TamsMessage enterNormalMode() {
         return null;
-    }
-
-    //This can be removed once multi-connection is complete
-    @Override
-    public void setInstance() {
     }
 
     @SuppressFBWarnings(value = "MS_PKGPROTECT")
