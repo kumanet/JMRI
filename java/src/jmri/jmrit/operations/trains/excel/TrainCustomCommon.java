@@ -46,9 +46,9 @@ public abstract class TrainCustomCommon {
 
     abstract public void setDirectoryName(String name);
 
-    public int getFileCount() {
-        return fileCount;
-    }
+//    public int getFileCount() {
+//        return fileCount;
+//    }
 
     /**
      * Adds one CSV file path to the collection of files to be processed.
@@ -76,7 +76,7 @@ public abstract class TrainCustomCommon {
         }
 
         fileCount++;
-        waitTimeSeconds = getFileCount() * Control.excelWaitTime;
+        waitTimeSeconds = fileCount * Control.excelWaitTime;
         alive = true;
 
         File csvNamesFile = new File(InstanceManager.getDefault(OperationsManager.class).getFile(getDirectoryName()),
@@ -105,7 +105,7 @@ public abstract class TrainCustomCommon {
         }
 
         // Only continue if we have some files to process.
-        if (getFileCount() == 0) {
+        if (fileCount == 0) {
             return true; // done
         }
 
@@ -121,7 +121,7 @@ public abstract class TrainCustomCommon {
             }
         }
 
-        log.debug("Queued {} files to custom Excel program", getFileCount());
+        log.debug("Queued {} files to custom Excel program", fileCount);
 
         // Build our command string out of these bits
         // We need to use cmd and start to allow launching data files like
@@ -162,8 +162,7 @@ public abstract class TrainCustomCommon {
         if (alive) {
             log.debug("Wait time: {} seconds process ready", waitTimeSeconds);
             long loopCount = waitTimeSeconds; // number of seconds to wait
-            while (loopCount > 0 && alive) {
-                loopCount--;
+            while (loopCount-- > 0 && alive) {
                 synchronized (this) {
                     try {
                         wait(1000); // 1 sec
@@ -202,10 +201,9 @@ public abstract class TrainCustomCommon {
             log.debug("Waiting {} seconds for Excel program to complete", waitTimeSeconds);
             status = process.waitFor(waitTimeSeconds, TimeUnit.SECONDS);
             // printing can take a long time, wait to complete
-            if (status) {
+            if (status && file.exists()) {
                 long loopCount = waitTimeSeconds; // number of seconds to wait
-                while (loopCount > 0) {
-                    loopCount--;
+                while (loopCount-- > 0 && file.exists()) {
                     synchronized (this) {
                         try {
                             wait(1000); // 1 sec
@@ -213,9 +211,6 @@ public abstract class TrainCustomCommon {
                             // TODO Auto-generated catch block
                             log.error("Thread unexpectedly interrupted", e);
                         }
-                    }
-                    if (!file.exists()) {
-                        break; // done printing
                     }
                 }
             }
