@@ -39,10 +39,6 @@ public class CbusSensor extends AbstractSensor implements CanListener {
         // build local addresses
         CbusAddress a = new CbusAddress(address);
         CbusAddress[] v = a.split();
-        if (v == null) {
-            log.error("Did not find usable system name: " + address);
-            return;
-        }
         switch (v.length) {
             case 1:
                 addrActive = v[0];
@@ -115,7 +111,8 @@ public class CbusSensor extends AbstractSensor implements CanListener {
                 setOwnState(Sensor.INACTIVE);
             }
             tc.sendCanMessage(m, this);
-        } else if (s == Sensor.UNKNOWN){
+        }
+        if (s == Sensor.UNKNOWN){
             setOwnState(Sensor.UNKNOWN);
         }
     }

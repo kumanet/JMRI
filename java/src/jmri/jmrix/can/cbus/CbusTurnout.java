@@ -40,10 +40,6 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
         // build local addresses
         CbusAddress a = new CbusAddress(address);
         CbusAddress[] v = a.split();
-        if (v == null) {
-            log.error("Did not find usable system name: " + address);
-            return;
-        }
         switch (v.length) {
             case 1:
                 addrThrown = v[0];
@@ -102,7 +98,8 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
                 m = addrThrown.makeMessage(tc.getCanid());
             }
             tc.sendCanMessage(m, this);
-        } else if (s == Turnout.CLOSED) {
+        } 
+        if (s == Turnout.CLOSED) {
             if (getInverted()){
                 m = addrThrown.makeMessage(tc.getCanid());
             }
