@@ -15,6 +15,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import jmri.CatalogTreeManager;
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
@@ -50,6 +52,7 @@ import jmri.jmrit.display.Positionable;
 import jmri.jmrit.display.PositionablePopupUtil;
 import jmri.jmrit.display.ToolTip;
 import jmri.util.JmriJFrame;
+import jmri.util.SystemType;
 import jmri.util.swing.JmriColorChooser;
 import org.jdom2.Element;
 import org.slf4j.Logger;
@@ -92,6 +95,21 @@ import org.slf4j.LoggerFactory;
  */
 public class PanelEditor extends Editor implements ItemListener {
 
+    private static final String SENSOR = "Sensor";
+    private static final String SIGNAL_HEAD = "SignalHead";
+    private static final String SIGNAL_MAST = "SignalMast";
+    private static final String MEMORY = "Memory";
+    private static final String RIGHT_TURNOUT = "RightTurnout";
+    private static final String LEFT_TURNOUT = "LeftTurnout";
+    private static final String SLIP_TO_EDITOR = "SlipTOEditor";
+    private static final String BLOCK_LABEL = "BlockLabel";
+    private static final String REPORTER = "Reporter";
+    private static final String LIGHT = "Light";
+    private static final String BACKGROUND = "Background";
+    private static final String MULTI_SENSOR = "MultiSensor";
+    private static final String RPSREPORTER = "RPSreporter";
+    private static final String FAST_CLOCK = "FastClock";
+    private static final String ICON = "Icon";
     private final JTextField nextX = new JTextField("0", 4);
     private final JTextField nextY = new JTextField("0", 4);
 
@@ -120,22 +138,6 @@ public class PanelEditor extends Editor implements ItemListener {
 
     @Override
     protected void init(String name) {
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    // Build resource catalog and load CatalogTree.xml now
-                    CatalogPanel catalog = new CatalogPanel();
-                    catalog.createNewBranch("IFJAR", "Program Directory", "resources");
-                    // log.debug("init run created (var=catalog)"); // where's this used, just a test run?
-                } catch (Exception ex) {
-                    log.error("Error trying to set up preferences {}", ex.toString());
-                }
-            }
-        };
-        Thread thr = new Thread(r);
-        thr.setName("PanelEditor init");
-        thr.start();
         java.awt.Container contentPane = this.getContentPane();
         contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
         // common items
@@ -226,8 +228,9 @@ public class PanelEditor extends Editor implements ItemListener {
                                 JOptionPane.ERROR_MESSAGE);
                         return;
                     }
-                    if (getTargetPanel().getTopLevelAncestor() != null) {
-                        ((JFrame) getTargetPanel().getTopLevelAncestor()).setTitle(newName);
+                    Component ancestor = getTargetPanel().getTopLevelAncestor(); // could be null
+                    if (ancestor instanceof JFrame) {
+                        ((JFrame) ancestor).setTitle(newName);
                     }
                     editor.setTitle();
                     InstanceManager.getDefault(PanelMenu.class).renameEditorPanel(editor);
@@ -281,21 +284,21 @@ public class PanelEditor extends Editor implements ItemListener {
         _addIconBox = new JComboBox<>();
         _addIconBox.setMinimumSize(new Dimension(75, 75));
         _addIconBox.setMaximumSize(new Dimension(200, 200));
-        _addIconBox.addItem(new ComboBoxItem("RightTurnout"));
-        _addIconBox.addItem(new ComboBoxItem("LeftTurnout"));
-        _addIconBox.addItem(new ComboBoxItem("SlipTOEditor"));
-        _addIconBox.addItem(new ComboBoxItem("Sensor")); // NOI18N
-        _addIconBox.addItem(new ComboBoxItem("SignalHead"));
-        _addIconBox.addItem(new ComboBoxItem("SignalMast"));
-        _addIconBox.addItem(new ComboBoxItem("Memory"));
-        _addIconBox.addItem(new ComboBoxItem("BlockLabel"));
-        _addIconBox.addItem(new ComboBoxItem("Reporter"));
-        _addIconBox.addItem(new ComboBoxItem("Light"));
-        _addIconBox.addItem(new ComboBoxItem("Background"));
-        _addIconBox.addItem(new ComboBoxItem("MultiSensor"));
-        _addIconBox.addItem(new ComboBoxItem("RPSreporter"));
-        _addIconBox.addItem(new ComboBoxItem("FastClock"));
-        _addIconBox.addItem(new ComboBoxItem("Icon"));
+        _addIconBox.addItem(new ComboBoxItem(RIGHT_TURNOUT));
+        _addIconBox.addItem(new ComboBoxItem(LEFT_TURNOUT));
+        _addIconBox.addItem(new ComboBoxItem(SLIP_TO_EDITOR));
+        _addIconBox.addItem(new ComboBoxItem(SENSOR)); // NOI18N
+        _addIconBox.addItem(new ComboBoxItem(SIGNAL_HEAD));
+        _addIconBox.addItem(new ComboBoxItem(SIGNAL_MAST));
+        _addIconBox.addItem(new ComboBoxItem(MEMORY));
+        _addIconBox.addItem(new ComboBoxItem(BLOCK_LABEL));
+        _addIconBox.addItem(new ComboBoxItem(REPORTER));
+        _addIconBox.addItem(new ComboBoxItem(LIGHT));
+        _addIconBox.addItem(new ComboBoxItem(BACKGROUND));
+        _addIconBox.addItem(new ComboBoxItem(MULTI_SENSOR));
+        _addIconBox.addItem(new ComboBoxItem(RPSREPORTER));
+        _addIconBox.addItem(new ComboBoxItem(FAST_CLOCK));
+        _addIconBox.addItem(new ComboBoxItem(ICON));
         _addIconBox.setSelectedIndex(-1);
         _addIconBox.addItemListener(this);  // must be AFTER no selection is set
         JPanel p1 = new JPanel();
@@ -477,17 +480,17 @@ public class PanelEditor extends Editor implements ItemListener {
         public String toString() {
             // I18N split Bundle name
             // use NamedBeanBundle property for basic beans like "Turnout" I18N
-            if ("Sensor".equals(name)) {
+            if (SENSOR.equals(name)) {
                 bundleName = "BeanNameSensor";
-            } else if ("SignalHead".equals(name)) {
+            } else if (SIGNAL_HEAD.equals(name)) {
                 bundleName = "BeanNameSignalHead";
-            } else if ("SignalMast".equals(name)) {
+            } else if (SIGNAL_MAST.equals(name)) {
                 bundleName = "BeanNameSignalMast";
-            } else if ("Memory".equals(name)) {
+            } else if (MEMORY.equals(name)) {
                 bundleName = "BeanNameMemory";
-            } else if ("Reporter".equals(name)) {
+            } else if (REPORTER.equals(name)) {
                 bundleName = "BeanNameReporter";
-            } else if ("Light".equals(name)) {
+            } else if (LIGHT.equals(name)) {
                 bundleName = "BeanNameLight";
             } else {
                 bundleName = name;
@@ -509,9 +512,9 @@ public class PanelEditor extends Editor implements ItemListener {
                 frame.getEditor().reset();
                 frame.setVisible(true);
             } else {
-                if (name.equals("FastClock")) {
+                if (name.equals(FAST_CLOCK)) {
                     addClock();
-                } else if (name.equals("RPSreporter")) {
+                } else if (name.equals(RPSREPORTER)) {
                     addRpsReporter();
                 } else {
                     log.error("Unable to open Icon Editor \"{}\"", item.getName());
@@ -584,7 +587,7 @@ public class PanelEditor extends Editor implements ItemListener {
             }
         });
 
-        JMenu warrantMenu = jmri.jmrit.logix.WarrantTableAction.makeWarrantMenu(isEditable());
+        JMenu warrantMenu = jmri.jmrit.logix.WarrantTableAction.getDefault().makeWarrantMenu(isEditable());
         if (warrantMenu != null) {
             menuBar.add(warrantMenu);
         }
@@ -627,7 +630,7 @@ public class PanelEditor extends Editor implements ItemListener {
     }
 
     /**
-     * Create popup for a Positionable object Popup items common to all
+     * Create popup for a Positionable object. Popup items common to all
      * positionable objects are done before and after the items that pertain
      * only to specific Positionable types.
      */
@@ -727,7 +730,7 @@ public class PanelEditor extends Editor implements ItemListener {
             }
             if (event.isPopupTrigger()) {
                 log.debug("mousePressed calls showPopUp");
-                if (event.isMetaDown() || event.isAltDown()) {
+                if (isMetaDown(event) || event.isAltDown()) {
                     // if requesting a popup and it might conflict with moving, delay the request to mouseReleased
                     delayedPopupTrigger = true;
                 } else {
@@ -748,7 +751,7 @@ public class PanelEditor extends Editor implements ItemListener {
             }
         } else {
             if (event.isPopupTrigger()) {
-                if (event.isMetaDown() || event.isAltDown()) {
+                if (isMetaDown(event) || event.isAltDown()) {
                     // if requesting a popup and it might conflict with moving, delay the request to mouseReleased
                     delayedPopupTrigger = true;
                 } else {
@@ -766,7 +769,7 @@ public class PanelEditor extends Editor implements ItemListener {
             }
         }
         // if ((event.isControlDown() || _selectionGroup!=null) && _currentSelection!=null){
-        if ((event.isControlDown()) || event.isMetaDown() || event.isAltDown()) {
+        if ((event.isControlDown()) || isMetaDown(event) || event.isAltDown()) {
             //Don't want to do anything, just want to catch it, so that the next two else ifs are not
             //executed
         } else if ((_currentSelection == null && _multiItemCopyGroup == null)
@@ -784,8 +787,9 @@ public class PanelEditor extends Editor implements ItemListener {
     public void mouseReleased(MouseEvent event) {
         setToolTip(null); // ends tooltip if displayed
         if (log.isDebugEnabled()) {
-            log.debug("mouseReleased at (" + event.getX() + "," + event.getY() + ") dragging= " + _dragging
-                    + " selectRect is " + (_selectRect == null ? "null" : "not null"));
+            // in if statement to avoid inline conditional unless logging
+            log.debug("mouseReleased at ({},{}) dragging= {} selectRect is {}", event.getX(), event.getY(), _dragging,
+                    _selectRect == null ? "null" : "not null");
         }
         List<Positionable> selections = getSelectedItems(event);
 
@@ -848,7 +852,7 @@ public class PanelEditor extends Editor implements ItemListener {
     @Override
     public void mouseDragged(MouseEvent event) {
         setToolTip(null); // ends tooltip if displayed
-        if ((event.isPopupTrigger()) || (!event.isMetaDown() && !event.isAltDown())) {
+        if ((event.isPopupTrigger()) || (!isMetaDown(event) && !event.isAltDown())) {
             if (_currentSelection != null) {
                 List<Positionable> selections = getSelectedItems(event);
                 if (selections.size() > 0) {
@@ -1060,21 +1064,21 @@ public class PanelEditor extends Editor implements ItemListener {
         }
         JMenu _add = new JMenu(Bundle.getMessage("MenuItemAddItem"));
         // for items in the following list, I18N is picked up later on
-        addItemPopUp(new ComboBoxItem("RightTurnout"), _add);
-        addItemPopUp(new ComboBoxItem("LeftTurnout"), _add);
-        addItemPopUp(new ComboBoxItem("SlipTOEditor"), _add);
-        addItemPopUp(new ComboBoxItem("Sensor"), _add);
-        addItemPopUp(new ComboBoxItem("SignalHead"), _add);
-        addItemPopUp(new ComboBoxItem("SignalMast"), _add);
-        addItemPopUp(new ComboBoxItem("Memory"), _add);
-        addItemPopUp(new ComboBoxItem("BlockLabel"), _add);
-        addItemPopUp(new ComboBoxItem("Reporter"), _add);
-        addItemPopUp(new ComboBoxItem("Light"), _add);
-        addItemPopUp(new ComboBoxItem("Background"), _add);
-        addItemPopUp(new ComboBoxItem("MultiSensor"), _add);
-        addItemPopUp(new ComboBoxItem("RPSreporter"), _add);
-        addItemPopUp(new ComboBoxItem("FastClock"), _add);
-        addItemPopUp(new ComboBoxItem("Icon"), _add);
+        addItemPopUp(new ComboBoxItem(RIGHT_TURNOUT), _add);
+        addItemPopUp(new ComboBoxItem(LEFT_TURNOUT), _add);
+        addItemPopUp(new ComboBoxItem(SLIP_TO_EDITOR), _add);
+        addItemPopUp(new ComboBoxItem(SENSOR), _add);
+        addItemPopUp(new ComboBoxItem(SIGNAL_HEAD), _add);
+        addItemPopUp(new ComboBoxItem(SIGNAL_MAST), _add);
+        addItemPopUp(new ComboBoxItem(MEMORY), _add);
+        addItemPopUp(new ComboBoxItem(BLOCK_LABEL), _add);
+        addItemPopUp(new ComboBoxItem(REPORTER), _add);
+        addItemPopUp(new ComboBoxItem(LIGHT), _add);
+        addItemPopUp(new ComboBoxItem(BACKGROUND), _add);
+        addItemPopUp(new ComboBoxItem(MULTI_SENSOR), _add);
+        addItemPopUp(new ComboBoxItem(RPSREPORTER), _add);
+        addItemPopUp(new ComboBoxItem(FAST_CLOCK), _add);
+        addItemPopUp(new ComboBoxItem(ICON), _add);
         addItemPopUp(new ComboBoxItem("Text"), _add);
         popup.add(_add);
     }
@@ -1135,7 +1139,7 @@ public class PanelEditor extends Editor implements ItemListener {
         }
         if (!removed) {
             _selectionGroup.add(p);
-        } else if (removed && _selectionGroup.isEmpty()) {
+        } else if (_selectionGroup.isEmpty()) {
             _selectionGroup = null;
         }
         _targetPanel.repaint();
@@ -1179,10 +1183,10 @@ public class PanelEditor extends Editor implements ItemListener {
                 className = ConfigXmlManager.adapterName(copied);
                 copied.setLocation(x, y);
                 try {
-                    adapter = (XmlAdapter) Class.forName(className).newInstance();
+                    adapter = (XmlAdapter) Class.forName(className).getDeclaredConstructor().newInstance();
                     Element el = adapter.store(copied);
                     adapter.load(el, this);
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException
                     | jmri.configurexml.JmriConfigureXmlException
                     | RuntimeException ex) {
                         log.debug(ex.getLocalizedMessage(), ex);
@@ -1302,6 +1306,19 @@ public class PanelEditor extends Editor implements ItemListener {
            }
         });
         popup.add(edit);
+    }
+
+    // The meta key was until Java 8 the right mouse button on Windows.
+    // On Java 9 on Windows 10, there is no more meta key. Note that this
+    // method is called both on mouse button events and mouse move events,
+    // and therefore "event.getButton() == MouseEvent.BUTTON3" doesn't work.
+    // event.getButton() always return 0 for MouseMoveEvent.
+    protected boolean isMetaDown(MouseEvent event) {
+        if (SystemType.isWindows() || SystemType.isLinux()) {
+            return SwingUtilities.isRightMouseButton(event);
+        } else {
+            return event.isMetaDown();
+        }
     }
 
     private final static Logger log = LoggerFactory.getLogger(PanelEditor.class);

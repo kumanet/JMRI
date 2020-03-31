@@ -2,18 +2,18 @@ package jmri.jmrix.can.cbus.simulator;
 
 import java.util.ArrayList;
 import jmri.jmrix.can.CanSystemConnectionMemo;
-import jmri.jmrix.can.cbus.simulator.CbusDummyCS;
-import jmri.jmrix.can.cbus.simulator.CbusDummyNode;
-import jmri.jmrix.can.cbus.simulator.CbusEventResponder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Simultaing a MERG CBUS Command Station + other network objects
- * <p>By default starts with 1 command station, a node in SLiM mode,
- * and an event request responder.</p>
- * <p>All simulation responses can be sent as @CanMessage or @CanReply </p>
+ * Simulating a MERG CBUS Command Station + other network objects.
+ * <p>
+ * By default starts with 1 command station, a node in SLiM mode,
+ * and an event request responder.
+ * <p>
+ * All simulation responses can be sent as {@link jmri.jmrix.can.CanMessage} or {@link jmri.jmrix.can.CanReply}
+ *
  * @author Steve Young Copyright (C) 2018
  * @see CbusDummyCS
  * @see CbusEventResponder
@@ -22,25 +22,26 @@ import org.slf4j.LoggerFactory;
  */
 public class CbusSimulator {
 
-    private CanSystemConnectionMemo memo;
+    private final CanSystemConnectionMemo memo;
     public ArrayList<CbusDummyCS> _csArr;
     public ArrayList<CbusDummyNode> _ndArr;
     public ArrayList<CbusEventResponder> _evResponseArr;
 
     public CbusSimulator(CanSystemConnectionMemo sysmemo){
         memo = sysmemo;
+        jmri.InstanceManager.store(this,jmri.jmrix.can.cbus.simulator.CbusSimulator.class);
         init();
     }
     
-    public void init(){
+    public final void init(){
         log.info("Starting CBUS Network Simulation Tools");
-        _csArr = new ArrayList<CbusDummyCS>();
+        _csArr = new ArrayList<>();
         _csArr.add(new CbusDummyCS(memo)); // type, id, memo
         
-        _ndArr = new ArrayList<CbusDummyNode>();
-        _ndArr.add(new CbusDummyNode(memo)); // type, id, memo
+        _ndArr = new ArrayList<>();
+        _ndArr.add(new CbusDummyNode(0,165,0,0,memo)); // nn, manufacturer, type, canid, memo
         
-        _evResponseArr = new ArrayList<CbusEventResponder>();
+        _evResponseArr = new ArrayList<>();
         _evResponseArr.add(new CbusEventResponder(memo) );
     }
     
@@ -75,19 +76,16 @@ public class CbusSimulator {
     }
     
     public CbusDummyNode getNewNd(){
-        CbusDummyNode newnd  = new CbusDummyNode(memo);
+        CbusDummyNode newnd  = new CbusDummyNode(0,165,0,0,memo);
         _ndArr.add(newnd);
         return newnd;
-        
     }
 
     public CbusEventResponder getNewEv(){
         CbusEventResponder newcs = new CbusEventResponder(memo);
         _evResponseArr.add(newcs);
         return newcs;
-        
     }
-    
 
     // removes CanListeners
     // resets all command stations to stop any session timers
@@ -110,6 +108,8 @@ public class CbusSimulator {
             _evResponseArr.set(i,null);
         } 
         _evResponseArr = null;
+        
+        jmri.InstanceManager.deregister(this, jmri.jmrix.can.cbus.simulator.CbusSimulator.class);
     }
 
     private static final Logger log = LoggerFactory.getLogger(CbusSimulator.class);

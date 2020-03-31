@@ -19,18 +19,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An icon to display a status and state of a color coded turnout.<P>
+ * An icon to display a status and state of a color coded turnout.<p>
  * This responds to only KnownState, leaving CommandedState to some other
  * graphic representation later.
  * <p>
  * "state" is the state of the underlying turnout ("closed", "thrown", etc.)
  * <p>
  * "status" is the operating condition of the track ("clear", "occupied", etc.)
- * <P>
+ * <p>
  * A click on the icon will command a state change. Specifically, it will set
  * the CommandedState to the opposite (THROWN vs CLOSED) of the current
  * KnownState. This will display the setting of the turnout points.
- * <P>
+ * <p>
  * The status is indicated by color and changes are done only done by the
  * occupancy sensing - OBlock or other sensor.
  * <p>
@@ -48,7 +48,7 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
     private NamedBeanHandle<OBlock> namedOccBlock = null;
 
     private IndicatorTrackPaths _pathUtil;
-    private IndicatorTOItemPanel _TOPanel;
+    private IndicatorTOItemPanel _itemPanel;
     private String _status;
 
     public IndicatorTurnoutIcon(Editor editor) {
@@ -192,6 +192,8 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
                 displayState(turnoutState());
             }
             setToolTip(new ToolTip(block.getDescription(), 0, 0));
+        } else {
+            setToolTip(new ToolTip(null, 0, 0));
         }
     }
 
@@ -248,9 +250,9 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
     /**
      * Place icon by its localized bean state name
      *
-     * @param status    - the track condition of the icon
-     * @param stateName - NamedBean name of turnout state
-     * @param icon      - icon corresponding to status and state
+     * @param status     the track condition of the icon
+     * @param stateName  NamedBean name of turnout state
+     * @param icon       icon corresponding to status and state
      */
     public void setIcon(String status, String stateName, NamedIcon icon) {
         if (log.isDebugEnabled()) {
@@ -443,7 +445,7 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
     @Override
     protected void editItem() {
         _paletteFrame = makePaletteFrame(java.text.MessageFormat.format(Bundle.getMessage("EditItem"), Bundle.getMessage("IndicatorTO")));
-        _TOPanel = new IndicatorTOItemPanel(_paletteFrame, "IndicatorTO", _iconFamily,
+        _itemPanel = new IndicatorTOItemPanel(_paletteFrame, "IndicatorTO", _iconFamily,
                 PickListModel.turnoutPickModelInstance(), _editor);
         ActionListener updateAction = new ActionListener() {
             @Override
@@ -475,31 +477,33 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
                 clone.put(_state2nameMap.get(ent.getKey()), newIcon);
             }
         }
-        _TOPanel.initUpdate(updateAction, iconMaps);
-        _TOPanel.setSelection(getTurnout());
+        _itemPanel.initUpdate(updateAction, iconMaps);
+        
         if (namedOccSensor != null) {
-            _TOPanel.setOccDetector(namedOccSensor.getBean().getDisplayName());
+            _itemPanel.setOccDetector(namedOccSensor.getBean().getDisplayName());
         }
         if (namedOccBlock != null) {
-            _TOPanel.setOccDetector(namedOccBlock.getBean().getDisplayName());
+            _itemPanel.setOccDetector(namedOccBlock.getBean().getDisplayName());
         }
-        _TOPanel.setShowTrainName(_pathUtil.showTrain());
-        _TOPanel.setPaths(_pathUtil.getPaths());
-        initPaletteFrame(_paletteFrame, _TOPanel);
+        _itemPanel.setShowTrainName(_pathUtil.showTrain());
+        _itemPanel.setPaths(_pathUtil.getPaths());
+        _itemPanel.setSelection(getTurnout());  // do after all other params set - calls resize()
+        
+        initPaletteFrame(_paletteFrame, _itemPanel);
     }
 
     @Override
     void updateItem() {
         if (log.isDebugEnabled()) {
-            log.debug("updateItem: " + getNameString() + " family= " + _TOPanel.getFamilyName());
+            log.debug("updateItem: " + getNameString() + " family= " + _itemPanel.getFamilyName());
         }
-        setTurnout(_TOPanel.getTableSelection().getSystemName());
-        setOccSensor(_TOPanel.getOccSensor());
-        setOccBlock(_TOPanel.getOccBlock());
-        _pathUtil.setShowTrain(_TOPanel.getShowTrainName());
-        _iconFamily = _TOPanel.getFamilyName();
-        _pathUtil.setPaths(_TOPanel.getPaths());
-        HashMap<String, HashMap<String, NamedIcon>> iconMap = _TOPanel.getIconMaps();
+        setTurnout(_itemPanel.getTableSelection().getSystemName());
+        setOccSensor(_itemPanel.getOccSensor());
+        setOccBlock(_itemPanel.getOccBlock());
+        _pathUtil.setShowTrain(_itemPanel.getShowTrainName());
+        _iconFamily = _itemPanel.getFamilyName();
+        _pathUtil.setPaths(_itemPanel.getPaths());
+        HashMap<String, HashMap<String, NamedIcon>> iconMap = _itemPanel.getIconMaps();
         if (iconMap != null) {
             Iterator<Entry<String, HashMap<String, NamedIcon>>> it = iconMap.entrySet().iterator();
             while (it.hasNext()) {
@@ -520,7 +524,7 @@ public class IndicatorTurnoutIcon extends TurnoutIcon implements IndicatorTrack 
                 }
             }
         }   // otherwise retain current map
-        finishItemUpdate(_paletteFrame, _TOPanel);
+        finishItemUpdate(_paletteFrame, _itemPanel);
         displayState(turnoutState());
     }
 

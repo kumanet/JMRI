@@ -1,11 +1,8 @@
 package jmri.jmrit.throttle;
 
 import java.awt.Component;
-import javax.swing.JLabel;
-import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import jmri.DccLocoAddress;
-import jmri.jmrit.DccLocoAddressSelector;
 import jmri.util.swing.JemmyUtil;
 import org.netbeans.jemmy.ComponentChooser;
 import org.netbeans.jemmy.operators.JButtonOperator;
@@ -13,14 +10,12 @@ import org.netbeans.jemmy.operators.JCheckBoxOperator;
 import org.netbeans.jemmy.operators.JDialogOperator;
 import org.netbeans.jemmy.operators.JFrameOperator;
 import org.netbeans.jemmy.operators.JInternalFrameOperator;
-import org.netbeans.jemmy.operators.JLabelOperator;
 import org.netbeans.jemmy.operators.JPopupMenuOperator;
 import org.netbeans.jemmy.operators.JTextFieldOperator;
 import org.netbeans.jemmy.operators.JToggleButtonOperator;
 import org.netbeans.jemmy.operators.JRadioButtonOperator;
 import org.netbeans.jemmy.operators.JSliderOperator;
 import org.netbeans.jemmy.operators.JSpinnerOperator;
-import org.netbeans.jemmy.util.NameComponentChooser;
 
 /*
  *  Helper class for operating the Throttle Frame.
@@ -109,6 +104,10 @@ public class ThrottleOperator extends JFrameOperator {
    public boolean releaseButtonEnabled(){
         return (new JButtonOperator(this,Bundle.getMessage("ButtonRelease"))).isEnabled();
    }
+   
+   public boolean dispatchButtonEnabled(){
+        return (new JButtonOperator(this,Bundle.getMessage("ButtonDispatch"))).isEnabled();
+   }
 
    public void answerStealQuestion(boolean steal){
         JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("StealRequestTitle"));
@@ -119,6 +118,30 @@ public class ThrottleOperator extends JFrameOperator {
         }
    }
 
+    public void answerShareQuestion(boolean share){
+        JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("ShareRequestTitle"));
+        if(share) {
+           (new JButtonOperator(jdo,Bundle.getMessage("ButtonYes"))).doClick();
+        } else {
+           (new JButtonOperator(jdo,Bundle.getMessage("ButtonNo"))).doClick();
+        }
+    }
+    
+    // Steal / Share / Cancel dialogue operators
+    public void answerStealShareQuestionSteal(){
+        JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("StealShareRequestTitle"));
+        new JButtonOperator(jdo,Bundle.getMessage("StealButton")).doClick();
+    }
+    
+    public void answerStealShareQuestionShare(){
+        JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("StealShareRequestTitle"));
+        new JButtonOperator(jdo,Bundle.getMessage("ShareButton")).doClick();
+    }
+    
+    public void answerStealShareQuestionCancel(){
+        JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("StealShareRequestTitle"));
+        new JButtonOperator(jdo,Bundle.getMessage("CancelButton")).doClick();
+    }
 
    // Function panel operations
    public JInternalFrameOperator getFunctionPanelOperator(){
@@ -204,11 +227,11 @@ public class ThrottleOperator extends JFrameOperator {
         JToggleButtonOperator jbo = new JToggleButtonOperator(fb);
         jbo.clickForPopup();
         JPopupMenuOperator jpmo = new JPopupMenuOperator();
-	jpmo.pushMenu(Bundle.getMessage("MenuItemProperties"));
+	    jpmo.pushMenuNoBlock(Bundle.getMessage("MenuItemProperties"));
    }
 
    public void toggleFunctionMomentary(int function){
-	openFunctionPopupMenu(function);
+	    openFunctionPopupMenu(function);
         JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("ButtonEditFunction"));
         (new JCheckBoxOperator(jdo,Bundle.getMessage("CheckBoxLockable"))).doClick();
         (new JButtonOperator(jdo,Bundle.getMessage("ButtonOK"))).doClick();
@@ -270,15 +293,15 @@ public class ThrottleOperator extends JFrameOperator {
         JInternalFrameOperator jifo  = getControlPanelOperator();
         jifo.clickForPopup();
         JPopupMenuOperator jpmo = new JPopupMenuOperator();
-	jpmo.pushMenu(Bundle.getMessage("ControlPanelProperties"));
+	    jpmo.pushMenuNoBlock(Bundle.getMessage("ControlPanelProperties"));
    }
 
    public void setSpeedStepDisplay(){
-	openControlPanelPopupMenu();
+	    openControlPanelPopupMenu();
         JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("TitleEditSpeedControlPanel"));
         (new JRadioButtonOperator(jdo,Bundle.getMessage("ButtonDisplaySpeedSteps"))).doClick();
         (new JButtonOperator(jdo,Bundle.getMessage("ButtonOK"))).doClick();
-        
+         
    }
 
    public void setSpeedSpinner(int i){
@@ -292,6 +315,5 @@ public class ThrottleOperator extends JFrameOperator {
    public void speedSpinnerMinimum(){
         new JSpinnerOperator(getControlPanelOperator()).scrollToMinimum();
    }
-
 
 }

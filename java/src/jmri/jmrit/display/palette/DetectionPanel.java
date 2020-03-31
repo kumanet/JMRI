@@ -42,6 +42,7 @@ public class DetectionPanel extends JPanel {
 
     /**
      * Add _blockPathPanel to this ItemPanel.
+     * @param parent the indicator track item panel
      */
     public DetectionPanel(ItemPanel parent) {
         super();
@@ -73,10 +74,8 @@ public class DetectionPanel extends JPanel {
                 }
             }
         });
-        _openPicklistButton.setToolTipText(Bundle.getMessage("ToolTipPickLists"));
         JPanel p = new JPanel();
         p.add(_openPicklistButton);
-        p.setToolTipText(Bundle.getMessage("ToolTipPickLists"));
         panel.add(p);
         add(panel);
 
@@ -124,7 +123,7 @@ public class DetectionPanel extends JPanel {
         blurb.setLayout(new BoxLayout(blurb, BoxLayout.Y_AXIS));
         blurb.add(Box.createVerticalStrut(ItemPalette.STRUT_SIZE));
         blurb.add(new JLabel(Bundle.getMessage("DragOccupancyName", Bundle.getMessage("DetectionSensor"))));
-        blurb.add(new JLabel(Bundle.getMessage("DragErrorName", Bundle.getMessage("ErrorSensor"))));
+//        blurb.add(new JLabel(Bundle.getMessage("DragErrorName", Bundle.getMessage("ErrorSensor"))));
         blurb.add(Box.createVerticalStrut(ItemPalette.STRUT_SIZE));
         JPanel panel = new JPanel();
         panel.add(blurb);
@@ -205,6 +204,7 @@ public class DetectionPanel extends JPanel {
 
     /**
      * Name of either Sensor or OBlock for detection
+     * @param name detector name
      */
     public void setOccDetector(String name) {
         _occDetectorName.setText(name);
@@ -216,6 +216,7 @@ public class DetectionPanel extends JPanel {
         if (_pathBoxes != null) {
             for (int i = 0; i < _pathBoxes.size(); i++) {
                 if (_pathBoxes.get(i).isSelected()) {
+                    // displayed path names are padded to 25 charts
                     paths.add(_pathBoxes.get(i).getName().trim());
                 }
             }
@@ -230,6 +231,7 @@ public class DetectionPanel extends JPanel {
         }
         for (int k = 0; k < iconPath.size(); k++) {
             for (int i = 0; i < _pathBoxes.size(); i++) {
+                // displayed path names are padded to 25 charts
                 String name = _pathBoxes.get(i).getName().trim();
                 if (iconPath.get(k).equals(name)) {
                     _pathBoxes.get(i).setSelected(true);

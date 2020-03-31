@@ -1,6 +1,5 @@
 package jmri.jmrix.sprog.pi.pisprogonecs;
 
-import jmri.jmrix.sprog.SprogSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 import org.junit.After;
 import org.junit.Assert;
@@ -8,9 +7,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * <p>
- * Tests for PiSprogOneCSSerialDriverAdapter
- * </P>
+ * Tests for PiSprogOneCSSerialDriverAdapter.
+ *
  * @author Paul Bender Copyright (C) 2016
  */
 public class PiSprogOneCSSerialDriverAdapterTest {
@@ -34,6 +32,5 @@ public class PiSprogOneCSSerialDriverAdapterTest {
     public void tearDown() {
         JUnitUtil.tearDown();
     }
-
 
 }

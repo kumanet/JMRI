@@ -20,21 +20,22 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
 
     public CbusDccProgrammer(jmri.jmrix.can.TrafficController tc) {
         this.tc = tc;
-        tc.addCanListener(this);
+        addTc(tc);
     }
 
     jmri.jmrix.can.TrafficController tc;
 
     /**
+     * {@inheritDoc}
      * Types implemented here.
      */
     @Override
     @Nonnull
     public List<ProgrammingMode> getSupportedModes() {
-        List<ProgrammingMode> ret = new ArrayList<ProgrammingMode>();
-        ret.add(ProgrammingMode.PAGEMODE);
+        List<ProgrammingMode> ret = new ArrayList<>();
         ret.add(ProgrammingMode.DIRECTBITMODE);
         ret.add(ProgrammingMode.DIRECTBYTEMODE);
+        ret.add(ProgrammingMode.PAGEMODE);
         ret.add(ProgrammingMode.REGISTERMODE);
         return ret;
     }
@@ -55,9 +56,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
     @Override
     synchronized public void writeCV(String CVname, int val, jmri.ProgListener p) throws jmri.ProgrammerException {
         final int CV = Integer.parseInt(CVname);
-        if (log.isDebugEnabled()) {
-            log.debug("writeCV " + CV + " listens " + p);
-        }
+        log.debug("writeCV {} listener {}",CV, p);
         useProgrammer(p);
         _progRead = false;
         progState = COMMANDSENT;
@@ -70,7 +69,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
             tc.sendCanMessage(CbusMessage.getWriteCV(_cv, _val, getMode(), tc.getCanid()), this);
         } catch (Exception e) {
             // program op failed, go straight to end
-            log.error("Write operation failed, exception " + e);
+            log.error("Write operation failed, {} ",e);
             progState = RETURNSENT;
             //controller().sendCanMessage(CbusMessage.getExitProgMode(), this);
         }
@@ -90,9 +89,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
     @Override
     synchronized public void readCV(String CVname, jmri.ProgListener p) throws jmri.ProgrammerException {
         final int CV = Integer.parseInt(CVname);
-        if (log.isDebugEnabled()) {
-            log.debug("readCV " + CV + " listens " + p);
-        }
+        log.debug("readCV {} listens {}",CV, p);
         useProgrammer(p);
         _progRead = true;
         progState = COMMANDSENT;
@@ -104,7 +101,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
             tc.sendCanMessage(CbusMessage.getReadCV(_cv, getMode(), tc.getCanid()), this);
         } catch (Exception e) {
             // program op failed, go straight to end
-            log.error("Read operation failed, exception " + e);
+            log.error("Read operation failed, {} ", e);
             progState = RETURNSENT;
             //controller().sendCanMessage(CbusMessage.getExitProgMode(), this);
         }
@@ -116,22 +113,19 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
     protected void useProgrammer(jmri.ProgListener p) throws jmri.ProgrammerException {
         // test for only one!
         if (_usingProgrammer != null && _usingProgrammer != p) {
-            if (log.isInfoEnabled()) {
-                log.info("programmer already in use by " + _usingProgrammer);
-            }
+            log.info("programmer already in use by {}", _usingProgrammer);
             throw new jmri.ProgrammerException("programmer in use");
         } else {
             _usingProgrammer = p;
-            return;
         }
     }
 
     /** 
      * {@inheritDoc}
+     * Only listening for frames coming in to JMRI, see CanReply
      */
     @Override
     public void message(CanMessage m) {
-        //log.error("message received unexpectedly: "+m.toString());
     }
 
     /** 
@@ -139,16 +133,16 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
      */
     @Override
     synchronized public void reply(CanReply m) {
-        if (progState == NOTPROGRAMMING) {
-            // we get the complete set of replies now, so ignore these
+        if ( m.extendedOrRtr() ) {
             return;
-        } else if (progState == COMMANDSENT) {
+        }
+        if (progState == COMMANDSENT) {
             log.debug("reply in COMMANDSENT state");
             // operation done, capture result, then have to leave programming mode
             // check for errors
             if ((m.getElement(0) == CbusConstants.CBUS_SSTAT)
                 && (m.getElement(2) == CbusConstants.SSTAT_NO_ACK)) {
-                log.warn("handle error reply " + m);
+                log.warn("handle error reply {}", m);
                 // perhaps no loco present? Fail back to end of programming
                 //controller().sendCanMessage(CbusMessage.getExitProgMode(), this);
                 stopTimer();
@@ -173,15 +167,8 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
                     notifyProgListenerEnd(_val, jmri.ProgListener.OK);
                 } else {
                     // Carry on waiting
-                    if (log.isDebugEnabled()) {
-                        log.debug("Reply ignored: " + m);
-                    }
+                    log.debug("Reply ignored: {}", m);
                 }
-            }
-
-        } else {
-            if (log.isDebugEnabled()) {
-                log.debug("reply in un-decoded state");
             }
         }
     }
@@ -195,9 +182,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
     synchronized protected void timeout() {
         if (progState != NOTPROGRAMMING) {
             // we're programming, time to stop
-            if (log.isDebugEnabled()) {
-                log.debug("timeout!");
-            }
+            log.debug("timeout!");
             // perhaps no loco present? Fail back to end of programming
             progState = NOTPROGRAMMING;
             //controller().sendCbusMessage(CbusMessage.getExitProgMode(), this);
@@ -207,9 +192,7 @@ public class CbusDccProgrammer extends AbstractProgrammer implements CanListener
 
     // internal method to notify of the final result
     protected void notifyProgListenerEnd(int value, int status) {
-        if (log.isDebugEnabled()) {
-            log.debug("notifyProgListenerEnd value " + value + " status " + status);
-        }
+        log.debug("notifyProgListenerEnd value {}, status {}", value, status);
         // the programmingOpReply handler might send an immediate reply, so
         // clear the current listener _first_
         jmri.ProgListener temp = _usingProgrammer;

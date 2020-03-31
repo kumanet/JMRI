@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handle XML persistance of SwingGuiLaf default values.
- * <P>
+ * <p>
  * This class is named as being the persistant form of the GuiLafConfigPane
  * class, but there's no object of that form created when this is read back.
  * Instead, this interacts directly with Swing and the default Locale.
@@ -72,19 +72,19 @@ public class GuiLafConfigPaneXml extends jmri.configurexml.AbstractXmlAdapter {
         }
         String name = shared.getAttribute("LAFclass").getValue();
         String className = installedLAFs.get(name);
-        log.debug("GUI selection: " + name + " class name: " + className);
+        log.debug("GUI selection: {} class name: {}", name, className);
         // set the GUI
         if (className != null) {
             InstanceManager.getDefault(GuiLafPreferencesManager.class).setLookAndFeel(name);
             try {
                 if (!className.equals(UIManager.getLookAndFeel().getClass().getName())) {
-                    log.debug("set GUI to " + name + "," + className);
+                    log.debug("set GUI to {},{}", name, className);
                     updateLookAndFeel(name, className);
                 } else {
-                    log.debug("skip updateLAF as already has className==" + className);
+                    log.debug("skip updateLAF as already has className=={}", className);
                 }
             } catch (Exception ex) {
-                log.error("Exception while setting GUI look & feel: " + ex);
+                log.error("Exception while setting GUI look & feel: {}", ex);
                 result = false;
             }
         }

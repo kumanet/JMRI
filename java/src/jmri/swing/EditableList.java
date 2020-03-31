@@ -1,6 +1,5 @@
 package jmri.swing;
 
-import java.applet.Applet;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
@@ -25,7 +24,7 @@ import javax.swing.event.ChangeEvent;
 
 /**
  *
- * @author rhwood
+ * @author Randall Wood
  */
 public class EditableList<E> extends JList<E> implements CellEditorListener {
 
@@ -176,8 +175,7 @@ public class EditableList<E> extends JList<E> implements CellEditorListener {
                 if (c == EditableList.this) {
                     // focus remains inside the table
                     return;
-                } else if ((c instanceof Window)
-                        || (c instanceof Applet && c.getParent() == null)) {
+                } else if (c instanceof Window) {
                     if (c == SwingUtilities.getRoot(EditableList.this)) {
                         if (!getListCellEditor().stopCellEditing()) {
                             getListCellEditor().cancelCellEditing();

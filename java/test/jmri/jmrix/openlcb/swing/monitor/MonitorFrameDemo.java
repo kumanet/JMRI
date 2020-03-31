@@ -27,12 +27,14 @@ public class MonitorFrameDemo {
          * Forward CanMessage to object under test
          */
         public void testMessage(CanMessage f) {
+            // FIXME: must clone, iterator is not threadsafe.
             for (jmri.jmrix.AbstractMRListener c : cmdListeners) {
                 ((CanListener) c).message(f);
             }
         }
 
         public void testReply(CanReply f) {
+            // FIXME: must clone, iterator is not threadsafe.
             for (jmri.jmrix.AbstractMRListener c : cmdListeners) {
                 ((CanListener) c).reply(f);
             }
@@ -149,6 +151,8 @@ public class MonitorFrameDemo {
     @After
     public void tearDown() throws Exception {
         jmri.util.JUnitUtil.resetWindows(false, false);
+        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
+
     }
 }

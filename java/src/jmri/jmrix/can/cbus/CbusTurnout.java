@@ -1,12 +1,10 @@
 package jmri.jmrix.can.cbus;
 
+import jmri.Sensor;
 import jmri.Turnout;
 import jmri.jmrix.can.CanListener;
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanReply;
-import jmri.jmrix.can.cbus.CbusConstants;
-import jmri.jmrix.can.cbus.CbusMessage;
-import jmri.jmrix.can.cbus.CbusOpCodes;
 import jmri.jmrix.can.TrafficController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +27,7 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
 
     }
 
-    TrafficController tc;
+    private final TrafficController tc;
 
     /**
      * Common initialization for both constructors.
@@ -59,11 +57,11 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
                 addrClosed = v[1];
                 break;
             default:
-                log.error("Can't parse CbusSensor system name: " + address);
+                log.error("Can't parse CbusTurnout system name: {}", address);
                 return;
         }
         // connect
-        tc.addCanListener(this);
+        addTc(tc);
     }
 
     /**
@@ -73,14 +71,23 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
     public void requestUpdateFromLayout() {
         CanMessage m;
         m = addrThrown.makeMessage(tc.getCanid());
-        int opc = CbusMessage.getOpcode(m);
-        if (CbusOpCodes.isShortEvent(opc)) {
+        if (CbusOpCodes.isShortEvent(CbusMessage.getOpcode(m))) {
             m.setOpCode(CbusConstants.CBUS_ASRQ);
         }
         else {
             m.setOpCode(CbusConstants.CBUS_AREQ);
         }
+        CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
         tc.sendCanMessage(m, this);
+        
+        if (getFeedbackMode() == ONESENSOR || getFeedbackMode() == TWOSENSOR) {
+            Sensor s1 = getFirstSensor();
+            if (s1 != null) s1.requestUpdateFromLayout();
+        }
+        if (getFeedbackMode() == TWOSENSOR) {
+            Sensor s2 = getSecondSensor();
+            if (s2 != null) s2.requestUpdateFromLayout();
+        }
     }
     
     /**
@@ -92,26 +99,20 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
     protected void forwardCommandChangeToLayout(int s) {
         CanMessage m;
         if (s == Turnout.THROWN) {
-            if (getInverted()){
-                m = addrClosed.makeMessage(tc.getCanid());
-            } else {
-                m = addrThrown.makeMessage(tc.getCanid());
-            }
+            m = getAddrThrown();
+            CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
             tc.sendCanMessage(m, this);
         } 
         if (s == Turnout.CLOSED) {
-            if (getInverted()){
-                m = addrThrown.makeMessage(tc.getCanid());
-            }
-            else {
-                m = addrClosed.makeMessage(tc.getCanid());
-            }
+            m = getAddrClosed();
+            CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
             tc.sendCanMessage(m, this);
         }
     }
     
     /**
      * Package method returning CanMessage for the Thrown Turnout Address
+     * @return CanMessage with the Thrown Address
      */    
     public CanMessage getAddrThrown(){
         CanMessage m;
@@ -125,6 +126,7 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
     
     /**
      * Package method returning CanMessage for the Closed Turnout Address
+     * @return CanReply with the Closed Address
      */    
     public CanMessage getAddrClosed(){
         CanMessage m;
@@ -136,29 +138,115 @@ public class CbusTurnout extends jmri.implementation.AbstractTurnout
         return m;
     }
     
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void message(CanMessage f) {
-        if (addrThrown.match(f)) {
-            newCommandedState(!getInverted() ? THROWN : CLOSED);
-        } else if (addrClosed.match(f)) {
-            newCommandedState(!getInverted() ? CLOSED : THROWN);
+    // note we only respond to addrThrown matches, 
+    // ie the left hand side of split of address "+5;+7"
+    // there's a response expected from 5
+    private void sendResponseToQuery(){
+        CanMessage m = null;
+        if (getCommandedState() == Turnout.THROWN) {
+            m=getAddrThrown(); // has already had inverted status considered
+            if (CbusMessage.isShort(m)) {
+                if (CbusMessage.getEventType(m)==CbusConstants.EVENT_ON) {
+                    m.setOpCode(CbusConstants.CBUS_ARSON);
+                }
+                else {
+                    m.setOpCode(CbusConstants.CBUS_ARSOF);
+                }
+            } else {
+                if (CbusMessage.getEventType(m)==CbusConstants.EVENT_ON) {
+                    m.setOpCode(CbusConstants.CBUS_ARON);
+                }
+                else {
+                    m.setOpCode(CbusConstants.CBUS_AROF);
+                }
+            }
+        } else if (getCommandedState() == Turnout.CLOSED){
+            m=getAddrThrown(); // has already had inverted status considered
+            if (CbusMessage.isShort(m)) {
+                if (CbusMessage.getEventType(m)==CbusConstants.EVENT_ON) {
+                    m.setOpCode(CbusConstants.CBUS_ARSOF);
+                }
+                else {
+                    m.setOpCode(CbusConstants.CBUS_ARSON);
+                }
+            } else {
+                if (CbusMessage.getEventType(m)==CbusConstants.EVENT_ON) {
+                    m.setOpCode(CbusConstants.CBUS_AROF);
+                }
+                else {
+                    m.setOpCode(CbusConstants.CBUS_ARON);
+                }
+            }
+        }
+        if (m!=null) {
+            CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
+            tc.sendCanMessage(m, this);
         }
     }
     
     /**
      * {@inheritDoc}
+     *
+     * @see jmri.jmrix.can.CanListener#message(jmri.jmrix.can.CanMessage)
+     */
+    @Override
+    public void message(CanMessage f) {
+        if ( f.isExtended() || f.isRtr() ) {
+            return;
+        }
+        if (addrThrown.match(f)) {
+            int state = (!getInverted() ? THROWN : CLOSED);
+            newCommandedState(state);
+            if (_activeFeedbackType == DIRECT) {
+                newKnownState(state);
+            } else if (_activeFeedbackType == DELAYED) {
+                newKnownState(INCONSISTENT);
+                jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> { newKnownState(state); },DELAYED_FEEDBACK_INTERVAL );
+            }
+        } else if (addrClosed.match(f)) {
+            int state = (!getInverted() ? CLOSED : THROWN);
+            newCommandedState(state);
+            if (_activeFeedbackType == DIRECT) {
+                newKnownState(state);
+            } else if (_activeFeedbackType == DELAYED) {
+                newKnownState(INCONSISTENT);
+                jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> { newKnownState(state); },DELAYED_FEEDBACK_INTERVAL );
+            }
+        }
+    }
+    
+    /**
+     * {@inheritDoc}
+     *
+     * @see jmri.jmrix.can.CanListener#reply(jmri.jmrix.can.CanReply)
      */
     @Override
     public void reply(CanReply f) {
+        if ( f.isExtended() || f.isRtr() ) {
+            return;
+        }
         // convert response events to normal
         f = CbusMessage.opcRangeToStl(f);
         if (addrThrown.match(f)) {
-            newCommandedState(!getInverted() ? THROWN : CLOSED);
+            int state = (!getInverted() ? THROWN : CLOSED);
+            newCommandedState(state);
+            if (_activeFeedbackType == DIRECT) {
+                newKnownState(state);
+            } else if (_activeFeedbackType == DELAYED) {
+                newKnownState(INCONSISTENT);
+                jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> { newKnownState(state); },DELAYED_FEEDBACK_INTERVAL );
+            }
         } else if (addrClosed.match(f)) {
-            newCommandedState(!getInverted() ? CLOSED : THROWN);
+            int state = (!getInverted() ? CLOSED : THROWN);
+            newCommandedState(state);
+            if (_activeFeedbackType == DIRECT) {
+                newKnownState(state);
+            } else if (_activeFeedbackType == DELAYED) {
+                newKnownState(INCONSISTENT);
+                jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> { newKnownState(state); },DELAYED_FEEDBACK_INTERVAL );
+            }
+        } else if (addrThrown.matchRequest(f)) {
+            sendResponseToQuery();
         }
     }
     

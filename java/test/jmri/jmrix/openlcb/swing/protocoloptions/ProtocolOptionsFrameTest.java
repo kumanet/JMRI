@@ -1,41 +1,36 @@
 package jmri.jmrix.openlcb.swing.protocoloptions;
 
 import org.junit.After;
-import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.awt.GraphicsEnvironment;
 
 import jmri.util.JUnitUtil;
 import jmri.jmrix.openlcb.OlcbSystemConnectionMemo;
 
-import static org.junit.Assert.*;
 
 /**
  * @author Balazs Racz, (C) 2018.
  */
-public class ProtocolOptionsFrameTest {
+public class ProtocolOptionsFrameTest extends jmri.util.JmriJFrameTestBase {
 
     OlcbSystemConnectionMemo scm;
-    ProtocolOptionsFrame f;
 
     @Before
-    public void setUp() throws Exception {
+    @Override
+    public void setUp() {
         JUnitUtil.setUp();
         scm = new OlcbSystemConnectionMemo();
+        if(!GraphicsEnvironment.isHeadless()){
+           frame = new ProtocolOptionsFrame(scm);
+        }
     }
 
     @After
-    public void tearDown() throws Exception {
+    @Override
+    public void tearDown() {
         scm.dispose();
-        JUnitUtil.tearDown();
-    }
-
-    @Test
-    public void initComponents() throws Exception {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        f = new ProtocolOptionsFrame(scm);
-        f.initComponents();
+        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
+        super.tearDown();
     }
 }

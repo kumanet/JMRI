@@ -41,12 +41,12 @@ public class StoreXmlConfigAction extends LoadStoreBaseAction {
 
     /**
      * Do the filename handling:
-     * <OL>
-     * <LI>rescan directory to see any new files
-     * <LI>Prompt user to select a file
-     * <LI>adds .xml extension if needed
-     * <LI>if that file exists, check with user
-     * </OL>
+     * <ol>
+     * <li>rescan directory to see any new files
+     * <li>Prompt user to select a file
+     * <li>adds .xml extension if needed
+     * <li>if that file exists, check with user
+     * </ol>
      *
      * @param fileChooser the file chooser to use
      * @return the file to store or null if the user declined to store a file
@@ -54,7 +54,7 @@ public class StoreXmlConfigAction extends LoadStoreBaseAction {
     @CheckForNull
     public static File getFileCustom(JFileChooser fileChooser) {
         fileChooser.rescanCurrentDirectory();
-        int retVal = fileChooser.showDialog(null, null);
+        int retVal = fileChooser.showDialog(null, Bundle.getMessage("MenuItemStore"));
         if (retVal != JFileChooser.APPROVE_OPTION) {
             return null;  // give up if no file selected
         }

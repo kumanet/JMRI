@@ -13,7 +13,7 @@ import jmri.implementation.DefaultConditionalAction;
 /**
  * Provide bean-like access to the collection of Logix, Routes, Memories, etc
  * that make up a OsIndicator.
- * <P>
+ * <p>
  * An OS Indicator drives the lamp on the panel for a particular OS. Honors a
  * separate lock/unlocked indication by showing occupied if the associated
  * turnout has been unlocked.
@@ -22,7 +22,8 @@ import jmri.implementation.DefaultConditionalAction;
  */
 public class OsIndicator implements Constants {
 
-    final static String namePrefix = commonNamePrefix + "OsIndicator" + commonNameSuffix; //NOI18N
+    static String logixPrefix = InstanceManager.getDefault(jmri.LogixManager.class).getSystemNamePrefix();
+    final static String namePrefix = logixPrefix + ":" + commonNamePrefix + "OsIndicator" + commonNameSuffix; //NOI18N
 
     /**
      * Nobody can build anonymous object
@@ -66,21 +67,21 @@ public class OsIndicator implements Constants {
         // Load variable into the Conditional
         List<ConditionalVariable> variableList = c.getCopyOfStateVariables();
         variableList.add(new ConditionalVariable(false, Conditional.Operator.NONE,
-                Conditional.TYPE_SENSOR_INACTIVE,
+                Conditional.Type.SENSOR_INACTIVE,
                 osSensor, true));
-        if (!lock.equals("")) {
+        if (!lock.isEmpty()) {
             variableList.add(new ConditionalVariable(false, Conditional.Operator.AND,
-                    Conditional.TYPE_SENSOR_INACTIVE,
+                    Conditional.Type.SENSOR_INACTIVE,
                     lock, true));
         }
         c.setStateVariables(variableList);
 
         List<ConditionalAction> actionList = c.getCopyOfActions();
         actionList.add(new DefaultConditionalAction(Conditional.ACTION_OPTION_ON_CHANGE_TO_TRUE,
-                Conditional.ACTION_SET_TURNOUT, output,
+                Conditional.Action.SET_TURNOUT, output,
                 Turnout.CLOSED, " ")); //NOI18N
         actionList.add(new DefaultConditionalAction(Conditional.ACTION_OPTION_ON_CHANGE_TO_FALSE,
-                Conditional.ACTION_SET_TURNOUT, output,
+                Conditional.Action.SET_TURNOUT, output,
                 Turnout.THROWN, " ")); //NOI18N
         c.setAction(actionList);          // string data
 

@@ -42,16 +42,18 @@ public class OlcbClockControlTest {
         void onChange(String property, Object newValue);
     }
 
-    private class MockPropertyChangeListener implements PropertyChangeListener {
+    private class MockRateChangeListener implements PropertyChangeListener {
         public MockInterface m;
 
-        public MockPropertyChangeListener() {
+        public MockRateChangeListener() {
             m = mock(MockInterface.class);
         }
 
         @Override
         public void propertyChange(PropertyChangeEvent propertyChangeEvent) {
-            m.onChange(propertyChangeEvent.getPropertyName(), propertyChangeEvent.getNewValue());
+            if (propertyChangeEvent.getPropertyName().equals("rate")) {
+                m.onChange(propertyChangeEvent.getPropertyName(), propertyChangeEvent.getNewValue());
+            }
         }
     }
 
@@ -64,7 +66,9 @@ public class OlcbClockControlTest {
     @After
     public void tearDown() throws Exception {
         if (iface != null) iface.dispose();
+        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
+
     }
 
     private void initializeWithClockMaster() {
@@ -192,7 +196,7 @@ public class OlcbClockControlTest {
     public void rateListenerSlave() throws Exception {
         initializeWithClockSlave();
         Timebase tb = InstanceManager.getDefault(Timebase.class);
-        MockPropertyChangeListener ml = new MockPropertyChangeListener();
+        MockRateChangeListener ml = new MockRateChangeListener();
         tb.addPropertyChangeListener(ml);
 
         clock.setRate(13.25);
@@ -208,7 +212,7 @@ public class OlcbClockControlTest {
     public void rateListenerMaster() throws Exception {
         initializeWithClockMaster();
         Timebase tb = InstanceManager.getDefault(Timebase.class);
-        MockPropertyChangeListener ml = new MockPropertyChangeListener();
+        MockRateChangeListener ml = new MockRateChangeListener();
         tb.addPropertyChangeListener(ml);
 
         clock.setRate(13.25);
@@ -227,7 +231,7 @@ public class OlcbClockControlTest {
     public void rateListenerMasterRounding() throws Exception {
         initializeWithClockMaster();
         Timebase tb = InstanceManager.getDefault(Timebase.class);
-        MockPropertyChangeListener ml = new MockPropertyChangeListener();
+        MockRateChangeListener ml = new MockRateChangeListener();
         tb.addPropertyChangeListener(ml);
 
         clock.setRate(13.33);
@@ -242,7 +246,7 @@ public class OlcbClockControlTest {
     public void rateListenerMasterRoundingAtZero() throws Exception {
         initializeWithClockMaster();
         Timebase tb = InstanceManager.getDefault(Timebase.class);
-        MockPropertyChangeListener ml = new MockPropertyChangeListener();
+        MockRateChangeListener ml = new MockRateChangeListener();
         tb.addPropertyChangeListener(ml);
 
         // A small but positive rate will be rounded up to 0.25.
@@ -258,7 +262,7 @@ public class OlcbClockControlTest {
     public void rateListenerSlaveRounding() throws Exception {
         initializeWithClockSlave();
         Timebase tb = InstanceManager.getDefault(Timebase.class);
-        MockPropertyChangeListener ml = new MockPropertyChangeListener();
+        MockRateChangeListener ml = new MockRateChangeListener();
         tb.addPropertyChangeListener(ml);
 
         clock.setRate(13.33);

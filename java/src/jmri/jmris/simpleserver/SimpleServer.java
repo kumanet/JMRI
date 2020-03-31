@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.ResourceBundle;
 import java.util.Scanner;
@@ -26,17 +27,6 @@ public class SimpleServer extends JmriServer {
 
     static ResourceBundle rb = ResourceBundle.getBundle("jmri.jmris.simpleserver.SimpleServerBundle");
 
-    /*
-     * @deprecated since 4.7.1 use @link{InstanceManager.getDefault()} instead.
-     */
-    @Deprecated
-    public static JmriServer instance() {
-        if (InstanceManager.getNullableDefault(SimpleServer.class) == null) {
-            InstanceManager.store(new SimpleServer(),SimpleServer.class);
-        }
-        return InstanceManager.getDefault(SimpleServer.class);
-    }
-
     // Create a new server using the default port
     public SimpleServer() {
         this(Integer.parseInt(rb.getString("SimpleServerPort")));
@@ -56,7 +46,7 @@ public class SimpleServer extends JmriServer {
     // Handle communication to a client through inStream and outStream
     @Override
     public void handleClient(DataInputStream inStream, DataOutputStream outStream) throws IOException {
-        Scanner inputScanner = new Scanner(new InputStreamReader(inStream, "UTF-8"));
+        Scanner inputScanner = new Scanner(new InputStreamReader(inStream, StandardCharsets.UTF_8));
         // Listen for commands from the client until the connection closes
         String cmd;
 
@@ -72,7 +62,7 @@ public class SimpleServer extends JmriServer {
         // Start by sending a welcome message
         outStream.writeBytes("JMRI " + jmri.Version.name() + " \n");
         outStream.writeBytes("RAILROAD " + InstanceManager.getDefault(WebServerPreferences.class).getRailroadName() + " \n");
-        outStream.writeBytes("NODE " + NodeIdentity.identity() + " \n");
+        outStream.writeBytes("NODE " + NodeIdentity.networkIdentity() + " \n");
 
         while (true) {
             inputScanner.skip("[\r\n]*");// skip any stray end of line characters.

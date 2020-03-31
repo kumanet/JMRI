@@ -2,10 +2,11 @@ package jmri.jmrit.catalog;
 
 import java.io.File;
 import java.util.HashMap;
+import org.apache.commons.io.FilenameUtils;
 
 /**
  * TreeModel used by CatalogPanel to create a tree of resources.
- * <P>
+ * <p>
  * Source of the tree content is the file system. Only directories are included
  * in the tree. A filter can be set to extract particular file types.
  *
@@ -88,7 +89,7 @@ public class CatalogTreeFS extends AbstractCatalogTree {
                 insertNodes(sp[i], pPath + File.separator + sp[i], newElement);
             }
         } else /* leaf */ {
-            String ext = jmri.util.FileChooserFilter.getFileExtension(fp);
+            String ext = FilenameUtils.getExtension(fp.getName());
             if (!filter(ext)) {
                 return;
             }

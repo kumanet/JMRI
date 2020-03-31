@@ -2,8 +2,9 @@ package jmri.jmrit.withrottle;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class MultiThrottle {
     private ThrottleControllerListener parentTCL = null;
     private ControllerInterface parentController = null;
     char whichThrottle;
-    HashMap<String, MultiThrottleController> throttles;
+    ConcurrentHashMap<String, MultiThrottleController> throttles;
 
     public MultiThrottle(char id, ThrottleControllerListener tcl, ControllerInterface ci) {
         if (log.isDebugEnabled()) {
@@ -90,7 +91,7 @@ public class MultiThrottle {
             return null;
         }
         if (throttles == null) {
-            throttles = new HashMap<>(1);
+            throttles = new ConcurrentHashMap<>(1);
         }
 
         if (throttles.containsKey(key)) {
@@ -128,22 +129,44 @@ public class MultiThrottle {
      * @param key address to be validated, of form Lnnnn or Snnn
      */
     private boolean isValidAddr(String key) {
-        int addr = Integer.parseInt(key.substring(1));
-        if ((key.charAt(0) == 'L') && 
-                !jmri.InstanceManager.throttleManagerInstance().canBeLongAddress(addr)) {
-            String msg = Bundle.getMessage("ErrorLongAddress", key);
+        if (key.length() < 2) {
+            String msg = Bundle.getMessage("ErrorInvalidAddressFormat", key);
             log.warn(msg);
             parentController.sendAlertMessage(msg);
             return false;
-        } else if ((key.charAt(0) == 'S') && 
-                !jmri.InstanceManager.throttleManagerInstance().canBeShortAddress(addr)) {
-            String msg = Bundle.getMessage("ErrorShortAddress", key);
-            log.warn(msg);
-            parentController.sendAlertMessage(msg);
-            return false;            
         }
-        return true;
-}
+        try {
+            int addr = Integer.parseInt(key.substring(1));
+            if (key.charAt(0) == 'L') {
+                if (jmri.InstanceManager.throttleManagerInstance().canBeLongAddress(addr)) {
+                    return true;
+                } else {
+                    String msg = Bundle.getMessage("ErrorLongAddress", key);
+                    log.warn(msg);
+                    parentController.sendAlertMessage(msg);
+                    return false;
+                }
+            } else if (key.charAt(0) == 'S') {
+                if (jmri.InstanceManager.throttleManagerInstance().canBeShortAddress(addr)) {
+                    return true;
+                } else {
+                    String msg = Bundle.getMessage("ErrorShortAddress", key);
+                    log.warn(msg);
+                    parentController.sendAlertMessage(msg);
+                    return false;
+                }
+            }
+            String msg = Bundle.getMessage("ErrorInvalidAddressFormat", key);
+            parentController.sendAlertMessage(msg);
+            log.warn(msg);
+            return false;
+        } catch (NumberFormatException e) {
+            String msg = Bundle.getMessage("ErrorInvalidAddressFormat", key);
+            parentController.sendAlertMessage(msg);
+            log.warn(msg);
+            return false;
+        }
+    }
 
     protected boolean removeThrottleController(String key, String action) {
 

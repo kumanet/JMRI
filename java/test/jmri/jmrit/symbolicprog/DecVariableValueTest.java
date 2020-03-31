@@ -3,9 +3,11 @@ package jmri.jmrit.symbolicprog;
 import java.util.HashMap;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
-import junit.framework.Test;
-import junit.framework.TestSuite;
+
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author	Bob Jacobsen Copyright 2003, 2006
@@ -45,12 +47,15 @@ public class DecVariableValueTest extends AbstractVariableValueTestBase {
     // end of abstract members
     
     // test the handling of radix masks
+    @Test
     public void testBaseMasks3() {
+        log.trace("testBaseMasks3");
         HashMap<String, CvValue> v = createCvMap();
         CvValue cv = new CvValue("81", p);
         cv.setValue(0);
         v.put("81", cv);
-        // create a variable pointed at CV 81, check name
+        // create a variable pointed at CV 81
+        //      Mask = 9, minVal = 0, maxVal = 2
         VariableValue variable = makeVar("label", "comment", "", false, false, false, false, "81", "9", 0, 2, v, null, null);
         checkValue(variable, "value object initially contains ", "0");
 
@@ -75,12 +80,16 @@ public class DecVariableValueTest extends AbstractVariableValueTestBase {
                        
     }
 
+    @Test
     public void testBaseMasksDecimalValues() {
+        log.trace("testBaseMasksDecimalValues");
         HashMap<String, CvValue> v = createCvMap();
         CvValue cv = new CvValue("81", p);
         cv.setValue(0);
         v.put("81", cv);
-        // create a variable pointed at CV 81, check name
+        // create variables pointed at CV 81
+        //  Upper:  Mask = 10, minVal = 0, maxVal = 9
+        //  Lower:  Mask =  1, minVal = 0, maxVal = 9
         VariableValue variableU = makeVar("upper", "comment", "", false, false, false, false, "81", "10", 0, 9, v, null, null);
         VariableValue variableL = makeVar("lower", "comment", "", false, false, false, false, "81",  "1", 0, 9, v, null, null);
         checkValue(variableU, "upper initially contains ", "0");
@@ -108,21 +117,17 @@ public class DecVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("cv value", 39, cv.getValue());
     }
     
-    // from here down is testing infrastructure
-    public DecVariableValueTest(String s) {
-        super(s);
+    @Before
+    @Override
+    public void setUp() {
+        super.setUp();
+    }
+    
+    @After
+    @Override
+    public void tearDown() {
+        super.tearDown();
     }
 
-    // Main entry point
-    static public void main(String[] args) {
-        String[] testCaseName = {"-noloading", DecVariableValueTest.class.getName()};
-        junit.textui.TestRunner.main(testCaseName);
-    }
-
-    // test suite from all defined tests
-    public static Test suite() {
-        TestSuite suite = new TestSuite(DecVariableValueTest.class);
-        return suite;
-    }
-
+    private final static  org.slf4j.Logger log =  org.slf4j.LoggerFactory.getLogger(DecVariableValueTest.class);
 }

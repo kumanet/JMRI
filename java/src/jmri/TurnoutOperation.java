@@ -1,7 +1,5 @@
 package jmri;
 
-import java.util.Iterator;
-import java.util.List;
 import javax.annotation.Nonnull;
 import jmri.implementation.AbstractTurnout;
 
@@ -123,6 +121,7 @@ public abstract class TurnoutOperation implements Comparable<Object> {
      *
      * @return name
      */
+    @Nonnull
     public String getName() {
         return name;
     }
@@ -239,18 +238,13 @@ public abstract class TurnoutOperation implements Comparable<Object> {
      * @return true iff any turnouts are using it
      */
     public boolean isInUse() {
-        boolean result = false;
         TurnoutManager tm = InstanceManager.turnoutManagerInstance();
-        List<String> turnouts = tm.getSystemNameList();
-        Iterator<String> iter = turnouts.iterator();
-        while (iter.hasNext()) {
-            Turnout t = tm.getBySystemName(iter.next());
+        for (Turnout t : tm.getNamedBeanSet()) {
             if (t != null && t.getTurnoutOperation() == this) {
-                result = true;
-                break;
+                return true;
             }
         }
-        return result;
+        return false;
     }
 
     /**

@@ -2,13 +2,14 @@ package jmri.jmrix.can.cbus.swing;
 
 import javax.swing.JMenu;
 import jmri.jmrix.can.CanSystemConnectionMemo;
+import jmri.jmrix.can.ConfigurationManager;
 import jmri.jmrix.can.swing.CanNamedPaneAction;
 
 /**
  * Create a menu containing the Jmri CAN- and CBUS-specific tools
  *
  * @author Bob Jacobsen Copyright 2003, 2008, 2009
- * @author Andrew Crosland 2008
+ * @author Andrew Crosland 2008, 2020
  */
 public class CbusMenu extends JMenu {
 
@@ -39,7 +40,9 @@ public class CbusMenu extends JMenu {
         new Item("MenuItemEventTable", "jmri.jmrix.can.cbus.swing.eventtable.CbusEventTablePane"),
         new Item("MenuItemNodeConfig", "jmri.jmrix.can.cbus.swing.nodeconfig.NodeConfigToolPane"),
         new Item("MenuItemCbusSlotMonitor", "jmri.jmrix.can.cbus.swing.cbusslotmonitor.CbusSlotMonitorPane"),
-        new Item("MenuItemNetworkSim", "jmri.jmrix.can.cbus.swing.simulator.SimulatorPane")
+        new Item("MenuItemEvRequestMon", "jmri.jmrix.can.cbus.swing.eventrequestmonitor.CbusEventRequestTablePane"),
+        new Item("MenuItemNetworkSim", "jmri.jmrix.can.cbus.swing.simulator.SimulatorPane"),
+        new Item("MenuItemBootloader", "jmri.jmrix.can.cbus.swing.bootloader.CbusBootloaderPane")
     };
 
     static class Item {

@@ -1,5 +1,6 @@
 package jmri.implementation;
 
+import javax.annotation.CheckReturnValue;
 import jmri.JmriException;
 import jmri.NamedBean;
 import jmri.StringIO;
@@ -18,7 +19,7 @@ public abstract class AbstractStringIO extends AbstractNamedBean implements Stri
 
     /**
      * Abstract constructor for new StringIO with system name
-     * 
+     *
      * @param systemName StringIO system name
      */
     public AbstractStringIO(@Nonnull String systemName) {
@@ -40,7 +41,7 @@ public abstract class AbstractStringIO extends AbstractNamedBean implements Stri
      * The string [u]must not[/u] be longer than the value of getMaximumLength()
      * unless that value is zero. Some microcomputers have little memory and
      * it's very important that this method is never called with too long strings.
-     * 
+     *
      * @param value the desired string value
      * @throws jmri.JmriException general error when setting the value fails
      */
@@ -90,7 +91,7 @@ public abstract class AbstractStringIO extends AbstractNamedBean implements Stri
      * accept too long strings.
      * On the other hand, if the StringIO is used to send a command, a too
      * long string is an error.
-     * 
+     *
      * @return true if long strings should be cut
      */
     abstract protected boolean cutLongStrings();
@@ -115,11 +116,15 @@ public abstract class AbstractStringIO extends AbstractNamedBean implements Stri
         return Bundle.getMessage("BeanNameStringIO");
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} 
+     * 
+     * Do a string comparison.
+     */
+    @CheckReturnValue
     @Override
-    @Nonnull
-    public String toString() {
-        return this.getClass().getName() + " (" + this.getSystemName() + ")"; //NOI18N
+    public int compareSystemNameSuffix(@Nonnull String suffix1, @Nonnull String suffix2, @Nonnull NamedBean n) {
+        return suffix1.compareTo(suffix2);
     }
 
 }

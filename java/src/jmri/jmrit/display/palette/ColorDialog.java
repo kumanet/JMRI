@@ -18,6 +18,7 @@ import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import jmri.InstanceManager;
 import jmri.jmrit.display.Positionable;
 import jmri.jmrit.display.PositionableLabel;
 import jmri.jmrit.display.PositionablePopupUtil;
@@ -28,7 +29,7 @@ import jmri.util.swing.JmriColorChooser;
  * A dialog to color a Component in a Window.  The ColorChooser
  * interactively modifies the color of the component on the window
  * until the user either cancels or decides to keep the changes.
- * <p>
+ *
  * @author Pete Cressman Copyright (C) 2018
  * @since 4.13.1
  */
@@ -149,7 +150,7 @@ public class ColorDialog extends JDialog implements ChangeListener {
             
             
             setContentPane(panel);
-            setLocation(jmri.util.PlaceWindow.nextTo(client, t, this));
+            InstanceManager.getDefault(jmri.util.PlaceWindow.class).nextTo(client, t, this);
 
             pack();
             setVisible(true);

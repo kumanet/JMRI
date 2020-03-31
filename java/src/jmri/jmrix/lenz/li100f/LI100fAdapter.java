@@ -10,7 +10,6 @@ import jmri.jmrix.lenz.XNetInitializationManager;
 import jmri.jmrix.lenz.XNetPacketizer;
 import jmri.jmrix.lenz.XNetSerialPortController;
 import jmri.jmrix.lenz.XNetTrafficController;
-import jmri.util.SerialUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import purejavacomm.CommPortIdentifier;
@@ -20,13 +19,13 @@ import purejavacomm.SerialPort;
 import purejavacomm.UnsupportedCommOperationException;
 
 /**
- * Provide access to XpressNet via a LI100F on an attached serial comm port.
+ * Provide access to XpressNet via a LI100F on an attached serial com port.
  * Normally controlled by the lenz.li100.LI100Frame class.
  *
  * @author Bob Jacobsen Copyright (C) 2002
  * @author Paul Bender, Copyright (C) 2003-2010
  */
-public class LI100fAdapter extends XNetSerialPortController implements jmri.jmrix.SerialPortAdapter {
+public class LI100fAdapter extends XNetSerialPortController {
 
     public LI100fAdapter() {
         super();
@@ -61,7 +60,7 @@ public class LI100fAdapter extends XNetSerialPortController implements jmri.jmri
                 log.debug("Serial timeout was observed as: {} {}",
                         activeSerialPort.getReceiveTimeout(),
                         activeSerialPort.isReceiveTimeoutEnabled());
-            } catch (Exception et) {
+            } catch (UnsupportedCommOperationException et) {
                 log.info("failed to set serial timeout: " + et);
             }
 
@@ -154,13 +153,8 @@ public class LI100fAdapter extends XNetSerialPortController implements jmri.jmri
      */
     protected void setSerialPort() throws UnsupportedCommOperationException {
         // find the baud rate value, configure comm options
-        int baud = validSpeedValues[0];  // default, but also defaulted in the initial value of selectedSpeed
-        for (int i = 0; i < validSpeeds.length; i++) {
-            if (validSpeeds[i].equals(mBaudRate)) {
-                baud = validSpeedValues[i];
-            }
-        }
-        SerialUtil.setSerialPortParams(activeSerialPort, baud,
+        int baud = currentBaudNumber(mBaudRate);
+        activeSerialPort.setSerialPortParams(baud,
                 SerialPort.DATABITS_8,
                 SerialPort.STOPBITS_1,
                 SerialPort.PARITY_NONE);
@@ -171,14 +165,22 @@ public class LI100fAdapter extends XNetSerialPortController implements jmri.jmri
             flow = 0;
         }
         configureLeadsAndFlowControl(activeSerialPort, flow);
-
-        /*if (getOptionState(option2Name).equals(validOption2[0]))
-         checkBuffer = true;*/
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String[] validBaudRates() {
         return Arrays.copyOf(validSpeeds, validSpeeds.length);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int[] validBaudNumbers() {
+        return Arrays.copyOf(validSpeedValues, validSpeedValues.length);
     }
 
     /**
@@ -195,6 +197,11 @@ public class LI100fAdapter extends XNetSerialPortController implements jmri.jmri
     protected String[] validSpeeds = new String[]{Bundle.getMessage("Baud9600"), Bundle.getMessage("LIBaud19200")};
     protected int[] validSpeedValues = new int[]{9600, 19200};
 
+    @Override
+    public int defaultBaudIndex() {
+        return 0;
+    }
+
     // meanings are assigned to these above, so make sure the order is consistent
     protected String[] validOption1 = new String[]{Bundle.getMessage("FlowOptionHwRecomm"), Bundle.getMessage("FlowOptionNo")};
 
@@ -210,6 +217,6 @@ public class LI100fAdapter extends XNetSerialPortController implements jmri.jmri
     }
     volatile static LI100fAdapter mInstance = null;
 
-    private final static Logger log = LoggerFactory.getLogger(LI100fAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(LI100fAdapter.class);
 
 }

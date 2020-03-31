@@ -20,7 +20,7 @@ public class XNetLight extends AbstractLight implements XNetListener {
 
     /**
      * Create a Light object, with only system name.
-     * <P>
+     * <p>
      * 'systemName' was previously validated in LnLightManager
      *
      * @param tc         the traffic controller for the connection
@@ -203,6 +203,6 @@ public class XNetLight extends AbstractLight implements XNetListener {
         internalState = OFFSENT;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(XNetLight.class);
+    private static final Logger log = LoggerFactory.getLogger(XNetLight.class);
 
 }

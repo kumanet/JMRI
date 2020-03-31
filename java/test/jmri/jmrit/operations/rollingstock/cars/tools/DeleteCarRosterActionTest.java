@@ -2,6 +2,11 @@ package jmri.jmrit.operations.rollingstock.cars.tools;
 
 import java.awt.GraphicsEnvironment;
 import java.awt.event.ActionEvent;
+
+import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.Test;
+
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
 import jmri.jmrit.operations.rollingstock.cars.CarManager;
@@ -9,9 +14,6 @@ import jmri.jmrit.operations.rollingstock.cars.CarsTableFrame;
 import jmri.util.JUnitOperationsUtil;
 import jmri.util.JUnitUtil;
 import jmri.util.swing.JemmyUtil;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
 
 /**
  *
@@ -26,6 +28,7 @@ public class DeleteCarRosterActionTest extends OperationsTestCase {
         DeleteCarRosterAction t = new DeleteCarRosterAction(ctf);
         Assert.assertNotNull("exists",t);
         JUnitUtil.dispose(ctf);
+        JUnitOperationsUtil.checkOperationsShutDownTask();
     }
     
     @Test
@@ -60,6 +63,9 @@ public class DeleteCarRosterActionTest extends OperationsTestCase {
         }
 
         Assert.assertEquals("Number of cars", 0, InstanceManager.getDefault(CarManager.class).getNumEntries());
+        JUnitUtil.dispose(ctf);
+        JUnitOperationsUtil.checkOperationsShutDownTask();
+
     }
 
     // private final static Logger log = LoggerFactory.getLogger(DeleteCarRosterActionTest.class);

@@ -1,13 +1,10 @@
 package jmri.jmrix.jmriclient;
 
 import org.junit.*;
-import jmri.Turnout;
 import jmri.util.JUnitUtil;
 
 /**
- * JMRIClientTurnoutTest.java
- *
- * Description:	tests for the jmri.jmrix.jmriclient.JMRIClientTurnout class
+ * Tests for the jmri.jmrix.jmriclient.JMRIClientTurnout class
  *
  * @author	Bob Jacobsen
  * @author  Paul Bender Copyright (C) 2017
@@ -38,7 +35,7 @@ public class JMRIClientTurnoutTest extends jmri.implementation.AbstractTurnoutTe
     public void testDispose() {
         t.setCommandedState(jmri.Turnout.CLOSED);    // in case registration with TrafficController
 
-        //is deferred to after first use
+        // is deferred to after first use
         t.dispose();
         Assert.assertEquals("controller listeners remaining", 1, numListeners());
     }
@@ -58,6 +55,7 @@ public class JMRIClientTurnoutTest extends jmri.implementation.AbstractTurnoutTe
 
     @After
     public void tearDown() {
+        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
 
         jcins = null;

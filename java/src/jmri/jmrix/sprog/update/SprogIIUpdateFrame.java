@@ -1,5 +1,7 @@
 package jmri.jmrix.sprog.update;
 
+import static jmri.jmrix.sprog.SprogConstants.TC_BOOT_REPLY_TIMEOUT;
+
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javax.swing.JOptionPane;
 import jmri.jmrix.sprog.SprogConstants.SprogState;
@@ -33,8 +35,24 @@ public class SprogIIUpdateFrame
         // add help menu to window
         addHelpMenu("package.jmri.jmrix.sprog.update.SprogIIUpdateFrame", true);
 
+        // Set a shorter timeout in the TC. Must be shorter than SprogUpdateFrame long timeout
+        tc.setTimeout(TC_BOOT_REPLY_TIMEOUT);
+        
         // Get the SPROG version
         _memo.getSprogVersionQuery().requestVersion(this);
+    }
+    
+    
+    /** 
+     * {@inheritDoc}
+     * Also ensures timers are no longer running
+     */
+    @Override
+    public void dispose() {
+        // kill any timers still running 
+        stopTimer();
+            
+        super.dispose();
     }
 
     int bootVer = 0;
@@ -47,34 +65,26 @@ public class SprogIIUpdateFrame
     @Override
     synchronized public void notifyVersion(SprogVersion v) {
         sv = v;
-        if (sv.sprogType.isSprog() == false) {
+        if (sv!=null && sv.sprogType.isSprog() == false) {
             // Didn't recognize a SPROG so check if it is in boot mode already
-            if (log.isDebugEnabled()) {
-                log.debug("SPROG not found - looking for bootloader");
-            }
+            log.debug("SPROG not found - looking for bootloader");
             statusBar.setText(Bundle.getMessage("StatusSprogNotFound"));
             blockLen = -1;
             requestBoot();
         } else {
             // Check that it's not a V4
-            if (sv.sprogType.sprogType > SprogType.SPROGV4) {
+            if (sv!=null && sv.sprogType.sprogType > SprogType.SPROGV4) {
                 statusBar.setText(Bundle.getMessage("StatusFoundX", sv.toString()));
                 blockLen = sv.sprogType.getBlockLen();
                 // Put SPROG in boot mode
-                if (log.isDebugEnabled()) {
-                    log.debug("Putting SPROG in boot mode");
-                }
+                log.debug("Putting SPROG in boot mode");
                 msg = new SprogMessage("b 1 1 1");
+                bootState = BootState.SETBOOTSENT;
                 tc.sendSprogMessage(msg, this);
-                // SPROG II and 3 will not reply to this so just wait a while
-                tc.setSprogState(SprogState.SIIBOOTMODE);
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // retain if needed later
-                }
-                // Look for bootloader version
-                requestBoot();
+                // SPROG II and 3 will not reply to this if successfull. Will
+                // reply with error if firmware is locked. Wait a while to allow
+                // Traffic Controller to time out
+                startLongTimer();
             } else {
                 log.error("Incorrect SPROG Type detected");
                 statusBar.setText(Bundle.getMessage("StatusIncorrectSprogType"));
@@ -104,6 +114,18 @@ public class SprogIIUpdateFrame
         }
     }
 
+    @Override
+    synchronized protected void stateSetBootSent() {
+        stopTimer();
+        log.debug("reply in SETBOOTSENT state");
+        // A reply to the enter bootloader command means the firmware is locked.
+        bootState = BootState.IDLE;
+        tc.setSprogState(SprogState.NORMAL);
+        JOptionPane.showMessageDialog(this, Bundle.getMessage("ErrorFirmwareLocked"),
+                Bundle.getMessage("SprogXFirmwareUpdate"), JOptionPane.ERROR_MESSAGE);
+        statusBar.setText(Bundle.getMessage("ErrorFirmwareLocked"));
+    }
+    
     @Override
     synchronized protected void stateBootVerReqSent() {
         stopTimer();
@@ -143,7 +165,7 @@ public class SprogIIUpdateFrame
             bootState = BootState.IDLE;
             tc.setSprogState(SprogState.NORMAL);
             JOptionPane.showMessageDialog(this, Bundle.getMessage("StatusUnableToConnectBootloader"),
-                    Bundle.getMessage("SprogXFirmwareUpdate", " II"), JOptionPane.ERROR_MESSAGE);
+                    Bundle.getMessage("SprogXFirmwareUpdate"), JOptionPane.ERROR_MESSAGE);
             statusBar.setText(Bundle.getMessage("StatusUnableToConnectBootloader"));
         }
     }
@@ -259,6 +281,10 @@ public class SprogIIUpdateFrame
             log.debug("Request bootloader version");
         }
         // allow parsing of bootloader replies
+        if (tc == null) {
+            log.warn("requestBoot with null tc, ignored");
+            return;
+        }
         tc.setSprogState(SprogState.SIIBOOTMODE);
         bootState = BootState.VERREQSENT;
         msg = SprogMessage.getReadBootVersion();
@@ -365,6 +391,8 @@ public class SprogIIUpdateFrame
         }
         msg = SprogMessage.getWriteEE(0xff, new int[]{0});
         bootState = BootState.SPROGMODESENT;
+        // Set TC timeout back to normal
+        tc.resetTimeout();
         tc.sendSprogMessage(msg, this);
         startLongTimer();
     }

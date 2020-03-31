@@ -3,7 +3,6 @@ package jmri.jmrix.nce.macro;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import javax.swing.JFileChooser;
@@ -279,4 +278,5 @@ public class NceMacroRestore extends Thread implements jmri.jmrix.nce.NceListene
     }
 
     private final static Logger log = LoggerFactory.getLogger(NceMacroRestore.class);
+
 }

@@ -1,23 +1,24 @@
 package jmri.jmrix.can.cbus;
 
 import java.util.ResourceBundle;
+import jmri.CabSignalManager;
 import jmri.GlobalProgrammerManager;
 import jmri.InstanceManager;
 import jmri.ThrottleManager;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 
+// import org.slf4j.Logger;
+// import org.slf4j.LoggerFactory;
+
 /**
- * Does configuration for various CAN-based communications implementations.
- * <p>
- * It would be good to replace this with properties-based method for redirecting
- * to classes in particular subpackages.
+ * Does configuration for MERG CBUS CAN-based communications implementations.
  * <hr>
  * This file is part of JMRI.
- * <P>
+ * <p>
  * JMRI is free software; you can redistribute it and/or modify it under the
  * terms of version 2 of the GNU General Public License as published by the Free
  * Software Foundation. See the "COPYING" file for a copy of this license.
- * <P>
+ * <p>
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
@@ -26,29 +27,33 @@ import jmri.jmrix.can.CanSystemConnectionMemo;
  */
 public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManager {
 
-    @SuppressWarnings("LeakingThisInConstructor")
     public CbusConfigurationManager(CanSystemConnectionMemo memo) {
         super(memo);
-        InstanceManager.store(this, CbusConfigurationManager.class);
+        addToConfigMgr();
         InstanceManager.store(cf = new jmri.jmrix.can.cbus.swing.CbusComponentFactory(adapterMemo),
-                jmri.jmrix.swing.ComponentFactory.class);
+            jmri.jmrix.swing.ComponentFactory.class);
+    }
+    
+    protected final void addToConfigMgr() {
+        InstanceManager.store(this, CbusConfigurationManager.class);
     }
 
-    jmri.jmrix.swing.ComponentFactory cf = null;
+    private final jmri.jmrix.swing.ComponentFactory cf;
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void configureManagers() {
-
+        
+        InstanceManager.store(getCbusPreferences(), CbusPreferences.class);
         InstanceManager.store(getPowerManager(), jmri.PowerManager.class);
 
-        InstanceManager.setSensorManager(
-                getSensorManager());
+        InstanceManager.setSensorManager(getSensorManager());
 
-        InstanceManager.setTurnoutManager(
-                getTurnoutManager());
+        InstanceManager.setTurnoutManager(getTurnoutManager());
 
-        InstanceManager.setThrottleManager(
-                getThrottleManager());
+        InstanceManager.setThrottleManager(getThrottleManager());
 
         if (getProgrammerManager().isAddressedModePossible()) {
             InstanceManager.store(getProgrammerManager(), jmri.AddressedProgrammerManager.class);
@@ -56,17 +61,22 @@ public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManage
         if (getProgrammerManager().isGlobalProgrammerAvailable()) {
             InstanceManager.store(getProgrammerManager(), GlobalProgrammerManager.class);
         }
+        
+        InstanceManager.store( getMultiMeter(), jmri.MultiMeter.class );
+        
+        InstanceManager.store(getCommandStation(), jmri.CommandStation.class);
 
-        jmri.InstanceManager.store(getCommandStation(), jmri.CommandStation.class);
+        InstanceManager.setReporterManager(getReporterManager());
 
-        jmri.InstanceManager.setReporterManager(getReporterManager());
-
-        jmri.InstanceManager.setLightManager(getLightManager());
+        InstanceManager.setLightManager(getLightManager());
+        
+        InstanceManager.setDefault(CabSignalManager.class,getCabSignalManager());
+        
     }
 
     /**
      * Tells which managers this class provides.
-     *
+     * {@inheritDoc}
      * @param type Class type to check
      * @return true if supported; false if not
      */
@@ -92,10 +102,20 @@ public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManage
             return true;
         } else if (type.equals(jmri.CommandStation.class)) {
             return true;
+        } else if (type.equals(jmri.MultiMeter.class)) {
+            return true;
+        } else if (type.equals(CbusPreferences.class)) {
+            return true;
+        } else if (type.equals(CabSignalManager.class)) {
+            return true;
         }
+        
         return false; // nothing, by default
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @SuppressWarnings("unchecked")
     @Override
     public <T> T get(Class<?> T) {
@@ -121,9 +141,15 @@ public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManage
             return (T) getLightManager();
         } else if (T.equals(jmri.CommandStation.class)) {
             return (T) getCommandStation();
+        } else if (T.equals(jmri.MultiMeter.class)) {
+            return (T) getMultiMeter();
+        } else if (T.equals(CbusPreferences.class)) {
+            return (T) getCbusPreferences();
+        } else if (T.equals(CabSignalManager.class)) {
+            return (T) getCabSignalManager();
         }
-
         return null; // nothing, by default
+        
     }
 
     private CbusDccProgrammerManager programmerManager;
@@ -227,9 +253,51 @@ public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManage
         }
         return commandStation;
     }
+    
+    protected CbusMultiMeter multiMeter;
+    
+    public CbusMultiMeter getMultiMeter() {
+        if (adapterMemo.getDisabled()) {
+            return null;
+        }
+        if (multiMeter == null) {
+            multiMeter = new CbusMultiMeter(adapterMemo);
+            InstanceManager.store( multiMeter, jmri.MultiMeter.class );
+        }
+        return multiMeter;
+    }
+    
+    private CbusPreferences cbusPreferences = null;
 
+    public CbusPreferences getCbusPreferences() {
+        if (adapterMemo.getDisabled()) {
+            return null;
+        }
+        if (cbusPreferences == null) {
+            cbusPreferences = new CbusPreferences();
+            InstanceManager.store( cbusPreferences, CbusPreferences.class );
+        }
+        return cbusPreferences;
+    }
+    
+    protected CbusCabSignalManager cabSignalManager;
+
+    public CbusCabSignalManager getCabSignalManager() {
+        if ( adapterMemo.getDisabled() ) {
+            return null;
+        }
+        if (cabSignalManager == null) {
+            cabSignalManager = new CbusCabSignalManager(adapterMemo);
+        }
+        return cabSignalManager;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void dispose() {
+        
         if (cf != null) {
             InstanceManager.deregister(cf, jmri.jmrix.swing.ComponentFactory.class);
         }
@@ -251,12 +319,26 @@ public class CbusConfigurationManager extends jmri.jmrix.can.ConfigurationManage
         if (throttleManager != null) {
             InstanceManager.deregister((CbusThrottleManager) throttleManager, jmri.jmrix.can.cbus.CbusThrottleManager.class);
         }
+        if (commandStation != null) {
+            InstanceManager.deregister(commandStation, jmri.CommandStation.class);
+        }
+        if (multiMeter != null) {
+            InstanceManager.deregister(multiMeter, jmri.MultiMeter.class);
+        }
+        if (cbusPreferences != null) {
+            InstanceManager.deregister(cbusPreferences, jmri.jmrix.can.cbus.CbusPreferences.class);
+        }
         InstanceManager.deregister(this, CbusConfigurationManager.class);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     protected ResourceBundle getActionModelResourceBundle() {
         return ResourceBundle.getBundle("jmri.jmrix.can.CanActionListBundle");
     }
+    
+    // private static final Logger log = LoggerFactory.getLogger(CbusConfigurationManager.class);
 
 }

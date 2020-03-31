@@ -1,13 +1,16 @@
 package jmri.jmrit.blockboss;
 
+import java.util.ArrayList;
+import java.util.Enumeration;
+
 import jmri.InstanceManager;
 import jmri.Sensor;
 import jmri.SignalHead;
 import jmri.Turnout;
 import jmri.util.JUnitUtil;
+
 import org.junit.Assert;
 import org.junit.After;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -175,13 +178,22 @@ public class BlockBossLogicTest {
     // check for basic not-fail if no signal name was set
     @Test
     public void testSimpleBlockNoSignal() throws jmri.JmriException {
-
         try { 
             new BlockBossLogic(null);
+        } catch (java.lang.NullPointerException e) {
+            // this is expected
+        }
+    }
+
+    // check for basic not-fail if empty signal name was set
+    @Test
+    public void testSimpleBlockEmptyName() throws jmri.JmriException {
+        try {
+            new BlockBossLogic("");
         } catch (java.lang.IllegalArgumentException e) {
             // this is expected
         }
-        jmri.util.JUnitAppender.assertWarnMessage("Signal Head \"null\" was not found");
+        jmri.util.JUnitAppender.assertWarnMessage("Signal Head \"\" was not found");
     }
 
     // test interruption
@@ -191,6 +203,7 @@ public class BlockBossLogicTest {
         
         forceInterrupt = false;
         p = new BlockBossLogic("IH1") {
+            @Override
             public void setOutput() {
                 testThread = this.thread;
                 if (forceInterrupt) {
@@ -348,6 +361,16 @@ public class BlockBossLogicTest {
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initInternalSignalHeadManager();
 
+        // clear the BlockBossLogic static list
+        Enumeration<BlockBossLogic> en = BlockBossLogic.entries();
+        ArrayList<SignalHead> heads = new ArrayList<>();
+        while (en.hasMoreElements()) {
+            heads.add(en.nextElement().getDrivenSignalNamedBean().getBean());
+        }
+        for (SignalHead head : heads) {  // avoids ConcurrentModificationException
+            BlockBossLogic.getStoppedObject(head);
+        }
+        
         t1 = InstanceManager.turnoutManagerInstance().newTurnout("IT1", "1");
         t2 = InstanceManager.turnoutManagerInstance().newTurnout("IT2", "2");
         t3 = InstanceManager.turnoutManagerInstance().newTurnout("IT3", "3");

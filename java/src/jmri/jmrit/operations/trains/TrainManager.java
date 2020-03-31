@@ -8,11 +8,19 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.List;
+
 import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
+
+import org.jdom2.Attribute;
+import org.jdom2.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jmri.InstanceManager;
 import jmri.InstanceManagerAutoDefault;
 import jmri.InstanceManagerAutoInitialize;
+import jmri.beans.PropertyChangeProviderImpl;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.rollingstock.cars.Car;
 import jmri.jmrit.operations.rollingstock.cars.CarLoad;
@@ -25,10 +33,6 @@ import jmri.jmrit.operations.trains.excel.TrainCustomSwitchList;
 import jmri.jmrit.operations.trains.schedules.TrainScheduleManager;
 import jmri.script.JmriScriptEngineManager;
 import jmri.util.ColorUtil;
-import org.jdom2.Attribute;
-import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Manages trains.
@@ -37,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * @author Daniel Boudreau Copyright (C) 2008, 2009, 2010, 2011, 2012, 2013,
  * 2014
  */
-public class TrainManager implements InstanceManagerAutoDefault, InstanceManagerAutoInitialize, PropertyChangeListener {
+public class TrainManager extends PropertyChangeProviderImpl implements InstanceManagerAutoDefault, InstanceManagerAutoInitialize, PropertyChangeListener {
 
     static final String NONE = "";
 
@@ -48,6 +52,9 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
     private boolean _printPreview = false; // when true, preview train manifest
     private boolean _openFile = false; // when true, open CSV file manifest
     private boolean _runFile = false; // when true, run CSV file manifest
+    
+    // Conductor attributes
+    private boolean _showLocationHyphenName = false;
 
     // Trains window row colors
     private boolean _rowColorManual = true; // when true train colors are manually assigned
@@ -69,24 +76,12 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
 //    public static final String ACTIVE_TRAIN_SCHEDULE_ID = "ActiveTrainScheduleId"; // NOI18N
     public static final String ROW_COLOR_NAME_CHANGED_PROPERTY = "TrainsRowColorChange"; // NOI18N
     public static final String TRAINS_BUILT_CHANGED_PROPERTY = "TrainsBuiltChange"; // NOI18N
+    public static final String TRAINS_SHOW_FULL_NAME_PROPERTY = "TrainsShowFullName"; // NOI18N
 
     public TrainManager() {
     }
 
     private int _id = 0; // train ids
-
-    /**
-     * Get the default instance of this class.
-     *
-     * @return the default instance of this class
-     * @deprecated since 4.9.2; use
-     * {@link jmri.InstanceManager#getDefault(java.lang.Class)} instead
-     */
-    @Deprecated
-    public static synchronized TrainManager instance() {
-        jmri.util.Log4JUtil.deprecationWarning(log, "instance");        
-        return InstanceManager.getDefault(TrainManager.class);
-    }
 
     /**
      * Get the number of items in the roster
@@ -169,6 +164,20 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
         setDirtyAndFirePropertyChange(PRINTPREVIEW_CHANGED_PROPERTY, old ? "Preview" : "Print", // NOI18N
                 enable ? "Preview" : "Print"); // NOI18N
     }
+    
+    /**
+     * When true show entire location name including hyphen
+     * @return true when showing entire location name
+     */
+    public boolean isShowLocationHyphenNameEnabled() {
+        return _showLocationHyphenName;
+    }
+    
+    public void setShowLocationHyphenNameEnabled(boolean enable) {
+        boolean old = _showLocationHyphenName;
+        _showLocationHyphenName = enable;
+        setDirtyAndFirePropertyChange(TRAINS_SHOW_FULL_NAME_PROPERTY, old, enable);
+    }
 
     public String getTrainsFrameTrainAction() {
         return _trainAction;
@@ -186,6 +195,7 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
      * Sets the selected schedule id
      *
      * @param id Selected schedule id
+     * Moved to TrainScheduleManager.java
      * @deprecated at or before 4.13.7
      */
     @Deprecated  // at or before 4.13.7
@@ -195,6 +205,8 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
 
     /**
      * @deprecated at or before 4.13.7
+     * Moved to TrainScheduleManager.java
+     * @return active schedule id
      */
     @Deprecated // at or before 4.13.7
     public String getTrainScheduleActiveId() {
@@ -432,6 +444,7 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
     public boolean isAnyTrainBuilding() {
         for (Train train : getTrainsByIdList()) {
             if (train.getStatusCode() == Train.CODE_BUILDING) {
+                log.debug("Train {} is currently building", train.getName());
                 return true;
             }
         }
@@ -1017,6 +1030,14 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
                     _trainAction = a.getValue();
                 }
             }
+            
+            // Conductor options
+            Element eConductorOptions = options.getChild(Xml.CONDUCTOR_OPTIONS);
+            if (eConductorOptions != null) {
+                if ((a = eConductorOptions.getAttribute(Xml.SHOW_HYPHEN_NAME)) != null) {
+                    _showLocationHyphenName = a.getValue().equals(Xml.TRUE);
+                }
+            }
 
             // Row color options
             Element eRowColorOptions = options.getChild(Xml.ROW_COLOR_OPTIONS);
@@ -1087,6 +1108,11 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
         e.setAttribute(Xml.RUN_FILE, isRunFileEnabled() ? Xml.TRUE : Xml.FALSE);
         e.setAttribute(Xml.TRAIN_ACTION, getTrainsFrameTrainAction());
         options.addContent(e);
+        
+        // Conductor options
+        e = new Element(Xml.CONDUCTOR_OPTIONS);
+        e.setAttribute(Xml.SHOW_HYPHEN_NAME, isShowLocationHyphenNameEnabled() ? Xml.TRUE : Xml.FALSE);
+        options.addContent(e);
 
         // Trains table row color options
         e = new Element(Xml.ROW_COLOR_OPTIONS);
@@ -1115,7 +1141,7 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
         }
 
         InstanceManager.getDefault(TrainCustomManifest.class).store(options); // save custom manifest elements
-        InstanceManager.getDefault(TrainCustomSwitchList.class).store(options); // save custom manifest elements
+        InstanceManager.getDefault(TrainCustomSwitchList.class).store(options); // save custom switch list elements
 
         root.addContent(options);
 
@@ -1133,31 +1159,19 @@ public class TrainManager implements InstanceManagerAutoDefault, InstanceManager
      */
     @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
-        log.debug("TrainManager sees property change: "
-                + e.getPropertyName()
-                + " old: "
-                + e.getOldValue()
-                + " new "
-                + e.getNewValue()); // NOI18N
+        log.debug("TrainManager sees property change: {} old: {} new: {}",
+                e.getPropertyName(),
+                e.getOldValue(),
+                e.getNewValue());
         // TODO use listener to determine if load name has changed
         // if (e.getPropertyName().equals(CarLoads.LOAD_NAME_CHANGED_PROPERTY)){
         // replaceLoad((String)e.getOldValue(), (String)e.getNewValue());
         // }
     }
 
-    java.beans.PropertyChangeSupport pcs = new java.beans.PropertyChangeSupport(this);
-
-    public synchronized void addPropertyChangeListener(java.beans.PropertyChangeListener l) {
-        pcs.addPropertyChangeListener(l);
-    }
-
-    public synchronized void removePropertyChangeListener(java.beans.PropertyChangeListener l) {
-        pcs.removePropertyChangeListener(l);
-    }
-
     private void setDirtyAndFirePropertyChange(String p, Object old, Object n) {
         InstanceManager.getDefault(TrainManagerXml.class).setDirty(true);
-        pcs.firePropertyChange(p, old, n);
+        propertyChangeSupport.firePropertyChange(p, old, n);
     }
 
     private final static Logger log = LoggerFactory.getLogger(TrainManager.class);

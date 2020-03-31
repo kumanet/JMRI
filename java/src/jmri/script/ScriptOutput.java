@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  *
- * @author rhwood
+ * @author Randall Wood
  */
 public class ScriptOutput {
 
@@ -24,7 +24,7 @@ public class ScriptOutput {
 
     /**
      * Provide access to the JTextArea containing all ScriptEngine output.
-     * <P>
+     * <p>
      * The output JTextArea is not created until this is invoked, so that code
      * that doesn't use this feature can run on GUI-less machines.
      * <p>

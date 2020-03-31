@@ -1,16 +1,14 @@
 package jmri.jmrix.lenz.liusbserver;
 
 import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.JLabel;
 
 /**
  * Handle configuring an XpressNet layout connection via a LIUSB Server.
- * <P>
+ * <p>
  * This uses the {@link LIUSBServerAdapter} class to do the actual connection.
  *
  * @author Paul Bender Copyright (C) 2009
-  *
+ *
  * @see LIUSBServerAdapter
  */
 public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig {
@@ -21,20 +19,14 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
      */
     public ConnectionConfig(jmri.jmrix.NetworkPortAdapter p) {
         super(p);
-	additionalItems.add(bcastPortFieldLabel);
-	additionalItems.add(bcastPortField);
-	bcastPortFieldLabel.setLabelFor(bcastPortField);
-
     }
 
     /**
-     * Ctor for a functional Swing object with no prexisting adapter.
+     * Ctor for a connection configuration with no preexisting adapter.
+     * {@link #setInstance()} will fill the adapter member.
      */
     public ConnectionConfig() {
         super();
-	additionalItems.add(bcastPortFieldLabel);
-	additionalItems.add(bcastPortField);
-	bcastPortFieldLabel.setLabelFor(bcastPortField);
     }
 
     @Override
@@ -43,8 +35,7 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
     }
 
     /**
-     * Load the adapter with an appropriate object
-     * <i>unless</i> it has already been set.
+     * {@inheritDoc}
      */
     @Override
     protected void setInstance() {
@@ -53,6 +44,9 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void loadDetails(JPanel details) {
         super.loadDetails(details);
@@ -62,10 +56,6 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
         portField.setText(String.valueOf(LIUSBServerAdapter.COMMUNICATION_TCP_PORT));
         portField.setEnabled(false); // we can't change this now.
         options.get(adapter.getOption1Name()).getComponent().setEnabled(false); // we can't change this now.
-        bcastPortField.setEnabled(false); // we can't change this now.
     }
-
-    protected JTextField bcastPortField = new JTextField(String.valueOf(LIUSBServerAdapter.BROADCAST_TCP_PORT));
-    protected JLabel bcastPortFieldLabel = new JLabel(Bundle.getMessage("BroadcastPortLabel"));
 
 }

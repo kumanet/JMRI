@@ -1,6 +1,5 @@
 package jmri.jmrix.can.cbus;
 
-import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.TrafficControllerScaffold;
 import jmri.util.JUnitUtil;
@@ -108,16 +107,35 @@ public class CbusSendTest {
         send.nERD(44444);
         checknERD();
     }
+
+    @Test
+    public void testaRST() {
+        send.aRST();
+        checkaRST();
+    }
     
     @Test
-    public void testTextAreaAdd1() {
-        TextAreaFIFO ta = new TextAreaFIFO(9);
-        CbusSend tasend = new CbusSend(memo,ta);
-        Assert.assertNotNull("exists",tasend);
-        tasend.searchForNodes();
-        Assert.assertTrue("textarea is updated 1",(ta.getText()).contains("Sending message for all FLiM nodes to respond"));
-        tasend = null;
-        ta = null;
+    public void testeNUM() {
+        send.eNUM(1234);
+        checkeNUM();
+    }
+    
+    @Test
+    public void testcANID() {
+        send.cANID(6543,77);
+        checkcANID();
+    }
+
+    @Test
+    public void testnNCLR() {
+        send.nNCLR(4321);
+        checknNCLR();
+    }
+
+    @Test
+    public void testrQmn() {
+        send.rQmn();
+        checkrQmn();
     }
     
     @Test
@@ -127,20 +145,17 @@ public class CbusSendTest {
         Assert.assertNotNull("exists",tasend);
         tasend.nodeExitLearnEvMode(22222);
         Assert.assertTrue("textarea is updated 2",(ta.getText()).contains("2 exit learn mode."));
-        tasend = null;
-        ta = null;
+        
     }
 
 
     @Test
     public void testTextAreaAdd3() {
-        TextAreaFIFO ta = new TextAreaFIFO(9);
+        ta = new TextAreaFIFO(9);
         CbusSend tasend = new CbusSend(memo,ta);
         Assert.assertNotNull("exists",tasend);
         tasend.nodeEnterLearnEvMode(33333);
         Assert.assertTrue("textarea is updated 3",(ta.getText()).contains("3 enter learn mode."));
-        tasend = null;
-        ta = null;
     }
 
     public void checknodeExitLearnEvMode() {
@@ -208,6 +223,30 @@ public class CbusSendTest {
         tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
     }
 
+    public void checkaRST() {
+        Assert.assertEquals("aRST sent", "[5f8] 07",
+        tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
+    }
+
+    public void checkeNUM() {
+        Assert.assertEquals("eNUM sent", "[5f8] 5D 04 D2",
+        tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
+    }
+
+    public void checkcANID() {
+        Assert.assertEquals("cANID sent", "[5f8] 75 19 8F 4D",
+        tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
+    }
+    
+    public void checknNCLR() {
+        Assert.assertEquals("nNCLR sent", "[5f8] 55 10 E1",
+        tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
+    }
+    
+    public void checkrQmn() {
+        Assert.assertEquals("rQmn sent", "[5f8] 11",
+        tcis.outbound.elementAt(tcis.outbound.size() - 1).toString());
+    }
 
     // The minimal setup for log4J
     @Before
@@ -222,10 +261,13 @@ public class CbusSendTest {
     @After
     public void tearDown() {
         send = null;
+        memo.dispose();
+        tcis.terminateThreads();
         tcis = null;
         memo = null;
         ta = null;
         JUnitUtil.tearDown();
+
     }
     
     // private final static Logger log = LoggerFactory.getLogger(CbusSendTest.class);

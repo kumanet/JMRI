@@ -5,6 +5,7 @@ import java.awt.GraphicsEnvironment;
 import jmri.*;
 import jmri.jmrit.roster.*;
 import jmri.util.*;
+import jmri.util.junit.rules.RetryRule;
 
 import org.junit.*;
 
@@ -15,29 +16,32 @@ import org.junit.*;
  */
 public class RosterFrameTest {
 
+    @Rule
+    public RetryRule retryRule = new RetryRule(3);  // allow 3 retries
+
+    @Rule // This test class was periodically stalling and causing the CI run to time out. Limit its duration.
+    public org.junit.rules.Timeout globalTimeout = org.junit.rules.Timeout.seconds(20);
+
+    private RosterFrame frame = null;
+
     @Test
     public void testCtor() {
         Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        RosterFrame frame = new RosterFrame();
         Assert.assertNotNull("exists", frame);
-        JUnitUtil.dispose(frame);
     }
 
     @Test
     public void testIdentifyEnabled() {
         Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        RosterFrame frame = new RosterFrame();
         frame.setVisible(true);
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
         Assert.assertTrue("Identify Button Enabled", operator.isIdentifyButtonEnabled());
-        JUnitUtil.dispose(frame);
     }
 
     @Test
     public void testIdentify3NotPresent() {
         Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        RosterFrame frame = new RosterFrame();
         frame.pack();
         frame.setVisible(true);
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
@@ -53,7 +57,6 @@ public class RosterFrameTest {
                 return JUnitAppender.checkForMessage("Read address 3, but no such loco in roster") != null;
             }, "error message at end");
             
-        JUnitUtil.dispose(frame);
     }
     
     @Test
@@ -75,7 +78,6 @@ public class RosterFrameTest {
         re3.setDccAddress("5");
         roster.addEntry(re3);
         
-        RosterFrame frame = new RosterFrame();
         frame.setVisible(true);
         frame.pack();
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
@@ -94,7 +96,6 @@ public class RosterFrameTest {
         Assert.assertEquals("selected ", 1, selected.length);
         Assert.assertEquals("selected ", re1, selected[0]);
         
-        JUnitUtil.dispose(frame);
     }
 
     @Test
@@ -119,7 +120,6 @@ public class RosterFrameTest {
         re3.setDccAddress("5");
         roster.addEntry(re3);
         
-        RosterFrame frame = new RosterFrame();
         frame.setVisible(true);
         frame.pack();
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
@@ -138,12 +138,12 @@ public class RosterFrameTest {
         //    }, "error message at end");
 
         JUnitUtil.waitFor(() ->{
-            return frame.getSelectedRosterEntries().length == 1;
-        }, "selection complete");
+                return frame.getSelectedRosterEntries().length == 1;
+            }, "selection complete");
         RosterEntry[] selected = frame.getSelectedRosterEntries();
         Assert.assertEquals("selected ", re1, selected[0]);
+	    Assert.assertTrue("entry selected",frame.checkIfEntrySelected());
         
-        JUnitUtil.dispose(frame);
     }
 
     @Test
@@ -169,7 +169,6 @@ public class RosterFrameTest {
         re3.setDccAddress("3");
         roster.addEntry(re3);
         
-        RosterFrame frame = new RosterFrame();
         frame.setVisible(true);
         frame.pack();
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
@@ -183,15 +182,15 @@ public class RosterFrameTest {
 
         // right now, nothing is ever selected, because multiple selection 
         // is not working.  See @Ignore above
-        
+
         JUnitUtil.waitFor(() ->{
-            return frame.getSelectedRosterEntries().length == 2;
-        }, "selection complete");
+                return frame.getSelectedRosterEntries().length == 2;
+            }, "selection complete");
         RosterEntry[] selected = frame.getSelectedRosterEntries();
         Assert.assertEquals("selected ", re1, selected[0]);
         Assert.assertEquals("selected ", re3, selected[1]);
+	    Assert.assertTrue("entry selected",frame.checkIfEntrySelected());
                 
-        JUnitUtil.dispose(frame);
     }
 
     @Test
@@ -217,7 +216,6 @@ public class RosterFrameTest {
         re3.setDecoderFamily("Dual Mode"); 
         roster.addEntry(re3);
         
-        RosterFrame frame = new RosterFrame();
         frame.setVisible(true);
         frame.pack();
         RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
@@ -232,13 +230,39 @@ public class RosterFrameTest {
         operator.pushIdentifyButton();
         
         JUnitUtil.waitFor(() ->{
-            return frame.getSelectedRosterEntries().length == 1;
-        }, "selection complete");
+                return frame.getSelectedRosterEntries().length == 1;
+            }, "selection complete");
         RosterEntry[] selected = frame.getSelectedRosterEntries();
         Assert.assertEquals("selected ", 1, selected.length);
         Assert.assertEquals("selected ", re3, selected[0]);  // 2nd address=3 selected by decoder match
+	    Assert.assertTrue("entry selected",frame.checkIfEntrySelected());
         
-        JUnitUtil.dispose(frame);
+    }
+
+    @Test
+    @Ignore("does not find and close dialog as expected")
+    public void testCheckIfEntrySelected() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        frame.setVisible(true);
+        RosterFrameScaffold operator = new RosterFrameScaffold(frame.getTitle());
+        Thread t = new Thread(() -> {
+	        jmri.util.swing.JemmyUtil.confirmJOptionPane(operator,"Message","","OK");
+        });
+        t.setName("Error Dialog Close Thread");
+        t.start();
+        // the return true case happens in the identify methods above, so
+	    // we only check the return false case here.
+	    Assert.assertFalse("entry not selected",frame.checkIfEntrySelected());
+    }
+
+    @Test
+    public void testGetandSetAllowQuit() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        frame.setVisible(true);
+	    frame.allowQuit(false);
+	    Assert.assertFalse("Quit Not Allowed",frame.isAllowQuit());
+	    frame.allowQuit(true);
+	    Assert.assertTrue("Quit Allowed",frame.isAllowQuit());
     }
 
     @Before
@@ -251,11 +275,18 @@ public class RosterFrameTest {
         jmri.InstanceManager.setDefault(jmri.jmrix.ConnectionConfigManager.class, new jmri.jmrix.ConnectionConfigManager());
         jmri.InstanceManager.setDefault(jmri.jmrit.symbolicprog.ProgrammerConfigManager.class, new jmri.jmrit.symbolicprog.ProgrammerConfigManager());
         JUnitUtil.initDebugProgrammerManager();
+        JUnitUtil.initRosterConfigManager();
         Roster.getDefault(); // ensure exists
+        if(!GraphicsEnvironment.isHeadless()){
+           frame = new RosterFrame();
+	    }
     }
 
     @After
     public void tearDown() {
+	    if(frame!=null) {
+           JUnitUtil.dispose(frame);
+	    }
         JUnitUtil.tearDown();
     }
 

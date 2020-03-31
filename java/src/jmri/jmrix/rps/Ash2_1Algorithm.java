@@ -8,20 +8,18 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of 2.1th algorithm for reducing Readings
- * <P>
+ * <p>
  * This algorithm was provided by Robert Ashenfelter based in part on the work
  * of Ralph Bucher in his paper "Exact Solution for Three Dimensional Hyperbolic
  * Positioning Algorithm and Synthesizable VHDL Model for Hardware
  * Implementation".
- * <P>
+ * <p>
  * Neither Ashenfelter nor Bucher provide any guarantee as to the intellectual
  * property status of this algorithm. Use it at your own risk.
  *
- * <p>
- *
  * @author	Robert Ashenfelter Copyright (C) 2007
  * @author	Bob Jacobsen Copyright (C) 2007
-  */
+ */
 public class Ash2_1Algorithm extends AbstractCalculator {
 
     @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
@@ -39,20 +37,11 @@ public class Ash2_1Algorithm extends AbstractCalculator {
     }
 
     public Ash2_1Algorithm(Point3d sensor1, Point3d sensor2, Point3d sensor3, double vsound) {
-        this(null, vsound);
-        sensors = new Point3d[3];
-        sensors[0] = sensor1;
-        sensors[1] = sensor2;
-        sensors[2] = sensor3;
+        this(new Point3d[]{sensor1, sensor2, sensor3}, vsound);
     }
 
     public Ash2_1Algorithm(Point3d sensor1, Point3d sensor2, Point3d sensor3, Point3d sensor4, double vsound) {
-        this(null, vsound);
-        sensors = new Point3d[4];
-        sensors[0] = sensor1;
-        sensors[1] = sensor2;
-        sensors[2] = sensor3;
-        sensors[3] = sensor4;
+        this(new Point3d[]{sensor1, sensor2, sensor3, sensor4}, vsound);
     }
 
     double Vs;
@@ -64,13 +53,13 @@ public class Ash2_1Algorithm extends AbstractCalculator {
     public Measurement convert(Reading r) {
 
         if (log.isDebugEnabled()) {
-            log.debug("Reading: " + r.toString());
-            log.debug("Sensors: " + sensors.length);
+            log.debug("Reading: {}", r);
+            log.debug("Sensors: {}", sensors.length);
             if (sensors.length >= 1 && sensors[0] != null) {
-                log.debug("Sensor[0]: " + sensors[0].x + "," + sensors[0].y + "," + sensors[0].z);
+                log.debug("Sensor[0]: {},{},{}", sensors[0].x, sensors[0].y, sensors[0].z);
             }
             if (sensors.length >= 2 && sensors[1] != null) {
-                log.debug("Sensor[1]: " + sensors[1].x + "," + sensors[1].y + "," + sensors[1].z);
+                log.debug("Sensor[1]: {},{},{}", sensors[1].x, sensors[1].y, sensors[1].z);
             }
         }
 
@@ -82,7 +71,7 @@ public class Ash2_1Algorithm extends AbstractCalculator {
         Zt = result.z;
         Vs = result.vs;
 
-        log.debug("x = " + Xt + " y = " + Yt + " z0 = " + Zt + " code = " + result.code);
+        log.debug("x = {} y = {} z0 = {} code = {}", Xt, Yt, Zt, result.code);
         return new Measurement(r, Xt, Yt, Zt, Vs, result.code, "Ash2_1Algorithm");
     }
 
@@ -406,5 +395,3 @@ public class Ash2_1Algorithm extends AbstractCalculator {
     private final static Logger log = LoggerFactory.getLogger(Ash2_1Algorithm.class);
 
 }
-
-

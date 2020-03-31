@@ -7,9 +7,7 @@ import org.jdom2.Element;
 import jmri.jmrix.lenz.liusbserver.ConnectionConfig;
 
 /**
- * ConnectionConfigXmlTest.java
- *
- * Description: tests for the ConnectionConfigXml class
+ * Tests for the jmri.jmrix.lenz.liusbserver.configurexml.ConnectionConfigXml class.
  *
  * @author   Paul Bender  Copyright (C) 2016
  */
@@ -33,6 +31,7 @@ public class ConnectionConfigXmlTest extends jmri.jmrix.configurexml.AbstractNet
     }
 
     @Test
+    @Override
     public void getInstanceTest() {
        super.getInstanceTest();
        JUnitAppender.assertErrorMessageStartsWith("Error opening network connection:");

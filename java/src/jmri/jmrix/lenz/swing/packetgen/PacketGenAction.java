@@ -3,7 +3,7 @@
  * object
  *
  * @author Bob Jacobsen Copyright (C) 2001, 2002
-  */
+ */
 package jmri.jmrix.lenz.swing.packetgen;
 
 import java.awt.event.ActionEvent;
@@ -36,6 +36,6 @@ public class PacketGenAction extends AbstractXPressNetAction {
         f.connect(_memo.getXNetTrafficController());
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PacketGenAction.class);
+    private static final Logger log = LoggerFactory.getLogger(PacketGenAction.class);
 
 }

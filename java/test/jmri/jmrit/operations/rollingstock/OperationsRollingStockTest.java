@@ -1,5 +1,8 @@
 package jmri.jmrit.operations.rollingstock;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
 import jmri.jmrit.operations.locations.Location;
@@ -7,8 +10,6 @@ import jmri.jmrit.operations.locations.Track;
 import jmri.jmrit.operations.rollingstock.cars.Car;
 import jmri.jmrit.operations.rollingstock.cars.CarTypes;
 import jmri.jmrit.operations.setup.Setup;
-import org.junit.Assert;
-import org.junit.Test;
 
 /**
  * Tests for the Operations Car class Last manually cross-checked on
@@ -86,6 +87,8 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         }
 
         jmri.util.JUnitAppender.assertErrorMessage("Tag 12345 Not Found");
+        
+
     }
 
     // test creation
@@ -126,6 +129,8 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         Assert.assertEquals("Car Comment", "TESTCOMMENT", rs1.getComment());
         Assert.assertEquals("Car Rfid", "TESTRFID", rs1.getRfid());
         Assert.assertEquals("Car Moves", 5, rs1.getMoves());
+        
+
     }
 
     // test Car weight and weighttons
@@ -212,6 +217,9 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         rs1.setLength("40");
         testresult = rs1.setLocation(testlocation1, testtrack1);
         Assert.assertEquals("Car null Set Length match", "okay", testresult);
+        
+        // car is now on track, need to remove to continue testing
+        rs1.setLocation(null, null);
 
         /* track needs to accept road */
         testtrack1.setRoadOption(Track.INCLUDE_ROADS);
@@ -223,6 +231,9 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         testtrack1.addRoadName("TESTROAD");
         testresult = rs1.setLocation(testlocation1, testtrack1);
         Assert.assertEquals("Car Set includeroads", "okay", testresult);
+        
+        // car is now on track, need to remove to continue testing
+        rs1.setLocation(null, null);
 
         /* track needs to accept road */
         testtrack1.setRoadOption(Track.EXCLUDE_ROADS);
@@ -233,6 +244,9 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         testtrack1.setRoadOption(Track.ALL_ROADS);
         testresult = rs1.setLocation(testlocation1, testtrack1);
         Assert.assertEquals("Car Set allroads", "okay", testresult);
+        
+        // car is now on track, need to remove to continue testing
+        rs1.setLocation(null, null);
 
         /* track needs to accept road */
         testtrack1.setRoadOption(Track.EXCLUDE_ROADS);

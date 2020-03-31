@@ -1,17 +1,19 @@
 package jmri.jmris;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-import org.junit.Assert;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for the jmri.jmris.JmriConnection class 
  *
  * @author Paul Bender
  */
-public class JmriConnectionTest extends TestCase {
+public class JmriConnectionTest {
 
+    @Test
     public void testCtorwithStreamParameter() {
         java.io.DataOutputStream output = new java.io.DataOutputStream(
                 new java.io.OutputStream() {
@@ -22,37 +24,16 @@ public class JmriConnectionTest extends TestCase {
                     }
                 });
         JmriConnection a = new JmriConnection(output);
-        Assert.assertNotNull(a);
+        assertThat(a).isNotNull();
     }
 
-    // from here down is testing infrastructure
-    public JmriConnectionTest(String s) {
-        super(s);
-    }
-
-    // Main entry point
-    static public void main(String[] args) {
-        String[] testCaseName = {JmriConnectionTest.class.getName()};
-        junit.textui.TestRunner.main(testCaseName);
-    }
-
-    // test suite from all defined tests
-    public static Test suite() {
-        TestSuite suite = new TestSuite(jmri.jmris.JmriConnectionTest.class);
-
-        return suite;
-    }
-
-    // The minimal setup for log4J
-    @Override
-    protected void setUp() throws Exception {
+    @BeforeEach
+    public void setUp() throws Exception {
         jmri.util.JUnitUtil.setUp();
-        super.setUp();
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+    @AfterEach
+    public void tearDown() throws Exception {
         jmri.util.JUnitUtil.tearDown();
 
     }

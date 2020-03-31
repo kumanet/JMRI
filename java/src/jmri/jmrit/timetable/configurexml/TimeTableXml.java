@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import jmri.InstanceManager;
 import jmri.jmrit.XmlFile;
 import jmri.util.FileUtil;
 import org.jdom2.Document;
@@ -17,7 +16,6 @@ import org.jdom2.JDOMException;
 // import org.jdom2.ProcessingInstruction;
 
 import jmri.jmrit.timetable.*;
-import jmri.jmrit.timetable.swing.*;
 
 /**
  * Load and store the timetable data file: TimeTableData.xml
@@ -433,8 +431,7 @@ public class TimeTableXml {
     }
 
 
-
-    private static class TimeTableXmlFile extends XmlFile {
+    public static class TimeTableXmlFile extends XmlFile {
         private static String fileLocation = FileUtil.getUserFilesPath() + "timetable/";  // NOI18N
         private static String demoLocation = FileUtil.getProgramPath() + "xml/demoTimetable/";  // NOI18N
         private static String baseFileName = "TimeTableData.xml";  // NOI18N
@@ -447,8 +444,8 @@ public class TimeTableXml {
             // Verify that preference:timetable exists
             File chkdir = new File(getFileLocation());
             if (!chkdir.exists()) {
-                if (!chkdir.mkdir()) {
-                    log.error("Create preference:timetable failed");  // NOI18N
+                if (!chkdir.mkdirs()) {
+                    log.error("Create {} failed", chkdir);  // NOI18N
                     return null;
                 }
             }
@@ -477,6 +474,9 @@ public class TimeTableXml {
         }
 
         public static String getFileName() {
+            if(baseFileName == null) {
+               baseFileName = "TimeTableData.xml";  // NOI18N
+            }
             return baseFileName;
         }
 
@@ -486,6 +486,9 @@ public class TimeTableXml {
          * @return path to location
          */
         public static String getFileLocation() {
+            if(fileLocation==null){
+               fileLocation = FileUtil.getUserFilesPath() + "timetable/";  // NOI18N
+            }
             return fileLocation;
         }
     }

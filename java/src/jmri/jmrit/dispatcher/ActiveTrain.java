@@ -205,7 +205,9 @@ public class ActiveTrain {
     private int mDepartureTimeMin = 0;
     private int mRestartDelay = 0;
     private NamedBeanHandle<jmri.Sensor> mStartSensor = null; // A Sensor that when changes state to active will trigger the trains start.
-    private NamedBeanHandle<jmri.Sensor> mRestartSensor = null; // A Sensor that when changes state to active will trigger the trains start.
+    private boolean resetStartSensor = true;
+    private NamedBeanHandle<jmri.Sensor> mRestartSensor = null; // A Sensor that when changes state to active will trigger the trains restart.
+    private boolean resetRestartSensor = true;
     private int mTrainType = LOCAL_FREIGHT;
     private boolean terminateWhenFinished = false;
 
@@ -233,16 +235,12 @@ public class ActiveTrain {
     }
 
     public String getTransitName() {
-        String s = mTransit.getSystemName();
-        String u = mTransit.getUserName();
-        if ((u != null) && (!u.equals("") && (!u.equals(s)))) {
-            return (s + "(" + u + ")");
-        }
+        String s = mTransit.getDisplayName();
         return s;
     }
 
     public String getActiveTrainName() {
-        return (mTrainName + "/" + getTransitName());
+        return (mTrainName + " / " + getTransitName());
     }
 
     // Note: Transit and Train may not be changed once an ActiveTrain is created.
@@ -416,6 +414,10 @@ public class ActiveTrain {
         mStartSensor = jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle(s.getDisplayName(), s);
     }
 
+    public void setResetStartSensor(boolean b) {
+        resetStartSensor = b;
+    }
+
     public jmri.Sensor getRestartSensor() {
         if (mRestartSensor == null) {
             return null;
@@ -438,6 +440,11 @@ public class ActiveTrain {
         mRestartSensor = jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle(s.getDisplayName(), s);
     }
 
+    public void setResetRestartSensor(boolean b) {
+        resetRestartSensor = b;
+    }
+
+
     private java.beans.PropertyChangeListener delaySensorListener = null;
     private java.beans.PropertyChangeListener restartSensorListener = null;
     private java.beans.PropertyChangeListener restartAllocationSensorListener = null;
@@ -458,10 +465,13 @@ public class ActiveTrain {
                             InstanceManager.getDefault(DispatcherFrame.class).removeDelayedTrain(at);
                             setStarted();
                             InstanceManager.getDefault(DispatcherFrame.class).forceScanOfAllocation();
-                            try {
-                                getDelaySensor().setKnownState(jmri.Sensor.INACTIVE);
-                            } catch (jmri.JmriException ex) {
-                                log.error("Error reseting start sensor back to in active");
+                            if (resetStartSensor) {
+                                try {
+                                    getDelaySensor().setKnownState(jmri.Sensor.INACTIVE);
+                                    log.debug("Start sensor {} set back to inActive", getDelaySensorName());
+                                } catch (jmri.JmriException ex) {
+                                    log.error("Error resetting start sensor {} back to inActive", getDelaySensorName());
+                                }
                             }
                         }
                     }
@@ -473,7 +483,7 @@ public class ActiveTrain {
 
     public void initializeRestartSensor() {
         if (mRestartSensor == null) {
-            log.error("Call to initialise delay on start sensor, but none specified");
+            log.error("Call to initialise delay on restart sensor, but none specified");
             return;
         }
         if (restartSensorListener == null) {
@@ -488,10 +498,13 @@ public class ActiveTrain {
                             InstanceManager.getDefault(DispatcherFrame.class).removeDelayedTrain(at);
                             restart();
                             InstanceManager.getDefault(DispatcherFrame.class).forceScanOfAllocation();
-                            try {
-                                getRestartSensor().setKnownState(jmri.Sensor.INACTIVE);
-                            } catch (jmri.JmriException ex) {
-                                log.error("Error reseting start sensor back to in active");
+                            if (resetRestartSensor) {
+                                try {
+                                    getRestartSensor().setKnownState(jmri.Sensor.INACTIVE);
+                                    log.debug("Restart sensor {} set back to inActive", getRestartSensorName());
+                                } catch (jmri.JmriException ex) {
+                                    log.error("Error resetting restart sensor back to inActive");
+                                }
                             }
                         }
                     }
@@ -530,7 +543,7 @@ public class ActiveTrain {
     /**
      * set train type using localized string name as stored
      *
-     * @param sType - name, such as "LOCAL_PASSENGER"
+     * @param sType  name, such as "LOCAL_PASSENGER"
      */
     public void setTrainType(String sType) {
         if (sType.equals(Bundle.getMessage("LOCAL_FREIGHT"))) {
@@ -856,11 +869,7 @@ public class ActiveTrain {
     }
 
     private String getSectionName(jmri.Section sc) {
-        String s = sc.getSystemName();
-        String u = sc.getUserName();
-        if ((u != null) && (!u.equals("") && (!u.equals(s)))) {
-            return (s + "(" + u + ")");
-        }
+        String s = sc.getDisplayName();
         return s;
     }
 
@@ -1079,6 +1088,9 @@ public class ActiveTrain {
             int minutes = getRestartDelay() % 60;
             restartHr = nowHours + hours + ((nowMinutes + minutes) / 60);
             restartMin = ((nowMinutes + minutes) % 60);
+            if (restartHr>23){
+                restartHr=restartHr-24;
+            }
         }
         InstanceManager.getDefault(DispatcherFrame.class).addDelayedTrain(this);
     }
@@ -1100,6 +1112,7 @@ public class ActiveTrain {
     }
 
     protected void restart() {
+        log.debug("{}: restarting", getTrainName());
         restartPoint = false;
         holdAllocation = false;
         setStatus(WAITING);

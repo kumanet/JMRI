@@ -28,18 +28,6 @@ public class AutomationManager implements InstanceManagerAutoDefault, PropertyCh
     public AutomationManager() {
     }
 
-    /**
-     * Get the default instance of this class.
-     *
-     * @return the default instance of this class
-     * @deprecated since 4.9.2; use
-     * {@link jmri.InstanceManager#getDefault(java.lang.Class)} instead
-     */
-    @Deprecated
-    public static synchronized AutomationManager instance() {
-        return InstanceManager.getDefault(AutomationManager.class);
-    }
-
     // stores known Automation instances by id
     protected Hashtable<String, Automation> _automationHashTable = new Hashtable<>();
 
@@ -206,6 +194,18 @@ public class AutomationManager implements InstanceManagerAutoDefault, PropertyCh
         box.addItem(null);
         for (Automation automation : getAutomationsByNameList()) {
             box.addItem(automation);
+        }
+    }
+    
+    /**
+     * Restarts all automations that were running when the operations program
+     * was last saved.
+     */
+    public void resumeAutomations() {
+        for (Automation automation : getAutomationsByNameList()) {
+            if (!automation.isActionRunning() && !automation.isReadyToRun()) {
+                automation.resume();
+            }
         }
     }
 

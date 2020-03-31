@@ -1,11 +1,14 @@
 package jmri.jmrix.xpa;
 
+import java.util.Comparator;
 import java.util.ResourceBundle;
 import jmri.InstanceManager;
+import jmri.NamedBean;
 import jmri.PowerManager;
 import jmri.ThrottleManager;
 import jmri.TurnoutManager;
 import jmri.jmrix.SystemConnectionMemo;
+import jmri.util.NamedBeanComparator;
 
 /**
  * Provide the required SystemConnectionMemo for the XPA+Modem adapters.
@@ -33,6 +36,11 @@ public class XpaSystemConnectionMemo extends SystemConnectionMemo {
     @Override
     protected ResourceBundle getActionModelResourceBundle() {
         return null;
+    }
+
+    @Override
+    public <B extends NamedBean> Comparator<B> getNamedBeanComparator(Class<B> type) {
+        return new NamedBeanComparator<>();
     }
 
     jmri.jmrix.swing.ComponentFactory cf = null;
@@ -78,7 +86,7 @@ public class XpaSystemConnectionMemo extends SystemConnectionMemo {
     private ThrottleManager throttleManager;
 
     /*
-     * Provide access to the Power Manager for this particular connection.
+     * Provide access to the PowerManager for this particular connection.
      */
     public PowerManager getPowerManager() {
         if (powerManager == null) {
@@ -95,7 +103,7 @@ public class XpaSystemConnectionMemo extends SystemConnectionMemo {
     private PowerManager powerManager;
 
     /*
-     * Provide access to the Turnout Manager for this particular connection.
+     * Provide access to the TurnoutManager for this particular connection.
      */
     public TurnoutManager getTurnoutManager() {
         if (turnoutManager == null) {

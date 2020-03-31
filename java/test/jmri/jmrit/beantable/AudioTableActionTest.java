@@ -1,5 +1,6 @@
 package jmri.jmrit.beantable;
 
+import jmri.Audio;
 import jmri.util.JUnitUtil;
 import jmri.util.junit.annotations.*;
 import org.junit.*;
@@ -8,7 +9,7 @@ import org.junit.*;
  *
  * @author Paul Bender Copyright (C) 2017	
  */
-public class AudioTableActionTest extends AbstractTableActionBase {
+public class AudioTableActionTest extends AbstractTableActionBase<Audio> {
 
     @Test
     public void testCTor() {
@@ -52,6 +53,30 @@ public class AudioTableActionTest extends AbstractTableActionBase {
          Assert.assertTrue("Default include add button",a.includeAddButton());
     }
 
+    @Test
+    @Ignore("Audio table does not have Add... button")
+    @Override
+    public void testAddButton() {
+    }
+
+    @Override
+    public String getAddFrameName(){
+        return "";
+    }
+
+    @Test
+    @Override
+    @Ignore("Audio table does not have Add... button")
+    public void testAddThroughDialog() {
+    }
+
+    @Test
+    @Override
+    @Ignore("Audio table does not have Add... button, so test needs re-written")
+    @ToDo("Re-write parent class test to use the right name, or add without dialog")
+    public void testEditButton() {
+    }
+
     // The minimal setup for log4J
     @Before
     @Override
@@ -66,7 +91,7 @@ public class AudioTableActionTest extends AbstractTableActionBase {
     @After
     @Override
     public void tearDown() {
-        jmri.util.JUnitAppender.suppressWarnMessage("Initialised Null audio system - no sounds will be available.");
+        JUnitUtil.clearShutDownManager(); // should be converted to check of scheduled ShutDownActions
         JUnitUtil.tearDown();
         a = null;
     }

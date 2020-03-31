@@ -31,7 +31,6 @@ import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.LayoutStyle;
 import javax.swing.ListSelectionModel;
@@ -52,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * automatically start the application with that profile after 10 seconds unless
  * the user intervenes.
  *
- * @author rhwood
+ * @author Randall Wood
  */
 public class ProfileManagerDialog extends JDialog {
 
@@ -63,8 +62,8 @@ public class ProfileManagerDialog extends JDialog {
     /**
      * Creates new form ProfileManagerDialog
      *
-     * @param parent {@inheritDoc}
-     * @param modal  {@inheritDoc}
+     * @param parent The frame containing this dialog
+     * @param modal The modal parameter for parent JDialog
      */
     public ProfileManagerDialog(Frame parent, boolean modal) {
         this(parent, modal, false);
@@ -73,8 +72,8 @@ public class ProfileManagerDialog extends JDialog {
     /**
      * Creates new form ProfileManagerDialog
      *
-     * @param parent {@inheritDoc}
-     * @param modal  {@inheritDoc}
+     * @param parent The frame containing this dialog
+     * @param modal The modal parameter for parent JDialog
      * @param disableTimer true if the timer should be disabled
      */
     public ProfileManagerDialog(Frame parent, boolean modal, boolean disableTimer) {
@@ -119,14 +118,17 @@ public class ProfileManagerDialog extends JDialog {
         setTitle(Bundle.getMessage("ProfileManagerDialog.title")); // NOI18N
         setMinimumSize(new Dimension(310, 110));
         addMouseListener(new MouseAdapter() {
+            @Override
             public void mousePressed(MouseEvent evt) {
                 formMousePressed(evt);
             }
         });
         addWindowListener(new WindowAdapter() {
+            @Override
             public void windowOpened(WindowEvent evt) {
                 formWindowOpened(evt);
             }
+            @Override
             public void windowClosed(WindowEvent evt) {
                 formWindowClosed(evt);
             }
@@ -145,6 +147,7 @@ public class ProfileManagerDialog extends JDialog {
 
 
         profiles.addKeyListener(new KeyAdapter() {
+            @Override
             public void keyPressed(KeyEvent evt) {
                 profilesKeyPressed(evt);
             }
@@ -278,8 +281,13 @@ public class ProfileManagerDialog extends JDialog {
                 countDownLbl.setText(Integer.toString(countDown));
             } else {
                 setVisible(false);
-                ProfileManager.getDefault().setActiveProfile(profiles.getSelectedValue());
-                log.info("Automatically starting with profile " + ProfileManager.getDefault().getActiveProfile().getId() + " after timeout.");
+                Profile profile = profiles.getSelectedValue();
+                ProfileManager.getDefault().setActiveProfile(profile);
+                if (profile != null) {
+                    log.info("Automatically starting with profile " + profile.getId() + " after timeout.");
+                } else {
+                    log.info("Automatically starting without a profile");
+                }
                 timer.stop();
                 countDown = -1;
                 dispose();
@@ -299,7 +307,7 @@ public class ProfileManagerDialog extends JDialog {
     /**
      * Get the active profile or display a dialog to prompt the user for it.
      *
-     * @param f - The {@link java.awt.Frame} to display the dialog over
+     * @param f  The {@link java.awt.Frame} to display the dialog over
      * @return the active or selected {@link Profile}
      * @throws java.io.IOException if unable to read or set the starting Profile
      * @see ProfileManager#getStartingProfile()
@@ -321,16 +329,8 @@ public class ProfileManagerDialog extends JDialog {
     }
 
     private void profileNameChanged(Profile p) {
-        try {
-            p.save();
-            log.info("Saving profile {}", p.getId());
-        } catch (IOException ex) {
-            log.error("Unable to save renamed profile: {}", ex.getMessage());
-            JOptionPane.showMessageDialog(this,
-                    Bundle.getMessage("ProfileManagerDialog.errorRenamingProfile"),
-                    Bundle.getMessage("ProfileManagerDialog.errorRenamingProfileTitle"),
-                    JOptionPane.ERROR_MESSAGE);
-        }
+        p.save();
+        log.info("Saving profile {}", p.getId());
     }
 
     private void profilesValueChanged(ListSelectionEvent evt) {//GEN-FIRST:event_profilesValueChanged

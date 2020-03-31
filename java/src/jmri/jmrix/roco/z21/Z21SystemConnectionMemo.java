@@ -1,9 +1,13 @@
 package jmri.jmrix.roco.z21;
 
+import java.util.Comparator;
 import java.util.ResourceBundle;
 import jmri.CommandStation;
 import jmri.InstanceManager;
+import jmri.NamedBean;
 import jmri.jmrix.lenz.XNetProgrammerManager;
+import jmri.util.NamedBeanComparator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * @author	Bob Jacobsen Copyright (C) 2010 copied from NCE into PowerLine for
  * multiple connections by
  * @author	Ken Cameron Copyright (C) 2011 copied from PowerLine into z21 by
- * @author	Paul Bender Copyright (C) 2013
+ * @author	Paul Bender Copyright (C) 2013,2019
  */
 public class Z21SystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
@@ -76,7 +80,7 @@ public class Z21SystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     private Z21ReporterManager _rm = null;
 
     /**
-     * Sensor Manager for this instance.
+     * SensorManager for this instance.
      */
     public void setSensorManager(Z21SensorManager sm){
         _sm = sm;
@@ -181,36 +185,43 @@ public class Z21SystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         z21CommandStation.setLocoNetMessagesFlag(true);
         z21CommandStation.setLocoNetLocomotiveMessagesFlag(true);
         z21CommandStation.setLocoNetTurnoutMessagesFlag(true);
-        z21CommandStation.setLocoNetOccupancyMessagesFlag(true);
 
-        // and forward the flags to the command station.
+        // and forward the flags to the command station
         _tc.sendz21Message(Z21Message.getLanSetBroadcastFlagsRequestMessage(
                            z21CommandStation.getZ21BroadcastFlags()),null);
 
-        // add an LocoNet Tunnel.
+        // add an LocoNet Tunnel
         _loconettunnel = new Z21LocoNetTunnel(this);
 
-        // add an XpressNet Tunnel.
+        // add an XpressNet Tunnel
         _xnettunnel = new Z21XPressNetTunnel(this);
 
         // set up the Reporter Manager
         jmri.InstanceManager.setReporterManager(getReporterManager());
 
-        // set up the Sensor Manager
+        // set up the SensorManager
         jmri.InstanceManager.setSensorManager(getSensorManager());
 
-        // but make sure the Loconet memo is set (for one feedback message).
+        // but make sure the LocoNet memo is set (for one feedback message).
         Z21XNetProgrammerManager xpm = (Z21XNetProgrammerManager) _xnettunnel.getStreamPortController().getSystemConnectionMemo().getProgrammerManager();
         xpm.setLocoNetMemo(_loconettunnel.getStreamPortController().getSystemConnectionMemo());
 
         // setup the MultiMeter
         getMultiMeter();
 
+        // setup the HeartBeat
+        getHeartBeat();
+
    }
 
     @Override
     protected ResourceBundle getActionModelResourceBundle() {
         return ResourceBundle.getBundle("jmri.jmrix.roco.z21.z21ActionListBundle");
+    }
+
+    @Override
+    public <B extends NamedBean> Comparator<B> getNamedBeanComparator(Class<B> type) {
+        return new NamedBeanComparator<>();
     }
 
     /**
@@ -260,6 +271,20 @@ public class Z21SystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     private Z21MultiMeter meter = null;
 
+    /**
+     * Provide access to the Z21HeartBeat instance for this connection.
+     * <p>
+     * NOTE: HeartBeat defaults to NULL
+     */
+    public Z21HeartBeat getHeartBeat() {
+        if(heartBeat == null){
+           heartBeat = new Z21HeartBeat(this);
+        }
+        return heartBeat;
+    }
+    
+    private Z21HeartBeat heartBeat = null;
+
 
     void shutdownTunnel(){
         if (_xnettunnel!=null) {
@@ -270,6 +295,9 @@ public class Z21SystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     @Override
     public void dispose() {
+        if(heartBeat!=null) {
+           heartBeat.dispose();
+        }
         shutdownTunnel();
         InstanceManager.deregister(this, Z21SystemConnectionMemo.class);
         super.dispose();

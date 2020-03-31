@@ -18,6 +18,7 @@ import jmri.jmrix.dccpp.DCCppPacketizer;
 import jmri.jmrix.dccpp.DCCppReply;
 import jmri.jmrix.dccpp.DCCppSimulatorPortController;
 import jmri.jmrix.dccpp.DCCppTrafficController;
+import jmri.util.ImmediatePipedOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Currently, the DCCppSimulator reacts to commands sent from the user interface
  * with messages an appropriate reply message.
  *
- **NOTE: Most DCC++ commands are still unsupported in this implementation.
+ * NOTE: Most DCC++ commands are still unsupported in this implementation.
  *
  * Normally controlled by the dccpp.DCCppSimulator.DCCppSimulatorFrame class.
  *
@@ -55,10 +56,10 @@ public class DCCppSimulatorAdapter extends DCCppSimulatorPortController implemen
     public DCCppSimulatorAdapter() {
         setPort(Bundle.getMessage("None"));
         try {
-            PipedOutputStream tempPipeI = new PipedOutputStream();
+            PipedOutputStream tempPipeI = new ImmediatePipedOutputStream();
             pout = new DataOutputStream(tempPipeI);
             inpipe = new DataInputStream(new PipedInputStream(tempPipeI));
-            PipedOutputStream tempPipeO = new PipedOutputStream();
+            PipedOutputStream tempPipeO = new ImmediatePipedOutputStream();
             outpipe = new DataOutputStream(tempPipeO);
             pin = new DataInputStream(new PipedInputStream(tempPipeO));
         } catch (java.io.IOException e) {
@@ -165,14 +166,22 @@ public class DCCppSimulatorAdapter extends DCCppSimulatorPortController implemen
     }
 
     /**
-     * Get an array of valid baud rates. This is currently just a message saying
-     * it's fixed.
+     * {@inheritDoc}
+     * Currently just a message saying it's fixed.
      *
      * @return null
      */
     @Override
     public String[] validBaudRates() {
-        return null;
+        return new String[]{};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int[] validBaudNumbers() {
+        return new int[]{};
     }
 
     @Deprecated

@@ -3,15 +3,17 @@ package jmri.jmrit.operations.rollingstock.cars.tools;
 import java.awt.GraphicsEnvironment;
 import java.text.MessageFormat;
 import java.util.List;
+
+import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.Test;
+
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
 import jmri.jmrit.operations.rollingstock.cars.CarManager;
 import jmri.util.JUnitOperationsUtil;
 import jmri.util.JUnitUtil;
 import jmri.util.swing.JemmyUtil;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
 
 /**
  * Tests for the Operations CarAttributeEditFrame class
@@ -48,6 +50,7 @@ public class CarAttributeEditFrameTest extends OperationsTestCase {
         Assert.assertEquals("old color", "Black", f.comboBox.getItemAt(0));
 
         JUnitUtil.dispose(f);
+
     }
 
     @Test
@@ -241,7 +244,7 @@ public class CarAttributeEditFrameTest extends OperationsTestCase {
 
         // now add a new type
         f.addTextBox.setText("ABC-TEST_TEST_TEST");
-        // should cause two dialog windows to appear
+        // the following should cause two dialog windows to appear
         Thread add = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -251,9 +254,11 @@ public class CarAttributeEditFrameTest extends OperationsTestCase {
         add.setName("Add type attribute"); // NOI18N
         add.start();
 
-        jmri.util.JUnitUtil.waitFor(() -> {
-            return add.getState().equals(Thread.State.WAITING);
-        }, "wait for prompt");
+        // dboudreau periodically fails on AppVeyor 3/27/2019
+        // try without the wait
+//        jmri.util.JUnitUtil.waitFor(() -> {
+//            return add.getState().equals(Thread.State.WAITING);
+//        }, "wait for prompt");
 
         JemmyUtil.pressDialogButton(Bundle.getMessage("ModifyLocations"), Bundle.getMessage("ButtonNo"));
         JemmyUtil.pressDialogButton(Bundle.getMessage("ModifyTrains"), Bundle.getMessage("ButtonNo"));

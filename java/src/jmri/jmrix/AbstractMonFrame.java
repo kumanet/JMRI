@@ -18,8 +18,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
-import javax.swing.SwingUtilities;
-import javax.swing.text.BadLocationException;
 import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
 import jmri.util.swing.TextAreaFIFO;
@@ -39,7 +37,7 @@ public abstract class AbstractMonFrame extends JmriJFrame {
 
     /**
      * Initialize the data source.
-     * <P>
+     * <p>
      * This is invoked at the end of the GUI initialization phase. Subclass
      * implementations should connect to their data source here.
      */
@@ -49,11 +47,12 @@ public abstract class AbstractMonFrame extends JmriJFrame {
     @OverridingMethodsMustInvokeSuper
     @Override
     public void dispose() {
-
-        p.setSimplePreferenceState(timeStampCheck, timeCheckBox.isSelected());
-        p.setSimplePreferenceState(rawDataCheck, rawCheckBox.isSelected());
-        p.setSimplePreferenceState(alwaysOnTopCheck, alwaysOnTopCheckBox.isSelected());
-        p.setSimplePreferenceState(autoScrollCheck, !autoScrollCheckBox.isSelected());
+        if(p!=null) {
+           p.setSimplePreferenceState(timeStampCheck, timeCheckBox.isSelected());
+           p.setSimplePreferenceState(rawDataCheck, rawCheckBox.isSelected());
+           p.setSimplePreferenceState(alwaysOnTopCheck, alwaysOnTopCheckBox.isSelected());
+           p.setSimplePreferenceState(autoScrollCheck, !autoScrollCheckBox.isSelected());
+        }
         monTextPane.dispose();
         super.dispose();
     }
@@ -397,6 +396,7 @@ public abstract class AbstractMonFrame extends JmriJFrame {
 
     StringBuffer linesBuffer = new StringBuffer();
     static private int MAX_LINES = 500;
+
     private static final Logger log = LoggerFactory.getLogger(AbstractMonFrame.class);
 
 }

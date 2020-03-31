@@ -1,19 +1,17 @@
 package jmri.jmrix.can;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
-
 import javax.annotation.Nonnull;
-
 import jmri.InstanceManager;
-import jmri.profile.Profile;
-import jmri.profile.ProfileManager;
+import jmri.NamedBean;
+import jmri.util.NamedBeanComparator;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Lightweight class to denote that a system is active, and provide general
@@ -32,18 +30,39 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     public CanSystemConnectionMemo() {
         super("M", DEFAULT_USERNAME);
-        register(); // registers general type
+        super.register(); // registers general type
+        storeCanMemotoInstance();
+    }
+    
+    // Allow for default systemPrefix other than "M"
+    public CanSystemConnectionMemo(String prefix) {
+        super(prefix, DEFAULT_USERNAME);
+        super.register(); // registers general type
+        storeCanMemotoInstance();
+    }
+
+    protected final void storeCanMemotoInstance() {
         InstanceManager.store(this, CanSystemConnectionMemo.class); // also register as specific type
     }
 
+    protected String _protocol = ConfigurationManager.MERGCBUS;
+    
     jmri.jmrix.swing.ComponentFactory cf = null;
 
     protected TrafficController tm;
 
+    /**
+     * Set Connection Traffic Controller
+     * @param tm System Connection Traffic Controller
+     */
     public void setTrafficController(TrafficController tm) {
         this.tm = tm;
     }
-
+    
+    /**
+     * Get Connection Traffic Controller
+     * @return System Connection Traffic Controller
+     */
     public TrafficController getTrafficController() {
         return tm;
     }
@@ -84,6 +103,9 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         }
     }
 
+    /**
+     * {@inheritDoc }
+     */
     @SuppressWarnings("unchecked")
     @Override
     public <T> T get(Class<?> T) {
@@ -93,9 +115,15 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         return super.get(T);
     }
 
+    public String getProtocol() {
+        return _protocol;
+    }
+    
     public void setProtocol(String protocol) {
         if (null != protocol) {
+            _protocol = protocol;
             switch (protocol) {
+                case ConfigurationManager.SPROGCBUS:
                 case ConfigurationManager.MERGCBUS:
                     manager = new jmri.jmrix.can.cbus.CbusConfigurationManager(this);
                     break;
@@ -126,6 +154,9 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         }
     }
 
+    /**
+     * {@inheritDoc }
+     */
     @Override
     protected ResourceBundle getActionModelResourceBundle() {
         if (manager == null) {
@@ -135,7 +166,16 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
     }
 
     /**
+     * {@inheritDoc }
+     */
+    @Override
+    public <B extends NamedBean> Comparator<B> getNamedBeanComparator(Class<B> type) {
+        return new NamedBeanComparator<>();
+    }
+
+    /**
      * Enumerate all protocols that have options set.
+     *
      * @return set of protocol names.
      */
     public Set<String> getProtocolsWithOptions() {
@@ -144,6 +184,7 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     /**
      * Get all options we have set (saved in the connection XML) for a given protocol type.
+     *
      * @param protocol String name of the protocol.
      * @return map of known protocol options to values, or empty map.
      */
@@ -154,6 +195,7 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     /**
      * Get a single option of a single protocol, or null if not present.
+     *
      * @param protocol name of the protocol.
      * @param option name of the option.
      * @return null if option has never been set; or the option value if set.
@@ -166,6 +208,7 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
 
     /**
      * Sets a protocol option. This list will be persisted when the connection gets saved.
+     *
      * @param protocol name of the protocol
      * @param option name of the option
      * @param value option value
@@ -183,7 +226,10 @@ public class CanSystemConnectionMemo extends jmri.jmrix.SystemConnectionMemo {
         m.put(option, value);
         // @todo When the connection options are changed, we need to mark the profile as dirty.
     }
-
+    
+    /**
+     * {@inheritDoc }
+     */
     @Override
     public void dispose() {
         if (manager != null) {

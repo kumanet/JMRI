@@ -1,17 +1,16 @@
 package jmri.jmrix.can.cbus.simulator;
 
 import java.awt.event.ActionListener;
-import java.awt.event.ActionEvent;
 import javax.swing.Timer;
 import jmri.jmrix.can.CanReply;
 import jmri.jmrix.can.cbus.CbusConstants;
-import jmri.jmrix.can.cbus.simulator.CbusDummyCS;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Simultaing a MERG CBUS Command Station Loco Session
+ * Simulating a MERG CBUS Command Station Loco Session.
+ *
  * @author Steve Young Copyright (C) 2018 2019
  * @see CbusDummyCS
  * @see CbusSimulator
@@ -102,9 +101,6 @@ public class CbusDummyCSSession {
     protected void setSpd( int speeddir) {
         _speedDirection = speeddir;
         _RefreshTimer.restart();
-        if (speeddir != 1) {
-            _cs.setEstop(false);
-        }
     }
     
     protected Boolean getIsDispatched() {
@@ -112,4 +108,5 @@ public class CbusDummyCSSession {
     }
     
     private static final Logger log = LoggerFactory.getLogger(CbusDummyCSSession.class);
+
 }
