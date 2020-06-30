@@ -112,6 +112,7 @@ public class ToolsMenu extends JMenu {
         add(new jmri.jmrit.simplelightctrl.SimpleLightCtrlAction(Bundle.getMessage("MenuItemLightControl")));
         add(new jmri.jmrit.speedometer.SpeedometerAction(Bundle.getMessage("MenuItemSpeedometer")));
         add(new jmri.jmrit.ampmeter.AmpMeterAction(Bundle.getMessage("MenuItemAmpMeter")));
+        add(new jmri.jmrit.voltmeter.VoltMeterAction(Bundle.getMessage("MenuItemVoltMeter")));
         add(new jmri.jmrit.sensorgroup.SensorGroupAction(Bundle.getMessage("MenuItemSensorGroup")));
         add(new jmri.jmrit.blockboss.BlockBossAction(Bundle.getMessage("MenuItemSimpleSignal")));
         add(new jmri.jmrit.sendpacket.SendPacketAction(Bundle.getMessage("MenuItemSendDCCPacket")));
@@ -135,6 +136,8 @@ public class ToolsMenu extends JMenu {
         add(new JSeparator());
         // add start web server menu item (immediate action)
         add(new jmri.web.server.WebServerAction());
+        // add the server menu
+        add(new jmri.jmris.ServerMenu());
     }
 
 }

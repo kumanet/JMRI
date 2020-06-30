@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
 import jmri.Reporter;
+import jmri.beans.PropertyChangeSupport;
 import jmri.jmrit.operations.OperationsXml;
 import jmri.jmrit.operations.locations.schedules.Schedule;
 import jmri.jmrit.operations.locations.schedules.ScheduleItem;
@@ -34,7 +35,7 @@ import jmri.jmrit.operations.trains.schedules.TrainScheduleManager;
  *
  * @author Daniel Boudreau Copyright (C) 2008 - 2014
  */
-public class Track {
+public class Track extends PropertyChangeSupport {
 
     public static final String NONE = "";
 
@@ -42,8 +43,6 @@ public class Track {
     protected String _name = NONE;
     protected String _trackType = NONE; // yard, spur, interchange or staging
     protected Location _location; // the location for this track
-    protected String _alternateTrackId = NONE; // the alternate track id
-    protected String _roadOption = ALL_ROADS; // controls which car roads are accepted
     protected int _trainDir = EAST + WEST + NORTH + SOUTH; // train direction served by this track
     protected int _numberRS = 0; // number of cars and engines
     protected int _numberCars = 0; // number of cars
@@ -58,7 +57,11 @@ public class Track {
     protected int _ignoreUsedLengthPercentage = 0; // value between 0 and 100, 100 = ignore 100%
     protected int _moves = 0; // count of the drops since creation
     protected int _blockingOrder = 0; // defines the order tracks are serviced by trains
+    protected String _alternateTrackId = NONE; // the alternate track id
     protected String _comment = NONE;
+    
+    // car types serviced by this track
+    protected List<String> _typeList = new ArrayList<>();
 
     // Manifest and switch list comments
     protected boolean _printCommentManifest = true;
@@ -66,11 +69,20 @@ public class Track {
     protected String _commentPickup = NONE;
     protected String _commentSetout = NONE;
     protected String _commentBoth = NONE;
-
+    
+    // road options
+    protected String _roadOption = ALL_ROADS; // controls which car roads are accepted
+    protected List<String> _roadList = new ArrayList<>();
+    
+    // load options
     protected String _loadOption = ALL_LOADS; // receive track load restrictions
+    protected List<String> _loadList = new ArrayList<>();
     protected String _shipLoadOption = ALL_LOADS; // ship track load restrictions
+    protected List<String> _shipLoadList = new ArrayList<>();
 
+    // destinations that this track will service
     protected String _destinationOption = ALL_DESTINATIONS; // track destination restriction
+    protected List<String> _destinationIdList = new ArrayList<>();
 
     // schedule options
     protected String _scheduleName = NONE; // Schedule name if there's one
@@ -90,6 +102,8 @@ public class Track {
     public static final String ROUTES = "routes"; // track only accepts certain routes // NOI18N
     public static final String EXCLUDE_TRAINS = "excludeTrains"; // track excludes certain trains // NOI18N
     public static final String EXCLUDE_ROUTES = "excludeRoutes"; // track excludes certain routes // NOI18N
+    protected  List<String> _dropList = new ArrayList<>();
+    protected  List<String> _pickupList = new ArrayList<>();
 
     // load options
     protected int _loadOptions = 0;
@@ -775,8 +789,6 @@ public class Track {
         setDirtyAndFirePropertyChange("trackPrintSwitchListComment", old, enable);
     }
 
-    List<String> _typeList = new ArrayList<>();
-
     /**
      * Returns all of the rolling stock type names serviced by this track.
      *
@@ -885,8 +897,6 @@ public class Track {
         setDirtyAndFirePropertyChange(ROADS_CHANGED_PROPERTY, old, option);
     }
 
-    List<String> _roadList = new ArrayList<>();
-
     public String[] getRoadNames() {
         String[] roads = new String[_roadList.size()];
         for (int i = 0; i < _roadList.size(); i++) {
@@ -980,8 +990,6 @@ public class Track {
         _loadOption = option;
         setDirtyAndFirePropertyChange(LOADS_CHANGED_PROPERTY, old, option);
     }
-
-    List<String> _loadList = new ArrayList<>();
 
     private void setLoadNames(String[] loads) {
         if (loads.length == 0) {
@@ -1123,8 +1131,6 @@ public class Track {
         _shipLoadOption = option;
         setDirtyAndFirePropertyChange(LOADS_CHANGED_PROPERTY, old, option);
     }
-
-    List<String> _shipLoadList = new ArrayList<>();
 
     private void setShipLoadNames(String[] loads) {
         if (loads.length == 0) {
@@ -1277,8 +1283,6 @@ public class Track {
         setDirtyAndFirePropertyChange(PICKUP_CHANGED_PROPERTY, old, option);
     }
 
-    List<String> _dropList = new ArrayList<>();
-
     public String[] getDropIds() {
         String[] ids = new String[_dropList.size()];
         for (int i = 0; i < _dropList.size(); i++) {
@@ -1353,8 +1357,6 @@ public class Track {
     public boolean containsDropId(String id) {
         return _dropList.contains(id);
     }
-
-    List<String> _pickupList = new ArrayList<>();
 
     public String[] getPickupIds() {
         String[] ids = new String[_pickupList.size()];
@@ -1549,7 +1551,7 @@ public class Track {
             if (checkPlannedPickUps(length)) {
                 return OKAY;
             }
-            // Note that a lot of the code checks for track length being an issue, therefore it has to be the last
+            // Note that much of the code checks for track length being an issue, therefore it has to be the last
             // check.
             // Is rolling stock too long for this track?
             if ((getLength() < length && getPool() == null) ||
@@ -1559,45 +1561,52 @@ public class Track {
             }
             log.debug("Rolling stock ({}) not accepted at location ({}, {}) no room!", rs.toString(), getLocation()
                     .getName(), getName()); // NOI18N
-            // calculate the available space
-            int available = getLength() -
-                    (getUsedLength() * (100 - getIgnoreUsedLengthPercentage()) / 100 +
-                            getReserved());
-            // could be less
-            int available3 = getLength() + (getLength() * getIgnoreUsedLengthPercentage() / 100) - getUsedLength() - getReserved();
-            if (available3 < available) {
-                available = available3;
-            }
-            // could be less based on track length
-            int available2 = getLength() - getReservedLengthDrops();
-            if (available2 < available) {
-                available = available2;
-            }
+  
             return MessageFormat.format(Bundle.getMessage("lengthIssue"), new Object[]{LENGTH, length,
-                    Setup.getLengthUnit().toLowerCase(), available});
+                    Setup.getLengthUnit().toLowerCase(), getAvailableTrackSpace()});
         }
         return OKAY;
     }
-
+    
     /**
-     *
+     * Performs two checks, number of new set outs shouldn't exceed the track
+     * length. The second check protects against overloading, the total number
+     * of cars shouldn't exceed the track length plus the number of cars to
+     * ignore.
+     * 
+     * @param length rolling stock length
      * @return true if the program should ignore some percentage of the car's
      *         length currently consuming track space.
      */
     private boolean checkPlannedPickUps(int length) {
-        if (getIgnoreUsedLengthPercentage() > 0) {
-            // two checks, number of new set outs shouldn't exceed the track length. The second check protects against
-            // overloading, the total number of cars shouldn't exceed the track length plus the number of cars to
-            // ignore.
-            if (getUsedLength() * (100 - getIgnoreUsedLengthPercentage()) / 100 +
-                    getReservedLengthDrops() +
-                    length <= getLength() &&
-                    getUsedLength() + getReserved() + length <= getLength() +
-                            (getLength() * getIgnoreUsedLengthPercentage() / 100)) {
-                return true;
-            }
+        if (getIgnoreUsedLengthPercentage() > 0 && getAvailableTrackSpace() >= length) {
+            return true;
         }
         return false;
+    }
+    
+    /**
+     * Available track space. Adjusted when a track is using the planned pickups
+     * feature
+     * 
+     * @return available track space
+     */
+    public int getAvailableTrackSpace() {
+        // calculate the available space
+        int available = getLength() -
+                (getUsedLength() * (100 - getIgnoreUsedLengthPercentage()) / 100 +
+                        getReserved());
+        // could be less if track is overloaded
+        int available3 = getLength() + (getLength() * getIgnoreUsedLengthPercentage() / 100) - getUsedLength() - getReserved();
+        if (available3 < available) {
+            available = available3;
+        }
+        // could be less based on track length
+        int available2 = getLength() - getReservedLengthDrops();
+        if (available2 < available) {
+            available = available2;
+        }
+        return available;
     }
 
     public int getReservedLengthDrops() {
@@ -1661,7 +1670,7 @@ public class Track {
         }
         Schedule schedule = getSchedule();
         if (schedule == null) {
-            log.error("No name schedule for id: " + getScheduleId());
+            log.error("No name schedule for id: {}", getScheduleId());
             return NONE;
         }
         return schedule.getName();
@@ -1673,7 +1682,7 @@ public class Track {
         }
         Schedule schedule = InstanceManager.getDefault(ScheduleManager.class).getScheduleById(getScheduleId());
         if (schedule == null) {
-            log.error("No schedule for id: " + getScheduleId());
+            log.error("No schedule for id: {}", getScheduleId());
         }
         return schedule;
     }
@@ -1695,7 +1704,7 @@ public class Track {
         if (_scheduleId.equals(NONE) && !_scheduleName.equals(NONE)) {
             Schedule schedule = InstanceManager.getDefault(ScheduleManager.class).getScheduleByName(_scheduleName);
             if (schedule == null) {
-                log.error("No schedule for name: " + _scheduleName);
+                log.error("No schedule for name: {}", _scheduleName);
             } else {
                 _scheduleId = schedule.getId();
             }
@@ -1781,7 +1790,7 @@ public class Track {
     public ScheduleItem getNextScheduleItem() {
         Schedule sch = getSchedule();
         if (sch == null) {
-            log.warn("Can not find schedule (" + getScheduleId() + ") assigned to track (" + getName() + ")");
+            log.warn("Can not find schedule ({}) assigned to track ({})", getScheduleId(), getName());
             return null;
         }
         List<ScheduleItem> items = sch.getItemsBySequenceList();
@@ -2163,7 +2172,7 @@ public class Track {
                             car.getLoadName(), currentSi.getTypeName(), currentTrainScheduleName, currentSi.getRoadName(),
                             currentSi.getReceiveLoadName()});
         } else {
-            log.error("ERROR Track " + getName() + " current schedule item is null!");
+            log.error("ERROR Track {} current schedule item is null!", getName());
             return SCHEDULE + " ERROR Track " + getName() + " current schedule item is null!"; // NOI18N
         }
         return OKAY;
@@ -2353,8 +2362,6 @@ public class Track {
         }
         return NONE;
     }
-
-    List<String> _destinationIdList = new ArrayList<>();
 
     public int getDestinationListSize() {
         return _destinationIdList.size();
@@ -3035,19 +3042,9 @@ public class Track {
         return e;
     }
 
-    java.beans.PropertyChangeSupport pcs = new java.beans.PropertyChangeSupport(this);
-
-    public synchronized void addPropertyChangeListener(java.beans.PropertyChangeListener l) {
-        pcs.addPropertyChangeListener(l);
-    }
-
-    public synchronized void removePropertyChangeListener(java.beans.PropertyChangeListener l) {
-        pcs.removePropertyChangeListener(l);
-    }
-
     protected void setDirtyAndFirePropertyChange(String p, Object old, Object n) {
         InstanceManager.getDefault(LocationManagerXml.class).setDirty(true);
-        pcs.firePropertyChange(p, old, n);
+        firePropertyChange(p, old, n);
     }
 
     /*

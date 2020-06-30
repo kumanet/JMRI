@@ -392,8 +392,10 @@ public class JUnitOperationsUtil {
         route.addLocation(chelmsford);
         RouteLocation rlC = route.addLocation(chelmsford); // enter 2nd time for train reversal
         rlC.setTrainDirection(RouteLocation.SOUTH);
+        rlC.setTrainIconX(126);
         RouteLocation rlB = route.addLocation(boston);
         rlB.setTrainDirection(RouteLocation.SOUTH);
+        rlB.setTrainIconX(26);
         RouteLocation rlA = route.addLocation(acton);
         rlA.setTrainDirection(RouteLocation.SOUTH);
         rlA.setPickUpAllowed(false); // don't include cars at destination
@@ -669,6 +671,7 @@ public class JUnitOperationsUtil {
         Assert.assertTrue(InstanceManager.containsDefault(ShutDownManager.class));
         ShutDownManager sm = InstanceManager.getDefault(jmri.ShutDownManager.class);
         List<ShutDownTask> list = sm.tasks();
+        // only one operations shut down task, the other can be NCE shutdown
         Assert.assertTrue("Two shut down tasks max", list.size() < 3);
         ShutDownTask operationShutdownTask = null;
         for (ShutDownTask task : list) {
@@ -679,18 +682,6 @@ public class JUnitOperationsUtil {
         }
         Assert.assertNotNull(operationShutdownTask);
         sm.deregister(operationShutdownTask);
-    }
-    
-    /**
-     * Only the NCE traffic controller shutdown task is running
-     */
-    public static void checkNceShutDownTask() {
-        Assert.assertTrue(InstanceManager.containsDefault(ShutDownManager.class));
-        ShutDownManager sm = InstanceManager.getDefault(jmri.ShutDownManager.class);
-        List<ShutDownTask> list = sm.tasks();
-        ShutDownTask nceShutdownTask = list.get(0);
-        Assert.assertNotNull(nceShutdownTask);
-        sm.deregister(nceShutdownTask);
     }
 
     // private final static Logger log = LoggerFactory.getLogger(JUnitOperationsUtil.class);
