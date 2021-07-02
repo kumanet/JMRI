@@ -1,5 +1,4 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
-"http://www.w3.org/TR/html4/strict.dtd">
+<!DOCTYPE html>
 
 <html lang="en">
 <head>
@@ -9,16 +8,7 @@
   <title>JMRI: Item Palette Help</title>
   <meta name="author" content="Pete Cressman">
   <meta name="keywords" content="JMRI help Item Palette">
-  <!-- Style -->
-  <meta http-equiv="content-type" content=
-  "text/html; charset=us-ascii">
-  <link rel="stylesheet" type="text/css" href="/css/default.css"
-  media="screen">
-  <link rel="stylesheet" type="text/css" href="/css/print.css"
-  media="print">
-  <link rel="icon" href="/images/jmri.ico" type="image/png">
-  <link rel="home" title="Home" href="/">
-  <!-- /Style -->
+  <!--#include virtual="/Style.shtml" -->
 </head>
 
 <body>
@@ -100,18 +90,17 @@
       <span class="since">Since 4.21</span><br>
       Should all of the icon sets of a device type be deleted, a
       <b>Restore Defaults</b> button is displayed. This button
-      reinstalls the default icons listed in the file, 
-      JMRI/xml/defaultPanelIcons.xml.  Holding the keys <b>Ctrl</b>
+      reinstalls the default icons listed in the file
+      JMRI/xml/defaultPanelIcons.xml. Holding the keys <b>Ctrl</b>
       and <b>A</b> down while clicking the <b>New Icon Set</b>
       button will reinstall any missing default icon sets for that
       tab.
       <p>
-      Previously, the Indicator Turnout tab had additional buttons to
-      add and delete status icons when the <b>Edit Icons</b>
-	  button was pressed. Now
-      these buttons are displayed only if the keys <b>Ctrl</b>
-      and <b>A</b> are held down while clicking <b>Edit Icons</b>.
-      </p>
+      Before 4.21 the Indicator Turnout tab always showed buttons to
+      add and delete status icons when the <b>Edit Icons</b> button
+      was pressed. Now these (advanced) buttons are displayed only if
+      the keys <b>Ctrl</b> and <b>A</b> are held down while clicking
+      <b>Edit Icons</b>.</p>
 
       <h2>Item Palette Tabs</h2>
 
@@ -214,12 +203,12 @@
       have colors to display status of
       the track circuit they represent. When the track circuit is
       configured by an OBlock, and the Portals and Paths it
-      contains, the following status states are be displayed by
+      contains, the following status states will be displayed by
       color:
 
       <ul>
         <li><b>Clear</b> Indicates ready for use. More precisely,
-        the circuit is in a known state and none of other status
+        the circuit is in a known state and none of the other status
         apply.</li>
 
         <li><b>Occupied</b> (Yellow) The track is occupied by an
@@ -286,5 +275,6 @@
       <!--#include virtual="/Footer.shtml" -->
     </div><!-- closes #mainContent-->
   </div><!-- closes #mBody-->
+  <script src="/js/main.js"></script>
 </body>
 </html>

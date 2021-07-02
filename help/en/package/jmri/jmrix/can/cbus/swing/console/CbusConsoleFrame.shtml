@@ -1,12 +1,11 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-"http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE html>
 
 <html lang="en">
 <head>
   <meta name="generator" content=
   "HTML Tidy for Mac OS X (vers 31 October 2006 - Apple Inc. build 15.17), see www.w3.org">
 
-  <title>JMRI: CBUS&trade; Console Tool</title>
+  <title>JMRI: CBUS&reg; Console Tool</title>
   <meta name="author" content="Bob Jacobsen">
   <meta name="keywords" content="JMRI CBUS help monitor console log logging event long short">
   <!--#include virtual="/Style.shtml" -->
@@ -17,7 +16,7 @@
   <div class="nomenu" id="mBody">
     <div id="mainContent">
 
-     <h1>JMRI : CBUS&trade; Console Tool</h1>
+     <h1>JMRI : CBUS Console Tool</h1>
      
      <ul class="snav">
       <li><a href="#logtofile">Logging</a></li>
@@ -382,12 +381,13 @@
         
         
         <h2></h2>
-        <p>CBUS&trade; is a registered trade mark of Dr Michael Bolton</p>
+        <p>CBUS&reg; is a registered trade mark of Dr Michael Bolton</p>
         <p></p>
 
         
       <!--#include virtual="/Footer.shtml" -->
     </div><!-- closes #mainContent-->
   </div><!-- closes #mBody-->
+  <script src="/js/main.js"></script>
 </body>
 </html>

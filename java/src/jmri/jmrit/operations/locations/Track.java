@@ -13,6 +13,7 @@ import jmri.InstanceManager;
 import jmri.Reporter;
 import jmri.beans.PropertyChangeSupport;
 import jmri.jmrit.operations.OperationsXml;
+import jmri.jmrit.operations.locations.divisions.Division;
 import jmri.jmrit.operations.locations.schedules.Schedule;
 import jmri.jmrit.operations.locations.schedules.ScheduleItem;
 import jmri.jmrit.operations.locations.schedules.ScheduleManager;
@@ -304,6 +305,14 @@ public class Track extends PropertyChangeSupport {
     public String getName() {
         return _name;
     }
+    
+    public Division getDivision() {
+        return getLocation().getDivision();
+    }
+    
+    public String getDivisionName() {
+        return getLocation().getDivisionName();
+    }
 
     public boolean isSpur() {
         return getTrackType().equals(Track.SPUR);
@@ -479,6 +488,13 @@ public class Track extends PropertyChangeSupport {
     public int getScheduleMode() {
         return _mode;
     }
+    
+    public String getScheduleModeName() {
+        if (getScheduleMode() == Track.MATCH) {
+            return Bundle.getMessage("Match");
+        }
+        return Bundle.getMessage("Sequential");
+    }
 
     public void setAlternateTrack(Track track) {
         Track oldTrack = _location.getTrackById(_alternateTrackId);
@@ -517,8 +533,7 @@ public class Track extends PropertyChangeSupport {
 
     /**
      * Used to determine if there's space available at this track for the car.
-     * Considers cars en route to this track. Used to prevent overloading the track
-     * with cars from staging or cars with custom loads.
+     * Considers cars en-route to this track. Used to prevent overloading the track.
      *
      * @param car The car to be set out.
      * @return true if space available.
@@ -529,8 +544,13 @@ public class Track extends PropertyChangeSupport {
             carLength = car.getKernel().getTotalLength();
         }
         int trackLength = getLength();
+     
         // is the car or kernel too long for the track?
-        if (trackLength < carLength) {
+        if (trackLength < carLength && getPool() == null) {
+            return false;
+        }
+        // is track part of a pool?
+        if (getPool() != null && getPool().getMaxLengthTrack(this) < carLength) {
             return false;
         }
         // ignore reservation factor unless car is departing staging
@@ -796,11 +816,7 @@ public class Track extends PropertyChangeSupport {
      * @return rolling stock type names
      */
     public String[] getTypeNames() {
-        String[] types = new String[_typeList.size()];
-        for (int i = 0; i < _typeList.size(); i++) {
-            types[i] = _typeList.get(i);
-        }
-        return types;
+        return _typeList.toArray(new String[0]);
     }
 
     private void setTypeNames(String[] types) {
@@ -891,36 +907,30 @@ public class Track extends PropertyChangeSupport {
     }
 
     public String[] getRoadNames() {
-        String[] roads = new String[_roadList.size()];
-        for (int i = 0; i < _roadList.size(); i++) {
-            roads[i] = _roadList.get(i);
+        String[] roads = _roadList.toArray(new String[0]);
+        if (_roadList.size() > 0) {
+            java.util.Arrays.sort(roads);
         }
-        if (_roadList.size() == 0) {
-            return roads;
-        }
-        java.util.Arrays.sort(roads);
         return roads;
     }
 
     private void setRoadNames(String[] roads) {
-        if (roads.length == 0) {
-            return;
-        }
-        java.util.Arrays.sort(roads);
-        for (String roadName : roads) {
-            if (!roadName.equals(NONE)) {
-                _roadList.add(roadName);
+        if (roads.length > 0) {
+            java.util.Arrays.sort(roads);
+            for (String roadName : roads) {
+                if (!roadName.equals(NONE)) {
+                    _roadList.add(roadName);
+                }
             }
         }
     }
 
     public void addRoadName(String road) {
-        if (_roadList.contains(road)) {
-            return;
+        if (!_roadList.contains(road)) {
+            _roadList.add(road);
+            log.debug("Track ({}) add car road ({})", getName(), road);
+            setDirtyAndFirePropertyChange(ROADS_CHANGED_PROPERTY, _roadList.size() - 1, _roadList.size());
         }
-        _roadList.add(road);
-        log.debug("Track ({}) add car road ({})", getName(), road);
-        setDirtyAndFirePropertyChange(ROADS_CHANGED_PROPERTY, _roadList.size() - 1, _roadList.size());
     }
 
     public void deleteRoadName(String road) {
@@ -977,13 +987,12 @@ public class Track extends PropertyChangeSupport {
     }
 
     private void setLoadNames(String[] loads) {
-        if (loads.length == 0) {
-            return;
-        }
-        java.util.Arrays.sort(loads);
-        for (String loadName : loads) {
-            if (!loadName.equals(NONE)) {
-                _loadList.add(loadName);
+        if (loads.length > 0) {
+            java.util.Arrays.sort(loads);
+            for (String loadName : loads) {
+                if (!loadName.equals(NONE)) {
+                    _loadList.add(loadName);
+                }
             }
         }
     }
@@ -995,14 +1004,10 @@ public class Track extends PropertyChangeSupport {
      * @return Array of load names as Strings
      */
     public String[] getLoadNames() {
-        String[] loads = new String[_loadList.size()];
-        for (int i = 0; i < _loadList.size(); i++) {
-            loads[i] = _loadList.get(i);
+        String[] loads = _loadList.toArray(new String[0]);
+        if (_loadList.size() > 0) {
+            java.util.Arrays.sort(loads);
         }
-        if (_loadList.size() == 0) {
-            return loads;
-        }
-        java.util.Arrays.sort(loads);
         return loads;
     }
 
@@ -1110,13 +1115,12 @@ public class Track extends PropertyChangeSupport {
     }
 
     private void setShipLoadNames(String[] loads) {
-        if (loads.length == 0) {
-            return;
-        }
-        java.util.Arrays.sort(loads);
-        for (String shipLoadName : loads) {
-            if (!shipLoadName.equals(NONE)) {
-                _shipLoadList.add(shipLoadName);
+        if (loads.length > 0) {
+            java.util.Arrays.sort(loads);
+            for (String shipLoadName : loads) {
+                if (!shipLoadName.equals(NONE)) {
+                    _shipLoadList.add(shipLoadName);
+                }
             }
         }
     }
@@ -1128,14 +1132,10 @@ public class Track extends PropertyChangeSupport {
      * @return Array of load names as Strings
      */
     public String[] getShipLoadNames() {
-        String[] loads = new String[_shipLoadList.size()];
-        for (int i = 0; i < _shipLoadList.size(); i++) {
-            loads[i] = _shipLoadList.get(i);
+        String[] loads = _shipLoadList.toArray(new String[0]);
+        if (_shipLoadList.size() > 0) {
+            java.util.Arrays.sort(loads);
         }
-        if (_shipLoadList.size() == 0) {
-            return loads;
-        }
-        java.util.Arrays.sort(loads);
         return loads;
     }
 
@@ -1261,11 +1261,7 @@ public class Track extends PropertyChangeSupport {
     }
 
     public String[] getDropIds() {
-        String[] ids = new String[_dropList.size()];
-        for (int i = 0; i < _dropList.size(); i++) {
-            ids[i] = _dropList.get(i);
-        }
-        return ids;
+        return _dropList.toArray(new String[0]);
     }
 
     private void setDropIds(String[] ids) {
@@ -1337,11 +1333,7 @@ public class Track extends PropertyChangeSupport {
     }
 
     public String[] getPickupIds() {
-        String[] ids = new String[_pickupList.size()];
-        for (int i = 0; i < _pickupList.size(); i++) {
-            ids[i] = _pickupList.get(i);
-        }
-        return ids;
+        return _pickupList.toArray(new String[0]);
     }
 
     private void setPickupIds(String[] ids) {
@@ -1935,7 +1927,7 @@ public class Track extends PropertyChangeSupport {
             return MessageFormat.format(Bundle.getMessage("carHasA"), new Object[] { CUSTOM, LOAD, car.getLoadName() });
         }
         log.debug("Track ({}) has schedule ({}) mode {} ({})", getName(), getScheduleName(), getScheduleMode(),
-                getScheduleMode() == SEQUENTIAL ? "Sequential" : "Match"); // NOI18N
+                getScheduleModeName()); // NOI18N
 
         ScheduleItem si = getCurrentScheduleItem();
         if (si == null) {
@@ -2131,7 +2123,7 @@ public class Track extends PropertyChangeSupport {
         }
         ScheduleItem currentSi = getCurrentScheduleItem();
         log.debug("Destination track ({}) has schedule ({}) item id ({}) mode: {} ({})", getName(), getScheduleName(),
-                getScheduleItemId(), getScheduleMode(), getScheduleMode() == SEQUENTIAL ? "Sequential" : "Match"); // NOI18N
+                getScheduleItemId(), getScheduleMode(), getScheduleModeName()); // NOI18N
         if (currentSi != null &&
                 (currentSi.getSetoutTrainScheduleId().equals(ScheduleItem.NONE) ||
                         InstanceManager.getDefault(TrainScheduleManager.class).getTrainScheduleActiveId()
@@ -2165,13 +2157,9 @@ public class Track extends PropertyChangeSupport {
             if (sch != null) {
                 currentTrainScheduleName = sch.getName();
             }
-            String mode = Bundle.getMessage("sequential");
-            if (getScheduleMode() == 1) {
-                mode = Bundle.getMessage("match");
-            }
             return SCHEDULE +
                     MessageFormat.format(Bundle.getMessage("sequentialMessage"),
-                            new Object[] { getScheduleName(), mode, car.toString(), car.getTypeName(), scheduleName,
+                            new Object[] { getScheduleName(), getScheduleModeName(), car.toString(), car.getTypeName(), scheduleName,
                                     car.getRoadName(), car.getLoadName(), currentSi.getTypeName(),
                                     currentTrainScheduleName, currentSi.getRoadName(),
                                     currentSi.getReceiveLoadName() });

@@ -1,20 +1,10 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!DOCTYPE html>
 
 <html lang="en">
 <head>
   <!-- Copyright 2012, 2014, 2020 -->
-
   <title>JMRI Remote Panels</title>
-  <!-- Style -->
-  <meta http-equiv="Content-Type" content=
-  "text/html; charset=us-ascii">
-  <link rel="stylesheet" type="text/css" href="/css/default.css"
-  media="screen">
-  <link rel="stylesheet" type="text/css" href="/css/print.css"
-  media="print">
-  <link rel="icon" href="/images/jmri.ico" type="image/png">
-  <link rel="home" title="Home" href="/">
-  <!-- /Style -->
+  <!--#include virtual="/Style.shtml" -->
 </head>
 
 <body>
@@ -64,7 +54,7 @@
 
       <p>This chapter shows an overview of how JMRI Web Server operates between the JMRI application and the Web
       Browser to demonstrate what code is involved, using Panels as an example.</p>
-      <p>
+
       <p>In <a href="#exampleA">part A</a> we show at how a panel initially shows up in the browser of a
       (remote) user logged on to JMRI Web Server.</p>
       <p><a href="#exampleB">Part B</a> focuses on the opposing flow of information. You will discover how user
@@ -233,7 +223,7 @@
         <li>Next, the HTML is written:<br>
           <code><br>
           $("#panel-area").append("&lt;div id=" + $widget.id + "r class='" +<br>
-          $widget.classes + "' " + $hoverText + "&gt;&lt/div&gt;");<br>
+          $widget.classes + "' " + $hoverText + "&gt;&lt;/div&gt;");<br>
           </code><br>
         </li>
 
@@ -357,5 +347,6 @@
       <!--#include virtual="/Footer.shtml" -->
     </div><!-- closes #mainContent-->
   </div><!-- closes #mBody-->
+  <script src="/js/main.js"></script>
 </body>
 </html>

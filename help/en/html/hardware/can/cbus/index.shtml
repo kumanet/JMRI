@@ -1,5 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-    "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE html>
 
 <html lang="en">
     <head>
@@ -17,7 +16,7 @@
             <!--#include virtual="Sidebar.shtml" -->
             <div id="mainContent">
 
-                <h1>JMRI Hardware Support: CBUS&trade; Main Support Page</h1>
+                <h1>JMRI Hardware Support: CBUS&reg; Main Support Page</h1>
                 <ul class="snav">
                     <li><a href="#introduction">Introduction</a></li>
                     <li><a href="#connecting">Connecting</a></li>

@@ -1,5 +1,4 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
-"http://www.w3.org/TR/html4/strict.dtd">
+<!DOCTYPE html>
 
 <html lang="en">
 <head>
@@ -7,13 +6,7 @@
   "HTML Tidy for Mac OS X (vers 31 October 2006 - Apple Inc. build 15.17), see www.w3.org">
 
   <title>JMRI Web Access</title>
-  <!-- Style -->
-  <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
-  <link rel="stylesheet" type="text/css" href="/css/default.css" media="screen">
-  <link rel="stylesheet" type="text/css" href="/css/print.css" media="print">
-  <link rel="icon" href="/images/jmri.ico" type="image/png">
-  <link rel="home" title="Home" href="/">
-  <!-- /Style -->
+  <!--#include virtual="/Style.shtml" -->
 </head>
 
 <body>
@@ -69,7 +62,7 @@
 
       <p>Select the "Start Up" tab, click "Add &#9662;", and select
       "Perform action...". In the new selection box that appears,
-      select "Start Web Server". Don't forget to save your
+      select "Start JMRI Web Server". Don't forget to save your
       changes!</p>
 
       <h2>Web Server Preferences</h2>
@@ -96,6 +89,11 @@
             ensure that users of the web site can see the power
             status, but cannot turn off or turn on layout
             power.</dd>
+
+            <dt>Start automatically with application</dt>
+
+            <dd>This will add the action "Start JMRI Web Server"
+            to your Start Up Preferences.</dd>
           </dl>
         </dd>
 
@@ -134,7 +132,7 @@
 
             <dt>Disallowed Frames</dt>
 
-            <dd>A list of windows that will not be displayed in the
+            <dd>A list of windows that will NOT be allowed in the
             browser.</dd>
           </dl>
         </dd>
@@ -144,9 +142,13 @@
 
       <p>JMRI Web Access provides a number of web services.</p>
 
-      <p><em>All links below assume you are currently using a web
+      <p>The example links below assume you are using a web
       browser on the same computer you are running JMRI on and that
-      JMRI is using the default port 12080.</em></p>
+      JMRI is using the default port 12080.<br />
+      To access the web 
+      server from another device on your network,
+      determine the IP address of the JMRI computer and use it 
+      instead of "localhost". Example: "http://192.168.1.7:12080"</p>
 
       <p>JMRI Web Access home page at <a href=
       "http://localhost:12080">http://localhost:12080</a> provides
@@ -344,5 +346,6 @@
       <!--#include virtual="/Footer.shtml" -->
     </div><!-- closes #mainContent-->
   </div><!-- closes #mBody-->
+  <script src="/js/main.js"></script>
 </body>
 </html>
