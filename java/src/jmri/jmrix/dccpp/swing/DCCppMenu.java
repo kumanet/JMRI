@@ -4,7 +4,7 @@ import java.util.ResourceBundle;
 import javax.swing.JMenu;
 
 /**
- * Create a menu containing the DCC++ specific tools.
+ * Create a menu containing the DCC-EX specific tools.
  *
  * @author Paul Bender Copyright 2003,2010
  * @author Mark Underwood Copyright 2015
@@ -30,12 +30,16 @@ public class DCCppMenu extends JMenu {
             setText(rb.getString("MenuDCC++"));
         }
 
-        add(new jmri.jmrix.dccpp.swing.mon.DCCppMonAction());
         if (memo != null) {
+            add(new jmri.jmrix.dccpp.swing.mon.DCCppMonAction(rb.getString("DCCppMonFrameTitle"), memo));
             add(new jmri.jmrix.dccpp.swing.packetgen.PacketGenAction(rb.getString("MenuItemSendDCCppCommand"), memo));
+            add(new jmri.jmrix.dccpp.swing.ConfigBaseStationAction(rb.getString("MenuItemConfigBaseStation"), memo));
+            add(new jmri.jmrix.dccpp.swing.virtuallcd.VirtualLCDAction(rb.getString("MenuItemVirtualLCDDisplay"), memo));
+            add(new jmri.jmrix.dccpp.swing.messages.MessagesAction(rb.getString("MenuItemMessages"), memo));
+            add(new jmri.jmrix.dccpp.swing.exrail.DCCppExrailAction(rb.getString("MenuItemExrail"), memo));
         }
         add(new jmri.jmrit.swing.meter.MeterAction());
-        add(new jmri.jmrix.dccpp.swing.ConfigBaseStationAction(rb.getString("MenuItemConfigBaseStation"), null));
+        add(new jmri.jmrix.dccpp.swing.DCCppRosterExportAction(rb.getString("DCCppRosterExportTitle")));
         add(new javax.swing.JSeparator());
         add(new jmri.jmrix.dccpp.dccppovertcp.ServerAction(rb.getString("MenuItemDCCppOverTCPServer")));
     }

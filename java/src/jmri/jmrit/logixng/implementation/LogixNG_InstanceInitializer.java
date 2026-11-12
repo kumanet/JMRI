@@ -3,7 +3,6 @@ package jmri.jmrit.logixng.implementation;
 import java.util.Arrays;
 import java.util.Set;
 import jmri.InstanceInitializer;
-import jmri.InstanceManager;
 import jmri.implementation.AbstractInstanceInitializer;
 import jmri.jmrit.logixng.*;
 import org.openide.util.lookup.ServiceProvider;
@@ -25,7 +24,7 @@ import org.openide.util.lookup.ServiceProvider;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <P>
+ *
  * @author Bob Jacobsen Copyright (C) 2001, 2008, 2014
  * @since 2.9.4
  */
@@ -34,7 +33,7 @@ public class LogixNG_InstanceInitializer extends AbstractInstanceInitializer {
 
     @Override
     public <T> Object getDefault(Class<T> type) {
-        
+
         // In order for getDefault() to be called for a particular manager,
         // the manager also needs to be added to the method getInitalizes()
         // below.
@@ -67,6 +66,10 @@ public class LogixNG_InstanceInitializer extends AbstractInstanceInitializer {
             return new DefaultNamedTableManager();
         }
 
+        if (type == GlobalVariableManager.class) {
+            return new DefaultGlobalVariableManager();
+        }
+
         return super.getDefault(type);
     }
 
@@ -80,7 +83,8 @@ public class LogixNG_InstanceInitializer extends AbstractInstanceInitializer {
                 LogixNG_Manager.class,
                 LogixNGPreferences.class,
                 ModuleManager.class,
-                NamedTableManager.class
+                NamedTableManager.class,
+                GlobalVariableManager.class
         ));
         return set;
     }

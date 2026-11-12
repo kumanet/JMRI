@@ -65,7 +65,7 @@ public class ImportRosterItemAction extends AbstractRosterItemAction {
         try {
             lroot = lf.rootFromFile(mFromFile).clone();
         } catch (Exception e) {
-            log.error("Exception while loading loco XML file: {} exception: {}", mFullFromFilename, e);
+            log.error("Exception while loading loco XML file: {} exception:", mFullFromFilename, e);
             return false;
         }
 
@@ -98,5 +98,5 @@ public class ImportRosterItemAction extends AbstractRosterItemAction {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(ImportRosterItemAction.class);
+    private static final Logger log = LoggerFactory.getLogger(ImportRosterItemAction.class);
 }

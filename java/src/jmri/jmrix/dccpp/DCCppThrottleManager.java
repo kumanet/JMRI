@@ -3,16 +3,15 @@ package jmri.jmrix.dccpp;
 import java.util.EnumSet;
 import java.util.HashMap;
 
+import jmri.DccLocoAddress;
 import jmri.DccThrottle;
 import jmri.LocoAddress;
 import jmri.SpeedStepMode;
 import jmri.ThrottleListener;
 import jmri.jmrix.AbstractThrottleManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * DCC++ implementation of a ThrottleManager based on the
+ * DCC-EX implementation of a ThrottleManager based on the
  * AbstractThrottleManager.
  *
  * @author Paul Bender Copyright (C) 2002-2004
@@ -22,31 +21,29 @@ import org.slf4j.LoggerFactory;
  */
 public class DCCppThrottleManager extends AbstractThrottleManager implements DCCppListener {
 
-    protected HashMap<LocoAddress, DCCppThrottle> throttles = new HashMap<LocoAddress, DCCppThrottle>(5);
+    protected HashMap<LocoAddress, DCCppThrottle> throttles = new HashMap<>(5);
 
     protected DCCppTrafficController tc;
-
+    
     /**
      * Constructor.
      * @param memo the memo for the connection this tm will use
      */
     public DCCppThrottleManager(DCCppSystemConnectionMemo memo) {
         super(memo);
-        DCCppMessage msg;
         // connect to the TrafficController manager
         tc = memo.getDCCppTrafficController();
 
         // Register to listen for throttle messages
-        tc.addDCCppListener(DCCppInterface.THROTTLE, this);
+        tc.addDCCppListener(DCCppInterface.THROTTLE, DCCppThrottleManager.this);
         //Request number of available slots
-        msg = DCCppMessage.makeCSMaxNumSlotsMsg();
-        tc.sendDCCppMessage(msg, this);
+        tc.sendDCCppMessage(DCCppMessage.makeCSMaxNumSlotsMsg(), DCCppThrottleManager.this);
     }
 
     /**
      * Request a new throttle object be created for the address, and let the
      * throttle listeners know about it.
-     *
+     * {@inheritDoc }
      */
     @Override
     public void requestThrottleSetup(LocoAddress address, boolean control) {
@@ -67,8 +64,9 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
     }
 
     /**
-     * DCC++ based systems DO NOT use the Dispatch Function
+     * DCC-EX based systems DO NOT use the Dispatch Function
      * (do they?)
+     * {@inheritDoc }
      */
     @Override
     public boolean hasDispatchFunction() {
@@ -76,7 +74,7 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
     }
 
     /**
-     * DCC++ based systems can have multiple throttles for the same 
+     * DCC-EX based systems can have multiple throttles for the same 
      * device
      * <p>
      * {@inheritDoc}
@@ -112,18 +110,19 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
         return true;
     }
 
-    /*
-     * Local method for deciding short/long address
+    /**
+     * Local method for deciding short/long address.
      * (is it?)
+     * @param num the address number to check.
+     * @return true if number greater than or equals 128.
      */
-    static protected boolean isLongAddress(int num) {
+    protected static boolean isLongAddress(int num) {
         return (num >= 128);
     }
 
     /**
-     * What speed modes are supported by this system? value should be xor of
-     * possible modes specifed by the DccThrottle interface DCC++ supports
-     * 14,27,28 and 128 speed step modes
+     * {@inheritDoc }
+     * DCC-EX supports 14,27,28 and 128 speed step modes
      */
     @Override
     public EnumSet<SpeedStepMode> supportedSpeedModes() {
@@ -136,6 +135,19 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
         if (r.getElement(0) == DCCppConstants.MAXNUMSLOTS_REPLY) {
             log.debug("MaxNumSlots reply received: {}", r);
             tc.getCommandStation().setCommandStationMaxNumSlots(r);
+        // handle loco state reply by finding the proper throttle and asking it to update itself
+        } else if (r.getElement(0) == DCCppConstants.LOCO_STATE_REPLY){
+            log.debug("LocoState reply received: {}", r);
+            int locoId = r.getLocoIdInt();
+            DccLocoAddress locoAddress = new DccLocoAddress(locoId, !canBeShortAddress(locoId));            
+            if (throttles.containsKey(locoAddress)) {
+                DCCppThrottle throttle = throttles.get(locoAddress);
+                if (log.isDebugEnabled()) log.debug("Passing locoState to throttle {}", throttle.getLocoAddress());
+                throttle.handleLocoState(r);
+            }                
+            
+        } else {
+            log.trace("ignoring reply: {}", r);
         }
     }
 
@@ -153,11 +165,6 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
             msg.setRetries(msg.getRetries() - 1);
             tc.sendDCCppMessage(msg, this);
         }        
-    }
-
-    @Override
-    public void releaseThrottle(DccThrottle t, ThrottleListener l) {
-        super.releaseThrottle(t, l);
     }
 
     @Override
@@ -187,6 +194,6 @@ public class DCCppThrottleManager extends AbstractThrottleManager implements DCC
         //stopThrottleRequestTimer(); no timer used in this tm
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppThrottleManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DCCppThrottleManager.class);
 
 }

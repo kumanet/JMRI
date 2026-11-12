@@ -1,7 +1,5 @@
 package jmri.jmrit.logixng.tools.swing.swing;
 
-import jmri.jmrit.logixng.tools.swing.*;
-
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -230,7 +228,7 @@ public class ModuleParametersTableModel extends AbstractTableModel {
             JComboBox<InitialValueType> typeComboBox = new JComboBox<>();
             
             for (InitialValueType type : InitialValueType.values()) {
-                typeComboBox.addItem(type);
+                if (type.isValidAsParameter()) typeComboBox.addItem(type);
             }
             JComboBoxUtil.setupComboBoxMaxRows(typeComboBox);
             

@@ -15,7 +15,6 @@ import java.util.List;
  * with a terminating newline
  * <dt>allInstructionString()<dd>The instruction and all those logically grouped
  * within it.
- * <dt>name()<dd>
  * </dl>
  *
  * SdfMacro and its subclasses don't do the notification needed to be Models in
@@ -132,7 +131,7 @@ public abstract class SdfMacro implements SdfConstants {
      * @param buff The SdfBuffer being scanned for instruction macros.
      * @return Object of SdfMacro subtype for specific next instruction
      */
-    static public SdfMacro decodeInstruction(SdfBuffer buff) {
+    public static SdfMacro decodeInstruction(SdfBuffer buff) {
         SdfMacro m;
 
         // full 1st byte decoder
@@ -212,6 +211,6 @@ public abstract class SdfMacro implements SdfConstants {
         return val;
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SdfMacro.class);
+    // private static final Logger log = LoggerFactory.getLogger(SdfMacro.class);
 
 }

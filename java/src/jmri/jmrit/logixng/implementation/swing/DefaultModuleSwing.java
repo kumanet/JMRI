@@ -17,6 +17,7 @@ import jmri.jmrit.logixng.swing.AbstractSwingConfigurator;
 import jmri.jmrit.logixng.swing.SwingConfiguratorInterface;
 import jmri.jmrit.logixng.swing.SwingTools;
 import jmri.jmrit.logixng.tools.swing.swing.ModuleParametersTableModel;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Configures an DefaultModule object with a Swing JPanel.
@@ -25,20 +26,20 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
 
     static final java.util.ResourceBundle rbx =
             java.util.ResourceBundle.getBundle("jmri.jmrit.logixng.tools.swing.LogixNGSwingBundle");  // NOI18N
-    
+
     protected JPanel panel;
     ModuleParametersTableModel _moduleParametersTableModel;
-    
+
     /** {@inheritDoc} */
     @Override
     public String getExecuteEvaluateMenuText() {
         return Bundle.getMessage("MenuText_ExecuteEvaluate");
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void executeEvaluate(@Nonnull Base object) {
-        
+
         if (! (object instanceof MaleSocket)) {
             throw new IllegalArgumentException("object is not a MaleSocket");
         }
@@ -46,19 +47,19 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
             throw new IllegalArgumentException("((MaleSocket)object).getObject() is not a Module");
         }
         Module module = (Module)((MaleSocket)object).getObject();
-        
+
         FemaleSocket femaleSocket = module.getRootSocket();
         if (!femaleSocket.isConnected()) {
             // Nothing to do since nothing is connected to the female socket
             jmri.util.ThreadingUtil.runOnGUIEventually(() -> {
-                JOptionPane.showMessageDialog(null,
+                JmriJOptionPane.showMessageDialog(null,
                         Bundle.getMessage("ExecuteEvaluate_ActionCompleted"),
                         Bundle.getMessage("ExecuteEvaluate_Title"),
-                        JOptionPane.PLAIN_MESSAGE);
+                        JmriJOptionPane.PLAIN_MESSAGE);
             });
             return;
         }
-        
+
         Base obj = femaleSocket.getConnectedSocket();
         if (obj == null) throw new NullPointerException("object is null");
         while (obj instanceof MaleSocket) {
@@ -66,54 +67,53 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
         }
         SwingConfiguratorInterface swi =
                 SwingTools.getSwingConfiguratorForClass(obj.getClass());
-        
+
         swi.executeEvaluate(femaleSocket.getConnectedSocket());
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public BaseManager<? extends NamedBean> getManager() {
         return null;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public JPanel getConfigPanel(@Nonnull JPanel buttonPanel) throws IllegalArgumentException {
         // This method is used to create a new item.
         throw new UnsupportedOperationException("Not supported");
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public JPanel getConfigPanel(@Nonnull Base object, @Nonnull JPanel buttonPanel) throws IllegalArgumentException {
         createPanel(object, buttonPanel);
         return panel;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public String getExampleSystemName() {
         throw new UnsupportedOperationException("Not supported");
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public String getAutoSystemName() {
         throw new UnsupportedOperationException("Not supported");
     }
-    
+
     protected void createPanel(@CheckForNull Base object, @Nonnull JPanel buttonPanel) {
         // This method is never used to create a module so we expect to have a module
         if (! (object instanceof Module)) {
             throw new IllegalArgumentException("object is not a Module: " + object.getClass().getName());
         }
         Module module = (Module)object;
-        
+
         panel = new JPanel();
-        
+
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        
-        JPanel tablePanel = new JPanel();
+
         JTable table = new JTable();
         _moduleParametersTableModel = new ModuleParametersTableModel(module);
         table.setModel(_moduleParametersTableModel);
@@ -128,9 +128,8 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
         _moduleParametersTableModel.setColumnForMenu(table);
         JScrollPane scrollpane = new JScrollPane(table);
         scrollpane.setPreferredSize(new Dimension(400, 200));
-        tablePanel.add(scrollpane, BorderLayout.CENTER);
-        panel.add(tablePanel);
-        
+        panel.add(scrollpane);
+
         // Add parameter
         JButton add = new JButton(Bundle.getMessage("TableAddParameter"));
         buttonPanel.add(add);
@@ -138,7 +137,7 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
             _moduleParametersTableModel.add();
         });
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public boolean validate(@Nonnull List<String> errorMessages) {
@@ -156,16 +155,16 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
                 hasErrors = true;
             }
         }
-        
+
         return !hasErrors;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public MaleSocket createNewObject(@Nonnull String systemName, @CheckForNull String userName) {
         throw new UnsupportedOperationException("Not supported");
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void updateObject(@Nonnull Base object) {
@@ -174,21 +173,21 @@ public class DefaultModuleSwing extends AbstractSwingConfigurator {
             throw new IllegalArgumentException("object is not a Module: " + object.getClass().getName());
         }
         Module module = (Module)object;
-        
+
         module.getParameters().clear();
         for (Parameter p : _moduleParametersTableModel.getParameters()) {
             module.addParameter(p);
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public String toString() {
         return Bundle.getMessage("DefaultModule_Short");
     }
-    
+
     @Override
     public void dispose() {
     }
-    
+
 }

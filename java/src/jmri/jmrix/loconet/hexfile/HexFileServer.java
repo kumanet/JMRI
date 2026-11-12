@@ -50,7 +50,7 @@ public class HexFileServer {
 
         // do the common manager config
         port.getSystemConnectionMemo().configureCommandStation(LnCommandStationType.COMMAND_STATION_DCS100, // full featured by default
-                false, false, false);
+                false, false, false, false, false);
         port.getSystemConnectionMemo().configureManagers();
 
         // Install a debug programmer, replacing the existing LocoNet one
@@ -125,6 +125,6 @@ public class HexFileServer {
     }
     private LnHexFilePort port = null;
 
-    private final static Logger log = LoggerFactory.getLogger(HexFileServer.class);
+    private static final Logger log = LoggerFactory.getLogger(HexFileServer.class);
 
 }

@@ -267,7 +267,7 @@ public class LsDecSignalHead extends DefaultSignalHead {
     }
 
     @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         if (getRed() != null && t.equals(getRed().getBean())) {
             return true;
         }
@@ -292,6 +292,6 @@ public class LsDecSignalHead extends DefaultSignalHead {
         return false;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LsDecSignalHead.class);
+    private static final Logger log = LoggerFactory.getLogger(LsDecSignalHead.class);
 
 }

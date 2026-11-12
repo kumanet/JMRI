@@ -1,16 +1,18 @@
 package jmri.jmrit.beantable;
 
-import java.awt.GraphicsEnvironment;
 import java.util.ResourceBundle;
+
 import javax.swing.JFrame;
 import javax.swing.JTextField;
 
 import jmri.InstanceManager;
 import jmri.Section;
 import jmri.util.JUnitUtil;
+import jmri.util.swing.JemmyUtil;
+
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.netbeans.jemmy.operators.*;
 
 /**
@@ -52,14 +54,15 @@ public class SectionTableActionTest extends AbstractTableActionBase<Section> {
 
     @Test
     @Override
+    @DisabledIfSystemProperty( named = "java.awt.headless", matches = "true" )
     public void testAddThroughDialog() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assume.assumeTrue(a.includeAddButton());
+
+        Assertions.assertTrue(a.includeAddButton());
         a.actionPerformed(null);
         JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
 
         // find the "Add... " button and press it.
-        jmri.util.swing.JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
+        JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
         new org.netbeans.jemmy.QueueTool().waitEmpty();
         JFrame f1 = JFrameOperator.waitJFrame(getAddFrameName(), true, true);
         JFrameOperator jf = new JFrameOperator(f1);
@@ -67,24 +70,25 @@ public class SectionTableActionTest extends AbstractTableActionBase<Section> {
         JLabelOperator jlo = new JLabelOperator(jf, Bundle.getMessage("LabelSystemName"));
         ((JTextField) jlo.getLabelFor()).setText("1");
         //press the "Add Selected Block" button to add the only defined block
-        jmri.util.swing.JemmyUtil.pressButton(jf, ResourceBundle.getBundle("jmri.jmrit.beantable.SectionTransitTableBundle").getString("AddBlockButton"));
+        JemmyUtil.pressButton(jf, ResourceBundle.getBundle("jmri.jmrit.beantable.SectionTransitTableBundle").getString("AddBlockButton"));
         //and press create
-        jmri.util.swing.JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
-        jmri.util.JUnitAppender.suppressWarnMessage("Block IB12 does not have a user name,may not work correctly in Section IY:AUTO:0001");
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
+        
         JUnitUtil.dispose(f1);
         JUnitUtil.dispose(f);
     }
 
     @Test
     @Override
+    @DisabledIfSystemProperty( named = "java.awt.headless", matches = "true" )
     public void testEditButton() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assume.assumeTrue(a.includeAddButton());
+
+        Assertions.assertTrue(a.includeAddButton());
         a.actionPerformed(null);
         JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
 
         // find the "Add... " button and press it.
-        jmri.util.swing.JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
+        JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
         JFrame f1 = JFrameOperator.waitJFrame(getAddFrameName(), true, true);
         JFrameOperator jf = new JFrameOperator(f1);
         //Enter 1 in the text field labeled "System Name:"
@@ -92,10 +96,9 @@ public class SectionTableActionTest extends AbstractTableActionBase<Section> {
         JLabelOperator jlo = new JLabelOperator(jf, Bundle.getMessage("LabelSystemName"));
         ((JTextField) jlo.getLabelFor()).setText("1");
         //press the "Add Selected Block" button to add the only defined block
-        jmri.util.swing.JemmyUtil.pressButton(jf, ResourceBundle.getBundle("jmri.jmrit.beantable.SectionTransitTableBundle").getString("AddBlockButton"));
+        JemmyUtil.pressButton(jf, ResourceBundle.getBundle("jmri.jmrit.beantable.SectionTransitTableBundle").getString("AddBlockButton"));
         //and press create
-        jmri.util.swing.JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
-        jmri.util.JUnitAppender.suppressWarnMessage("Block IB12 does not have a user name,may not work correctly in Section IY:AUTO:0001");
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
 
         JFrameOperator jfo = new JFrameOperator(f);
 
@@ -103,10 +106,88 @@ public class SectionTableActionTest extends AbstractTableActionBase<Section> {
         // find the "Edit" button and press it.  This is in the table body.
         tbl.clickOnCell(0, BeanTableDataModel.NUMCOLUMN + 2);
         JFrame f2 = JFrameOperator.waitJFrame(getEditFrameName(), true, true);
-        jmri.util.swing.JemmyUtil.pressButton(new JFrameOperator(f2), Bundle.getMessage("ButtonCancel"));
+        JemmyUtil.pressButton(new JFrameOperator(f2), Bundle.getMessage("ButtonCancel"));
         JUnitUtil.dispose(f2);
         JUnitUtil.dispose(f1);
         JUnitUtil.dispose(f);
+    }
+
+    private static Section firstSection() {
+        return InstanceManager.getDefault(jmri.SectionManager.class).getNamedBeanSet().stream().findFirst().orElse(null);
+    }
+
+    private JFrameOperator openAddFrame() {
+        a.actionPerformed(null);
+        JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
+        JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
+        JFrameOperator jf = new JFrameOperator(JFrameOperator.waitJFrame(getAddFrameName(), true, true));
+        ((JTextField) new JLabelOperator(jf, Bundle.getMessage("LabelSystemName")).getLabelFor()).setText("1");
+        JemmyUtil.pressButton(jf, ResourceBundle.getBundle("jmri.jmrit.beantable.SectionTransitTableBundle").getString("AddBlockButton"));
+        return jf;
+    }
+
+    @Test
+    @DisabledIfSystemProperty( named = "java.awt.headless", matches = "true" )
+    public void testStopPointsInInches() {
+        InstanceManager.getDefault(jmri.BlockManager.class).getBySystemName("IB12").setLength(500.0f);
+        JFrameOperator jf = openAddFrame();
+        SectionTableAction sta = (SectionTableAction) a;
+        jmri.util.ThreadingUtil.runOnGUI(() -> {
+            sta.stopPointUnitsBox.setSelectedItem(SectionStopPoint.Units.INCHES);
+            sta.forwardStopPointField.setText("12 7/32");
+            sta.reverseStopPointField.setText("2.5");
+        });
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
+        Section s = firstSection();
+        Assertions.assertNotNull(s, "created");
+        Assertions.assertEquals(391 * 25.4f / 32, s.getStopPointMm(Section.FORWARD), 0.01f, "12 7/32 in");
+        Assertions.assertEquals(2.5f * 25.4f, s.getStopPointMm(Section.REVERSE), 0.01f, "2 1/2 in");
+        Assertions.assertEquals(SectionStopPoint.Units.INCHES, SectionStopPoint.getUnits(s), "shown in inches next time");
+        JUnitUtil.dispose(JFrameOperator.waitJFrame(getTableFrameName(), true, true));
+    }
+
+    @Test
+    @DisabledIfSystemProperty( named = "java.awt.headless", matches = "true" )
+    public void testStopPointBeyondTheSectionIsRefused() {
+        InstanceManager.getDefault(jmri.BlockManager.class).getBySystemName("IB12").setLength(500.0f);
+        JFrameOperator jf = openAddFrame();
+        SectionTableAction sta = (SectionTableAction) a;
+        jmri.util.ThreadingUtil.runOnGUI(() -> {
+            sta.stopPointUnitsBox.setSelectedItem(SectionStopPoint.Units.MM);
+            sta.forwardStopPointField.setText("620");
+        });
+        Thread t = JemmyUtil.createModalDialogOperatorThread(Bundle.getMessage("ErrorTitle"), Bundle.getMessage("ButtonOK"));
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
+        JUnitUtil.waitFor(() -> !t.isAlive(), "error shown");
+        Assertions.assertNull(firstSection(), "not created");
+
+        Thread t2 = JemmyUtil.createModalDialogOperatorThread(Bundle.getMessage("ErrorTitle"), Bundle.getMessage("ButtonOK"));
+        jmri.util.ThreadingUtil.runOnGUI(() -> sta.forwardStopPointField.setText("about here"));
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
+        JUnitUtil.waitFor(() -> !t2.isAlive(), "not a distance");
+        Assertions.assertNull(firstSection(), "still not created");
+
+        jmri.util.ThreadingUtil.runOnGUI(() -> sta.forwardStopPointField.setText("480"));
+        JemmyUtil.pressButton(jf, Bundle.getMessage("ButtonCreate"));
+        Section s = firstSection();
+        Assertions.assertNotNull(s, "created once inside the Section");
+        Assertions.assertEquals(480.0f, s.getStopPointMm(Section.FORWARD), 0.0f);
+        JUnitUtil.dispose(JFrameOperator.waitJFrame(getTableFrameName(), true, true));
+    }
+
+    @Test
+    @DisabledIfSystemProperty( named = "java.awt.headless", matches = "true" )
+    public void testUnitsChangeConvertsWhatIsShown() {
+        JFrameOperator jf = openAddFrame();
+        SectionTableAction sta = (SectionTableAction) a;
+        jmri.util.ThreadingUtil.runOnGUI(() -> {
+            sta.stopPointUnitsBox.setSelectedItem(SectionStopPoint.Units.MM);
+            sta.forwardStopPointField.setText("254");
+            sta.stopPointUnitsBox.setSelectedItem(SectionStopPoint.Units.INCHES);
+        });
+        Assertions.assertEquals("10", sta.forwardStopPointField.getText());
+        jmri.util.ThreadingUtil.runOnGUI(() -> jf.getWindow().dispose());
+        JUnitUtil.dispose(JFrameOperator.waitJFrame(getTableFrameName(), true, true));
     }
 
     @Override
@@ -118,21 +199,25 @@ public class SectionTableActionTest extends AbstractTableActionBase<Section> {
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
-        jmri.util.JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
         helpTarget = "package.jmri.jmrit.beantable.SectionTable";
         InstanceManager.setDefault(jmri.BlockManager.class, new jmri.BlockManager());
         a = new SectionTableAction();
-        InstanceManager.getDefault(jmri.BlockManager.class).provideBlock("IB12");
+        InstanceManager.getDefault(jmri.BlockManager.class).provideBlock("IB12")
+            .setUserName("Block 12 userName");
 
     }
 
     @Override
     @AfterEach
     public void tearDown() {
+        if ( a != null ){ 
+            a.dispose();
+            a = null;
+        }
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SectionTableActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SectionTableActionTest.class);
 }

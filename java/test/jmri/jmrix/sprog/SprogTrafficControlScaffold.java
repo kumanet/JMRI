@@ -1,6 +1,7 @@
 package jmri.jmrix.sprog;
 
 import java.util.Vector;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,20 +18,20 @@ public class SprogTrafficControlScaffold extends SprogTrafficController {
        super(memo);
     }
 
-    public void setTestReplies(boolean state) {
+    public synchronized void setTestReplies(boolean state) {
         useTestReplies = state;
     }
     
     // override some SprogTrafficController methods for test purposes
     @Override
     public boolean status() {
-        return true;
+        return isTcThreadAlive();
     }
 
     /**
      * record messages sent, provide access for making sure they are OK
      */
-    public Vector<SprogMessage> outbound = new Vector<SprogMessage>();  // public OK here, so long as this is a test class
+    public Vector<SprogMessage> outbound = new Vector<>();  // public OK here, so long as this is a test class
 
     @Override
     public void sendSprogMessage(SprogMessage m) {
@@ -67,11 +68,8 @@ public class SprogTrafficControlScaffold extends SprogTrafficController {
      */
     protected void sendTestMessage(SprogMessage m, SprogListener l) {
         // forward a test message to NceListeners
-        if (log.isDebugEnabled()) {
-            log.debug("sendTestMessage    [{}]", m);
-        }
+        log.debug("sendTestMessage    [{}]", m);
         notifyMessage(m, l);
-        return;
     }
 
     /**
@@ -79,16 +77,14 @@ public class SprogTrafficControlScaffold extends SprogTrafficController {
      */
     protected void sendTestReply(SprogReply m) {
         // forward a test message to NceListeners
-        if (log.isDebugEnabled()) {
-            log.debug("sendTestReply [{}]", m);
-        }
+        log.debug("sendTestReply [{}]", m);
         notifyReply(m);
-        try {
-            Thread.sleep(50);
-        } catch (InterruptedException e) {
-            log.debug("Thread interrupted while sleeping");
-        }
-        return;
+        // SprogTrafficController.notifyReply() delivers the reply to listeners
+        // via SwingUtilities.invokeLater(), i.e. asynchronously on the EDT. Drain
+        // the EDT queue synchronously so the reply has been fully processed before
+        // this method returns; otherwise callers race the pending event and may
+        // observe stale power state (formerly papered over with Thread.sleep(50)).
+        jmri.util.ThreadingUtil.runOnGUI(() -> {});
     }
 
     /*
@@ -98,6 +94,6 @@ public class SprogTrafficControlScaffold extends SprogTrafficController {
         return cmdListeners.size();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SprogTrafficControlScaffold.class);
+    private static final Logger log = LoggerFactory.getLogger(SprogTrafficControlScaffold.class);
 
 }

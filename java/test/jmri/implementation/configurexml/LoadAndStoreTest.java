@@ -1,12 +1,15 @@
 package jmri.implementation.configurexml;
 
 import java.io.File;
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.stream.Stream;
 
 import jmri.*;
 import jmri.implementation.MockCommandStation;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,9 +34,9 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         return getFiles(new File("java/test/jmri/implementation/configurexml"), false, true);
     }
 
-    @ParameterizedTest(name = "{index}: {0} (pass={1})")
+    @ParameterizedTest(name = "[{index}] {arguments}")
     @MethodSource("data")
-    public void loadAndStoreTest(File file, boolean pass) throws Exception {
+    public void loadAndStoreTest(File file, boolean pass) throws IOException, JmriException, ParseException {
         super.loadLoadStoreFileCheck(file);
     }
 
@@ -42,7 +45,9 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
     }
 
     @BeforeEach
-    public void localSetUp() {
+    @Override
+    public void setUp(@TempDir java.io.File tempDir) throws IOException  {
+        super.setUp(tempDir);
         // for DCC Signals
         InstanceManager.store(new MockCommandStation("N"), CommandStation.class);
     }

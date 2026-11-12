@@ -1,10 +1,11 @@
 package jmri.util;
 
-import java.awt.event.ActionEvent;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.lang.reflect.InvocationTargetException;
+import java.util.TimerTask;
 
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -33,12 +34,12 @@ public class ThreadingUtil {
      * <p> {@code
      * ThreadingUtil.runOnLayout(() -> {
      *     sensor.setState(value);
-     * }); 
+     * });
      * }
      *
      * @param ta What to run, usually as a lambda expression
      */
-    static public void runOnLayout(@Nonnull ThreadAction ta) {
+    public static void runOnLayout(@Nonnull ThreadAction ta) {
         runOnGUI(ta);
     }
 
@@ -50,14 +51,14 @@ public class ThreadingUtil {
      * <p> {@code
      * ThreadingUtil.runOnLayout(() -> {
      *     sensor.setState(value);
-     * }); 
+     * });
      * }
      *
      * @param ta What to run, usually as a lambda expression
      * @throws JmriException when an exception occurs
      * @throws RuntimeException when an exception occurs
      */
-    static public void runOnLayoutWithJmriException(
+    public static void runOnLayoutWithJmriException(
             @Nonnull ThreadActionWithJmriException ta)
             throws JmriException, RuntimeException {
         runOnGUIWithJmriException(ta);
@@ -73,12 +74,12 @@ public class ThreadingUtil {
      * <p> {@code
      * ThreadingUtil.runOnLayoutEventually(() -> {
      *     sensor.setState(value);
-     * }); 
+     * });
      * }
      *
      * @param ta What to run, usually as a lambda expression
      */
-    static public void runOnLayoutEventually(@Nonnull ThreadAction ta) {
+    public static void runOnLayoutEventually(@Nonnull ThreadAction ta) {
         runOnGUIEventually(ta);
     }
 
@@ -92,16 +93,16 @@ public class ThreadingUtil {
      * <p> {@code
      * ThreadingUtil.runOnLayoutDelayed(() -> {
      *     sensor.setState(value);
-     * }, 1000); 
+     * }, 1000);
      * }
+     *
+     * If you need to cancel an operation, see jmri.util.TimerUtil.scheduleOnGUIThread
      *
      * @param ta    what to run, usually as a lambda expression
      * @param delay interval in milliseconds
-     * @return reference to timer object handling delay so you can cancel if desired; note that operation may have already taken place.
      */
-    @Nonnull 
-    static public Timer runOnLayoutDelayed(@Nonnull ThreadAction ta, int delay) {
-        return runOnGUIDelayed(ta, delay);
+    public static void runOnLayoutDelayed(@Nonnull ThreadAction ta, int delay) {
+        runOnGUIDelayed(ta, delay);
     }
 
     /**
@@ -109,7 +110,7 @@ public class ThreadingUtil {
      *
      * @return true if on the layout-operation thread
      */
-    static public boolean isLayoutThread() {
+    public static boolean isLayoutThread() {
         return isGUIThread();
     }
 
@@ -123,12 +124,12 @@ public class ThreadingUtil {
      * });
      * }
      * <p>
-     * If an InterruptedException is encountered, it'll be deferred to the 
+     * If an InterruptedException is encountered, it'll be deferred to the
      * next blocking call via Thread.currentThread().interrupt()
-     * 
+     *
      * @param ta What to run, usually as a lambda expression
      */
-    static public void runOnGUI(@Nonnull ThreadAction ta) {
+    public static void runOnGUI(@Nonnull ThreadAction ta) {
         if (isGUIThread()) {
             // run now
             ta.run();
@@ -159,17 +160,19 @@ public class ThreadingUtil {
      * });
      * }
      * <p>
-     * If an InterruptedException is encountered, it'll be deferred to the 
+     * If an InterruptedException is encountered, it'll be deferred to the
      * next blocking call via Thread.currentThread().interrupt()
-     * 
+     *
      * @param ta What to run, usually as a lambda expression
      * @throws JmriException when an exception occurs
      * @throws RuntimeException when an exception occurs
      */
-    static public void runOnGUIWithJmriException(
+    @SuppressFBWarnings(value = {"THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"},
+            justification = "We throw exception if it's a runtime exception")
+    public static void runOnGUIWithJmriException(
             @Nonnull ThreadActionWithJmriException ta)
             throws JmriException, RuntimeException {
-        
+
         if (isGUIThread()) {
             // run now
             ta.run();
@@ -216,12 +219,12 @@ public class ThreadingUtil {
      * <p>
      * If an InterruptedException is encountered, it'll be deferred to the next
      * blocking call via Thread.currentThread().interrupt()
-     * 
+     *
      * @param <E> generic
      * @param ta What to run, usually as a lambda expression
      * @return the value returned by ta
      */
-    static public <E> E runOnGUIwithReturn(@Nonnull ReturningThreadAction<E> ta) {
+    public static <E> E runOnGUIwithReturn(@Nonnull ReturningThreadAction<E> ta) {
         if (isGUIThread()) {
             // run now
             return ta.run();
@@ -252,15 +255,15 @@ public class ThreadingUtil {
      * after the current routine has returned.
      * <p>
      * Typical uses:
-     * <p> {@code 
-     * ThreadingUtil.runOnGUIEventually( ()->{ 
+     * <p> {@code
+     * ThreadingUtil.runOnGUIEventually( ()->{
      *      mine.setVisible();
-     * } ); 
+     * } );
      * }
      *
      * @param ta What to run, usually as a lambda expression
      */
-    static public void runOnGUIEventually(@Nonnull ThreadAction ta) {
+    public static void runOnGUIEventually(@Nonnull ThreadAction ta) {
         // dispatch to Swing
         SwingUtilities.invokeLater(ta);
     }
@@ -273,25 +276,26 @@ public class ThreadingUtil {
      * <p>
      * Typical uses:
      * <p>
-     * {@code 
-     * ThreadingUtil.runOnGUIDelayed( ()->{ 
-     *  mine.setVisible(); 
+     * {@code
+     * ThreadingUtil.runOnGUIDelayed( ()->{
+     *  mine.setVisible();
      * }, 1000);
      * }
      *
+     * If you need to cancel an operation, see jmri.util.TimerUtil.scheduleOnGUIThread
+     *
      * @param ta    What to run, usually as a lambda expression
      * @param delay interval in milliseconds
-     * @return reference to timer object handling delay so you can cancel if desired; note that operation may have already taken place.
      */
-    @Nonnull 
-    static public Timer runOnGUIDelayed(@Nonnull ThreadAction ta, int delay) {
+    public static void runOnGUIDelayed(@Nonnull Runnable ta, int delay) {
         // dispatch to Swing via timer
-        Timer timer = new Timer(delay, (ActionEvent e) -> {
-            ta.run();
-        });
-        timer.setRepeats(false);
-        timer.start();
-        return timer;
+        var task = new TimerTask(){
+                @Override
+                public void run() {
+                    ThreadingUtil.runOnGUIEventually(() -> {ta.run();});
+                }
+        };
+        TimerUtil.scheduleOnGUIThread(task, delay);
     }
 
     /**
@@ -299,7 +303,7 @@ public class ThreadingUtil {
      *
      * @return true if on the event dispatch thread
      */
-    static public boolean isGUIThread() {
+    public static boolean isGUIThread() {
         return SwingUtilities.isEventDispatchThread();
     }
 
@@ -308,47 +312,47 @@ public class ThreadingUtil {
      * @param runner Runnable.
      * @return new Thread.
      */
-    static public Thread newThread(Runnable runner) {
+    public static Thread newThread(Runnable runner) {
         return new Thread(getJmriThreadGroup(), runner);
     }
-    
+
     /**
      * Create a new thread in the JMRI group.
      * @param runner Thread runnable.
      * @param name Thread name.
      * @return New Thread.
      */
-    static public Thread newThread(Runnable runner, String name) {
+    public static Thread newThread(Runnable runner, String name) {
         return new Thread(getJmriThreadGroup(), runner, name);
     }
-    
+
     /**
      * Get the JMRI default thread group.
-     * This should be passed to as the first argument to the {@link Thread} 
+     * This should be passed to as the first argument to the {@link Thread}
      * constructor so we can track JMRI-created threads.
      * @return JMRI default thread group.
      */
-    static public ThreadGroup getJmriThreadGroup() {
+    public static ThreadGroup getJmriThreadGroup() {
         // we access this dynamically instead of keeping it in a static
-        
+
         ThreadGroup main = Thread.currentThread().getThreadGroup();
-        while (main.getParent() != null ) {main = main.getParent(); }        
+        while (main.getParent() != null ) {main = main.getParent(); }
         ThreadGroup[] list = new ThreadGroup[main.activeGroupCount()+2];  // space on end
         int max = main.enumerate(list);
-        
+
         for (int i = 0; i<max; i++) { // usually just 2 or 3, quite quick
             if (list[i].getName().equals("JMRI")) return list[i];
         }
         return new ThreadGroup(main, "JMRI");
     }
-    
+
     /**
      * Check whether a specific thread is running (or able to run) right now.
      *
      * @param t the thread to check
      * @return true is the specified thread is or could be running right now
      */
-    static public boolean canThreadRun(@Nonnull Thread t) {
+    public static boolean canThreadRun(@Nonnull Thread t) {
         Thread.State s = t.getState();
         return s.equals(Thread.State.RUNNABLE);
     }
@@ -366,7 +370,7 @@ public class ThreadingUtil {
      * @param t the thread to check
      * @return true is the specified thread is or could be running right now
      */
-    static public boolean isThreadWaiting(@Nonnull Thread t) {
+    public static boolean isThreadWaiting(@Nonnull Thread t) {
         Thread.State s = t.getState();
         return s.equals(Thread.State.BLOCKED) || s.equals(Thread.State.WAITING) || s.equals(Thread.State.TIMED_WAITING);
     }
@@ -378,13 +382,13 @@ public class ThreadingUtil {
      * In this implementation, this is the same as {@link #requireLayoutThread(org.slf4j.Logger)}
      * @param logger The logger object from the calling class, usually "log"
      */
-    static public void requireGuiThread(org.slf4j.Logger logger) {
+    public static void requireGuiThread(org.slf4j.Logger logger) {
         if (!isGUIThread()) {
             // fail, which can be a bit slow to do the right thing
             LoggingUtil.warnOnce(logger, "Call not on GUI thread", new Exception("traceback"));
-        } 
+        }
     }
-    
+
     /**
      * Check that a call is on the Layout thread. Warns (once) if not.
      * Intended to be the run-time check mechanism for {@code @InvokeOnLayoutThread}
@@ -392,18 +396,18 @@ public class ThreadingUtil {
      * In this implementation, this is the same as {@link #requireGuiThread(org.slf4j.Logger)}
      * @param logger The logger object from the calling class, usually "log"
      */
-    static public void requireLayoutThread(org.slf4j.Logger logger) {
+    public static void requireLayoutThread(org.slf4j.Logger logger) {
         if (!isLayoutThread()) {
             // fail, which can be a bit slow to do the right thing
             LoggingUtil.warnOnce(logger, "Call not on Layout thread", new Exception("traceback"));
-        } 
+        }
     }
-    
+
     /**
      * Interface for use in ThreadingUtil's lambda interfaces
      */
     @FunctionalInterface
-    static public interface ThreadAction extends Runnable {
+    public static interface ThreadAction extends Runnable {
 
         /**
          * {@inheritDoc}
@@ -418,7 +422,7 @@ public class ThreadingUtil {
      * Interface for use in ThreadingUtil's lambda interfaces
      */
     @FunctionalInterface
-    static public interface ThreadActionWithJmriException {
+    public static interface ThreadActionWithJmriException {
 
         /**
          * When an object implementing interface <code>ThreadActionWithJmriException</code>
@@ -438,18 +442,20 @@ public class ThreadingUtil {
 
     /**
      * Interface for use in ThreadingUtil's lambda interfaces
-     * 
+     *
      * @param <E> the type returned
      */
     @FunctionalInterface
-    static public interface ReturningThreadAction<E> {
+    public static interface ReturningThreadAction<E> {
         public E run();
     }
-    
+
     /**
      * Warn if a thread is holding locks. Used when transitioning to another context.
      */
-    static public void warnLocks() {
+    @SuppressWarnings("deprecation")    // The method getId() from the type Thread is deprecated since version 19
+                                        // The replacement Thread.threadId() isn't available before version 19
+    public static void warnLocks() {
         if ( log.isDebugEnabled() ) {
             try {
                 java.lang.management.ThreadInfo threadInfo = java.lang.management.ManagementFactory
@@ -479,12 +485,12 @@ public class ThreadingUtil {
         }
     }
     private static boolean lastWarnLocksLimit = false;
-    private static RuntimeException lastWarnLocksException = null; 
+    private static RuntimeException lastWarnLocksException = null;
     public RuntimeException getlastWarnLocksException() { // public for script and test access
         return lastWarnLocksException;
     }
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ThreadingUtil.class);
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ThreadingUtil.class);
 
 }
 

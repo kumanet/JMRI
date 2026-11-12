@@ -1,7 +1,10 @@
 package jmri;
 
-import org.junit.Assert;
+import jmri.util.JUnitUtil;
+
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the Light class
@@ -13,10 +16,35 @@ public class SensorTest {
     @Test
     @SuppressWarnings("all")
     public void testStateConstants() {
-        Assert.assertTrue("On and Off differ", (Sensor.ON & Sensor.OFF) == 0);
-        Assert.assertTrue("On and Unknown differ", (Sensor.ON & Sensor.UNKNOWN) == 0);
-        Assert.assertTrue("Off and Unknown differ", (Sensor.OFF & Sensor.UNKNOWN) == 0);
-        Assert.assertTrue("On and Inconsistent differ", (Sensor.ON & Sensor.INCONSISTENT) == 0);
-        Assert.assertTrue("Off and Inconsistent differ", (Sensor.OFF & Sensor.INCONSISTENT) == 0);
+        assertTrue( (Sensor.ON & Sensor.OFF) == 0, "On and Off differ");
+        assertTrue( (Sensor.ON & Sensor.UNKNOWN) == 0, "On and Unknown differ");
+        assertTrue( (Sensor.OFF & Sensor.UNKNOWN) == 0, "Off and Unknown differ");
+        assertTrue( (Sensor.ON & Sensor.INCONSISTENT) == 0, "On and Inconsistent differ");
+        assertTrue( (Sensor.OFF & Sensor.INCONSISTENT) == 0, "Off and Inconsistent differ");
     }
+
+    @Test
+    public void testDetectsNames() {
+        for (Sensor.Detects d : Sensor.Detects.values()) {
+            Assertions.assertSame(d, Sensor.Detects.getByShortName(d.getShortName()), "read back from its stored name");
+            Assertions.assertEquals(d.getPeopleName(), d.toString(), "shown by its name for people");
+            Assertions.assertFalse(d.getPeopleName().startsWith("SensorDetects"), "a name from the bundle: " + d);
+        }
+        Assertions.assertEquals("wheels", Sensor.Detects.WHEELS.getShortName());
+        Assertions.assertEquals("body", Sensor.Detects.BODY.getShortName());
+        Assertions.assertEquals("tag", Sensor.Detects.TAG.getShortName());
+        Assertions.assertSame(Sensor.Detects.WHEELS, Sensor.Detects.getByShortName(null), "none stored");
+        Assertions.assertSame(Sensor.Detects.WHEELS, Sensor.Detects.getByShortName("laser"), "stored by a later version");
+    }
+
+    @BeforeEach
+    public void setUp() {
+        JUnitUtil.setUp();
+    }
+
+    @AfterEach
+    public void tearDown() {
+        JUnitUtil.tearDown();
+    }
+
 }

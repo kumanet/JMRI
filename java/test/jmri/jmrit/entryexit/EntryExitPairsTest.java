@@ -1,6 +1,5 @@
 package jmri.jmrit.entryexit;
 
-import java.awt.GraphicsEnvironment;
 import java.util.List;
 import java.util.HashMap;
 
@@ -9,14 +8,13 @@ import jmri.Sensor;
 import jmri.SensorManager;
 import jmri.Turnout;
 import jmri.TurnoutManager;
+import jmri.jmrit.display.layoutEditor.LayoutBlock;
 import jmri.jmrit.display.layoutEditor.LayoutBlockManager;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
+
 import org.junit.jupiter.api.*;
-import org.junit.Assume;
-import org.junit.jupiter.api.BeforeAll;
+
 import org.netbeans.jemmy.EventTool;
 import org.netbeans.jemmy.operators.JButtonOperator;
 import org.netbeans.jemmy.operators.JDialogOperator;
@@ -24,22 +22,24 @@ import org.netbeans.jemmy.operators.JDialogOperator;
 /**
  *
  * @author Paul Bender Copyright (C) 2017
-+ * @author Dave Sand Copyright (C) 2018
+ * @author Dave Sand Copyright (C) 2018
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class EntryExitPairsTest {
 
-    static EntryExitTestTools tools;
-    static HashMap<String, LayoutEditor> panels = new HashMap<>();
+    private EntryExitTestTools tools;
+    private HashMap<String, LayoutEditor> panels = new HashMap<>();
 
-    static EntryExitPairs eep;
-    static LayoutBlockManager lbm;
-    static SensorManager sm;
-    static TurnoutManager tm;
+    private EntryExitPairs eep;
+    private LayoutBlockManager lbm;
+    private SensorManager sm;
+    private TurnoutManager tm;
 
     @Test
     public void testCTor() {
         EntryExitPairs t = new EntryExitPairs();
-        Assert.assertNotNull("exists", t);  // NOI18N
+        Assertions.assertNotNull( t, "exists");
+        t.dispose();
     }
 
     @Test
@@ -51,24 +51,29 @@ public class EntryExitPairsTest {
     @Test
     public void testGetSourceList() {
         List<Object> list = eep.getSourceList(panels.get("Alpha"));  // NOI18N
-        Assert.assertEquals("test source list", 4, list.size());  // NOI18N
+        Assertions.assertEquals( 4, list.size(), "test source list");
     }
 
     @Test
     public void testSetSingleSegmentRoute() {
         DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
                 sm.getSensor("NX-AW-Main"), panels.get("Alpha"), eep);  // NOI18N
-        Assert.assertNotNull("single segment route", dp);  // NOI18N
+        Assertions.assertNotNull( dp, "single segment route");
         eep.setSingleSegmentRoute(dp.getUniqueId());
         new EventTool().waitNoEvent(1000);
 
+        LayoutBlock lb = lbm.getLayoutBlock("B-Alpha-Main");
+        Assertions.assertNotNull(lb);
+        Turnout to = tm.getTurnout("T-AE");
+        Assertions.assertNotNull(to);
+
         // Check the results
-        JUnitUtil.waitFor(()->{return lbm.getLayoutBlock("B-Alpha-Main").getUseExtraColor();}, "Route active");  // NOI18N
-        JUnitUtil.waitFor(()->{return tm.getTurnout("T-AE").getKnownState() == Turnout.CLOSED;}, "Turnout closed");  // NOI18N
+        JUnitUtil.waitFor(()->{return lb.getUseExtraColor();}, "Route active");  // NOI18N
+        JUnitUtil.waitFor(()->{return to.getKnownState() == Turnout.CLOSED;}, "Turnout closed");  // NOI18N
     }
 
     @Test
-    public void testDiscoverPairs() throws Exception {
+    public void testDiscoverPairs() throws jmri.JmriException {
         eep.automaticallyDiscoverEntryExitPairs(panels.get("Alpha"), EntryExitPairs.FULLINTERLOCK);  // NOI18N
     }
 
@@ -76,12 +81,12 @@ public class EntryExitPairsTest {
     public void testNxPairDelete() {
         Sensor sensor = sm.getSensor("NX-From-Alpha");  // NOI18N
         boolean chkDelete = eep.deleteNxPair(sensor);
-        Assert.assertTrue("delete empty", chkDelete);  // NOI18N
+        Assertions.assertTrue( chkDelete, "delete empty");
 
         createModalDialogOperatorThread(Bundle.getMessage("WarningTitle"), Bundle.getMessage("ButtonNo"));  // NOI18N
         sensor = sm.getSensor("NX-Alpha-EB");  // NOI18N
         chkDelete = eep.deleteNxPair(sensor);
-        Assert.assertFalse("delete active denied", chkDelete);  // NOI18N
+        Assertions.assertFalse( chkDelete, "delete active denied");
     }
 
     void createModalDialogOperatorThread(String dialogTitle, String buttonText) {
@@ -96,15 +101,21 @@ public class EntryExitPairsTest {
         t.start();
     }
 
+    @Test
+    public void testTypeHandledName(){
+        Assertions.assertEquals("Entry Exit", eep.getBeanTypeHandled());
+        Assertions.assertEquals("Entry Exit", eep.getBeanTypeHandled(false));
+        Assertions.assertEquals("Entry Exits", eep.getBeanTypeHandled(true));
+    }
+
     @BeforeEach
-    public void before() throws Exception {
+    public void before() throws jmri.JmriException {
         JUnitUtil.setUp();
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        jmri.util.JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
         JUnitUtil.initConfigureManager();
         tools = new EntryExitTestTools();
         panels = EntryExitTestTools.getPanels();
-        Assert.assertNotNull("Get LE panels", panels);  // NOI18N
+        Assertions.assertNotNull( panels, "Get LE panels");
         eep = InstanceManager.getDefault(EntryExitPairs.class);
         lbm = InstanceManager.getDefault(LayoutBlockManager.class);
         sm = InstanceManager.getDefault(SensorManager.class);
@@ -122,11 +133,15 @@ public class EntryExitPairsTest {
         tm = null;
         panels = null;
         tools = null;
+
+        JUnitUtil.clearRouteThreads();
+        JUnitUtil.clearTurnoutThreads();
+        JUnitUtil.removeMatchingThreads("Routing stabilising timer");
+
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-//     private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntryExitPairsTest.class);
+//     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntryExitPairsTest.class);
 
 }

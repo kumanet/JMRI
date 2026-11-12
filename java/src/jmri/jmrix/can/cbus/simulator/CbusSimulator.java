@@ -1,6 +1,9 @@
 package jmri.jmrix.can.cbus.simulator;
 
+import javax.annotation.Nonnull;
+
 import java.util.ArrayList;
+import java.util.List;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 
 import org.slf4j.Logger;
@@ -20,28 +23,30 @@ import org.slf4j.LoggerFactory;
  * @see CbusDummyNode
  * @since 4.15.2
  */
-public class CbusSimulator {
+public class CbusSimulator implements jmri.Disposable {
 
     private final CanSystemConnectionMemo memo;
     public ArrayList<CbusDummyCS> _csArr;
     public ArrayList<CbusDummyNode> _ndArr;
     public ArrayList<CbusEventResponder> _evResponseArr;
 
-    public CbusSimulator(CanSystemConnectionMemo sysmemo){
+    public CbusSimulator(@Nonnull CanSystemConnectionMemo sysmemo){
         memo = sysmemo;
-        jmri.InstanceManager.store(this,jmri.jmrix.can.cbus.simulator.CbusSimulator.class);
+        _csArr = new ArrayList<>();
+        _ndArr = new ArrayList<>();
+        _evResponseArr = new ArrayList<>();
         init();
     }
-    
+
     public final void init(){
         log.info("Starting CBUS Network Simulation Tools");
-        _csArr = new ArrayList<>();
+        
         _csArr.add(new CbusDummyCS(memo)); // type, id, memo
         
-        _ndArr = new ArrayList<>();
-        _ndArr.add(new CbusDummyNode(0,165,0,0,memo)); // nn, manufacturer, type, canid, memo
         
-        _evResponseArr = new ArrayList<>();
+        // _ndArr.add(new CbusDummyNode(0,165,0,0,memo)); // nn, manufacturer, type, canid, memo
+        
+        
         _evResponseArr.add(new CbusEventResponder(memo) );
     }
     
@@ -63,22 +68,77 @@ public class CbusSimulator {
     
     public CbusDummyNode getNd(int id){
         return _ndArr.get(id);
-    }  
+    }
+
+    public void addNode ( CbusDummyNode nd) {
+        _ndArr.add(nd);
+    }
+
+    public void removeNode(CbusDummyNode nd) {
+        _ndArr.remove(nd);
+    }
 
     public CbusEventResponder getEv( int id ){
         return _evResponseArr.get(id);
     }
     
+    /**
+     * @return the simulated command stations, in the order made
+     * @since 5.19.1
+     */
+    @Nonnull
+    public List<CbusDummyCS> getCommandStations() {
+        return new ArrayList<>(_csArr);
+    }
+
+    /**
+     * Is this the simulator of a CAN Simulation connection, with no real bus?
+     * Only then may simulated trains use it.
+     *
+     * @return true if the connection's traffic controller is CAN Simulation's
+     * @since 5.19.1
+     */
+    public boolean isOnCanSimulation() {
+        return memo.getTrafficController() instanceof jmri.jmrix.can.adapters.loopback.LoopbackTrafficController;
+    }
+
+    /**
+     * Speed commands for simulated trains, from this simulator's command
+     * stations. Made when first asked for, and kept until disposed.
+     *
+     * @return the speed source
+     * @since 5.19.1
+     */
+    @Nonnull
+    public synchronized CbusSimulatedSpeedSource getSimulatedSpeedSource() {
+        if (speedSource == null) {
+            speedSource = new CbusSimulatedSpeedSource(this);
+        }
+        return speedSource;
+    }
+
+    /**
+     * Where simulated trains report detection on this connection's CBUS
+     * sensors. Made when first asked for, and kept until disposed.
+     *
+     * @return the output
+     * @since 5.19.1
+     */
+    @Nonnull
+    public synchronized CbusSimulatedSensorOutput getSimulatedSensorOutput() {
+        if (sensorOutput == null) {
+            sensorOutput = new CbusSimulatedSensorOutput(memo);
+        }
+        return sensorOutput;
+    }
+
+    private CbusSimulatedSpeedSource speedSource;
+    private CbusSimulatedSensorOutput sensorOutput;
+
     public CbusDummyCS getNewCS(){
         CbusDummyCS newcs = new CbusDummyCS(memo);
         _csArr.add(newcs);
         return newcs;
-    }
-    
-    public CbusDummyNode getNewNd(){
-        CbusDummyNode newnd  = new CbusDummyNode(0,165,0,0,memo);
-        _ndArr.add(newnd);
-        return newnd;
     }
 
     public CbusEventResponder getNewEv(){
@@ -87,29 +147,37 @@ public class CbusSimulator {
         return newcs;
     }
 
-    // removes CanListeners
-    // resets all command stations to stop any session timers
+    /**
+     * Disposes of all simulated objects.
+     * CanListeners can be removed and command stations can stop session timers.
+     * Does not remove instance from InstanceManager or CAN memo.
+     */
+    @Override
     public void dispose() {
-        log.info("Stopping all CBUS Simulation Tools");
-        for (int i = 0; i < _csArr.size(); i++) {
-            _csArr.get(i).dispose();
-            _csArr.set(i,null);
+        synchronized (this) {
+            if (speedSource != null) {
+                speedSource.dispose();
+            }
+            if (sensorOutput != null) {
+                sensorOutput.dispose();
+            }
         }
-        _csArr = null;
-        
-        for (int i = 0; i < _ndArr.size(); i++) {
-            _ndArr.get(i).dispose();
-            _ndArr.set(i,null);
-        }        
-        _ndArr = null;
-        
-        for (int i = 0; i < _evResponseArr.size(); i++) {
-            _evResponseArr.get(i).dispose();
-            _evResponseArr.set(i,null);
-        } 
-        _evResponseArr = null;
-        
-        jmri.InstanceManager.deregister(this, jmri.jmrix.can.cbus.simulator.CbusSimulator.class);
+        log.info("Stopping {} Simulations",_csArr.size()+_ndArr.size()+_evResponseArr.size());
+        for ( CbusDummyCS cs : _csArr ) {
+            cs.dispose();
+        }
+        _csArr.clear();
+
+        for ( CbusDummyNode cs : _ndArr ) {
+            cs.dispose();
+        }
+        _ndArr.clear();
+
+        for ( CbusEventResponder cs : _evResponseArr ) {
+            cs.dispose();
+        }
+        _evResponseArr.clear();
+
     }
 
     private static final Logger log = LoggerFactory.getLogger(CbusSimulator.class);

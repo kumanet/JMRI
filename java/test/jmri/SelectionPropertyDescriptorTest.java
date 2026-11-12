@@ -4,11 +4,14 @@ import java.util.Arrays;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.Test;
-import static org.junit.Assert.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
@@ -17,15 +20,9 @@ import org.junit.jupiter.api.BeforeEach;
 public class SelectionPropertyDescriptorTest {
     
     @Test
-    public void testCTor() {
+    public void testCtor() {
         SelectionPropertyDescriptorImpl t = new SelectionPropertyDescriptorImpl();
-        Assert.assertNotNull("exists",t);
-    }
-
-    @Test
-    public void testGetValueClass() {
-        SelectionPropertyDescriptorImpl t = new SelectionPropertyDescriptorImpl();
-        assertEquals(javax.swing.JComboBox.class, t.getValueClass());
+        assertNotNull( t, "exists");
     }
 
     @Test
@@ -43,15 +40,15 @@ public class SelectionPropertyDescriptorTest {
     @Test
     public void testPassThroughSuper() {
         SelectionPropertyDescriptorImpl t = new SelectionPropertyDescriptorImpl();
-        Assert.assertEquals("Default property option","B",t.defaultValue);
-        Assert.assertEquals("property key set","TEST_PROPERTY_KEY",t.propertyKey);
-        Assert.assertEquals("editable set true",true,t.isEditable(null));
-        Assert.assertEquals("column header set","Column Header Text",t.getColumnHeaderText());
+        assertEquals( "B",t.defaultValue, "Default property option");
+        assertEquals( "TEST_PROPERTY_KEY",t.propertyKey, "property key set");
+        assertTrue( t.isEditable(null), "editable set true");
+        assertEquals( "Column Header Text",t.getColumnHeaderText(), "column header set");
     }
 
-    private class SelectionPropertyDescriptorImpl extends SelectionPropertyDescriptor {
+    private static class SelectionPropertyDescriptorImpl extends SelectionPropertyDescriptor {
 
-        public SelectionPropertyDescriptorImpl() {
+        private SelectionPropertyDescriptorImpl() {
             super("TEST_PROPERTY_KEY", new String[]{"A","B","C"}, new String[]{"A Tip","B Tip","C Tip"}, "B");
         }
         

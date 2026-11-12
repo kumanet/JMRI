@@ -1,9 +1,9 @@
 package jmri.jmrix.direct;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.CommandStation;
 import jmri.DccLocoAddress;
 import jmri.LocoAddress;
+import jmri.SystemConnectionMemo;
 import jmri.jmrix.AbstractThrottle;
 
 /**
@@ -14,15 +14,16 @@ import jmri.jmrix.AbstractThrottle;
  */
 public class Throttle extends AbstractThrottle {
 
-    private CommandStation tcl;
+    private final CommandStation tcl;
 
     /**
      * Constructor.
      * @param address loco address.
      * @param tc system connection traffic controller.
+     * @param memo the system connection.
      */
-    public Throttle(DccLocoAddress address, CommandStation tc) {
-        super(null);
+    public Throttle(DccLocoAddress address, CommandStation tc, SystemConnectionMemo memo) {
+        super(memo);
         tcl = tc;
 
         // cache settings.
@@ -32,6 +33,11 @@ public class Throttle extends AbstractThrottle {
         // Functions default to false
         this.address = address;
         this.isForward = true;
+    }
+
+    @Deprecated (since="5.13.3", forRemoval=true)
+    public Throttle(DccLocoAddress address, CommandStation tc) {
+        this(address, tc, jmri.InstanceManager.getDefault(SystemConnectionMemo.class));
     }
 
     DccLocoAddress address;
@@ -47,7 +53,7 @@ public class Throttle extends AbstractThrottle {
     @Override
     protected void sendFunctionGroup1() {
         byte[] result = jmri.NmraPacket.function0Through4Packet(address.getNumber(), address.isLongAddress(),
-                getF0(), getF1(), getF2(), getF3(), getF4());
+                getFunction(0), getFunction(1), getFunction(2), getFunction(3), getFunction(4));
 
         tcl.sendPacket(result, 1);
     }
@@ -59,7 +65,7 @@ public class Throttle extends AbstractThrottle {
     protected void sendFunctionGroup2() {
 
         byte[] result = jmri.NmraPacket.function5Through8Packet(address.getNumber(), address.isLongAddress(),
-                getF5(), getF6(), getF7(), getF8());
+                getFunction(5), getFunction(6), getFunction(7), getFunction(8));
 
         tcl.sendPacket(result, 1);
     }
@@ -71,7 +77,7 @@ public class Throttle extends AbstractThrottle {
     protected void sendFunctionGroup3() {
 
         byte[] result = jmri.NmraPacket.function9Through12Packet(address.getNumber(), address.isLongAddress(),
-                getF9(), getF10(), getF11(), getF12());
+                getFunction(9), getFunction(10), getFunction(11), getFunction(12));
 
         tcl.sendPacket(result, 1);
     }
@@ -83,7 +89,6 @@ public class Throttle extends AbstractThrottle {
      *
      * @param speed Number from 0 to 1; less than zero is emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point
     @Override
     public synchronized void setSpeedSetting(float speed) {
         float oldSpeed = this.speedSetting;
@@ -132,6 +137,6 @@ public class Throttle extends AbstractThrottle {
     }
 
     // initialize logging
-    // private final static Logger log = LoggerFactory.getLogger(Throttle.class);
+    // private static final Logger log = LoggerFactory.getLogger(Throttle.class);
 
 }

@@ -39,22 +39,32 @@ public class SerialMessage extends jmri.jmrix.AbstractMRMessage {
 
     /**
      * This ctor interprets the byte array as a sequence of characters to send.
-     *
+     * @deprecated 5.13.5, unused, requires further development.
      * @param a Array of bytes to send
      */
+    @Deprecated( since="5.13.5", forRemoval=true)
     public SerialMessage(byte[] a) {
-        super(String.valueOf(a));
+        // super(String.valueOf(a)); // Spotbug toString on array
+        // requires further development to produce correct values for hardware type.
+        super(StringUtil.hexStringFromBytes(a).replaceAll("\\s", ""));
         setTimeout(100);
     }
 
     /**
-     * This ctor takes an int value for the 16 bit data content
+     * This ctor takes an int value for the 16 bit data content, with an
+     * optional leading byte.  If the value is greater than 0xFFFF,
+     * i.e. the upper byte of three is non-zero, the upper byte is
+     * used as the op code, otherwise 0xFE (TMCC 1) will be used.
      *
      * @param value The value stored in the content of the packet
      */
     public SerialMessage(int value) {
         super(3);
-        setOpCode(0xFE);
+        if ( (value & 0xFF0000) != 0) {
+            setOpCode((value >> 16 ) & 0xFF);
+        } else {
+            setOpCode(0xFE);
+        }
         putAsWord(value);
         setTimeout(100);
     }

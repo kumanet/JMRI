@@ -5,11 +5,12 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Point;
 import java.util.ArrayList;
+
+import javax.annotation.Nonnull;
+
 import jmri.Sensor;
 import jmri.jmrit.display.controlPanelEditor.shape.LocoLabel;
 import jmri.jmrit.logix.OBlock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A utility class replacing common methods formerly implementing the
@@ -50,23 +51,15 @@ public class IndicatorTrackPaths {
         if (_paths == null) {
             _paths = new ArrayList<>();
         }
-        if (path != null && path.length() > 0) {
-            path = path.trim();
-            if (!_paths.contains(path)) {
-                _paths.add(path);
-            }
+        if (path != null && path.length() > 0 && !_paths.contains(path.trim() )) {
+            _paths.add(path.trim());
         }
-        if (log.isDebugEnabled()) {
-            log.debug("addPath \"{}\" #paths= {}", path, _paths.size());
-        }
+        log.debug("addPath \"{}\" #paths= {}", path, _paths.size());
     }
 
     protected void removePath(String path) {
-        if (_paths != null) {
-            if (path != null && path.length() > 0) {
-                path = path.trim();
-                _paths.remove(path);
-            }
+        if ( _paths != null && path != null && path.length() > 0 ) {
+            _paths.remove(path.trim());
         }
     }
 
@@ -78,7 +71,7 @@ public class IndicatorTrackPaths {
         return _showTrain;
     }
 
-    protected String getStatus(OBlock block, int state) {
+    protected synchronized String getStatus(OBlock block, int state) {
         String pathName = block.getAllocatedPathName();
         String status;
         removeLocoIcon();
@@ -115,21 +108,48 @@ public class IndicatorTrackPaths {
         }
     }
 
-    protected void setLocoIcon(OBlock block, Point pt, Dimension size, Editor ed) {
+    /**
+     * @param block OBlock occupied by train
+     * @param pt    position of track icon
+     * @param size  size of track icon
+     * @param ed    editor
+     * LocoLabel ctor causes editor to draw a graphic. Must be done on GUI
+     * Called from IndicatorTrackIcon.setStatus and IndicatorTurnoutIcon.setStatus
+     * Each wraps this method with ThreadingUtil.runOnLayoutEventually, so there is
+     * a time lag for when track icon changes and display of the change.
+     */
+    @SuppressWarnings("deprecation")    // The method getId() from the type Thread is deprecated since version 19
+                                        // The replacement Thread.threadId() isn't available before version 19
+    @jmri.InvokeOnLayoutThread
+    protected synchronized void setLocoIcon(@Nonnull OBlock block, Point pt, Dimension size, Editor ed) {
         if (!_showTrain) {
             removeLocoIcon();
             return;
         }
         String trainName = (String) block.getValue();
-        if (trainName == null) {
+        if (trainName == null || trainName.isEmpty()) {
             removeLocoIcon();
             return;
         }
-        if (_loco != null || pt == null) {
+        if ((block.getState() & (OBlock.OCCUPIED | OBlock.RUNNING)) == 0) {
+            // during delay of runOnLayoutEventually, state has changed
+            // don't paint loco icon 
+            return;
+        }
+        // ed may have been disposed before this runOnGUIEventually callback fires
+        if (_loco != null || pt == null || !ed.isDisplayable()) {
             return;
         }
         trainName = trainName.trim();
-        _loco = new LocoLabel(ed);
+        try {
+            _loco = new LocoLabel(ed);
+        } catch (Exception e) {
+            jmri.jmrit.logix.Warrant w = block.getWarrant();
+            log.error("Exception in setLocoIcon() in thread {} {} for block \"{}\", train \"{}\" \"{}\". state= {} at pt({}, {})",
+                    Thread.currentThread().getName(), Thread.currentThread().getId(), block.getDisplayName(), trainName,
+                    (w!=null? w.getDisplayName(): "no warrant"), block.getState(), pt.x, pt.y, e);
+            return;
+        }
         Font font = block.getMarkerFont();
         if (font == null) {
             font = ed.getFont();
@@ -145,8 +165,8 @@ public class IndicatorTrackPaths {
         _loco.setCornerRadius(height);
         _loco.setDisplayLevel(Editor.MARKERS);
         _loco.updateSize();
-        pt.x = pt.x + (size.width - _loco.maxWidth()) / 2;
-        pt.y = pt.y + (size.height - _loco.maxHeight()) / 2;
+        pt.x += (size.width - _loco.maxWidth()) / 2;
+        pt.y += (size.height - _loco.maxHeight()) / 2;
         _loco.setLocation(pt);
         try {
             ed.putItem(_loco);
@@ -178,5 +198,6 @@ public class IndicatorTrackPaths {
         return status;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(IndicatorTrackPaths.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IndicatorTrackPaths.class);
+
 }

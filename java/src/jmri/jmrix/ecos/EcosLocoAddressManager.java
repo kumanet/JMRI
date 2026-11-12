@@ -1,5 +1,7 @@
 package jmri.jmrix.ecos;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.Component;
 import java.awt.HeadlessException;
 import java.awt.event.ActionEvent;
@@ -8,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.List;
+
 import javax.annotation.Nonnull;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -16,6 +19,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+
 import jmri.*;
 import jmri.implementation.AbstractShutDownTask;
 import jmri.jmrit.beantable.ListedTableFrame;
@@ -28,6 +32,7 @@ import jmri.jmrix.ecos.utilities.RemoveObjectFromEcos;
 import jmri.jmrix.ecos.utilities.RosterToEcos;
 import jmri.managers.AbstractManager;
 import jmri.profile.ProfileManager;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,11 +54,15 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
     private String rosterAttribute;
     private EcosTrafficController tc;
     private Thread waitPrefLoad;
-    private Hashtable<String, EcosLocoAddress> _tecos = new Hashtable<String, EcosLocoAddress>();   // stores known Ecos Object ids to DCC
-    private Hashtable<Integer, EcosLocoAddress> _tdcc = new Hashtable<Integer, EcosLocoAddress>();  // stores known DCC Address to Ecos Object ids
+    private Hashtable<String, EcosLocoAddress> _tecos = new Hashtable<>();   // stores known Ecos Object ids to DCC
+    private Hashtable<Integer, EcosLocoAddress> _tdcc = new Hashtable<>();  // stores known DCC Address to Ecos Object ids
 
     public EcosLocoAddressManager(@Nonnull EcosSystemConnectionMemo memo) {
         super(memo);
+        init();
+    }
+
+    private void init() {
         locoToRoster = new EcosLocoToRoster(getMemo());
         tc = getMemo().getTrafficController();
         p = getMemo().getPreferenceManager();
@@ -62,7 +71,7 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
         loadEcosData();
         try {
             if (InstanceManager.getNullableDefault(ListedTableFrame.class) == null) {
-                new ListedTableFrame();
+                new ListedTableFrame<jmri.Turnout>();
             }
             InstanceManager.getDefault(ListedTableFrame.class).addTable("jmri.jmrix.ecos.swing.locodatabase.EcosLocoTableTabAction", "ECoS Loco Database", false);
         } catch (HeadlessException he) {
@@ -96,7 +105,7 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
 
     /**
      * EcosLocoAddresses have no system prefix, so return input unchanged.
-     * 
+     *
      * @param s the input to make a system name
      * @return the resultant system name
      */
@@ -104,15 +113,6 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
     @Nonnull
     public String makeSystemName(@Nonnull String s) {
         return s;
-    }
-
-
-    @Override
-    @Nonnull
-    @Deprecated  // will be removed when Manager method is removed due to @Override
-    public List<String> getSystemNameList() {
-        jmri.util.LoggingUtil.deprecationWarning(log, "getSystemNameList");
-        return new ArrayList<String>();
     }
 
     public void clearLocoToRoster() {
@@ -192,7 +192,7 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
 
     public List<String> getEcosObjectList() {
         String[] arr = new String[_tecos.size()];
-        List<String> out = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
         Enumeration<String> en = _tecos.keys();
         int i = 0;
         while (en.hasMoreElements()) {
@@ -330,6 +330,8 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
 
     /* Dispose is dealt with at shutdown */
     @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "This method intentionally doesn't do anything")
     public void dispose() {
     }
 
@@ -337,6 +339,10 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
         if (waitPrefLoad != null) {
             waitPrefLoad.interrupt();
         }
+    }
+
+    protected boolean threadsRunning() {
+        return ( waitPrefLoad != null ? waitPrefLoad.isAlive() : false );
     }
 
     public boolean shutdownDispose() {
@@ -423,6 +429,8 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
      * track of roster entries and sync them up with the Ecos.
      */
     @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "Further investigation is needed to handle this correctly")
     public void propertyChange(java.beans.PropertyChangeEvent e) {
         //If we are adding the loco to the roster from the ecos, we don't want to be adding it back to the ecos!
         if (getLocoToRoster()) {
@@ -861,10 +869,6 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
                 log.trace("waitForPrefLoad received InterruptedException, honoring termination request");
                 wait = true;
                 return false;
-            } catch (Exception e) {
-                wait = true;
-                log.error(e.toString());
-                return false;
             }
             wait = p.getPreferencesLoaded() && rcm.isInitialized(ProfileManager.getDefault().getActiveProfile());
             if (count >= 1000) {
@@ -909,6 +913,6 @@ public class EcosLocoAddressManager extends AbstractManager<NamedBean> implement
         return Bundle.getMessage("EcosLocoAddresses");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(EcosLocoAddressManager.class);
+    private static final Logger log = LoggerFactory.getLogger(EcosLocoAddressManager.class);
 
 }

@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -20,7 +21,6 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -29,11 +29,9 @@ import jmri.InstanceManager;
 import jmri.profile.Profile;
 import jmri.profile.ProfileManager;
 import jmri.util.MultipartMessage;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.javaworld.GridLayout2;
 import jmri.util.problemreport.LogProblemReportProvider;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * User interface for sending a problem report via email.
@@ -148,11 +146,10 @@ public class ReportPanel extends JPanel {
         });
         add(sendButton);
     }
-    
-    // made static, public, not final so can be changed via script
-    static public String requestURL = "http://jmri.org/problem-report.php";  // NOI18N
 
-    @SuppressWarnings("unchecked")
+    // made static, public, not final so can be changed via script
+    public static String requestURL = "http://jmri.org/problem-report.php";  // NOI18N
+
     public void sendButtonActionPerformed(java.awt.event.ActionEvent e) {
         ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.mailreport.ReportBundle");
         try {
@@ -255,27 +252,30 @@ public class ReportPanel extends JPanel {
             log.debug("server response:");
             boolean checkResponse = false;
             for (String line : response) {
-                log.debug("               :{}", line);
+                log.debug("         line: {}", line);
                 if (line.contains("<p>Message successfully sent!</p>")) {
                     checkResponse = true;
                 }
             }
 
             if (checkResponse) {
-                JOptionPane.showMessageDialog(null, rb.getString("InfoMessage"), rb.getString("InfoTitle"), JOptionPane.INFORMATION_MESSAGE);
+                JmriJOptionPane.showMessageDialog(this, rb.getString("InfoMessage"),
+                    rb.getString("InfoTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
                 // close containing Frame
                 getTopLevelAncestor().setVisible(false);
             } else {
-                JOptionPane.showMessageDialog(null, rb.getString("ErrMessage"), rb.getString("ErrTitle"), JOptionPane.ERROR_MESSAGE); // TODO add Bundle to folder and use ErrorTitle key in NamedBeanBundle props
+                JmriJOptionPane.showMessageDialog(this, rb.getString("ErrMessage"),
+                    rb.getString("ErrTitle"), JmriJOptionPane.ERROR_MESSAGE); // TODO add Bundle to folder and use ErrorTitle key in NamedBeanBundle props
                 sendButton.setEnabled(true);
             }
 
-        } catch (IOException ex) {
-            log.error("Error when attempting to send report: {}", ex);
+        } catch (IOException | URISyntaxException ex) {
+            log.error("Error when attempting to send report", ex);
             sendButton.setEnabled(true);
         } catch (AddressException ex) {
-            log.error("Invalid email address: {}", ex);
-            JOptionPane.showMessageDialog(null, rb.getString("ErrAddress"), rb.getString("ErrTitle"), JOptionPane.ERROR_MESSAGE); // TODO add Bundle to folder and use ErrorTitle key in NamedBeanBundle props
+            log.error("Invalid email address", ex);
+            JmriJOptionPane.showMessageDialog(this, rb.getString("ErrAddress"),
+                rb.getString("ErrTitle"), JmriJOptionPane.ERROR_MESSAGE); // TODO add Bundle to folder and use ErrorTitle key in NamedBeanBundle props
             sendButton.setEnabled(true);
         }
     }
@@ -303,7 +303,7 @@ public class ReportPanel extends JPanel {
                     try {
                         out.putNextEntry(new ZipEntry(directory + file.getName() + "/"));
                     } catch (IOException ex) {
-                        log.error("Exception when adding directory: {}", ex);
+                        log.error("Exception when adding directory", ex);
                     }
                     addDirectory(out, file, directory + file.getName() + "/");
                 } else {
@@ -331,12 +331,13 @@ public class ReportPanel extends JPanel {
                     log.debug("Skip file: {}{}", directory, file.getName());
                 }
             } catch (FileNotFoundException ex) {
-                log.error("Exception when adding file: {}", ex);
+                log.error("Exception when adding file", ex);
             } catch (IOException ex) {
-                log.error("Exception when adding file: {}", ex);
+                log.error("Exception when adding file", ex);
             }
         }
     }
 
-    private static final Logger log = LoggerFactory.getLogger(ReportPanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ReportPanel.class);
+
 }

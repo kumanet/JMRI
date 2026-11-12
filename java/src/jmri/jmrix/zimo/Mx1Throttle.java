@@ -1,6 +1,5 @@
 package jmri.jmrix.zimo;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.DccLocoAddress;
 import jmri.LocoAddress;
 import jmri.jmrix.AbstractThrottle;
@@ -161,7 +160,6 @@ public class Mx1Throttle extends AbstractThrottle implements Mx1Listener {
      *
      * @param speed Number from 0 to 1; less than zero is emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point, notify on any change
     @Override
     public synchronized void setSpeedSetting(float speed) {
         float oldSpeed = this.speedSetting;
@@ -174,12 +172,15 @@ public class Mx1Throttle extends AbstractThrottle implements Mx1Listener {
     void sendSpeedCmd() {
         Mx1Message m;
         int value = 0;
-        int cData1 = (isForward ? 0x20 : 0x00);
+        int cData1 = (isForward ? 0x00 : 0x20);
         cData1 = cData1 + (getFunction(0) ? 0x10 : 0x00);
         synchronized(this) {
             if (super.speedStepMode == jmri.SpeedStepMode.NMRA_DCC_128) {
                 //m = Mx1Message.getSendSpeed128(addressLo, addressHi, value);
-                value = (int) ((127 - 1) * speedSetting); // -1 for rescale to avoid estop
+                value = Math.round((127 - 1) * speedSetting); // -1 for rescale to avoid estop
+                if (speedSetting > 0 && value == 0) {
+                    value = 1;          // ensure non-zero speed for non-zero input
+                }
                 if (value > 0) {
                     value = value + 1;  // skip estop
                 }
@@ -192,7 +193,10 @@ public class Mx1Throttle extends AbstractThrottle implements Mx1Listener {
                 value = (value & 0x7F);
                 cData1 = cData1 + 0xc;
             } else if (super.speedStepMode == jmri.SpeedStepMode.NMRA_DCC_28) {
-                value = (int) ((28) * speedSetting); // -1 for rescale to avoid estop
+                value = Math.round((28) * speedSetting); // -1 for rescale to avoid estop
+                if (speedSetting > 0 && value == 0) {
+                    value = 1;          // ensure non-zero speed for non-zero input
+                }
                 if (value > 0) {
                     value = value + 3; // skip estop
                 }
@@ -260,6 +264,6 @@ public class Mx1Throttle extends AbstractThrottle implements Mx1Listener {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(Mx1Throttle.class);
+    private static final Logger log = LoggerFactory.getLogger(Mx1Throttle.class);
 
 }

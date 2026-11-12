@@ -1,13 +1,10 @@
 package jmri.jmrix.nce.ncemon;
 
-import javax.swing.JOptionPane;
-import jmri.jmrix.nce.NceListener;
-import jmri.jmrix.nce.NceMessage;
-import jmri.jmrix.nce.NceReply;
-import jmri.jmrix.nce.NceSystemConnectionMemo;
+import java.awt.Dimension;
+
+import jmri.jmrix.nce.*;
 import jmri.jmrix.nce.swing.NcePanelInterface;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Swing action to create and register a MonFrame object
@@ -38,6 +35,14 @@ public class NceMonPanel extends jmri.jmrix.AbstractMonPane implements NceListen
         x.append(": ");
         x.append("Command Monitor");
         return x.toString();
+    }
+
+    /**
+     * The minimum frame size for font size 16
+     */
+    @Override
+    public Dimension getMinimumDimension() {
+        return new Dimension(700, 500);
     }
 
     @Override
@@ -72,8 +77,11 @@ public class NceMonPanel extends jmri.jmrix.AbstractMonPane implements NceListen
         try {
             memo.getNceTrafficController().addNceListener(this);
         } catch (java.lang.NullPointerException e) {
-            log.error("Unable to start the NCE Command monitor");
-            JOptionPane.showMessageDialog(null, "An Error has occurred that prevents the NCE Command Monitor from being loaded.\nPlease check the System Console for more information", "No Connection", JOptionPane.WARNING_MESSAGE);
+            log.error("Unable to start the NCE Command monitor"); // NOI18N
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("DialogMonError"),
+                    Bundle.getMessage("DialogMonErrorTitle"),
+                    JmriJOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -98,7 +106,7 @@ public class NceMonPanel extends jmri.jmrix.AbstractMonPane implements NceListen
     /**
      * Nested class to create one of these using old-style defaults
      */
-    static public class Default extends jmri.jmrix.nce.swing.NceNamedPaneAction {
+    public static class Default extends jmri.jmrix.nce.swing.NceNamedPaneAction {
 
         public Default() {
             super("Nce Command Monitor",
@@ -108,6 +116,6 @@ public class NceMonPanel extends jmri.jmrix.AbstractMonPane implements NceListen
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NceMonPanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceMonPanel.class);
 
 }

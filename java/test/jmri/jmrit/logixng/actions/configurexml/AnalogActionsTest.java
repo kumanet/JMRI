@@ -6,14 +6,12 @@ import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
 import org.jdom2.Element;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+
+import org.junit.jupiter.api.*;
 
 /**
  * Test ActionTurnoutXml
- * 
+ *
  * @author Daniel Bergqvist 2019
  */
 public class AnalogActionsTest {
@@ -21,20 +19,19 @@ public class AnalogActionsTest {
     @Test
     public void testLoad() throws JmriConfigureXmlException {
         AbstractNamedBeanManagerConfigXML b;
-        
+
         b = new AnalogActionMemoryXml();
-        Assert.assertNotNull("exists", b);
+        Assertions.assertNotNull( b, "exists");
         b.load((Element) null, (Object) null);
         JUnitAppender.assertMessage("Invalid method called");
-        
+
         b = new AnalogManyXml();
-        Assert.assertNotNull("exists", b);
+        Assertions.assertNotNull( b, "exists");
         b.load((Element) null, (Object) null);
         JUnitAppender.assertMessage("Invalid method called");
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -45,10 +42,11 @@ public class AnalogActionsTest {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
+
 }

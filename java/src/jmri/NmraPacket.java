@@ -1,6 +1,9 @@
 package jmri;
 
 import javax.annotation.CheckForNull;
+
+import javax.annotation.Nonnull;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,9 +55,9 @@ import org.slf4j.LoggerFactory;
         justification = "null returned is documented in each method to mean no valid result")
 public class NmraPacket {
 
-    static final public int accIdLowLimit = 1;
-    static final public int accIdHighLimit = 2044;
-    static final public int accIdAltHighLimit = 2048;
+    public static final int accIdLowLimit = 1;
+    public static final int accIdHighLimit = 2044;
+    public static final int accIdAltHighLimit = 2048;
 
     /**
      * Create a packet containing a decoder idle instruction.
@@ -412,11 +415,11 @@ public class NmraPacket {
      * @param aspect     Aspect Number starting with 0 and a maximum of 31
      * @return the instruction packet
      */
+    @Nonnull
     public static byte[] accSignalDecoderPkt(int outputAddr, int aspect) {
 
         if (outputAddr < accIdLowLimit || outputAddr > accIdHighLimit) {
             log.error("invalid signal decoder address {}", outputAddr);
-            return null;
         }
 
         outputAddr -= 1; // Make the address 0 based
@@ -649,11 +652,11 @@ public class NmraPacket {
      * @param aspect     Aspect Number starting with 0 and a maximum of 31
      * @return a packet
      */
+    @Nonnull
     public static byte[] altAccSignalDecoderPkt(int outputAddr, int aspect) {
 
         if (outputAddr < 1 || outputAddr > 2048) {
             log.error("invalid signal decoder address {}", outputAddr);
-            return null;
         }
 
         outputAddr -= 1; // Make the address 0 based
@@ -711,11 +714,11 @@ public class NmraPacket {
         return retVal;
     }
 
+    @Nonnull
     protected static byte[] accSignalDecoderPktCommon(int lowAddr, int boardAddr, int aspect) {
 
         if (aspect < 0 || aspect > 31) {
             log.error("invalid signal decoder aspect {}", aspect);
-            return null;
         }
 
         int midAddr = boardAddr & 0x3F;
@@ -1426,7 +1429,7 @@ public class NmraPacket {
      * @param longAddr true if address is long; false otherwise
      * @return true if address is valid; false otherwise
      */
-    static public boolean addressCheck(int address, boolean longAddr) {
+    public static boolean addressCheck(int address, boolean longAddr) {
         if (address < 0) {  // zero is valid broadcast
             log.error("invalid address {}", address);
             return false;
@@ -1461,7 +1464,7 @@ public class NmraPacket {
      * @param packet the packet
      * @return the type or {@link jmri.NmraPacket.DccAddressType#NO_ADDRESS}
      */
-    static public DccAddressType extractAddressType(byte[] packet) {
+    public static DccAddressType extractAddressType(byte[] packet) {
         if (packet[0] == 0x00) {
             return DccAddressType.BROADCAST;
         }
@@ -1496,7 +1499,7 @@ public class NmraPacket {
      * @return the address; -1 is returned if there is no address or the case
      *         isn't considered yet
      */
-    static public int extractAddressNumber(byte[] packet) {
+    public static int extractAddressNumber(byte[] packet) {
         switch (extractAddressType(packet)) {
             case BROADCAST:
                 return 0;
@@ -1531,7 +1534,7 @@ public class NmraPacket {
      * @param packet the packet
      * @return the instruction or 0
      */
-    static public int extractInstruction(byte[] packet) {
+    public static int extractInstruction(byte[] packet) {
         switch (extractAddressType(packet)) {
             case BROADCAST:
             case NO_ADDRESS:
@@ -1554,7 +1557,7 @@ public class NmraPacket {
      * @return the readable packet
      * @see jmri.util.StringUtil#hexStringFromBytes(byte[])
      */
-    static public String format(byte[] p) {
+    public static String format(byte[] p) {
         return jmri.util.StringUtil.hexStringFromBytes(p);
     }
 
@@ -1573,7 +1576,7 @@ public class NmraPacket {
      * @throws IllegalArgumentException if packet array can't be decoded, e.g.
      *                                  is too short or null
      */
-    static public String toString(byte[] p) throws IllegalArgumentException {
+    public static String toString(byte[] p) throws IllegalArgumentException {
         if (p == null || p.length == 0) {
             throw new IllegalArgumentException("Content required");
         }
@@ -1585,5 +1588,5 @@ public class NmraPacket {
      */
     private NmraPacket() {
     }
-    private final static Logger log = LoggerFactory.getLogger(NmraPacket.class);
+    private static final Logger log = LoggerFactory.getLogger(NmraPacket.class);
 }

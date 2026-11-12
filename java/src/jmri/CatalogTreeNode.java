@@ -96,7 +96,6 @@ public class CatalogTreeNode extends DefaultMutableTreeNode {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Enumeration<TreeNode> children() { // for JDK 9 typing
         return super.children();
     }
@@ -113,5 +112,5 @@ public class CatalogTreeNode extends DefaultMutableTreeNode {
         _leafs = leafs;
     }
 
-    //    private final static Logger log = LoggerFactory.getLogger(CatalogTreeNode.class);
+    //    private static final Logger log = LoggerFactory.getLogger(CatalogTreeNode.class);
 }

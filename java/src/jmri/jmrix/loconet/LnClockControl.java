@@ -1,9 +1,8 @@
 package jmri.jmrix.loconet;
 
 import java.util.Date;
-import jmri.JmriException;
-
 import jmri.PowerManager;
+import jmri.ThrottleManager;
 import jmri.implementation.DefaultClockControl;
 
 import org.slf4j.Logger;
@@ -70,6 +69,18 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
         this.tc = tc;
         this.pm = pm;
 
+        // get throttleID of this connection
+        ThrottleManager tm = tc.getSystemConnectionMemo().getThrottleManager();
+        if(tm instanceof LnThrottleManager) {
+            throttleID = ((LnThrottleManager) tm).getThrottleID();
+            log.debug("Got throttleID 0x{}.", Integer.toHexString(throttleID));
+        }
+        else {
+            // 7f 71 (from LNPE) as two 7bit values combined into 14bit integer is 0x3ff1
+            throttleID = 0x3ff1;
+            log.debug("Cannot get throttleID from ThrottleManager. Using default 0x{}.", Integer.toHexString(throttleID));
+        }
+        
         // listen for updated slot contents
         if (sm != null) {
             sm.addSlotListener(this);
@@ -92,6 +103,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
     final SlotManager sm;
     final LnTrafficController tc;
     final LnPowerManager pm;
+    final int throttleID;
 
     /* Operational variables */
     jmri.Timebase clock = null;
@@ -111,9 +123,9 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
     private boolean correctFastClock = false;
     private boolean readInProgress = false;
     /* constants */
-    final static long MSECPERHOUR = 3600000;
-    final static long MSECPERMINUTE = 60000;
-    final static double CORRECTION = 915.0;
+    static final long MSECPERHOUR = 3600000;
+    static final long MSECPERMINUTE = 60000;
+    static final double CORRECTION = 915.0;
 
     /**
      * Accessor routines
@@ -150,7 +162,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
         return curRate;
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getHours, Date.getMinutes
     @Override
     public void setTime(Date now) {
         curDays = now.getDate();
@@ -159,7 +171,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
         setClock();
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getTime, Date.getHours
     @Override
     public Date getTime() {
         Date tem = clock.getTime();
@@ -186,7 +198,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
         setClock();
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getDate, Date.getHours
     @Override
     public void initializeHardwareClock(double rate, Date now, boolean getTime) {
         synchronizeWithInternalClock = clock.getSynchronize();
@@ -232,7 +244,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
     /**
      * Corrects the LocoNet Fast Clock
      */
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getDate, Date.getHours, Date.getMinutes
     public void newMinute() {
         // ignore if waiting on LocoNet clock read
         if (!inSyncWithInternalFastClock) {
@@ -271,7 +283,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
      *
      * @param s the LocoNetSlot object which has been changed
      */
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getTime, Date.getHours
     @Override
     public void notifyChangedSlot(LocoNetSlot s) {
         // only watch the clock slot
@@ -340,6 +352,7 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
             s.setFcMinutes(curMinutes);
             s.setFcRate(curRate);
             s.setFcFracMins(curFractionalMinutes);
+            s.setThrottleIdentity(throttleID);
 
             // set other content
             //     power (GTRK_POWER, 0x01 bit in byte 7)
@@ -370,6 +383,6 @@ public class LnClockControl extends DefaultClockControl implements SlotListener 
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnClockControl.class);
+    private static final Logger log = LoggerFactory.getLogger(LnClockControl.class);
 
 }

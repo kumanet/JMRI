@@ -1,15 +1,16 @@
 package jmri.implementation;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
+import java.beans.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Set;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.CheckForNull;
 import javax.annotation.OverridingMethodsMustInvokeSuper;
+
 import jmri.NamedBean;
 import jmri.beans.BeanUtil;
 
@@ -51,7 +52,9 @@ public abstract class AbstractNamedBean implements NamedBean {
      *                                               normalized
      * @throws jmri.NamedBean.BadSystemNameException if the system name is null
      */
-    protected AbstractNamedBean(@Nonnull String sys, @CheckForNull String user) throws NamedBean.BadUserNameException, NamedBean.BadSystemNameException {
+    protected AbstractNamedBean(@Nonnull String sys, @CheckForNull String user)
+            throws NamedBean.BadUserNameException, NamedBean.BadSystemNameException {
+
         if (Objects.isNull(sys)) {
             throw new NamedBean.BadSystemNameException();
         }
@@ -66,7 +69,7 @@ public abstract class AbstractNamedBean implements NamedBean {
      * {@inheritDoc}
      */
     @Override
-    final public String getComment() {
+    public final String getComment() {
         return this.comment;
     }
 
@@ -74,14 +77,14 @@ public abstract class AbstractNamedBean implements NamedBean {
      * {@inheritDoc}
      */
     @Override
-    final public void setComment(String comment) {
+    public final void setComment(String comment) {
         String old = this.comment;
         if (comment == null || comment.trim().isEmpty()) {
             this.comment = null;
         } else {
             this.comment = comment;
         }
-        firePropertyChange("Comment", old, comment);
+        firePropertyChange(PROPERTY_COMMENT, old, comment);
     }
     private String comment;
 
@@ -91,7 +94,7 @@ public abstract class AbstractNamedBean implements NamedBean {
     @Override
     @CheckReturnValue
     @Nonnull
-    final public String getDisplayName() {
+    public final String getDisplayName() {
         return NamedBean.super.getDisplayName();
     }
 
@@ -101,26 +104,8 @@ public abstract class AbstractNamedBean implements NamedBean {
     @Override
     @CheckReturnValue
     @Nonnull
-    final public String getDisplayName(DisplayOptions displayOptions) {
+    public final String getDisplayName(DisplayOptions displayOptions) {
         return NamedBean.super.getDisplayName(displayOptions);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    @Deprecated  // will be removed when superclass method is removed due to @Override
-    @CheckReturnValue
-    @Nonnull
-    final public String getFullyFormattedDisplayName() {
-        return getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    @Deprecated  // will be removed when superclass method is removed due to @Override
-    @CheckReturnValue
-    @Nonnull
-    final public String getFullyFormattedDisplayName(boolean userNameFirst) {
-        return getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME);
     }
 
     // implementing classes will typically have a function/listener to get
@@ -135,6 +120,7 @@ public abstract class AbstractNamedBean implements NamedBean {
     protected final HashMap<PropertyChangeListener, String> register = new HashMap<>();
     protected final HashMap<PropertyChangeListener, String> listenerRefs = new HashMap<>();
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void addPropertyChangeListener(@Nonnull PropertyChangeListener l,
@@ -148,10 +134,12 @@ public abstract class AbstractNamedBean implements NamedBean {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void addPropertyChangeListener(@Nonnull String propertyName,
-                                                       @Nonnull PropertyChangeListener l, String beanRef, String listenerRef) {
+            @Nonnull PropertyChangeListener l, String beanRef, String listenerRef) {
+
         pcs.addPropertyChangeListener(propertyName, l);
         if (beanRef != null) {
             register.put(l, beanRef);
@@ -161,18 +149,21 @@ public abstract class AbstractNamedBean implements NamedBean {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void addPropertyChangeListener(PropertyChangeListener listener) {
         pcs.addPropertyChangeListener(listener);
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void addPropertyChangeListener(String propertyName, PropertyChangeListener listener) {
         pcs.addPropertyChangeListener(propertyName, listener);
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void removePropertyChangeListener(PropertyChangeListener listener) {
@@ -183,6 +174,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void removePropertyChangeListener(String propertyName, PropertyChangeListener listener) {
@@ -193,6 +185,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
     public synchronized PropertyChangeListener[] getPropertyChangeListenersByReference(@Nonnull String name) {
@@ -216,6 +209,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         return new ArrayList<>(listenerRefs.values());
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public synchronized void updateListenerRef(PropertyChangeListener l, String newName) {
@@ -239,12 +233,14 @@ public abstract class AbstractNamedBean implements NamedBean {
         return pcs.getPropertyChangeListeners().length;
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
     public synchronized PropertyChangeListener[] getPropertyChangeListeners() {
         return pcs.getPropertyChangeListeners();
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
     public synchronized PropertyChangeListener[] getPropertyChangeListeners(String propertyName) {
@@ -254,7 +250,7 @@ public abstract class AbstractNamedBean implements NamedBean {
     /** {@inheritDoc} */
     @Override
     @Nonnull
-    final public String getSystemName() {
+    public final String getSystemName() {
         return mSystemName;
     }
 
@@ -262,10 +258,10 @@ public abstract class AbstractNamedBean implements NamedBean {
     */
     @Nonnull
     @Override
-    final public String toString() {
+    public final String toString() {
         /*
          * Implementation note:  This method is final to ensure that the
-         * contract for toString is properly implemented.  See the 
+         * contract for toString is properly implemented.  See the
          * comment in NamedBean#toString() for more info.
          * If a subclass wants to add extra info at the end of the
          * toString output, extend {@link #toStringSuffix}.
@@ -280,18 +276,20 @@ public abstract class AbstractNamedBean implements NamedBean {
     protected String toStringSuffix() {
         return "";
     }
-    
+
+    /** {@inheritDoc} */
     @Override
-    final public String getUserName() {
+    public final String getUserName() {
         return mUserName;
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public void setUserName(String s) throws NamedBean.BadUserNameException {
         String old = mUserName;
         mUserName = NamedBean.normalizeUserName(s);
-        firePropertyChange("UserName", old, mUserName);
+        firePropertyChange(PROPERTY_USERNAME, old, mUserName);
     }
 
     @OverridingMethodsMustInvokeSuper
@@ -299,6 +297,12 @@ public abstract class AbstractNamedBean implements NamedBean {
         pcs.firePropertyChange(p, old, n);
     }
 
+    @OverridingMethodsMustInvokeSuper
+    protected void firePropertyChange(PropertyChangeEvent evt) {
+        pcs.firePropertyChange(evt);
+    }
+
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public void dispose() {
@@ -308,8 +312,13 @@ public abstract class AbstractNamedBean implements NamedBean {
             register.remove(l);
             listenerRefs.remove(l);
         }
+        // the name handles of this bean are no longer needed
+        if (jmri.InstanceManager.containsDefault(jmri.NamedBeanHandleManager.class)) {
+            jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).removeNamedBeanHandles(this);
+        }
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
     public String describeState(int state) {
@@ -347,6 +356,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public Object getProperty(@Nonnull String key) {
@@ -356,6 +366,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         return parameters.get(key);
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     @Nonnull
@@ -366,6 +377,7 @@ public abstract class AbstractNamedBean implements NamedBean {
         return parameters.keySet();
     }
 
+    /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
     public void removeProperty(String key) {
@@ -377,6 +389,7 @@ public abstract class AbstractNamedBean implements NamedBean {
 
     private HashMap<String, Object> parameters = null;
 
+    /** {@inheritDoc} */
     @Override
     public void vetoableChange(java.beans.PropertyChangeEvent evt) throws java.beans.PropertyVetoException {
     }
@@ -384,7 +397,7 @@ public abstract class AbstractNamedBean implements NamedBean {
     /**
      * {@inheritDoc}
      * <p>
-     * This implementation tests that 
+     * This implementation tests that
      * {@link jmri.NamedBean#getSystemName()}
      * is equal for this and obj.
      *
@@ -406,17 +419,17 @@ public abstract class AbstractNamedBean implements NamedBean {
 
     /**
      * {@inheritDoc}
-     * 
-     * @return hash code value is based on sthe ystem name.
+     *
+     * @return hash code value is based on the system name.
      */
     @Override
     public int hashCode() {
-        return getSystemName().hashCode(); // as the 
+        return getSystemName().hashCode(); // as the
     }
-    
+
     /**
-     * {@inheritDoc} 
-     * 
+     * {@inheritDoc}
+     *
      * By default, does an alphanumeric-by-chunks comparison.
      */
     @CheckReturnValue

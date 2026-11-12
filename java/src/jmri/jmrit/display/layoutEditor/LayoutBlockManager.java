@@ -6,21 +6,26 @@ import java.util.Set;
 import javax.annotation.CheckForNull;
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
-import javax.swing.JOptionPane;
+
 import jmri.Block;
 import jmri.BlockManager;
 import jmri.jmrit.display.EditorManager;
 import jmri.InstanceManager;
+import jmri.JmriException;
 import jmri.Memory;
+import jmri.MemoryManager;
 import jmri.NamedBean;
 import jmri.NamedBeanHandle;
 import jmri.Sensor;
+import jmri.SensorManager;
 import jmri.SignalHead;
 import jmri.SignalMast;
 import jmri.Turnout;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.managers.AbstractManager;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.ThreadingUtil;
 
 /**
  * Implementation of a Manager to handle LayoutBlocks. Note: the same
@@ -38,9 +43,28 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
 
     public LayoutBlockManager() {
         super(InstanceManager.getDefault(InternalSystemConnectionMemo.class));
-        InstanceManager.sensorManagerInstance().addVetoableChangeListener(this);
-        InstanceManager.memoryManagerInstance().addVetoableChangeListener(this);
+        sensorManager = InstanceManager.sensorManagerInstance();
+        sensorManager.addVetoableChangeListener(LayoutBlockManager.this);
+        memoryManager = InstanceManager.memoryManagerInstance();
+        memoryManager.addVetoableChangeListener(LayoutBlockManager.this);
     }
+
+    /**
+     * The SensorManager and MemoryManager this manager listens to for deletions, so that
+     * {@link #dispose()} stops listening to those, not to whatever the InstanceManager holds by then.
+     */
+    private final SensorManager sensorManager;
+    private final MemoryManager memoryManager;
+
+    /**
+     * String constant for advanced routing enabled.
+     */
+    public static final String PROPERTY_ADVANCED_ROUTING_ENABLED = "advancedRoutingEnabled";
+
+    /**
+     * String constant for the topology property.
+     */
+    public static final String PROPERTY_TOPOLOGY = "topology";
 
     @Override
     public int getXMLOrder() {
@@ -71,7 +95,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
             @CheckForNull String systemName,
             String userName) {
         // Check that LayoutBlock does not already exist
-        LayoutBlock result = null;
+        LayoutBlock result;
 
         if ((userName == null) || userName.isEmpty()) {
             log.error("Attempt to create a LayoutBlock with no user name");
@@ -142,6 +166,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
      * @param block the block to remove.
      */
     public void deleteLayoutBlock(LayoutBlock block) {
+        layoutBlockByBlock.values().remove(block);
         deregister(block);
     }
 
@@ -164,13 +189,29 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         return getBySystemName(name);
     }
 
+    // LayoutBlock found for each Block, checked on every use as either may change
+    private final java.util.Map<Block, LayoutBlock> layoutBlockByBlock = new java.util.concurrent.ConcurrentHashMap<>();
+
     @CheckReturnValue
     @CheckForNull
     public LayoutBlock getLayoutBlock(@CheckForNull Block block) {
+        if (block != null) {
+            LayoutBlock found = layoutBlockByBlock.get(block);
+            if ((found != null) && (found.getBlock() == block)
+                    && (getBySystemName(found.getSystemName()) == found)) {
+                return found;
+            }
+        }
         for (LayoutBlock lb : getNamedBeanSet()) {
             if (lb.getBlock() == block) {
+                if (block != null) {
+                    layoutBlockByBlock.put(block, lb);
+                }
                 return lb;
             }
+        }
+        if (block != null) {
+            layoutBlockByBlock.remove(block);
         }
         return null;
     }
@@ -221,6 +262,8 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
     public void initializeLayoutBlockPaths() {
         log.debug("start initializeLayoutBlockPaths");
 
+        log.debug("start initializeLayoutBlockPaths getNamedBeanSet {}", getNamedBeanSet());
+
         // cycle through all LayoutBlocks, completing initialization of associated jmri.Blocks
         for (LayoutBlock b : getNamedBeanSet()) {
             log.debug("Calling block '{}({})'.initializeLayoutBlock()", b.getSystemName(), b.getDisplayName());
@@ -240,8 +283,8 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         }
 
         if (badBeanErrors > 0) { // perhaps incremented via addBadBeanError(), but that's never called?
-            JOptionPane.showMessageDialog(null, "" + badBeanErrors + " " + Bundle.getMessage("Warn2"),
-                    Bundle.getMessage("WarningTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null, "" + badBeanErrors + " " + Bundle.getMessage("Warn2"),
+                    Bundle.getMessage("WarningTitle"), JmriJOptionPane.ERROR_MESSAGE);
         }
         try {
             new BlockValueFile().readBlockValues();
@@ -249,6 +292,10 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
             log.error("JDOM Exception when retreiving block values", jde);
         } catch (java.io.IOException ioe) {
             log.error("I/O Exception when retreiving block values", ioe);
+        } catch (RuntimeException re) {
+            // restoring the saved block values is not worth losing the routing
+            // initialization below, which would otherwise be skipped silently
+            log.error("Exception when retreiving block values", re);
         }
 
         //special tests for getFacingSignalHead method - comment out next three lines unless using LayoutEditorTests
@@ -357,9 +404,9 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         }
 
         //blocks are connected, get connection item types
-        LayoutTurnout lt = null;
+        LayoutTurnout lt;
         TrackSegment tr = lc.getTrackSegment();
-        int boundaryType = 0;
+        int boundaryType;
 
         if (tr == null) {
             // this is an internal crossover block boundary
@@ -402,8 +449,8 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
 
                 case LayoutConnectivity.XOVER_BOUNDARY_BD: {
                     if (facingIsBlock1) {
-                        if (lt.getSignalHead(LayoutTurnout.Geometry.POINTB2) == null) { //there is no signal head for diverging (crossed
-                            //over)
+                        if (lt.getSignalHead(LayoutTurnout.Geometry.POINTB2) == null) {
+                            // there is no signal head for diverging (crossed over)
                             return lt.getSignalHead(LayoutTurnout.Geometry.POINTB1);
                         } else { //there is a diverging (crossed over) signal head, return it
                             return lt.getSignalHead(LayoutTurnout.Geometry.POINTB2);
@@ -1287,7 +1334,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
 
         for (TrackSegment t : panel.getTrackSegments()) {
             if (t.getLayoutBlock() == fLayoutBlock) {
-                PositionablePoint p = null;
+                PositionablePoint p;
 
                 if (t.getType1() == HitPointType.POS_POINT) {
                     p = (PositionablePoint) t.getConnect1();
@@ -1356,7 +1403,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
 
         for (TrackSegment t : panel.getTrackSegments()) {
             if (t.getLayoutBlock() == fLayoutBlock) {
-                PositionablePoint p = null;
+                PositionablePoint p;
 
                 if (t.getType1() == HitPointType.POS_POINT) {
                     p = (PositionablePoint) t.getConnect1();
@@ -1482,6 +1529,72 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
             return null;
         }
 
+        // ----- Begin Turntable Boundary Check -----
+        for (LayoutEditor ed : InstanceManager.getDefault(EditorManager.class).getAll(LayoutEditor.class)) {
+            for (LayoutTurntable turntable : ed.getLayoutTurntables()) {
+                LayoutBlock turntableBlock = turntable.getLayoutBlock();
+                if (turntableBlock == null) continue;
+
+                // Check if one of the blocks is the turntable's block
+                if (turntableBlock.getBlock() == facingBlock || turntableBlock.getBlock() == protectedBlock) {
+                    Block otherBlock = (turntableBlock.getBlock() == facingBlock) ? protectedBlock : facingBlock;
+
+                    for (LayoutTurntable.RayTrack ray : turntable.getRayTrackList()) {
+                        TrackSegment connectedTrack = ray.getConnect();
+                        if (connectedTrack != null && connectedTrack.getLayoutBlock() != null && connectedTrack.getLayoutBlock().getBlock() == otherBlock) {
+                            // We found the correct ray. Now find the mast based on direction.
+                            if (turntableBlock.getBlock() == protectedBlock) {
+                                // Path 2: Moving from Ray block INTO Turntable. The facing mast is the Approach Mast.
+                                if (T.equals(SignalMast.class)) {
+                                    return ray.getApproachMast();
+                                }
+                            } else { // turntableBlock.getBlock() == facingBlock
+                                // Path 1: Moving FROM Turntable out to Ray block. The facing mast is the exit mast for that ray.
+                                if (T.equals(SignalMast.class)) {
+                                    SignalMast exitMast = turntable.getExitSignalMast();
+                                    // This is the mast protecting the path from the turntable to the ray.
+                                    return exitMast;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // ----- Begin Traverser Boundary Check -----
+        for (LayoutEditor ed : InstanceManager.getDefault(EditorManager.class).getAll(LayoutEditor.class)) {
+            for (LayoutTraverser traverser : ed.getLayoutTraversers()) {
+                LayoutBlock traverserBlock = traverser.getLayoutBlock();
+                if (traverserBlock == null) continue;
+
+                // Check if one of the blocks is the traverser's block
+                if (traverserBlock.getBlock() == facingBlock || traverserBlock.getBlock() == protectedBlock) {
+                    Block otherBlock = (traverserBlock.getBlock() == facingBlock) ? protectedBlock : facingBlock;
+
+                    for (LayoutTraverser.SlotTrack slot : traverser.getSlotList()) {
+                        TrackSegment connectedTrack = slot.getConnect();
+                        if (connectedTrack != null && connectedTrack.getLayoutBlock() != null && connectedTrack.getLayoutBlock().getBlock() == otherBlock) {
+                            // We found the correct slot. Now find the mast based on direction.
+                            if (traverserBlock.getBlock() == protectedBlock) {
+                                // Path 2: Moving from Slot block INTO Traverser. The facing mast is the Approach Mast.
+                                if (T.equals(SignalMast.class)) {
+                                    return slot.getApproachMast();
+                                }
+                            } else { // traverserBlock.getBlock() == facingBlock
+                                // Path 1: Moving FROM Traverser out to Slot block. The facing mast is the exit mast for that slot.
+                                if (T.equals(SignalMast.class)) {
+                                    SignalMast exitMast = traverser.getExitSignalMast();
+                                    // This is the mast protecting the path from the traverser to the slot.
+                                    return exitMast;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // ----- End Traverser Boundary Check -----
+
         if (!T.equals(SignalMast.class) && !T.equals(Sensor.class)) {
             log.error("Incorrect class type called, must be either SignalMast or Sensor");
 
@@ -1550,7 +1663,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
 
             return null;
         }
-        LayoutTurnout lt = null;
+        LayoutTurnout lt;
         LayoutTrack connected = lc.getConnectedObject();
 
         TrackSegment tr = lc.getTrackSegment();
@@ -1913,8 +2026,50 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
     @Nonnull
     private List<LayoutBlock> getProtectingBlocksByBeanByPanel(
             @CheckForNull NamedBean bean,
-            @CheckForNull LayoutEditor panel) {
+            @Nonnull LayoutEditor panel) {
         List<LayoutBlock> protectingBlocks = new ArrayList<>();
+
+        // Check for turntable approach masts first, as they are a special case. Ignore NX sensor beans.
+        for (LayoutTurntable turntable : panel.getLayoutTurntables()) {
+            if (bean instanceof SignalMast && turntable.isApproachMast((SignalMast) bean)) {
+                if (turntable.getLayoutBlock() != null) {
+                    protectingBlocks.add(turntable.getLayoutBlock());
+                    return protectingBlocks;
+                }
+            }
+            if (bean.equals(turntable.getExitSignalMast())) {
+                for (LayoutTurntable.RayTrack ray : turntable.getRayTrackList()) {
+                    TrackSegment connectedTrack = ray.getConnect();
+                    if (connectedTrack != null && connectedTrack.getLayoutBlock() != null) {
+                        if (!protectingBlocks.contains(connectedTrack.getLayoutBlock())) {
+                            protectingBlocks.add(connectedTrack.getLayoutBlock());
+                        }
+                    }
+                }
+                return protectingBlocks;
+            }
+        }
+
+        // Check for traverser approach masts first, as they are a special case. Ignore NX sensor beans.
+        for (LayoutTraverser traverser : panel.getLayoutTraversers()) {
+            if (bean instanceof SignalMast && traverser.isApproachMast((SignalMast) bean)) {
+                if (traverser.getLayoutBlock() != null) {
+                    protectingBlocks.add(traverser.getLayoutBlock());
+                    return protectingBlocks;
+                }
+            }
+            if (bean.equals(traverser.getExitSignalMast())) {
+                for (int i=0; i < traverser.getNumberSlots(); i++) {
+                    TrackSegment connectedTrack = traverser.getSlotConnectOrdered(i);
+                    if (connectedTrack != null && connectedTrack.getLayoutBlock() != null) {
+                        if (!protectingBlocks.contains(connectedTrack.getLayoutBlock())) {
+                            protectingBlocks.add(connectedTrack.getLayoutBlock());
+                        }
+                    }
+                }
+                return protectingBlocks;
+            }
+        }
 
         if (!(bean instanceof SignalMast) && !(bean instanceof Sensor)) {
             log.error("Incorrect class type called, must be either SignalMast or Sensor");
@@ -1923,7 +2078,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         }
 
         PositionablePoint pp = panel.getFinder().findPositionablePointByEastBoundBean(bean);
-        TrackSegment tr = null;
+        TrackSegment tr;
         boolean east = true;
 
         if (pp == null) {
@@ -2200,8 +2355,47 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
     private LayoutBlock getFacingBlockByBeanByPanel(
             @Nonnull NamedBean bean,
             @Nonnull LayoutEditor panel) {
+        // Check for turntable masts first, as they are a special case. Ignore NX sensor beans.
+        for (LayoutTurntable turntable : panel.getLayoutTurntables()) {
+            if (bean.equals(turntable.getBufferMast())) {
+                return turntable.getLayoutBlock();
+            }
+            if (bean.equals(turntable.getExitSignalMast())) {
+                return turntable.getLayoutBlock();
+            }
+            if (bean instanceof SignalMast && turntable.isApproachMast((SignalMast) bean)) {
+                for (LayoutTurntable.RayTrack ray : turntable.getRayTrackList()) {
+                    if (bean.equals(ray.getApproachMast())) {
+                        TrackSegment connectedTrack = ray.getConnect();
+                        if (connectedTrack != null && connectedTrack.getLayoutBlock() != null) {
+                            return connectedTrack.getLayoutBlock();
+                        }
+                    }
+                }
+            }
+        }
+        // Check for traverser masts, as they are a special case. Ignore NX sensor beans.
+        for (LayoutTraverser traverser : panel.getLayoutTraversers()) {
+            if (bean.equals(traverser.getBufferMast())) {
+                return traverser.getLayoutBlock();
+            }
+            if (bean.equals(traverser.getExitSignalMast())) {
+                return traverser.getLayoutBlock();
+            }
+            if (bean instanceof SignalMast && traverser.isApproachMast((SignalMast) bean)) {
+                for (LayoutTraverser.SlotTrack slot : traverser.getSlotList()) {
+                    if (bean.equals(slot.getApproachMast())) {
+                        TrackSegment connectedTrack = slot.getConnect();
+                        if (connectedTrack != null && connectedTrack.getLayoutBlock() != null) {
+                            return connectedTrack.getLayoutBlock();
+                        }
+                    }
+                }
+            }
+        }
+
         PositionablePoint pp = panel.getFinder().findPositionablePointByEastBoundBean(bean);
-        TrackSegment tr = null;
+        TrackSegment tr;
         boolean east = true;
 
         //Don't think that the logic for this is the right way round
@@ -2494,13 +2688,18 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         if (boo && initialized) {
             initializeLayoutBlockRouting();
         }
-        firePropertyChange("advancedRoutingEnabled", !enableAdvancedRouting, enableAdvancedRouting);
+        firePropertyChange(PROPERTY_ADVANCED_ROUTING_ENABLED, !enableAdvancedRouting, enableAdvancedRouting);
     }
 
     private void initializeLayoutBlockRouting() {
         if (!enableAdvancedRouting || !initialized) {
             log.debug("initializeLayoutBlockRouting immediate return due to {} {}", enableAdvancedRouting, initialized);
 
+            return;
+        }
+        if (!ThreadingUtil.isLayoutThread()) {
+            // routing tables are only changed on the layout thread
+            ThreadingUtil.runOnLayout(this::initializeLayoutBlockRouting);
             return;
         }
         firstRoutingChange = System.nanoTime();
@@ -2518,80 +2717,109 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         return lbct;
     }
 
-    LayoutBlockConnectivityTools lbct = new LayoutBlockConnectivityTools();
+    private final LayoutBlockConnectivityTools lbct = new LayoutBlockConnectivityTools();
 
-    private long lastRoutingChange;
+    private volatile long lastRoutingChange;
 
     void setLastRoutingChange() {
         log.debug("setLastRoutingChange");
-        lastRoutingChange = System.nanoTime();
-        stabilised = false;
+        synchronized (stabilisedLock) {
+            lastRoutingChange = System.nanoTime();
+            stabilised = false;
+        }
         setRoutingStabilised();
     }
 
-    boolean checking = false;
-    boolean stabilised = false;
+    // guards lastRoutingChange, stabilised and checking together, so that a
+    // change can not be made between finding the tables unchanged and
+    // reporting them as stable; the events are posted to the layout thread
+    // while holding it, so they arrive in the order the changes were made
+    private final Object stabilisedLock = new Object();
+    private boolean checking = false;
+    volatile boolean stabilised = false;
 
-    private void setRoutingStabilised() {
-        if (checking) {
-            return;
-        }
-        log.debug("routing table change has been initiated");
-        checking = true;
+    // how long the routing tables must be unchanged to be reported as stable
+    private long stabilisedDelayMsec = 2000L;
 
-        if (namedStabilisedIndicator != null) {
-            try {
-                namedStabilisedIndicator.getBean().setState(Sensor.INACTIVE);
-            } catch (jmri.JmriException ex) {
-                log.debug("Error setting stability indicator sensor");
+    /**
+     * Set how long the routing tables must be unchanged before the routing
+     * is reported as stable. For tests.
+     *
+     * @param msec the time in milliseconds, 2000 by default
+     */
+    void setStabilisedDelay(long msec) {
+        stabilisedDelayMsec = msec;
+    }
+
+    public void setRoutingStabilised() {
+        synchronized (stabilisedLock) {
+            if (checking) {
+                return;
             }
+            log.debug("routing table change has been initiated");
+            checking = true;
+            stabilised = false;
+
+            ThreadingUtil.runOnLayoutEventually(() -> {
+                if (namedStabilisedIndicator != null) {
+                    try {
+                        namedStabilisedIndicator.getBean().setState(Sensor.INACTIVE);
+                    } catch (JmriException ex) {
+                        log.debug("Error setting stability indicator sensor");
+                    }
+                }
+                firePropertyChange(PROPERTY_TOPOLOGY, true, false);
+            });
         }
+        long delay = stabilisedDelayMsec;
         Runnable r = () -> {
             try {
-                firePropertyChange("topology", true, false);
                 long oldvalue = lastRoutingChange;
 
-                while (!stabilised) {
-                    Thread.sleep(2000L); //two seconds
+                while (true) {
+                    Thread.sleep(delay);
 
-                    if (oldvalue == lastRoutingChange) {
-                        log.debug("routing table has now been stable for 2 seconds");
-                        checking = false;
-                        stabilised = true;
-                        jmri.util.ThreadingUtil.runOnLayoutEventually(() -> firePropertyChange("topology", false, true));
-
-                        if (namedStabilisedIndicator != null) {
-                            jmri.util.ThreadingUtil.runOnLayoutEventually(() -> {
-                                log.debug("Setting StabilisedIndicator Sensor {} ACTIVE",
-                                        namedStabilisedIndicator.getBean().getDisplayName());
-                                try {
-                                    namedStabilisedIndicator.getBean().setState(Sensor.ACTIVE);
-                                } catch (jmri.JmriException ex) {
-                                    log.debug("Error setting stability indicator sensor");
-                                }
-                            });
-                        } else {
-                            log.debug("Stable, no sensor to set");
+                    synchronized (stabilisedLock) {
+                        if (oldvalue == lastRoutingChange) {
+                            log.debug("routing table has now been stable for {} msec", delay);
+                            checking = false;
+                            stabilised = true;
+                            ThreadingUtil.runOnLayoutEventually(this::reportRoutingStabilised);
+                            break;
                         }
-                    } else {
-                        long seconds = (long) ((lastRoutingChange - firstRoutingChange) / 1e9);
-                        log.debug("routing table not stable after {} in {}",
-                                String.format("%d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60),
-                                Thread.currentThread().getName());
                     }
+                    long seconds = (long) ((lastRoutingChange - firstRoutingChange) / 1e9);
+                    log.debug("routing table not stable after {} in {}",
+                            String.format("%d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60),
+                            Thread.currentThread().getName());
                     oldvalue = lastRoutingChange;
                 }
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
-                checking = false;
-
-                //} catch (jmri.JmriException ex) {
-                //log.debug("Error setting stability indicator sensor");
+                synchronized (stabilisedLock) {
+                    checking = false;
+                }
             }
         };
-        thr = jmri.util.ThreadingUtil.newThread(r, "Routing stabilising timer");
+        thr = ThreadingUtil.newThread(r, "Routing stabilising timer");
         thr.start();
     } //setRoutingStabilised
+
+    private void reportRoutingStabilised() {
+        firePropertyChange(PROPERTY_TOPOLOGY, false, true);
+
+        if (namedStabilisedIndicator != null) {
+            log.debug("Setting StabilisedIndicator Sensor {} ACTIVE",
+                    namedStabilisedIndicator.getBean().getDisplayName());
+            try {
+                namedStabilisedIndicator.getBean().setState(Sensor.ACTIVE);
+            } catch (JmriException ex) {
+                log.debug("Error setting stability indicator sensor");
+            }
+        } else {
+            log.debug("Stable, no sensor to set");
+        }
+    }
 
     private Thread thr = null;
 
@@ -2604,11 +2832,11 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
      * @throws jmri.JmriException if no sensor manager.
      *
      */
-    public void setStabilisedSensor(@Nonnull String pName) throws jmri.JmriException {
+    public void setStabilisedSensor(@Nonnull String pName) throws JmriException {
         if (InstanceManager.getNullableDefault(jmri.SensorManager.class) != null) {
             try {
                 Sensor sensor = InstanceManager.sensorManagerInstance().provideSensor(pName);
-                namedStabilisedIndicator = jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle(
+                namedStabilisedIndicator = InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle(
                         pName,
                         sensor);
                 try {
@@ -2617,16 +2845,16 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
                     } else {
                         sensor.setState(Sensor.INACTIVE);
                     }
-                } catch (jmri.JmriException ex) {
+                } catch (JmriException ex) {
                     log.error("Error setting stablilty indicator sensor");
                 }
             } catch (IllegalArgumentException ex) {
                 log.error("Sensor '{}' not available", pName);
-                throw new jmri.JmriException("Sensor '" + pName + "' not available");
+                throw new JmriException("Sensor '" + pName + "' not available");
             }
         } else {
             log.error("No SensorManager for this protocol");
-            throw new jmri.JmriException("No Sensor Manager Found");
+            throw new JmriException("No Sensor Manager Found");
         }
     }
 
@@ -2695,7 +2923,7 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
             @Nonnull RosterEntry re) {
         List<LayoutBlock> result = new ArrayList<>();
 
-        BlockManager bm = jmri.InstanceManager.getDefault(jmri.BlockManager.class);
+        BlockManager bm = InstanceManager.getDefault(BlockManager.class);
         List<Block> blockList = bm.getBlocksOccupiedByRosterEntry(re);
         for (Block block : blockList) {
             String uname = block.getUserName();
@@ -2709,6 +2937,13 @@ public class LayoutBlockManager extends AbstractManager<LayoutBlock> implements 
         return result;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutBlockManager.class);
+    @Override
+    public void dispose(){
+        sensorManager.removeVetoableChangeListener(this);
+        memoryManager.removeVetoableChangeListener(this);
+        super.dispose();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutBlockManager.class);
 
 }

@@ -1,26 +1,26 @@
 package apps.gui3;
 
-import apps.gui3.tabbedpreferences.TabbedPreferencesAction;
 import apps.*;
+import apps.gui3.tabbedpreferences.TabbedPreferencesAction;
+import apps.swing.AboutDialog;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.awt.*;
 import java.awt.event.AWTEventListener;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.io.*;
 import java.util.EventObject;
 
 import javax.swing.*;
+import javax.swing.text.*;
 
+import jmri.InstanceManager;
+import jmri.jmrit.logixng.LogixNG_Manager;
 import jmri.profile.*;
-
-import apps.swing.AboutDialog;
-
 import jmri.util.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.*;
 
 /**
  * Base class for GUI3 JMRI applications.
@@ -47,13 +47,13 @@ public abstract class Apps3 extends AppsBase {
      *
      * @param applicationName application name
      */
-    static public void preInit(String applicationName) {
+    public static void preInit(String applicationName) {
         AppsBase.preInit(applicationName);
 
         // Initialise system console
         // Put this here rather than in apps.AppsBase as this is only relevant
         // for GUI applications - non-gui apps will use STDOUT & STDERR
-        SystemConsole.create();
+        SystemConsole.getInstance();
 
         splash(true);
 
@@ -75,27 +75,39 @@ public abstract class Apps3 extends AppsBase {
         super(applicationName, configFileDef, args);
 
         // create GUI
-        initializeHelpSystem();
         if (SystemType.isMacOSX()) {
             initMacOSXMenus();
         }
-        if (((!configOK) || (!configDeferredLoadOK)) && (!preferenceFileExists)) {
-            FirstTimeStartUpWizardAction prefsAction = new FirstTimeStartUpWizardAction("Start Up Wizard");
-            prefsAction.setApp(this);
-            prefsAction.actionPerformed(null);
+        if ( (((!configOK) || (!configDeferredLoadOK)) && (!preferenceFileExists)) || wizardLaunchCheck() ) {
+            launchFirstTimeStartupWizard();
             return;
         }
         createAndDisplayFrame();
     }
 
     /**
+     * To be overridden by applications that need to make
+     * additional checks as to whether the first time wizard
+     * should be launched.
+     * @return true to force the wizard to be launched
+     */
+    protected boolean wizardLaunchCheck() {
+        return false;
+    }
+
+    public void launchFirstTimeStartupWizard() {
+        FirstTimeStartUpWizardAction prefsAction = new FirstTimeStartUpWizardAction("Start Up Wizard");
+        prefsAction.setApp(this);
+        prefsAction.actionPerformed(null);
+    }
+
+    /**
      * For compatability with adding in buttons to the toolbar using the
      * existing createbuttonmodel
      */
-    @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
-            justification = "only one application at a time")
     protected static void setButtonSpace() {
         _buttonSpace = new JPanel();
+        _buttonSpace.setOpaque(false);
         _buttonSpace.setLayout(new FlowLayout(FlowLayout.LEFT));
     }
 
@@ -106,29 +118,49 @@ public abstract class Apps3 extends AppsBase {
      * @see apps.startup.CreateButtonModelFactory
      * @return null if no such space exists
      */
-    static public JComponent buttonSpace() {
+    public static JComponent buttonSpace() {
         return _buttonSpace;
     }
     static JComponent _buttonSpace = null;
 
     protected JmriJFrame mainFrame;
 
-    protected void initializeHelpSystem() {
-        // initialize help system
-        HelpUtil.initOK();
-
-        // tell help to use default browser for external types
-        HelpUtil.setContentViewerUI("jmri.util.ExternalLinkContentViewerUI");
-
-        // help items are set in the various Tree/Menu/Toolbar constructors
-    }
-
     abstract protected void createMainFrame();
 
     public void createAndDisplayFrame() {
         createMainFrame();
 
-        //A Shutdown manager handles the quiting of the application
+        // Add a copy-cut-paste menu to all text fields that don't have a popup menu
+        long eventMask = AWTEvent.MOUSE_EVENT_MASK;
+        Toolkit.getDefaultToolkit().addAWTEventListener((AWTEvent e) -> {
+            if (e instanceof MouseEvent) {
+                JmriMouseEvent me = new JmriMouseEvent((MouseEvent) e);
+                if (me.isPopupTrigger() && me.getComponent() instanceof JTextComponent) {
+                    var tc = (JTextComponent)me.getComponent();
+                    // provide a pop up if one not already defined
+                    if (tc.getComponentPopupMenu() == null) {
+                        final JTextComponent component1 = (JTextComponent) me.getComponent();
+                        final JPopupMenu menu = new JPopupMenu();
+                        JMenuItem item;
+                        item = new JMenuItem(new DefaultEditorKit.CopyAction());
+                        item.setText("Copy");
+                        item.setEnabled(component1.getSelectionStart() != component1.getSelectionEnd());
+                        menu.add(item);
+                        item = new JMenuItem(new DefaultEditorKit.CutAction());
+                        item.setText("Cut");
+                        item.setEnabled(component1.isEditable() && component1.getSelectionStart() != component1.getSelectionEnd());
+                        menu.add(item);
+                        item = new JMenuItem(new DefaultEditorKit.PasteAction());
+                        item.setText("Paste");
+                        item.setEnabled(component1.isEditable());
+                        menu.add(item);
+                        menu.show(me.getComponent(), me.getX(), me.getY());
+                    }
+                }
+            }
+        }, eventMask);
+
+        // A Shutdown manager handles the quiting of the application
         mainFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         displayMainFrame(mainFrame.getMaximumSize());
     }
@@ -158,7 +190,7 @@ public abstract class Apps3 extends AppsBase {
         splash(false);
     }
 
-    static protected void splash(boolean show) {
+    protected static void splash(boolean show) {
         splash(show, false);
     }
 
@@ -167,7 +199,7 @@ public abstract class Apps3 extends AppsBase {
     static boolean debugFired = false;
     static boolean debugmsg = false;
 
-    static protected void splash(boolean show, boolean debug) {
+    protected static void splash(boolean show, boolean debug) {
         if (debugListener == null && debug) {
             // set a global listener for debug options
             debugFired = false;
@@ -181,8 +213,10 @@ public abstract class Apps3 extends AppsBase {
                          and the if the debugFired hasn't been set, this allows us to ensure that we don't
                          miss the user pressing F8, while we are checking*/
                         debugmsg = true;
-                        if (e.getID() == KeyEvent.KEY_PRESSED && e instanceof KeyEvent && ((KeyEvent) e).getKeyCode() == 119) {
+                        if (e.getID() == KeyEvent.KEY_PRESSED && e instanceof KeyEvent && ((KeyEvent) e).getKeyCode() == 119) {     // F8
                             startupDebug();
+                        } else if (e.getID() == KeyEvent.KEY_PRESSED && e instanceof KeyEvent && ((KeyEvent) e).getKeyCode() == 120) {  // F9
+                            InstanceManager.getDefault(LogixNG_Manager.class).startLogixNGsOnLoad(false);
                         } else {
                             debugmsg = false;
                         }
@@ -206,15 +240,19 @@ public abstract class Apps3 extends AppsBase {
         }
     }
 
-    static protected JPanel splashDebugMsg() {
-        JLabel panelLabel = new JLabel(Bundle.getMessage("PressF8ToDebug"));
-        panelLabel.setFont(panelLabel.getFont().deriveFont(9f));
+    protected static JPanel splashDebugMsg() {
+        JLabel panelLabelDisableLogix = new JLabel(Bundle.getMessage("PressF8ToDebug"));
+        panelLabelDisableLogix.setFont(panelLabelDisableLogix.getFont().deriveFont(9f));
+        JLabel panelLabelDisableLogixNG = new JLabel(Bundle.getMessage("PressF9ToDisableLogixNG"));
+        panelLabelDisableLogixNG.setFont(panelLabelDisableLogix.getFont().deriveFont(9f));
         JPanel panel = new JPanel();
-        panel.add(panelLabel);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.PAGE_AXIS));
+        panel.add(panelLabelDisableLogix);
+        panel.add(panelLabelDisableLogixNG);
         return panel;
     }
 
-    static protected void startupDebug() {
+    protected static void startupDebug() {
         debugFired = true;
         debugmsg = true;
 
@@ -267,24 +305,21 @@ public abstract class Apps3 extends AppsBase {
                 if (ProfileManager.getDefault().migrateToProfiles(getConfigFileName())) { // migration or first use
                     // notify user of change only if migration occurred
                     // TODO: a real migration message
-                    JOptionPane.showMessageDialog(sp,
+                    JmriJOptionPane.showMessageDialog(sp,
                             Bundle.getMessage("ConfigMigratedToProfile"),
                             jmri.Application.getApplicationName(),
-                            JOptionPane.INFORMATION_MESSAGE);
+                            JmriJOptionPane.INFORMATION_MESSAGE);
                 }
             } catch (IOException | IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(sp,
+                JmriJOptionPane.showMessageDialog(sp,
                         ex.getLocalizedMessage(),
                         jmri.Application.getApplicationName(),
-                        JOptionPane.ERROR_MESSAGE);
-                log.error(ex.getMessage(), ex);
+                        JmriJOptionPane.ERROR_MESSAGE);
+                log.error("Exception: ", ex);
             }
         }
         try {
             ProfileManagerDialog.getStartingProfile(sp);
-            // Manually setting the configFilename property since calling
-            // Apps.setConfigFilename() does not reset the system property
-            System.setProperty("org.jmri.Apps.configFilename", Profile.CONFIG_FILENAME);
             Profile profile = ProfileManager.getDefault().getActiveProfile();
             if (profile != null) {
                 log.info("Starting with profile {}", profile.getId());
@@ -315,14 +350,14 @@ public abstract class Apps3 extends AppsBase {
             // this was logged in the super method
             String name = ProfileManager.getDefault().getActiveProfileName();
             if (!GraphicsEnvironment.isHeadless()) {
-                JOptionPane.showMessageDialog(sp,
+                JmriJOptionPane.showMessageDialog(sp,
                         Bundle.getMessage("SingleConfigMigratedToSharedConfig", name),
                         jmri.Application.getApplicationName(),
-                        JOptionPane.INFORMATION_MESSAGE);
+                        JmriJOptionPane.INFORMATION_MESSAGE);
             }
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Apps3.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Apps3.class);
 
 }

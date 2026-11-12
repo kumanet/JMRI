@@ -5,7 +5,8 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 
 /**
- * Define common base class methods for CvValue and VariableValue classes
+ * Represents a single CV or Variable value.  
+ * Defines common base class methods for CvValue and VariableValue classes
  * <p>
  * The ToRead parameter (boolean, unbound) is used to remember whether this
  * object has been read during a "read all" operation. This allows removal of
@@ -18,9 +19,11 @@ import java.beans.PropertyChangeSupport;
  * The Available parameter (boolean, unbound) remembers whether the variable
  * should be displayed, programmed, etc.
  * <p>
- * Represents a single CV value
+ * Variables and CVs track their states, as shown below.<br>
+ * <a href="doc-files/VariableStates.png"><img src="doc-files/VariableStates.png" alt="States for variables and their colors" height="33%" width="33%"></a>
+ * 
  *
- * @author Bob Jacobsen Copyright (C) 2001, 2005
+ * @author Bob Jacobsen Copyright (C) 2001, 2005, 2026
  */
 public abstract class AbstractValue {
 
@@ -34,87 +37,94 @@ public abstract class AbstractValue {
     abstract void setColor(Color c);
 
     /**
-     * Defines state when nothing is known about the real value.
+     * States, hence colors, of Variables and CVs.
+     *
+     * Note that these as written and read by name in LocoFiles in the roster.
+     * Do not change the name of these values without putting a migration scheme
+     * in place.
      */
-    public static final int UNKNOWN = 0;
+    public enum ValueState {
+        /**
+         * Defines state when nothing is known about the real value.
+         */
+        UNKNOWN(Color.red.brighter(), "Unknown"),
 
-    /**
-     * Defines state where value has been edited, no longer same as in decoder
-     * or file.
-     */
-    public static final int EDITED = 4;
+        /**
+         * Defines state where value has been edited, no longer same as in decoder
+         * or file.
+         */
+        EDITED(Color.orange, "Edited"),
 
-    /**
-     * Defines state where value has been read from (hence same as) decoder, but
-     * perhaps not same as in file.
-     */
-    public static final int READ = 16;
+        /**
+         * Defines state where value has been read from (hence same as) decoder, but
+         * perhaps not same as in file.
+         */
+        READ(null, "Read"),
 
-    /**
-     * Defines state where value has been written to (hence same as) decoder,
-     * but perhaps not same as in file.
-     */
-    public static final int STORED = 64;
+        /**
+         * Defines state where value has been written to (hence same as) decoder,
+         * but perhaps not same as in file.
+         */
+        STORED(null, "Stored"),
 
-    /**
-     * Defines state where value was read from a config file, but might not be
-     * the same as the decoder.
-     */
-    public static final int FROMFILE = 256;
+        /**
+         * Defines state where value was read from a config file, but might not be
+         * the same as the decoder. It is known to have been edited/read/written
+         * at some point.
+         */
+        FROMFILE(Color.yellow, "FromFile"),
 
-    /**
-     * Defines state where value was read from a config file, and is the same as
-     * the decoder.
-     */
-    public static final int SAME = 512;
+        /**
+         * Defines state where value was read from a config file, but might not be
+         * the same as the decoder. It's unknown whether the item has been edited/read/written
+         * at some point.
+         */
+        FROMFILEUNKNOWN(Color.yellow, "FromFileUnknown"),
 
-    /**
-     * Defines state where value was read from a config file, and is the not the
-     * same as the decoder.
-     */
-    public static final int DIFF = 1024;
+        /**
+         * Defines state where value was defined by the decoder definition default, 
+         * and has never been edited or read from or written to the decoder.
+         */
+        FROMDEFAULT(Color.yellow, "FromDefault"),  // ice blue 0xF0F8FF
 
-    /**
-     * Define color to denote UNKNOWN state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_UNKNOWN = Color.red.brighter();
+        /**
+         * Defines state where value was read from a config file, and is the same as
+         * the decoder.
+         */
+        SAME(null, "Same"),
 
-    /**
-     * Define color to denote EDITED state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_EDITED = Color.orange;
+        /**
+         * Defines state where value was read from a config file, and is the not the
+         * same as the decoder.
+         */
+        DIFFERENT(Color.red.brighter(), "Different");
 
-    /**
-     * Define color to denote READ state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_READ = null;
 
-    /**
-     * Define color to denote STORED state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_STORED = null;
+        private final Color _color;
+        private final String _name;
 
-    /**
-     * Define color to denote FROMFILE state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_FROMFILE = Color.yellow;
+        private ValueState(Color color, String name) {
+            this._color = color;
+            this._name = name;
+        }
 
-    /**
-     * Define color to denote SAME state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_SAME = null;
+        /**
+         * Gets the color associated with this state value.
+         * @return the color assigned to this state value or null if
+         *         to use default for the component
+         */
+        public Color getColor() {
+            return _color;
+        }
 
-    /**
-     * Define color to denote DIFF state. null means to use default for the
-     * component.
-     */
-    static final Color COLOR_DIFF = Color.red.brighter();
+        /**
+         * Gets the name associated with this state value.
+         * @return the name assigned to this state value
+         */
+        public String getName() {
+            return _name;
+        }
+    }
 
     /**
      * Mark whether this object needs to be read.
@@ -157,60 +167,6 @@ public abstract class AbstractValue {
         return _toWrite;
     }
     private boolean _toWrite = false;
-
-    /**
-     * Gets the color associated with a particular state value.
-     *
-     * @param val a state value
-     * @return the color assigned to the specified state value
-     */
-    public static Color stateColorFromValue(int val) {
-        switch (val) {
-            case UNKNOWN:
-                return COLOR_UNKNOWN;
-            case EDITED:
-                return COLOR_EDITED;
-            case READ:
-                return COLOR_READ;
-            case STORED:
-                return COLOR_STORED;
-            case FROMFILE:
-                return COLOR_FROMFILE;
-            case SAME:
-                return COLOR_SAME;
-            case DIFF:
-                return COLOR_DIFF;
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Gets the name associated with a particular state value.
-     *
-     * @param val a state value
-     * @return the name assigned to the specified state value
-     */
-    public static String stateNameFromValue(int val) {
-        switch (val) {
-            case UNKNOWN:
-                return "Unknown";
-            case EDITED:
-                return "Edited";
-            case READ:
-                return "Read";
-            case STORED:
-                return "Stored";
-            case FROMFILE:
-                return "FromFile";
-            case SAME:
-                return "Same";
-            case DIFF:
-                return "Different";
-            default:
-                return "<unexpected value: " + val + ">";
-        }
-    }
 
     /**
      * Sets the availability status of the object.

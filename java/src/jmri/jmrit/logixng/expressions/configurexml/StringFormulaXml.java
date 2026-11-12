@@ -102,7 +102,7 @@ public class StringFormulaXml extends jmri.managers.configurexml.AbstractNamedBe
             try {
                 h.setFormula(formula.getTextTrim());
             } catch (ParserException e) {
-                log.error("cannot set formula: " + formula.getTextTrim(), e);
+                log.error("cannot set formula: {}", formula.getTextTrim(), e);
             }
         }
 
@@ -110,5 +110,5 @@ public class StringFormulaXml extends jmri.managers.configurexml.AbstractNamedBe
         return true;
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringFormulaXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringFormulaXml.class);
 }

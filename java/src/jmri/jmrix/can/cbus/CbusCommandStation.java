@@ -2,13 +2,12 @@ package jmri.jmrix.can.cbus;
 
 import javax.annotation.CheckForNull;
 import jmri.CommandStation;
+import jmri.jmrix.AbstractMRMessage;
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.TrafficController;
 import jmri.jmrix.can.cbus.node.CbusNode;
 import jmri.jmrix.can.cbus.node.CbusNodeTableDataModel;
-import jmri.jmrix.can.cbus.simulator.CbusSimulator;
-import jmri.util.ThreadingUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,16 +27,11 @@ public class CbusCommandStation implements CommandStation {
     public CbusCommandStation(CanSystemConnectionMemo memo) {
         tc = memo.getTrafficController();
         adapterMemo = memo;
-        if ( ( tc != null ) && ( tc.getClass().getName().contains("Loopback")) ) {
-            ThreadingUtil.runOnLayout(() -> {
-                CbusSimulator sim = new jmri.jmrix.can.cbus.simulator.CbusSimulator(adapterMemo);
-                log.debug("sim {}",sim);
-            });
-        }
+        
     }
     
     private final TrafficController tc;
-    private CanSystemConnectionMemo adapterMemo;
+    private final CanSystemConnectionMemo adapterMemo;
 
     /**
      * Send a specific packet to the rails.
@@ -74,11 +68,33 @@ public class CbusCommandStation implements CommandStation {
     }
 
     /**
+     * Check that a session handle is valid before it is sent to the layout.
+     * <p>
+     * A CbusThrottle has a handle of -1 when disposed, or when its session has
+     * been stolen and is awaiting recovery. A negative handle must never be
+     * put on the CAN bus.
+     *
+     * @param handle the session handle to check
+     * @param opName the operation, for logging
+     * @return true if the handle is valid, else false
+     */
+    private boolean isValidHandle(int handle, String opName) {
+        if (handle < 0) {
+            log.warn("Invalid session handle {} for {}, not sent to layout", handle, opName);
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Release a session freeing up the slot for reuse.
      *
      * @param handle the handle for the session to be released
      */
     protected void releaseSession(int handle) {
+        if (!isValidHandle(handle, "KLOC")) {
+            return;
+        }
         // Send KLOC
         CanMessage msg = new CanMessage(2, tc.getCanid());
         msg.setOpCode(CbusConstants.CBUS_KLOC);
@@ -92,6 +108,9 @@ public class CbusCommandStation implements CommandStation {
      * @param handle    The handle of the session to which it applies
      */
     protected void sendKeepAlive(int handle) {
+        if (!isValidHandle(handle, "DKEEP")) {
+            return;
+        }
         CanMessage msg = new CanMessage(2, tc.getCanid());
         msg.setOpCode(CbusConstants.CBUS_DKEEP);
         msg.setElement(1, handle);
@@ -106,10 +125,28 @@ public class CbusCommandStation implements CommandStation {
      * @param speed_dir Bit 7 is direction (1 = forward) 6:0 are speed
      */
     protected void setSpeedDir(int handle, int speed_dir) {
+        setSpeedDir(handle, speed_dir, null);
+    }
+
+    /**
+     * Set loco speed and direction, and be told when the message has been
+     * sent.
+     *
+     * @param handle    The handle of the session to which it applies
+     * @param speed_dir Bit 7 is direction (1 = forward) 6:0 are speed
+     * @param sent      told when the message has been written to the
+     *                  connection, or null; not told if no message is sent
+     * @since 5.19.1
+     */
+    protected void setSpeedDir(int handle, int speed_dir, @CheckForNull AbstractMRMessage.SentListener sent) {
+        if (!isValidHandle(handle, "DSPD")) {
+            return;
+        }
         CanMessage msg = new CanMessage(3, tc.getCanid());
         msg.setOpCode(CbusConstants.CBUS_DSPD);
         msg.setElement(1, handle);
         msg.setElement(2, speed_dir);
+        msg.setSentListener(sent);
         log.debug("setSpeedDir session handle {} speedDir {}", handle, speed_dir);
         tc.sendCanMessage(msg, null);
     }
@@ -122,6 +159,9 @@ public class CbusCommandStation implements CommandStation {
      * @param functions Function bits
      */
     protected void setFunctions(int group, int handle, int functions) {
+        if (!isValidHandle(handle, "DFUN")) {
+            return;
+        }
         log.debug("Set function group {} Fns {} for session handle {}", group, functions, handle);
         CanMessage msg = new CanMessage(4, tc.getCanid());
         msg.setOpCode(CbusConstants.CBUS_DFUN);
@@ -138,6 +178,9 @@ public class CbusCommandStation implements CommandStation {
      * @param mode the speed step mode
      */
     protected void setSpeedSteps(int handle, int mode) {
+        if (!isValidHandle(handle, "STMOD")) {
+            return;
+        }
         log.debug("Set speed step mode {} for session handle {}", mode, handle);
         CanMessage msg = new CanMessage(3, tc.getCanid());
         msg.setOpCode(CbusConstants.CBUS_STMOD);
@@ -159,7 +202,7 @@ public class CbusCommandStation implements CommandStation {
     @CheckForNull
     protected CbusNode getMasterCommandStation(){
         // if NodeTable already has the node stored, use it
-        CbusNodeTableDataModel nodeModel =  jmri.InstanceManager.getNullableDefault(CbusNodeTableDataModel.class);
+        CbusNodeTableDataModel nodeModel =  adapterMemo.get(CbusNodeTableDataModel.class);
         if (nodeModel!=null && nodeModel.getCsByNum(0)!=null) {
             return nodeModel.getCsByNum(0);
         }
@@ -220,10 +263,7 @@ public class CbusCommandStation implements CommandStation {
     public String getSystemPrefix() {
         return adapterMemo.getSystemPrefix();
     }
-    
-    public void dispose() {
-    }
 
-    private final static Logger log = LoggerFactory.getLogger(CbusCommandStation.class);
+    private static final Logger log = LoggerFactory.getLogger(CbusCommandStation.class);
 
 }

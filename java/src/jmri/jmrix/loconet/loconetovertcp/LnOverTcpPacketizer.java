@@ -1,7 +1,5 @@
 package jmri.jmrix.loconet.loconetovertcp;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 import jmri.jmrix.loconet.LnNetworkPortController;
 import jmri.jmrix.loconet.LnPacketizer;
@@ -46,13 +44,6 @@ public class LnOverTcpPacketizer extends LnPacketizer {
         super(m);
         xmtHandler = new XmtHandler();
         rcvHandler = new RcvHandler(this);
-    }
-
-    @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
-            justification = "Only used during system initialization")
-    @Deprecated
-    public LnOverTcpPacketizer() {
-        this(new LocoNetSystemConnectionMemo());
     }
 
     public LnNetworkPortController networkController = null;
@@ -113,17 +104,28 @@ public class LnOverTcpPacketizer extends LnPacketizer {
 
         // readline is deprecated, but there are no problems
         // with multi-byte characters here.
-        @SuppressWarnings("deprecation")
+        @SuppressWarnings("deprecation")  // InputStream#readline
         @Override
         public void run() {
 
             String rxLine;
-            while (true) {  // loop permanently, program close will exit
+            while (! Thread.interrupted()) {  // loop permanently, program close will exit
                 try {
-                    // start by looking for a complete line
+                    // Start by looking for a complete line.
+                    // This will block until input is returned, even if the thread is interrupted.
                     rxLine = istream.readLine();
+                    if (Thread.interrupted()) {
+                        // This indicates normal termination of the thread
+                        // followed by some input being provided by readLine above.
+                        // We return immediately to end the thread, rather than
+                        // processing the no-long-relevant input.
+                        return;
+                    }
                     if (rxLine == null) {
-                        log.warn("run: input stream returned null, exiting loop");
+                        log.info("run: server closed connection, attempting recovery");
+                        if (trafficController.networkController != null) {
+                            trafficController.networkController.recover();
+                        }
                         return;
                     }
 
@@ -185,23 +187,32 @@ public class LnOverTcpPacketizer extends LnPacketizer {
                         }
 
                         // message is complete, dispatch it !!
-                        if (log.isDebugEnabled()) {
-                            log.debug("queue message for notification");
+                        msg.setReceivedTime(System.nanoTime());
+                        log.trace("message complete: {}", msg);
+                        
+                        // check if this message was supposed to be ignored
+                        // sentList will be empty if preference "LoconetUpdateSlotOnMessageCreation" is not activated
+                        if(trafficController.getSentList().contains(msg)) {
+                            trafficController.getSentList().remove(msg);
+                            log.trace("found packet {} in sentList, ignoring. {} packets in sentList remaining.", msg, trafficController.getSentList().size());
                         }
+                        else {
+                            log.trace("queue message for notification: {}", msg);
 
-                        final LocoNetMessage thisMsg = msg;
-                        final LnPacketizer thisTc = trafficController;
-                        // return a notification via the queue to ensure end
-                        Runnable r = new Runnable() {
-                            LocoNetMessage msgForLater = thisMsg;
-                            LnPacketizer myTc = thisTc;
-
-                            @Override
-                            public void run() {
-                                myTc.notify(msgForLater);
-                            }
-                        };
-                        javax.swing.SwingUtilities.invokeLater(r);
+                            final LocoNetMessage thisMsg = msg;
+                            final LnPacketizer thisTc = trafficController;
+                            // return a notification via the queue to ensure end
+                            Runnable r = new Runnable() {
+                                LocoNetMessage msgForLater = thisMsg;
+                                LnPacketizer myTc = thisTc;
+                                
+                                @Override
+                                public void run() {
+                                    myTc.notify(msgForLater);
+                                }
+                            };
+                            javax.swing.SwingUtilities.invokeLater(r);
+                        }
                     }
                     // done with this one
                 } catch (LocoNetMessageException e) {
@@ -236,12 +247,10 @@ public class LnOverTcpPacketizer extends LnPacketizer {
             while (true) {   // loop permanently
                 // any input?
                 try {
-                    // get content; failure is a NoSuchElementException
+                    // get content; blocks write until present
                     log.debug("check for input");
-                    byte msg[] = null;
-                    synchronized (this) {
-                        msg = xmtList.removeFirst();
-                    }
+
+                    byte msg[] = xmtList.take();
 
                     // input - now send
                     try {
@@ -260,9 +269,7 @@ public class LnOverTcpPacketizer extends LnPacketizer {
                                 }
                                 packet.append(hexString);
                             }
-                            if (log.isDebugEnabled()) { // Avoid building unneeded Strings
-                                log.debug("Write to LbServer: {}", packet.toString());
-                            }
+                            log.debug("Write to LbServer: {}", packet.toString());
                             packet.append("\r\n");
                             ostream.write(packet.toString().getBytes());
                             ostream.flush();
@@ -273,19 +280,18 @@ public class LnOverTcpPacketizer extends LnPacketizer {
                         }
                     } catch (java.io.IOException e) {
                         log.warn("sendLocoNetMessage: IOException: {}", e.toString());
+                        // write failed; connection likely dropped
+                        if (networkController != null) {
+                            networkController.recover();
+                        }
                     }
-                } catch (NoSuchElementException e) {
-                    // message queue was empty, wait for input
-                    log.debug("start wait");
-
-                    new jmri.util.WaitHandler(this);  // handle synchronization, spurious wake, interruption
-
-                    log.debug("end wait");
+                } catch (InterruptedException ie) {
+                    return; // ending the thread
                 }
             }
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnOverTcpPacketizer.class);
+    private static final Logger log = LoggerFactory.getLogger(LnOverTcpPacketizer.class);
 
 }

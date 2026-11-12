@@ -5,6 +5,7 @@ import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import javax.swing.*;
+
 import jmri.*;
 import jmri.jmrit.entryexit.DestinationPoints;
 import jmri.jmrit.entryexit.EntryExitPairs;
@@ -15,6 +16,8 @@ import jmri.jmrit.logix.WarrantManager;
 import jmri.swing.NamedBeanComboBox;
 import jmri.util.FileUtil;
 import jmri.util.swing.JComboBoxUtil;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.WrapLayout;
 
 /**
  * Create a where used report based on the selected bean.  The selection combo box is
@@ -60,6 +63,7 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
         // Build an empty where used listing
         JScrollPane scrollPane;
         buildWhereUsedListing(ItemType.NONE, null);
+        _scrolltext.setLayout(new BoxLayout(_scrolltext, BoxLayout.Y_AXIS));
         scrollPane = new JScrollPane(_scrolltext);
         contentPane.add(scrollPane);
 
@@ -72,6 +76,7 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
 
     void buildTopPanel() {
         _topPanel = new JPanel();
+        _topPanel.setLayout(new WrapLayout());
         JLabel itemTypeLabel = new JLabel(Bundle.getMessage("MakeLabel", Bundle.getMessage("LabelItemType")));  // NOI18N
         _topPanel.add(itemTypeLabel);
         _itemTypeBox = new JComboBox<>();
@@ -91,7 +96,7 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
             setItemNameBox(_itemType);
         });
 
-        _createButton = new JButton(Bundle.getMessage("ButtonCreate"));  // NOI18N
+        _createButton = new JButton(Bundle.getMessage("ButtonCreateReport"));  // NOI18N
         _createButton.addActionListener((e) -> buildWhereUsedListing(_itemType, _itemBean));
 
         _topPanel.add(_createButton);
@@ -189,8 +194,11 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
             case ENTRYEXIT:
                 _textArea = EntryExitWhereUsed.getWhereUsed(bean);
                 break;
+            case AUDIO:
+                _textArea = AudioWhereUsed.getWhereUsed(bean);
+                break;
             default:
-                _textArea = new JTextArea(Bundle.getMessage("TypePrompt", Bundle.getMessage("ButtonCreate")));
+                _textArea = new JTextArea(Bundle.getMessage("TypePrompt", Bundle.getMessage("ButtonCreateReport")));
                 break;
         }
 
@@ -206,7 +214,7 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
         repaint();
     }
 
-    JFileChooser userFileChooser = new JFileChooser(FileUtil.getUserFilesPath());
+    JFileChooser userFileChooser = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
 
     /**
      * Save the where used textarea content to a text file.
@@ -231,13 +239,13 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
             Object[] options = {Bundle.getMessage("SaveDuplicateReplace"),  // NOI18N
                     Bundle.getMessage("SaveDuplicateAppend"),  // NOI18N
                     Bundle.getMessage("ButtonCancel")};               // NOI18N
-            int selectedOption = JOptionPane.showOptionDialog(null,
+            int selectedOption = JmriJOptionPane.showOptionDialog(null,
                     Bundle.getMessage("SaveDuplicatePrompt", file.getName(),
                             Bundle.getMessage("SaveDuplicateAppend"),
                             Bundle.getMessage("SaveDuplicateReplace")), // NOI18N
                     Bundle.getMessage("SaveDuplicateTitle"),   // NOI18N
-                    JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.WARNING_MESSAGE,
+                    JmriJOptionPane.DEFAULT_OPTION,
+                    JmriJOptionPane.WARNING_MESSAGE,
                     null, options, options[0]);
             if (selectedOption == 2 || selectedOption == -1) {
                 log.debug("Save where used content stopped, file replace/append cancelled");  // NOI18N
@@ -252,7 +260,7 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
         try {
             FileUtil.appendTextToFile(file, _textArea.getText());
         } catch (IOException e) {
-            log.error("Unable to write where used content to '{}', exception: '{}'", file, e);  // NOI18N
+            log.error("Unable to write where used content to '{}', exception", file, e);  // NOI18N
         }
     }
 
@@ -304,6 +312,9 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
             case ENTRYEXIT:
                 nameBox = new NamedBeanComboBox<DestinationPoints>(InstanceManager.getDefault(EntryExitPairs.class));
                 break;
+            case AUDIO:
+                nameBox = new NamedBeanComboBox<Audio>(InstanceManager.getDefault(AudioManager.class));
+                break;
             default:
                 return null;             // Skip any other items.
         }
@@ -331,7 +342,8 @@ public class WhereUsedFrame extends jmri.util.JmriJFrame {
         BLOCK("BeanNameBlock"),
         SECTION("BeanNameSection"),
         WARRANT("BeanNameWarrant"),
-        ENTRYEXIT("BeanNameEntryExit");
+        ENTRYEXIT("BeanNameEntryExit"),
+        AUDIO("BeanNameAudio");
 
         private final String _bundleKey;
 

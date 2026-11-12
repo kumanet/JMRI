@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +46,7 @@ public class DefaultWebServerConfigurationTest {
                 .as("Default file paths")
                 .satisfies(paths -> {
                     assertThat(paths).isNotNull();
-                    assertThat(paths.size()).isEqualTo(15);
+                    assertThat(paths.size()).isEqualTo(14);
                 });
     }
 
@@ -78,15 +79,16 @@ public class DefaultWebServerConfigurationTest {
 
     /**
      * Test of load method with missing/non-existent resource.
-     * 
-     * @throws Exception if unable to use reflection
      */
     @Test
-    public void testLoadWithMissingResource() throws Exception {
-        Method method = instance.getClass()
-                .getDeclaredMethod("loadMap", HashMap.class, String.class);
-        method.setAccessible(true);
-        method.invoke(instance, new HashMap<String, String>(), "no.such.resource");
+    public void testLoadWithMissingResource() {
+        Assertions.assertDoesNotThrow( () -> {
+            Method method = instance.getClass()
+                    .getDeclaredMethod("loadMap", HashMap.class, String.class);
+            method.setAccessible(true);
+            method.invoke(instance, new HashMap<String, String>(), "no.such.resource");
+        });
         JUnitAppender.assertErrorMessage("Unable to load no.such.resource");
     }
+
 }

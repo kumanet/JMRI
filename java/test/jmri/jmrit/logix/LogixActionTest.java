@@ -1,14 +1,15 @@
 package jmri.jmrit.logix;
 
 import jmri.InstanceManager;
+import jmri.JmriException;
 import jmri.Memory;
 import jmri.Sensor;
 import jmri.SignalHead;
 import jmri.Turnout;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,13 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class LogixActionTest {
 
     @Test
-    public void testLogixAction() throws Exception {
+    @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
+    public void testLogixAction() throws JmriException {
         jmri.configurexml.ConfigXmlManager cm = new jmri.configurexml.ConfigXmlManager() {
         };
 
         // load and display sample file. Panel file does not display screen
         java.io.File f = new java.io.File("java/test/jmri/jmrit/logix/valid/LogixActionTest.xml");
-        cm.load(f);
+        Assertions.assertTrue(cm.load(f));
         InstanceManager.getDefault(jmri.LogixManager.class).activateAllLogixs();
 
         Memory im6 = InstanceManager.memoryManagerInstance().getMemory("IM6");
@@ -142,7 +144,7 @@ public class LogixActionTest {
         Sensor is15 = InstanceManager.sensorManagerInstance().getSensor("IS15");
         assertThat(is15).withFailMessage("is15 null").isNotNull();
         is15.setState(Sensor.ACTIVE); // indirect action
-        Assert.assertFalse("warrant EastToWestOnSiding deallocated", w.isAllocated());
+        Assertions.assertFalse( w.isAllocated(), "warrant EastToWestOnSiding deallocated");
         // change memory value
         im6.setValue("WestToEastOnMain");
         is14.setState(Sensor.INACTIVE); // toggle
@@ -172,7 +174,6 @@ public class LogixActionTest {
     public void tearDown() {
         InstanceManager.getDefault(WarrantManager.class).dispose();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 }

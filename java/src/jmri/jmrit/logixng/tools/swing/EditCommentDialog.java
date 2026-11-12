@@ -1,8 +1,6 @@
 package jmri.jmrit.logixng.tools.swing;
 
 import java.awt.*;
-import static java.awt.Component.LEFT_ALIGNMENT;
-import static java.awt.Component.TOP_ALIGNMENT;
 import java.awt.event.ActionEvent;
 
 import javax.swing.*;
@@ -19,7 +17,7 @@ public class EditCommentDialog {
     
     private String _comment;
     private JDialog _editCommentDialog = null;
-    private final JLabel _commentLabel = new JLabel("Comment" + ":");   // NOI18N
+    private final JLabel _commentLabel = new JLabel(Bundle.getMessage("Comment") + ":"); 
     private final JTextArea _commentTextArea = new JTextArea();
     
     
@@ -67,8 +65,7 @@ public class EditCommentDialog {
         buttonCancel.addActionListener((ActionEvent e) -> {
             cancelPressed(null);
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        buttonCancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        buttonCancel.setToolTipText(Bundle.getMessage("CancelCommentLogixNGButtonHint"));      // NOI18N
         
         // OK
         JButton buttonOK = new JButton(Bundle.getMessage("ButtonOK"));    // NOI18N
@@ -76,8 +73,7 @@ public class EditCommentDialog {
         buttonOK.addActionListener((ActionEvent e) -> {
             okPressed(null);
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        buttonOK.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        buttonOK.setToolTipText(Bundle.getMessage("EditButtonHint"));      // NOI18N
         
         _editCommentDialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -98,13 +94,13 @@ public class EditCommentDialog {
         return _comment;
     }
     
-    final protected void cancelPressed(ActionEvent e) {
+    protected final void cancelPressed(ActionEvent e) {
         _editCommentDialog.setVisible(false);
         _editCommentDialog.dispose();
         _editCommentDialog = null;
     }
     
-    final protected void okPressed(ActionEvent e) {
+    protected final void okPressed(ActionEvent e) {
         if (_commentTextArea.getText().isEmpty()) {
             _comment = null;
         } else {

@@ -3,11 +3,10 @@ package jmri.jmrit.logixng.tools.swing;
 import java.awt.event.*;
 import java.util.*;
 
-import javax.annotation.Nonnull;
-
+import jmri.Category;
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.beantable.BeanTableDataModel;
-import jmri.jmrit.beantable.BeanTableFrame;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.Module;
 import jmri.jmrit.logixng.implementation.AbstractFemaleSocket;
@@ -17,58 +16,57 @@ import jmri.jmrit.logixng.util.LogixNG_Thread;
 
 /**
  * Editor of Module
- * 
+ *
  * @author Daniel Bergqvist 2020
  */
 public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Module> {
 
     BeanTableDataModel<Module> beanTableDataModel;
-    
+
 //    private final ModuleManager _moduleManager =
 //            InstanceManager.getDefault(ModuleManager.class);
-    
+
     protected final Module _module;
-    
+
     /**
      * Maintain a list of listeners -- normally only one.
      */
     private final List<EditorEventListener> listenerList = new ArrayList<>();
-    
+
     /**
      * This contains a list of commands to be processed by the listener
      * recipient.
      */
     final HashMap<String, String> moduleData = new HashMap<>();
-    
+
     /**
      * Create a new ConditionalNG List View editor.
      *
-     * @param f the bean table frame
      * @param m the bean table model
      * @param sName name of the LogixNG being edited
      */
-    public ModuleEditor(BeanTableFrame<Module> f,
-            BeanTableDataModel<Module> m, String sName) {
-        
+    public ModuleEditor(BeanTableDataModel<Module> m, String sName) {
+
         super(setupRootSocket(null, sName),
                 EnableClipboard.EnableClipboard,
                 EnableRootRemoveCutCopy.DisableRootRemoveCutCopy,
                 EnableRootPopup.EnableRootPopup,
-                EnableExecuteEvaluate.EnableExecuteEvaluate
+                EnableExecuteEvaluate.EnableExecuteEvaluate,
+                EnableChangeUsernameForRoot.DisableChangeUsername
         );
-        
+
         this.beanTableDataModel = m;
-        
+
         if (!_treePane._femaleRootSocket.isConnected()) {
             // This should never happen
-            throw new RuntimeException("Module is not connected");
+            throw new JmriUncheckedException("Module is not connected");
         }
         if (!(_treePane._femaleRootSocket.getConnectedSocket().getObject() instanceof Module)) {
             // This should never happen
-            throw new RuntimeException("Connected socket is not a Module");
+            throw new JmriUncheckedException("Connected socket is not a Module");
         }
         _module = (Module) _treePane._femaleRootSocket.getConnectedSocket().getObject();
-        
+
         if (_module.getUserName() == null) {
             ModuleEditor.this.setTitle(
                     Bundle.getMessage("TitleEditModule", _module.getSystemName()));
@@ -79,7 +77,7 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
                             _module.getUserName()));
         }
     }
-    
+
     @Override
     protected void executeEvaluate(SwingConfiguratorInterface swi, MaleSocket maleSocket) {
         Base b = maleSocket;
@@ -88,20 +86,20 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
             module = (Module)maleSocket.getObject();
         } else {
             while ((b != null) && !(b instanceof Module)) b = b.getParent();
-            if (b == null) throw new RuntimeException("Module is not found");
+            if (b == null) throw new JmriUncheckedException("Module is not found");
             module = (Module)b;
         }
-        
+
         LogixNG_Thread.getThread(LogixNG_Thread.DEFAULT_LOGIXNG_THREAD).runOnLogixNGEventually(() -> {
-            
+
             // We need to create a temporary ConditionalNG to be able to
             // execute/evaluate a module or a part of a module
             module.setCurrentConditionalNG(new DefaultConditionalNG("IQC1", null));
-            
+
             swi.executeEvaluate(maleSocket);
         });
     }
-    
+
     private static FemaleSocket setupRootSocket(Base parent, String sName) {
         FemaleSocket socket = new RootSocket(parent, new FemaleSocketListener() {
             @Override
@@ -114,16 +112,16 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
                 // Do nothing
             }
         }, "Root");
-        
+
         Module module = InstanceManager.getDefault(ModuleManager.class).getBySystemName(sName);
-        
+
         try {
             socket.connect(new ModuleEditorMaleSocket(null, module));
         } catch (SocketAlreadyConnectedException e) {
             // This should never happen
-            throw new RuntimeException("Socket already connected", e);
+            throw new JmriUncheckedException("Socket already connected", e);
         }
-        
+
         return socket;
     }
 
@@ -134,7 +132,7 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
         moduleData.put("Finish", _module.getSystemName());  // NOI18N
         fireModuleEvent();
     }
-    
+
     /**
      * Notify the listeners to check for new data.
      */
@@ -158,29 +156,29 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
     public void bringToFront() {
         this.setVisible(true);
     }
-    
-    
+
+
     private static class RootSocket extends AbstractFemaleSocket {
 
         public RootSocket(Base parent, FemaleSocketListener listener, String name) {
             super(parent, listener, name);
         }
-        
+
         @Override
         public boolean canDisconnect() {
             return false;
         }
-        
+
         @Override
         public void disposeMe() {
             throw new UnsupportedOperationException("Not supported");
         }
-        
+
         @Override
         public boolean isCompatible(MaleSocket socket) {
             return socket instanceof ModuleEditorMaleSocket;
         }
-        
+
         @Override
         public Map<Category, List<Class<? extends Base>>> getConnectableClasses() {
 //            Map<Category, List<Class<? extends Base>>> map = new HashMap<>();
@@ -190,17 +188,17 @@ public class ModuleEditor extends TreeEditor implements AbstractLogixNGEditor<Mo
 //            return map;
             throw new UnsupportedOperationException("Not supported");
         }
-        
+
         @Override
         public String getShortDescription(Locale locale) {
             return Bundle.getMessage(locale, "ModuleEditor_RootSocket_Short");
         }
-        
+
         @Override
         public String getLongDescription(Locale locale) {
             return Bundle.getMessage(locale, "ModuleEditor_RootSocket_Long", getName());
         }
-        
+
     }
-    
+
 }

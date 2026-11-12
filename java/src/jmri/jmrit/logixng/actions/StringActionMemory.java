@@ -1,100 +1,49 @@
 package jmri.jmrit.logixng.actions;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyVetoException;
-import java.beans.VetoableChangeListener;
 import java.util.*;
-
-import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
 
 import jmri.*;
 import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.util.LogixNG_SelectNamedBean;
+import jmri.jmrit.logixng.util.parser.ParserException;
 
 /**
  * Sets a Memory.
  *
  * @author Daniel Bergqvist Copyright 2018
  */
-public class StringActionMemory extends AbstractStringAction
-        implements VetoableChangeListener {
+public class StringActionMemory extends AbstractStringAction {
 
-    private NamedBeanHandle<Memory> _memoryHandle;
+    private final LogixNG_SelectNamedBean<Memory> _selectNamedBean =
+            new LogixNG_SelectNamedBean<>(
+                    this, Memory.class, InstanceManager.getDefault(MemoryManager.class));
 
     public StringActionMemory(String sys, String user) {
         super(sys, user);
     }
 
     @Override
-    public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) {
+    public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws ParserException {
         StringActionManager manager = InstanceManager.getDefault(StringActionManager.class);
         String sysName = systemNames.get(getSystemName());
         String userName = userNames.get(getSystemName());
         if (sysName == null) sysName = manager.getAutoSystemName();
         StringActionMemory copy = new StringActionMemory(sysName, userName);
         copy.setComment(getComment());
-        if (_memoryHandle != null) copy.setMemory(_memoryHandle);
+        _selectNamedBean.copy(copy._selectNamedBean);
         return manager.registerAction(copy);
     }
 
-    public void setMemory(@Nonnull String memoryName) {
-        assertListenersAreNotRegistered(log, "setMemory");
-        Memory memory = InstanceManager.getDefault(MemoryManager.class).getMemory(memoryName);
-        if (memory != null) {
-            setMemory(memory);
-        } else {
-            removeMemory();
-            log.error("memory \"{}\" is not found", memoryName);
-        }
-    }
-
-    public void setMemory(@Nonnull NamedBeanHandle<Memory> handle) {
-        assertListenersAreNotRegistered(log, "setMemory");
-        _memoryHandle = handle;
-        InstanceManager.memoryManagerInstance().addVetoableChangeListener(this);
-    }
-
-    public void setMemory(@Nonnull Memory memory) {
-        assertListenersAreNotRegistered(log, "setMemory");
-        setMemory(InstanceManager.getDefault(NamedBeanHandleManager.class)
-                .getNamedBeanHandle(memory.getDisplayName(), memory));
-    }
-
-    public void removeMemory() {
-        assertListenersAreNotRegistered(log, "setMemory");
-        if (_memoryHandle != null) {
-            InstanceManager.memoryManagerInstance().removeVetoableChangeListener(this);
-            _memoryHandle = null;
-        }
-    }
-
-    public NamedBeanHandle<Memory> getMemory() {
-        return _memoryHandle;
+    public LogixNG_SelectNamedBean<Memory> getSelectNamedBean() {
+        return _selectNamedBean;
     }
 
     /** {@inheritDoc} */
     @Override
-    public void setValue(String value) {
-        if (_memoryHandle != null) {
-            _memoryHandle.getBean().setValue(value);
-        }
-    }
-
-    @Override
-    public void vetoableChange(PropertyChangeEvent evt) throws PropertyVetoException {
-        if ("CanDelete".equals(evt.getPropertyName())) { // No I18N
-            if (evt.getOldValue() instanceof Memory) {
-                if (evt.getOldValue().equals(getMemory().getBean())) {
-                    PropertyChangeEvent e = new PropertyChangeEvent(this, "DoNotDelete", null, null);
-                    throw new PropertyVetoException(Bundle.getMessage("StringMemory_MemoryInUseMemoryActionVeto", getDisplayName()), e); // NOI18N
-                }
-            }
-        } else if ("DoDelete".equals(evt.getPropertyName())) { // No I18N
-            if (evt.getOldValue() instanceof Memory) {
-                if (evt.getOldValue().equals(getMemory().getBean())) {
-                    removeMemory();
-                }
-            }
+    public void setValue(String value) throws JmriException {
+        Memory memory = _selectNamedBean.evaluateNamedBean(getConditionalNG());
+        if (memory != null) {
+            memory.setValue(value);
         }
     }
 
@@ -112,14 +61,8 @@ public class StringActionMemory extends AbstractStringAction
 
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return true;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
 
     /** {@inheritDoc} */
@@ -131,11 +74,7 @@ public class StringActionMemory extends AbstractStringAction
     /** {@inheritDoc} */
     @Override
     public String getLongDescription(Locale locale) {
-        if (_memoryHandle != null) {
-            return Bundle.getMessage(locale, "StringActionMemory_Long", _memoryHandle.getBean().getDisplayName());
-        } else {
-            return Bundle.getMessage(locale, "StringActionMemory_Long", "none");
-        }
+        return Bundle.getMessage(locale, "StringActionMemory_Long", _selectNamedBean.getDescription(locale));
     }
 
     /** {@inheritDoc} */
@@ -146,28 +85,15 @@ public class StringActionMemory extends AbstractStringAction
 
     /** {@inheritDoc} */
     @Override
-    public void registerListenersForThisClass() {
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void unregisterListenersForThisClass() {
-    }
-
-    /** {@inheritDoc} */
-    @Override
     public void disposeMe() {
     }
 
     /** {@inheritDoc} */
     @Override
     public void getUsageDetail(int level, NamedBean bean, List<NamedBeanUsageReport> report, NamedBean cdl) {
-        log.debug("getUsageReport :: StringActionMemory: bean = {}, report = {}", cdl, report);
-        if (getMemory() != null && bean.equals(getMemory().getBean())) {
-            report.add(new NamedBeanUsageReport("LogixNGAction", cdl, getLongDescription()));
-        }
+        _selectNamedBean.getUsageDetail(level, bean, report, cdl, this, LogixNG_SelectNamedBean.Type.Action);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringActionMemory.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringActionMemory.class);
 
 }

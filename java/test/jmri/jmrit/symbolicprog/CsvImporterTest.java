@@ -21,14 +21,14 @@ public class CsvImporterTest {
     public File makeTempFile(String contents) throws IOException {
         // create a file
         FileUtil.createDirectory(FileUtil.getUserFilesPath() + "temp");
-        File f = new java.io.File(FileUtil.getUserFilesPath() + "temp" + File.separator + "CsvImporter.test.xml");
+        File f = new File(FileUtil.getUserFilesPath() + "temp" + File.separator + "CsvImporter.test.xml");
         // recreate it
         if (f.exists()) {
-            f.delete();
+            Assertions.assertTrue(f.delete());
         }
-        PrintStream p = new PrintStream(new FileOutputStream(f));
-        p.print(contents);
-        p.close();
+        try (PrintStream p = new PrintStream(new FileOutputStream(f))) {
+            p.print(contents);
+        }
 
         return f;
     }
@@ -59,6 +59,6 @@ public class CsvImporterTest {
         jmri.util.JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CsvImporterTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(CsvImporterTest.class);
 
 }

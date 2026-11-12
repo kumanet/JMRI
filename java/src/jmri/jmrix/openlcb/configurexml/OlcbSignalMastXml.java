@@ -5,9 +5,10 @@ import jmri.InstanceManager;
 import jmri.JmriException;
 import jmri.SignalAppearanceMap;
 import jmri.jmrix.openlcb.OlcbSignalMast;
+
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import org.openlcb.EventID;
 
 import javax.annotation.Nonnull;
 
@@ -15,7 +16,7 @@ import javax.annotation.Nonnull;
  * Handle XML configuration for OlcbSignalMast objects.
  *
  * @author Bob Jacobsen Copyright: Copyright (c) 2017, 2018
- * 
+ *
  */
 public class OlcbSignalMastXml
         extends jmri.managers.configurexml.AbstractNamedBeanManagerConfigXML {
@@ -38,17 +39,17 @@ public class OlcbSignalMastXml
         e.addContent(new Element("systemName").addContent(p.getSystemName()));
 
         storeCommon(p, e);
-        
+
         Element lit = new Element("lit");
-        lit.addContent(new Element("lit").addContent(p.getLitEventId()));
-        lit.addContent(new Element("notlit").addContent(p.getNotLitEventId()));
+        lit.addContent(new Element("lit").addContent(nullToEmpty(p.getLitEventId())));
+        lit.addContent(new Element("notlit").addContent(nullToEmpty(p.getNotLitEventId())));
         e.addContent(lit);
-        
+
         Element held = new Element("held");
-        held.addContent(new Element("held").addContent(p.getHeldEventId()));
-        held.addContent(new Element("notheld").addContent(p.getNotHeldEventId()));
+        held.addContent(new Element("held").addContent(nullToEmpty(p.getHeldEventId())));
+        held.addContent(new Element("notheld").addContent(nullToEmpty(p.getNotHeldEventId())));
         e.addContent(held);
-        
+
         SignalAppearanceMap appMap = p.getAppearanceMap();
         if (appMap != null) {
             java.util.Enumeration<String> aspects = appMap.getAspects();
@@ -56,7 +57,7 @@ public class OlcbSignalMastXml
                 String key = aspects.nextElement();
                 Element el = new Element("aspect");
                 el.setAttribute("defines", key);
-                el.addContent(new Element("event").addContent(p.getOutputForAppearance(key)));
+                el.addContent(new Element("event").addContent(nullToEmpty(p.getOutputForAppearance(key))));
                 e.addContent(el);
             }
         }
@@ -83,7 +84,7 @@ public class OlcbSignalMastXml
             m = (OlcbSignalMast) InstanceManager.getDefault(jmri.SignalMastManager.class)
                     .provideCustomSignalMast(sys, OlcbSignalMast.class);
         } catch (JmriException e) {
-            log.error("Failed to load OlcbSignalMast {}: {}", sys, e);
+            log.error("Failed to load OlcbSignalMast {}", sys, e);
             return false;
         }
 
@@ -94,25 +95,56 @@ public class OlcbSignalMastXml
         return loadCommonOlcbMast(m, shared);
     }
 
+    /**
+     * If the input string is a zero Event ID, replace it 
+     * with the empty String
+     * @param event an event ID read from an element
+     * @param m the relevant signal mast, used for a warning message
+     * @return the event ID or the empty String
+     */
+    private String convertZeroEvent(String event, OlcbSignalMast m) {
+        if ("".equals(event)) {
+            return "";
+        }
+        if (event == null) {
+            return "";
+        }
+        try {
+            var eventID = new EventID(event);
+            if (eventID.getContents()[0] == 0) {
+                // migrate starting-with-zero event ID to blank
+                log.warn("Migrating zero-initial-value event {} to a blank entry in signal mast \"{}\"", event, m.getDisplayName());
+                return "";
+            } else {
+                // non-zero-starting event ID, normal case
+                return event;
+            }
+        } catch (IllegalArgumentException ex) {
+            // not dotted-hex, assume this is a event name
+            return event;
+        }
+        
+    }
+    
     protected boolean loadCommonOlcbMast(OlcbSignalMast m, Element element) {
         loadCommon(m, element);
         
         if (element.getChild("lit") != null) {
             Element lit = element.getChild("lit");
-            m.setLitEventId(lit.getChild("lit").getValue());
-            m.setNotLitEventId(lit.getChild("notlit").getValue());
+            m.setLitEventId(convertZeroEvent(childValue(lit, "lit"), m));
+            m.setNotLitEventId(convertZeroEvent(childValue(lit, "notlit"), m));
         }
-        
+
         if (element.getChild("held") != null) {
             Element held = element.getChild("held");
-            m.setHeldEventId(held.getChild("held").getValue());
-            m.setNotHeldEventId(held.getChild("notheld").getValue());
+            m.setHeldEventId(convertZeroEvent(childValue(held, "held"), m));
+            m.setNotHeldEventId(convertZeroEvent(childValue(held, "notheld"), m));
         }
-        
+
         List<Element> list = element.getChildren("aspect");
         for (Element e : list) {
             String aspect = e.getAttribute("defines").getValue();
-            String event = e.getChild("event").getValue();
+            String event = convertZeroEvent(childValue(e, "event"), m);
             m.setOutputForAppearance(aspect, event);
         }
         Element e = element.getChild("disabledAspects");
@@ -132,5 +164,5 @@ public class OlcbSignalMastXml
         log.error("Invalid method called");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OlcbSignalMastXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OlcbSignalMastXml.class);
 }

@@ -2,12 +2,14 @@ package jmri.jmrit.roster.swing;
 
 import java.awt.Component;
 import java.awt.event.ActionEvent;
+
 import javax.swing.Icon;
-import javax.swing.JOptionPane;
+
 import jmri.beans.BeanUtil;
 import jmri.jmrit.roster.Roster;
 import jmri.jmrit.roster.rostergroup.RosterGroupSelector;
 import jmri.util.swing.JmriAbstractAction;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.WindowInterface;
 
 /**
@@ -66,24 +68,24 @@ public class RenameRosterGroupAction extends JmriAbstractAction {
         }
         // null might be valid output from getting the selectedRosterGroup,
         // so we have to check for null again.
-        if (group == null) {
-            group = (String) JOptionPane.showInputDialog(_who,
+        if (group == null || group.equals(Roster.NOGROUP)) {
+            group = (String) JmriJOptionPane.showInputDialog(_who,
                     Bundle.getMessage("RenameRosterGroupDialog"),
                     Bundle.getMessage("RenameRosterGroupTitle", ""),
-                    JOptionPane.INFORMATION_MESSAGE,
+                    JmriJOptionPane.INFORMATION_MESSAGE,
                     null,
                     Roster.getDefault().getRosterGroupList().toArray(),
                     null);
         }
         // can't rename the groups that represent the entire roster 
-        if (group == null || group.equals(Roster.ALLENTRIES)) {
+        if (group == null || group.equals(Roster.ALLENTRIES) || group.equals(Roster.NOGROUP)) {
             return;
         }
 
-        String entry = (String) JOptionPane.showInputDialog(_who,
+        String entry = (String) JmriJOptionPane.showInputDialog(_who,
                 Bundle.getMessage("RenameRosterGroupNewName", group),
                 Bundle.getMessage("RenameRosterGroupTitle", group),
-                JOptionPane.INFORMATION_MESSAGE,
+                JmriJOptionPane.INFORMATION_MESSAGE,
                 null,
                 null,
                 null);
@@ -93,10 +95,10 @@ public class RenameRosterGroupAction extends JmriAbstractAction {
         if (entry == null || entry.length() == 0 || entry.equals(Roster.ALLENTRIES)) {
             return;
         } else if (Roster.getDefault().getRosterGroupList().contains(entry)) {
-            JOptionPane.showMessageDialog(_who,
+            JmriJOptionPane.showMessageDialog(_who,
                     Bundle.getMessage("RenameRosterGroupSameName", entry),
                     Bundle.getMessage("RenameRosterGroupTitle", group),
-                    JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.ERROR_MESSAGE);
         }
 
         // rename the roster grouping

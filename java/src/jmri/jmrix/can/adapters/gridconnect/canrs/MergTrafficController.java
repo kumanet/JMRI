@@ -24,28 +24,30 @@ public class MergTrafficController extends GcTrafficController {
 
     public MergTrafficController() {
         super();
-        setCanId(CbusConstants.DEFAULT_STANDARD_ID);
+        super.setCanId(CbusConstants.DEFAULT_STANDARD_ID);
     }
 
     // New message for hardware protocol
     @Override
     protected AbstractMRMessage newMessage() {
         log.debug("New MergMessage created");
-        MergMessage msg = new MergMessage();
-        return msg;
+        return new MergMessage();
     }
 
     /**
-     * Make a CanReply from a MergReply reply
+     * Make a CanReply from a MergReply reply.
+     * {@inheritDoc}
      */
     @Override
     public CanReply decodeFromHardware(AbstractMRReply m) {
         log.debug("Decoding from hardware");
-        MergReply gc = new MergReply();
-        try {
+        // no throwaway MergReply is allocated for every incoming frame
+        MergReply gc;
+        if (m instanceof MergReply) {
             gc = (MergReply) m;
-        } catch(java.lang.ClassCastException cce){
+        } else {
             log.error("{} is not a MergReply",m);
+            gc = new MergReply();
         }
         CanReply ret = gc.createReply();
         log.debug("CanReply created {} from MergReply {}", ret, gc);
@@ -53,24 +55,24 @@ public class MergTrafficController extends GcTrafficController {
     }
 
     /**
-     * Encode a CanMessage for the hardware
+     * Encode a CanMessage for the hardware.
+     * {@inheritDoc}
      */
     @Override
     public AbstractMRMessage encodeForHardware(CanMessage m) {
         //log.debug("Encoding for hardware");
-        MergMessage ret = new MergMessage(m);
-
-        return ret;
+        return new MergMessage(m);
     }
 
-    // New reply from hardware
+    /**
+     * {@inheritDoc}
+     */
     @Override
     protected AbstractMRReply newReply() {
         log.debug("New MergReply created");
-        MergReply reply = new MergReply();
-        return reply;
+        return new MergReply();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MergTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(MergTrafficController.class);
 
 }

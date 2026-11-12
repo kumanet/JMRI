@@ -1,5 +1,7 @@
 package jmri.jmrit.display.layoutEditor;
 
+import java.awt.Color;
+import java.awt.Font;
 import java.text.MessageFormat;
 import java.util.*;
 
@@ -8,6 +10,7 @@ import javax.annotation.Nonnull;
 
 import jmri.*;
 import jmri.jmrit.signalling.SignallingGuiTools;
+import jmri.jmrit.display.ToolTip;
 
 /**
  * LayoutTurnout is the abstract base for classes representing various types of turnout on the layout.
@@ -39,11 +42,11 @@ import jmri.jmrit.signalling.SignallingGuiTools;
  *
  *    Wye           Three-way
  *
- *       B                D
+ *       C                D
  *      //               //
  * A ==**           A ==**== B
  *      \\               \\
- *       C                C
+ *       B                C
  *
  *           Crossovers
  * Right-hand            left-hand
@@ -120,6 +123,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
         super(id, models);
 
         type = t;
+        createTooltip(models);
     }
 
     protected LayoutTurnout(@Nonnull String id,
@@ -151,6 +155,15 @@ abstract public class LayoutTurnout extends LayoutTrack {
         disableWhenOccupied = false;
         type = t;
         version = v;
+        createTooltip(models);
+
+    }
+
+    private void createTooltip(LayoutEditor models) {
+        var tt = new ToolTip(null, 0, 0, new Font("SansSerif", Font.PLAIN, 12),
+                Color.black, new Color(215, 225, 255), Color.black, null);
+        setToolTip(tt);
+        setShowToolTip(models.showToolTip());
     }
 
     // Defined constants for turnout types
@@ -1210,10 +1223,10 @@ abstract public class LayoutTurnout extends LayoutTrack {
      * to locate and set the turnout associated with this is LayoutTurnout.
      * This is different from {@link #getTurnout()}, which returns an
      * actual Turnout reference or null.
-     * @param tName provide empty string for none; never null
+     * @param name provide empty string for none; never null
      */
-    public void setTurnout(@Nonnull String tName) {
-        assert tName != null;
+    public void setTurnout(@Nonnull String name) {
+        String tName = Objects.requireNonNull(name);
         if (namedTurnout != null) {
             deactivateTurnout();
         }
@@ -1250,10 +1263,10 @@ abstract public class LayoutTurnout extends LayoutTrack {
     }
 
     /**
-     * @param tName provide empty string for none (not null)
+     * @param name provide empty string for none (not null)
      */
-    public void setSecondTurnout(@Nonnull String tName) {
-        assert tName != null;
+    public void setSecondTurnout(@Nonnull String name) {
+        String tName = Objects.requireNonNull(name);
         if (tName.equals(secondTurnoutName)) { // haven't changed anything
             return;
         }
@@ -1920,7 +1933,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
         if (getSecondTurnout() != null) {
             int t2state = getSecondTurnout().getKnownState();
             if (secondTurnoutInverted) {
-                t2state = Turnout.invertTurnoutState(getSecondTurnout().getKnownState());
+                t2state = Turnout.invertTurnoutState(t2state);
             }
             if (result != t2state) {
                 return INCONSISTENT;
@@ -2658,7 +2671,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
                     // the points on the TurnoutView itself. Change to
                     // direction from connections.
                     //lc.setDirection(Path.computeDirection(getCoordsA(), getCoordsB()));
-                    lc.setDirection( models.computeDirectionAB(this) );
+                    lc.setDirection(models.computeDirectionAB(this));
 
                     log.trace("getLayoutConnectivity lbA != lbB");
                     log.trace("   Block boundary  ('{}'<->'{}') found at {}", lbA, lbB, this);
@@ -2675,7 +2688,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
                     // the points on the TurnoutView itself. Change to
                     // direction from connections.
                     //lc.setDirection(Path.computeDirection(getCoordsA(), getCoordsC()));
-                    lc.setDirection( models.computeDirectionAC(this) );
+                    lc.setDirection(models.computeDirectionAC(this));
 
                     log.trace("getLayoutConnectivity lbA != lbC");
                     log.trace("   Block boundary  ('{}'<->'{}') found at {}", lbA, lbC, this);
@@ -2692,7 +2705,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
                     // the points on the TurnoutView itself. Change to
                     // direction from connections.
                     //lc.setDirection(Path.computeDirection(getCoordsC(), getCoordsD()));
-                    lc.setDirection( models.computeDirectionCD(this) );
+                    lc.setDirection(models.computeDirectionCD(this));
 
                     log.trace("getLayoutConnectivity lbC != lbD");
                     log.trace("   Block boundary  ('{}'<->'{}') found at {}", lbC, lbD, this);
@@ -2709,7 +2722,7 @@ abstract public class LayoutTurnout extends LayoutTrack {
                     // the points on the TurnoutView itself. Change to
                     // direction from connections.
                     //lc.setDirection(Path.computeDirection(getCoordsB(), getCoordsD()));
-                    lc.setDirection( models.computeDirectionBD(this) );
+                    lc.setDirection(models.computeDirectionBD(this));
 
                     log.trace("getLayoutConnectivity lbB != lbD");
                     log.trace("   Block boundary  ('{}'<->'{}') found at {}", lbB, lbD, this);
@@ -2884,5 +2897,42 @@ abstract public class LayoutTurnout extends LayoutTrack {
         }
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurnout.class);
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getTypeName() {
+        return Bundle.getMessage("TypeName_Turnout");
+    }
+
+    // Tooltip support
+    private ToolTip _tooltip;
+    private boolean _showTooltip;
+
+    public void setShowToolTip(boolean set) {
+        _showTooltip = set;
+    }
+
+    public boolean showToolTip() {
+        return _showTooltip;
+    }
+
+    public void setToolTip(ToolTip tip) {
+        _tooltip = tip;
+    }
+
+    public ToolTip getToolTip() {
+        return _tooltip;
+    }
+
+    @Nonnull
+    public  String getNameString() {
+        var turnout = getTurnout();
+        if (turnout != null) {
+            return turnout.getDisplayName(jmri.NamedBean.DisplayOptions.USERNAME_SYSTEMNAME);
+        }
+        return getId();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurnout.class);
 }

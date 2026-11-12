@@ -21,6 +21,7 @@ public class ConnectionConfigXml extends AbstractConnectionConfigXml {
         super();
     }
 
+    /** {@inheritDoc} */
     @Override
     protected void getInstance() {
         adapter = new InternalAdapter();
@@ -32,13 +33,13 @@ public class ConnectionConfigXml extends AbstractConnectionConfigXml {
         adapter = ((ConnectionConfig) object).getAdapter();
     }
 
-
+    /** {@inheritDoc} */
     @Override
     public Element store(Object o) {
         getInstance(o);
-        
+
         if (adapter == null) return null;
-        
+
         Element e = new Element("connection");
         storeCommon(e, adapter);
 
@@ -47,10 +48,15 @@ public class ConnectionConfigXml extends AbstractConnectionConfigXml {
         return e;
     }
 
+    /** {@inheritDoc} */
     @Override
     public boolean load(Element shared, Element perNode) {
         boolean result = true;
         getInstance();
+
+        if (adapter == null) {
+            return false;
+        }
 
         this.loadCommon(shared, perNode, adapter);
         // register, so can be picked up
@@ -64,9 +70,15 @@ public class ConnectionConfigXml extends AbstractConnectionConfigXml {
         return result;
     }
 
+    /** {@inheritDoc} */
     @Override
     protected void register() {
         this.register(new ConnectionConfig(adapter));
+    }
+
+    @Override
+    protected void dispose() {
+        adapter.dispose();
     }
 
 }

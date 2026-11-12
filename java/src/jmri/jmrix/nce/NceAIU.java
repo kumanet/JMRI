@@ -75,7 +75,7 @@ public class NceAIU {
             try {
                 sensorArray[offset].setKnownState(newState);
             } catch (JmriException e) {
-                log.error("exception in sensorChange: {}", e);
+                log.error("exception in sensorChange", e);
             }
         }
     }
@@ -100,7 +100,7 @@ public class NceAIU {
         return sensorArray[index];
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NceAIU.class);
+    private static final Logger log = LoggerFactory.getLogger(NceAIU.class);
 }
 
 

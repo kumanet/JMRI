@@ -1,23 +1,24 @@
 package jmri.jmrix.debugthrottle;
 
-import jmri.SpeedStepMode;
-import jmri.SystemConnectionMemo;
+import jmri.*;
+import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.NotApplicable;
 
-import org.mockito.Mockito;
 import org.junit.jupiter.api.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@SuppressWarnings("deprecation")
 public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     @Test
     public void testCTor() {
-        assertThat(instance).withFailMessage("exists").isNotNull();
+        assertNotNull( instance, "exists");
     }
 
     /**
@@ -27,8 +28,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Test
     public void testGetSpeedIncrement() {
         float expResult = 1.0F/126.0F;
-        float result = instance.getSpeedIncrement();
-        assertThat(result).isEqualTo(expResult);
+        assertEquals( expResult, instance.getSpeedIncrement(), 0.001);
     }
 
     /**
@@ -37,9 +37,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Test
     @Override
     public void testGetIsForward() {
-        boolean expResult = true;
-        boolean result = instance.getIsForward();
-        assertThat(result).isEqualTo(expResult);
+        assertEquals( true, instance.getIsForward());
     }
 
     /**
@@ -48,9 +46,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Test
     @Override
     public void testGetSpeedStepMode() {
-        SpeedStepMode expResult = SpeedStepMode.NMRA_DCC_128;
-        SpeedStepMode result = instance.getSpeedStepMode();
-        assertThat(result).isEqualTo(expResult);
+        assertEquals( SpeedStepMode.NMRA_DCC_128, instance.getSpeedStepMode());
     }
 
     /**
@@ -188,6 +184,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @NotApplicable("DebugThrottle does not send Functions")
     public void testSendFunctionGroup1() {
     }
 
@@ -196,6 +193,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @NotApplicable("DebugThrottle does not send Functions")
     public void testSendFunctionGroup2() {
     }
 
@@ -204,6 +202,7 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @NotApplicable("DebugThrottle does not send Functions")
     public void testSendFunctionGroup3() {
     }
 
@@ -211,11 +210,9 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Override
     public void setUp() {
         JUnitUtil.setUp();
-        SystemConnectionMemo memo = Mockito.mock(SystemConnectionMemo.class);
-        Mockito.when(memo.getUserName()).thenReturn("Test");
-        Mockito.when(memo.getSystemPrefix()).thenReturn("T");
-        JUnitUtil.initDebugThrottleManager();
-        instance = new DebugThrottle(new jmri.DccLocoAddress(100,true),memo);
+        var memo = InstanceManager.getDefault(InternalSystemConnectionMemo.class);
+        JUnitUtil.initDebugThrottleManager(memo);
+        instance = new DebugThrottle(new DccLocoAddress(100,true),memo);
     }
 
     @AfterEach
@@ -224,6 +221,6 @@ public class DebugThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(DebugThrottleTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(DebugThrottleTest.class);
 
 }

@@ -1,13 +1,17 @@
 package jmri.jmrit.display.layoutEditor;
 
 import java.io.*;
+import java.text.ParseException;
 import java.util.stream.Stream;
 
+import jmri.InstanceManager;
+import jmri.JmriException;
 import jmri.util.*;
+import jmri.jmrit.display.Editor;
+import jmri.jmrit.logixng.LogixNG_Manager;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -34,7 +38,7 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
 
     @ParameterizedTest(name = "{index}: {0} (pass={1})")
     @MethodSource("data")
-    public void loadAndStoreTest(File file, boolean pass) throws Exception {
+    public void loadAndStoreTest(File file, boolean pass) throws IOException, JmriException, ParseException {
         this.loadLoadStoreFileCheck(file);
     }
 
@@ -42,7 +46,7 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         super(SaveType.User, true);
     }
 
-    static boolean done;
+    private boolean done;
 
     /**
      * Wait for the layout editor block processing to take place. This is quite
@@ -54,73 +58,76 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         done = false;
         ThreadingUtil.runOnGUIDelayed(() -> done = true, 2500);
         JUnitUtil.waitFor(() -> {
-            return jmri.InstanceManager.getDefault(LayoutBlockManager.class).stabilised || done;
-        });
+            return InstanceManager.getDefault(LayoutBlockManager.class).stabilised || done;
+        },"LayoutBlockManager stabilised || done");
 
         // need to do two separate ones because of waitFor limit
         done = false;
         ThreadingUtil.runOnGUIDelayed(() -> done = true, 2500);
         JUnitUtil.waitFor(() -> {
-            return jmri.InstanceManager.getDefault(LayoutBlockManager.class).stabilised || done;
-        });
-        if ( ! jmri.InstanceManager.getDefault(LayoutBlockManager.class).stabilised ) {
+            return InstanceManager.getDefault(LayoutBlockManager.class).stabilised || done;
+        },"LayoutBlockManager stabilised || done");
+        if ( ! InstanceManager.getDefault(LayoutBlockManager.class).stabilised ) {
             log.debug("not stabilized after check");
         }
-        
+
         // and wait yet another 2 sec before writing out
         done = false;
-        jmri.util.ThreadingUtil.runOnGUIDelayed(()->{ 
+        ThreadingUtil.runOnGUIDelayed(()->{
                 done = true;
             }, 2000);
-        jmri.util.JUnitUtil.waitFor(()->{return done;});
+        JUnitUtil.waitFor(()->{return done;},"GUI wait did not complete");
 
         if ( ! jmri.InstanceManager.getDefault(LayoutBlockManager.class).stabilised ) {
             log.debug(" still not stabilized");
         }
 
         done = false;
-        jmri.util.ThreadingUtil.runOnGUIDelayed(()->{ 
+        ThreadingUtil.runOnGUIDelayed(()->{
                 done = true;
             }, 2000);
-        jmri.util.JUnitUtil.waitFor(()->{return done;});
+        JUnitUtil.waitFor(()->{return done;},"next GUI wait did not complete");
 
         if ( ! jmri.InstanceManager.getDefault(LayoutBlockManager.class).stabilised ) {
             log.debug(" nor now");
         }
+
+        InstanceManager.getDefault(LogixNG_Manager.class).setupAllLogixNGs();
     }
-     
+
     /**
      * Also writes out image files from these for later offline checking.This
      * can't be (easily) automated, as the images vary from platform to
      * platform.
      *
      * @param file the file to check
-     * @throws Exception on any unexpected exceptional condition
+     * {@inheritDoc}
+     * @throws java.io.IOException on test failure
+     * @throws jmri.JmriException on test failure
      */
     @Override
-    public void loadLoadStoreFileCheck(File file) throws Exception {
+    public void loadLoadStoreFileCheck(File file) throws IOException, JmriException, ParseException {
         super.loadLoadStoreFileCheck(file);
 
         done = false;
         ThreadingUtil.runOnGUIDelayed(() -> done = true, 1000);
-        JUnitUtil.waitFor(() -> done);
+        JUnitUtil.waitFor(() -> done,"1 sec gui delay incomplete");
 
         storeAndCompareImage(file);
     }
 
     // store image(s) of any JFrames
     //  inFile is an XML file
-    public void storeAndCompareImage(File inFile) throws Exception {
+    public void storeAndCompareImage(File inFile) throws IOException {
         int index = 0;
         for (JmriJFrame frame : JmriJFrame.getFrameList()) {
             index++;
-            if (frame instanceof LayoutEditor) {
-                LayoutEditor le = (LayoutEditor) frame;
+            if (frame instanceof Editor) {
+                Editor le = (Editor) frame;
 
                 String name = inFile.getName();
                 FileUtil.createDirectory(FileUtil.getUserFilesPath() + "temp");
                 File outFile = new File(FileUtil.getUserFilesPath() + "temp/" + name + "." + index + ".png");
-                System.out.println(outFile);
 
                 java.awt.Dimension size = new java.awt.Dimension(Math.min(le.getTargetPanel().getSize().width, 2000),
                         Math.min(le.getTargetPanel().getSize().height, 1000));
@@ -151,15 +158,16 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
     }
 
     protected void findAndComparePngFiles(String name, File inFile, File outFile, int index, String subdir) throws IOException {
-        File compFile = new File(inFile.getCanonicalFile().getParentFile().
-                getParent() + "/loadref/" + subdir + "/" + name + "." + index + ".png");
+        File parent = inFile.getCanonicalFile().getParentFile();
+        Assertions.assertNotNull(parent);
+        String filepath = parent.getParent();
+        Assertions.assertNotNull(filepath);
+        File compFile = new File(filepath + "/loadref/" + subdir + "/" + name + "." + index + ".png");
 
         int checkVal = compareImageFiles(compFile, outFile);
-        if (checkVal != 0) {
-            log.error("Fail to compare new: {}", outFile);
-            log.error("Fail to compare ref: {}", compFile);
-            Assert.assertEquals("Screenshots didn't compare", 0, checkVal);
-        }
+        Assertions.assertEquals(0, checkVal,
+            () -> "Screenshots didn't compare, new: " + outFile
+                + " ref: " + compFile);
     }
 
     /**
@@ -170,12 +178,12 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
      */
     public static int compareImageFiles(File fileA, File fileB) {
         try {
-            log.info("FileA: " + fileA.toString());
-            log.info("FileB: " + fileB.toString());
+            log.info("FileA: {}",fileA);
+            log.info("FileB: {}",fileB);
 
             // check comparison file exists
             if (!fileA.exists()) {
-                log.warn("Comparison file {} doesn't exist, test skipped", fileA.getName());
+                log.info("Comparison file {} doesn't exist, test skipped", fileA.getName());
                 return 0;  // consider this passed with message
             }
             // get buffer data from both files
@@ -210,8 +218,10 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
 
     @BeforeEach
     @Override
-    public void setUp() {
-        super.setUp();
+    public void setUp(@TempDir java.io.File tempDir) throws IOException  {
+        // This test should not use tempDir because if we do, we cannot download
+        // the screenshots of failing tests from GitHub Windows CI.
+        super.setUp(FileUtil.getFile(FileUtil.SETTINGS));
         JUnitUtil.initLayoutBlockManager();
     }
 
@@ -224,6 +234,6 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         super.tearDown();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoadAndStoreTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoadAndStoreTest.class);
 
 }

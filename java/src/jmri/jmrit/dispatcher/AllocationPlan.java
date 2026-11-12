@@ -62,6 +62,7 @@ public class AllocationPlan {
     private Section _tSectionTwo = null;
     private int _tSectionOneSeq = 0;
     private int _tSectionTwoSeq = 0;
+    private int _passingSeq = 0;
 
     //
     // Access methods
@@ -127,6 +128,26 @@ public class AllocationPlan {
         return 0;
     }
 
+    /**
+     * Get the sequence number, in the second train's Transit, of the place
+     * where it passes the first train in a passing meet.
+     *
+     * @return the sequence number, or 0 if not set
+     */
+    protected int getPassingSequenceNum() {
+        return _passingSeq;
+    }
+
+    /**
+     * Set the sequence number, in the second train's Transit, of the place
+     * where it passes the first train in a passing meet.
+     *
+     * @param seq the sequence number
+     */
+    protected void setPassingSequenceNum(int seq) {
+        _passingSeq = seq;
+    }
+
     //
     // Other Methods
     //
@@ -160,5 +181,5 @@ public class AllocationPlan {
         // does nothing for now
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AllocationPlan.class);
+    private static final Logger log = LoggerFactory.getLogger(AllocationPlan.class);
 }

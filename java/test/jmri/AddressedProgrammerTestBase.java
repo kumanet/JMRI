@@ -1,8 +1,13 @@
 package jmri;
 
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Base JUnit tests for the Operations Mode Programmers derived from
@@ -18,46 +23,46 @@ abstract public class AddressedProgrammerTestBase extends ProgrammerTestBase {
     @Test
     @Override
     public void testDefault() {
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertEquals("Check Default", ProgrammingMode.OPSBYTEMODE,
-                programmer.getMode());        
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        assertEquals( ProgrammingMode.OPSBYTEMODE, programmer.getMode(),
+            "Check Default");
     }
 
     @Test
     @Override
     public void testGetCanRead() {
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertFalse("can read", programmer.getCanRead());
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        assertFalse( programmer.getCanRead(), "can read");
     }
     
     @Test
     @Override
     public void testSetGetMode() {
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertThrows(IllegalArgumentException.class, () -> programmer.setMode(ProgrammingMode.REGISTERMODE));
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        var ex = assertThrows(IllegalArgumentException.class, () ->
+            programmer.setMode(ProgrammingMode.REGISTERMODE));
+        assertNotNull(ex);
     }
 
     @Test
     public void testGetLongAddress(){
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertNotNull("long/short address boolean",((AddressedProgrammer)programmer).getLongAddress());
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        assertNotNull(((AddressedProgrammer)programmer).getLongAddress(), "long/short address boolean");
     }
 
     @Test
     public void testGetAddressNumber(){
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertNotNull("Numeric Address",((AddressedProgrammer)programmer).getAddressNumber());
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        assertNotNull( ((AddressedProgrammer)programmer).getAddressNumber(), "Numeric Address");
     }
 
     @Test
     public void testGetAddress(){
-        Assume.assumeTrue(programmer instanceof AddressedProgrammer);
-        Assert.assertNotNull("String Address",((AddressedProgrammer)programmer).getAddress());
+        assumeTrue(programmer instanceof AddressedProgrammer);
+        assertNotNull( ((AddressedProgrammer)programmer).getAddress(), "String Address");
     }
 
-    
     // must set the value of programmer in setUp.
-    @BeforeEach
     @Override
     abstract public void setUp();
 

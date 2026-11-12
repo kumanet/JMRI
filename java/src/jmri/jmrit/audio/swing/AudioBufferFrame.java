@@ -1,22 +1,21 @@
 package jmri.jmrit.audio.swing;
 
-//import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.io.File;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.event.ChangeEvent;
 import javax.swing.filechooser.FileNameExtensionFilter;
+
 import jmri.Audio;
 import jmri.AudioException;
 import jmri.AudioManager;
@@ -24,8 +23,7 @@ import jmri.InstanceManager;
 import jmri.jmrit.audio.AudioBuffer;
 import jmri.jmrit.beantable.AudioTableAction.AudioTableDataModel;
 import jmri.util.FileUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Defines a GUI to edit AudioBuffer objects.
@@ -52,22 +50,22 @@ public class AudioBufferFrame extends AbstractAudioFrame {
     private final Object lock = new Object();
 
     // UI components for Add/Edit Buffer
-    JLabel urlLabel = new JLabel(Bundle.getMessage("MakeLabel", Bundle.getMessage("LabelURL")));
-    JTextField url = new JTextField(40);
-    JButton buttonBrowse = new JButton("...");
-    JCheckBox stream = new JCheckBox(Bundle.getMessage("LabelStream"));
+    private final JLabel urlLabel = new JLabel(Bundle.getMessage("MakeLabel", Bundle.getMessage("LabelURL")));
+    private final JTextField url = new JTextField(40);
+    private final JButton buttonBrowse = new JButton("...");
+    private final JCheckBox stream = new JCheckBox(Bundle.getMessage("LabelStream"));
     // JLabel formatLabel = new JLabel(Bundle.getMessage("LabelFormat"));
     // JTextField format = new JTextField(20);
-    JLabel loopStartLabel = new JLabel(Bundle.getMessage("LabelLoopStart"));
-    JSpinner loopStart = new JSpinner();
-    JLabel loopEndLabel = new JLabel(Bundle.getMessage("LabelLoopEnd"));
-    JSpinner loopEnd = new JSpinner();
-    JFileChooser fileChooser;
+    private final JLabel loopStartLabel = new JLabel(Bundle.getMessage("LabelLoopStart"));
+    private final JSpinner loopStart = new JSpinner();
+    private final JLabel loopEndLabel = new JLabel(Bundle.getMessage("LabelLoopEnd"));
+    private final JSpinner loopEnd = new JSpinner();
+    private JFileChooser fileChooser;
     // AudioWaveFormPanel waveForm = new AudioWaveFormPanel();
 
-    private final static String PREFIX = "IAB";
+    private static final String PREFIX = "IAB";
 
-    @SuppressWarnings("OverridableMethodCallInConstructor")
+//    @SuppressWarnings("OverridableMethodCallInConstructor")
     public AudioBufferFrame(String title, AudioTableDataModel model) {
         super(title, model);
         layoutFrame();
@@ -81,22 +79,19 @@ public class AudioBufferFrame extends AbstractAudioFrame {
     }
 
     @Override
-    @SuppressWarnings("UnnecessaryBoxing")
-    public void layoutFrame() {
+    public final void layoutFrame() {
         super.layoutFrame();
-        JPanel p;
 
-        JPanel p2;
-        p = new JPanel();
+        JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(Bundle.getMessage("LabelSample")),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));
-        p2 = new JPanel();
+        JPanel p2 = new JPanel();
         p2.setLayout(new FlowLayout());
         p2.add(urlLabel);
         p2.add(url);
-        buttonBrowse.addActionListener(this::browsePressed);
+        buttonBrowse.addActionListener( e -> browsePressed());
         buttonBrowse.setToolTipText(Bundle.getMessage("ToolTipButtonBrowse"));
         p2.add(buttonBrowse);
         p.add(p2);
@@ -141,45 +136,40 @@ public class AudioBufferFrame extends AbstractAudioFrame {
         loopStart.setPreferredSize(new JTextField(8).getPreferredSize());
         loopStart.setModel(
                 new SpinnerNumberModel(Long.valueOf(0), Long.valueOf(0), Long.valueOf(Long.MAX_VALUE), Long.valueOf(1)));
-        loopStart.addChangeListener((ChangeEvent e) -> {
+        loopStart.addChangeListener( e ->
             loopEnd.setValue(
                     ((Long) loopStart.getValue()
                             < (Long) loopEnd.getValue())
                             ? loopEnd.getValue()
-                            : loopStart.getValue());
-        });
+                            : loopStart.getValue()));
         p.add(loopStart);
         p.add(loopEndLabel);
         loopEnd.setPreferredSize(new JTextField(8).getPreferredSize());
         loopEnd.setModel(
                 new SpinnerNumberModel(Long.valueOf(0), Long.valueOf(0), Long.valueOf(Long.MAX_VALUE), Long.valueOf(1)));
-        loopEnd.addChangeListener((ChangeEvent e) -> {
+        loopEnd.addChangeListener( e ->
             loopStart.setValue(
                     ((Long) loopEnd.getValue()
                             < (Long) loopStart.getValue())
                             ? loopEnd.getValue()
-                            : loopStart.getValue());
-        });
+                            : loopStart.getValue()));
         p.add(loopEnd);
         main.add(p);
 
         p = new JPanel();
-        JButton apply;
-        p.add(apply = new JButton(Bundle.getMessage("ButtonApply")));
-        apply.addActionListener((ActionEvent e) -> {
-            applyPressed(e);
-        });
-        JButton ok;
-        p.add(ok = new JButton(Bundle.getMessage("ButtonOK")));
+        JButton apply = new JButton(Bundle.getMessage("ButtonApply"));
+        p.add(apply);
+        apply.addActionListener( e -> applyPressed());
+        JButton ok = new JButton(Bundle.getMessage("ButtonOK"));
+        p.add(ok);
         ok.addActionListener((ActionEvent e) -> {
-            applyPressed(e);
-            frame.dispose();
+            if (applyPressed()) {
+                frame.dispose();
+            }
         });
-        JButton cancel;
-        p.add(cancel = new JButton(Bundle.getMessage("ButtonCancel")));
-        cancel.addActionListener((ActionEvent e) -> {
-            frame.dispose();
-        });
+        JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));
+        p.add(cancel);
+        cancel.addActionListener( e -> frame.dispose());
         frame.getContentPane().add(p);
     }
 
@@ -187,7 +177,6 @@ public class AudioBufferFrame extends AbstractAudioFrame {
      * Populate the Edit Buffer frame with default values.
      */
     @Override
-    @SuppressWarnings("UnnecessaryBoxing")
     public void resetFrame() {
         synchronized (lock) {
             sysName.setText(PREFIX + nextCounter()); // NOI18N
@@ -196,9 +185,9 @@ public class AudioBufferFrame extends AbstractAudioFrame {
         url.setText(null);
         // format.setText(null);
         stream.setSelected(false);
-        stream.setEnabled(false); //(true);
-        loopStart.setValue(Long.valueOf(0));
-        loopEnd.setValue(Long.valueOf(0));
+        stream.setEnabled(false);
+        loopStart.setValue(0L);
+        loopEnd.setValue(0L);
 
         this.newBuffer = true;
     }
@@ -209,7 +198,7 @@ public class AudioBufferFrame extends AbstractAudioFrame {
     @Override
     public void populateFrame(Audio a) {
         if (!(a instanceof AudioBuffer)) {
-            throw new IllegalArgumentException(a.getSystemName() + " is not an AudioBuffer object");
+            throw new IllegalArgumentException(a + " is not an AudioBuffer object");
         }
         super.populateFrame(a);
         AudioBuffer b = (AudioBuffer) a;
@@ -227,9 +216,9 @@ public class AudioBufferFrame extends AbstractAudioFrame {
         this.newBuffer = false;
     }
 
-    void browsePressed(ActionEvent e) {
+    private void browsePressed() {
         if (fileChooser == null) {
-            fileChooser = new JFileChooser("resources" + File.separator + "sounds" + File.separator); // NOI18N
+            fileChooser = new jmri.util.swing.JmriJFileChooser("resources" + File.separator + "sounds" + File.separator); // NOI18N
             fileChooser.setFileFilter(new FileNameExtensionFilter("Audio Files (*.wav)", "wav")); // NOI18N
         }
 
@@ -245,37 +234,40 @@ public class AudioBufferFrame extends AbstractAudioFrame {
                 url.setText(fileName);
 //                try {
 //                    WaveFileReader wfr = new WaveFileReader(FileUtil.getExternalFilename(fileName));
-//                    JOptionPane.showMessageDialog(null, wfr.toString(), wfr.toString(), JOptionPane.INFORMATION_MESSAGE);
+//                    JmriJOptionPane.showMessageDialog(null, wfr.toString(), wfr.toString(), JmriJOptionPane.INFORMATION_MESSAGE);
 //                } catch (AudioException ex) {
-//                    JOptionPane.showMessageDialog(null, ex.getMessage(), rba.getString("TitleReadError"), JOptionPane.ERROR_MESSAGE);
+//                    JmriJOptionPane.showMessageDialog(this, ex.getMessage(), rba.getString("TitleReadError"), JmriJOptionPane.ERROR_MESSAGE);
 //                }
             }
         }
     }
 
-    void applyPressed(ActionEvent e) {
+    private boolean applyPressed() {
         String sName = sysName.getText();
         if (entryError(sName, PREFIX, "" + counter)) {
-            return;
+            return false;
         }
         String user = userName.getText();
-        if (user.equals("")) {
+        if (user.isEmpty()) {
             user = null;
         }
         AudioBuffer b;
         try {
             AudioManager am = InstanceManager.getDefault(jmri.AudioManager.class);
+            if (newBuffer && am.getBySystemName(sName) != null) {
+                throw new AudioException(Bundle.getMessage("DuplicateSystemName"));
+            }
             try {
                 b = (AudioBuffer) am.provideAudio(sName);
             } catch (IllegalArgumentException ex) {
-                throw new AudioException("Problem creating buffer");
+                throw new AudioException(Bundle.getMessage("ProblemCreatingBuffer"));
             }
-            if (newBuffer && am.getByUserName(user) != null) {
+            if ((user != null) && newBuffer && am.getByUserName(user) != null) {
                 am.deregister(b);
                 synchronized (lock) {
                     prevCounter();
                 }
-                throw new AudioException("Duplicate user name - please modify");
+                throw new AudioException(Bundle.getMessage("DuplicateUserName"));
             }
             b.setUserName(user);
             b.setStreamed(stream.isSelected());
@@ -298,18 +290,23 @@ public class AudioBufferFrame extends AbstractAudioFrame {
             // Notify changes
             model.fireTableDataChanged();
         } catch (AudioException ex) {
-            JOptionPane.showMessageDialog(null, ex.getMessage(), Bundle.getMessage("AudioCreateErrorTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, ex.getMessage(),
+                Bundle.getMessage("AudioCreateErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
+            return false;
         }
+        newBuffer = false;  // If the user presses Apply, the dialog stays visible.
+        return true;
     }
 
     private static int nextCounter() {
-        return counter++;
+        counter++;
+        return counter-1;
     }
 
     private static void prevCounter() {
         counter--;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(AudioBufferFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AudioBufferFrame.class);
 
 }

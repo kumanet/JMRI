@@ -2,9 +2,7 @@ package jmri.jmrit.display;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.*;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Test;
 
 /**
  * Test Positionable
@@ -16,7 +14,7 @@ public class PositionableTest {
     @Test
     public void testCtor() {
         Positionable.DuplicateIdException e = new Positionable.DuplicateIdException();
-        Assert.assertNotNull(e);
+        Assertions.assertNotNull(e);
     }
 
     @BeforeEach

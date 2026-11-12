@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  *
  * @Author Paul Bender Copyright (C) 2014
  */
-final public class XBeeIOStream extends AbstractPortController {
+public final class XBeeIOStream extends AbstractPortController {
 
     private DataOutputStream pout = null; // for output to other classes
     private DataInputStream pin = null; // for input from other classes
@@ -34,7 +34,7 @@ final public class XBeeIOStream extends AbstractPortController {
     private Thread sourceThread;  // thread writing to the remote xbee
     private Thread sinkThread;  // thread reading from the remote xbee
 
-    private RemoteXBeeDevice remoteXBee;
+    private final RemoteXBeeDevice remoteXBee;
     private final XBeeTrafficController xtc;
 
     public XBeeIOStream(XBeeNode node, XBeeTrafficController tc) {
@@ -133,7 +133,7 @@ final public class XBeeIOStream extends AbstractPortController {
     public void recover() {
     }
 
-    static private class TransmitThread implements Runnable {
+    private static class TransmitThread implements Runnable {
 
         private RemoteXBeeDevice node = null;
         private XBeeTrafficController xtc = null;
@@ -165,7 +165,7 @@ final public class XBeeIOStream extends AbstractPortController {
                 } catch (java.io.IOException e) {
                     log.error("IOException reading serial data from pipe before sending to XBee");
                 }
-                byte dataArray[] = new byte[data.size()];
+                byte[] dataArray = new byte[data.size()];
                 int i = 0;
                 for (Byte n : data) {
                     dataArray[i++] = n;
@@ -189,7 +189,7 @@ final public class XBeeIOStream extends AbstractPortController {
 
     }
 
-    static private class ReceiveThread implements Runnable {
+    private static class ReceiveThread implements Runnable {
 
         private final RemoteXBeeDevice node;
         private final XBeeTrafficController xtc;
@@ -212,10 +212,10 @@ final public class XBeeIOStream extends AbstractPortController {
                 try {
                     com.digi.xbee.api.models.XBeeMessage message = xtc.getXBee().readDataFrom(node, 100);
                     if (message != null) {
-                        byte data[] = message.getData();
+                        byte[] data = message.getData();
                         log.debug("Received {}", data);
-                        for (int i = 0; i < data.length; i++) {
-                            pipe.write(data[i]);
+                        for (byte datum : data) {
+                            pipe.write(datum);
                         }
                     }
                 } catch (java.io.IOException ioe) {
@@ -230,6 +230,6 @@ final public class XBeeIOStream extends AbstractPortController {
 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(XBeeIOStream.class);
+    private static final Logger log = LoggerFactory.getLogger(XBeeIOStream.class);
 
 }

@@ -3,7 +3,7 @@ package jmri.jmrit.beantable.signalmast;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -17,7 +17,6 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.border.TitledBorder;
@@ -36,6 +35,8 @@ import jmri.implementation.SignalHeadSignalMast;
 import jmri.swing.NamedBeanComboBox;
 import jmri.util.StringUtil;
 import jmri.util.javaworld.GridLayout2;
+import jmri.util.swing.JComboBoxUtil;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * A pane for configuring SignalHeadSignalMast objects.
@@ -47,6 +48,11 @@ import jmri.util.javaworld.GridLayout2;
 public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
 
     public SignalHeadSignalMastAddPane() {
+        initPane();
+    }
+
+    final void initPane() {
+
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         // lit/unlit controls
         JPanel p = new JPanel();
@@ -61,11 +67,8 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
         signalHeadPanel.setBorder(border);
         add(signalHeadPanel);
 
-        includeUsed.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                refreshHeadComboBox();
-            }
+        includeUsed.addActionListener((ActionEvent e) -> {
+            refreshHeadComboBox();
         });
 
         // disabled aspects controls
@@ -85,9 +88,9 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
 
     JPanel signalHeadPanel = new JPanel();
     ArrayList<NamedBeanComboBox<SignalHead>> headList = new ArrayList<>(5);
-    JCheckBox includeUsed = new JCheckBox(Bundle.getMessage("IncludeUsedHeads"));
+    private final JCheckBox includeUsed = new JCheckBox(Bundle.getMessage("IncludeUsedHeads"));
 
-    JCheckBox allowUnLit = new JCheckBox();
+    private final JCheckBox allowUnLit = new JCheckBox();
 
     LinkedHashMap<String, JCheckBox> disabledAspects = new LinkedHashMap<>(NOTIONAL_ASPECT_COUNT);
     JPanel disabledAspectsPanel = new JPanel();
@@ -116,6 +119,7 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
             head.setExcludedItems(alreadyUsed);
             headList.add(head);
             signalHeadPanel.add(head);
+            JComboBoxUtil.setupComboBoxMaxRows(head);
         }
         signalHeadPanel.add(includeUsed);
 
@@ -173,6 +177,7 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
             head.setEnabled(false);
             head.setSelectedItem(currentMast.getHeadsUsed().get(i).getBean()); // must match NamedBeanComboBox above
             signalHeadPanel.add(head);
+            JComboBoxUtil.setupComboBoxMaxRows(head);
         }
         signalHeadPanel.add(includeUsed);
         signalHeadPanel.revalidate();
@@ -210,8 +215,8 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
                 // see if it exists (remember, we're not handling a current mast)
                 SignalMast m = InstanceManager.getDefault(SignalMastManager.class).getSignalMast(name);
                 if (m != null) {
-                    JOptionPane.showMessageDialog(null, java.text.MessageFormat.format(Bundle.getMessage("DuplicateMast"),
-                            new Object[]{m.getDisplayName()}), Bundle.getMessage("DuplicateMastTitle"), JOptionPane.INFORMATION_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(this, java.text.MessageFormat.format(Bundle.getMessage("DuplicateMast"),
+                            new Object[]{m.getDisplayName()}), Bundle.getMessage("DuplicateMastTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
                     return false;
                 }
                 try {
@@ -234,7 +239,7 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
         }
 
         // heads are attached via the system name
-        if (!username.equals("")) {
+        if (!username.isEmpty()) {
             currentMast.setUserName(username);
         }
 
@@ -262,14 +267,14 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
     }
 
     void handleCreateException(String sysName) {
-        JOptionPane.showMessageDialog(null,
+        JmriJOptionPane.showMessageDialog(this,
                 Bundle.getMessage("ErrorSignalMastAddFailed", sysName) + "\n" + Bundle.getMessage("ErrorAddFailedCheck"),
                 Bundle.getMessage("ErrorTitle"),
-                JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.ERROR_MESSAGE);
     }
 
     @ServiceProvider(service = SignalMastAddPane.SignalMastAddPaneProvider.class)
-    static public class SignalMastAddPaneProvider extends SignalMastAddPane.SignalMastAddPaneProvider {
+    public static class SignalMastAddPaneProvider extends SignalMastAddPane.SignalMastAddPaneProvider {
         /** {@inheritDoc} */
         @Override
         @Nonnull public String getPaneName() {
@@ -282,6 +287,6 @@ public class SignalHeadSignalMastAddPane extends SignalMastAddPane {
         }
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignalHeadSignalMastAddPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignalHeadSignalMastAddPane.class);
 
 }

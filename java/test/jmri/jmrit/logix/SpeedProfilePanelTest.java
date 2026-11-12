@@ -6,7 +6,6 @@ import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.roster.RosterSpeedProfile;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 import org.junit.Assume;
 
@@ -34,10 +33,9 @@ public class SpeedProfilePanelTest {
     @AfterEach
     public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SpeedProfilePanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SpeedProfilePanelTest.class);
 
 }

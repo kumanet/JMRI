@@ -23,7 +23,7 @@ import jmri.jmrix.AbstractMRTrafficController;
  * message.
  *
  * @author Bob Jacobsen Copyright (C) 2001
- * @author ken cameron Copyright (C) 2013
+ * @author Ken Cameron Copyright (C) 2013, 2023
  */
 public class NceTrafficController extends AbstractMRTrafficController implements NceInterface, CommandStation {
 
@@ -63,10 +63,10 @@ public class NceTrafficController extends AbstractMRTrafficController implements
                 || getUsbSystem() == NceTrafficController.USB_SYSTEM_SB5
                 || getUsbSystem() == NceTrafficController.USB_SYSTEM_TWIN));
 
-        if (isUsb && NmraPacket.isAccSignalDecoderPkt(packet)
+        if (NmraPacket.isAccSignalDecoderPkt(packet)
                 && (NmraPacket.getAccSignalDecoderPktAddress(packet) > 0)
                 && (NmraPacket.getAccSignalDecoderPktAddress(packet) <= 2044)) {
-            // intercept NMRA signal cmds to USB systems
+            // intercept only those NMRA signal cmds we can handle with NCE binary commands
             int addr = NmraPacket.getAccSignalDecoderPktAddress(packet);
             int aspect = packet[2];
             log.debug("isAccSignalDecoderPkt(packet) sigAddr ={}, aspect ={}", addr, aspect);
@@ -124,44 +124,50 @@ public class NceTrafficController extends AbstractMRTrafficController implements
     /**
      * Create all commands in the ASCII format.
      */
-    static public final int OPTION_FORCE_ASCII = -1;
+    public static final int OPTION_FORCE_ASCII = -1;
     /**
      * Create commands compatible with the 1999 EPROM.
      * <p>
      * This is binary for everything except service-mode CV programming
      * operations.
      */
-    static public final int OPTION_1999 = 0;
+    public static final int OPTION_1999 = 0;
     /**
      * Create commands compatible with the 2004 EPROM.
      * <p>
      * This is binary for everything except service-mode CV programming
      * operations.
      */
-    static public final int OPTION_2004 = 10;
+    public static final int OPTION_2004 = 10;
     /**
      * Create commands compatible with the 2006 EPROM.
      * <p>
      * This is binary for everything, including service-mode CV programming
      * operations.
      */
-    static public final int OPTION_2006 = 20;
+    public static final int OPTION_2006 = 20;
     /**
      * Create commands compatible with the 1.28 EPROM.
      * <p>
      * For PowerCab/SB3 original pre-Nov 2012
      */
-    static public final int OPTION_1_28 = 30;
+    public static final int OPTION_1_28 = 30;
     /**
      * Create commands compatible with the 1.65 EPROM.
      * <p>
      * For PowerCab/SB5/Twin update post-Nov 2012
      */
-    static public final int OPTION_1_65 = 40;
+    public static final int OPTION_1_65 = 40;
+    /**
+     * Create commands compatible with the PH5.
+     * <p>
+     * For PH5
+     */
+    public static final int OPTION_PH5 = 80;
     /**
      * Create all commands in the binary format.
      */
-    static public final int OPTION_FORCE_BINARY = 10000;
+    public static final int OPTION_FORCE_BINARY = 10000;
 
     private int commandOptions = OPTION_2006;
     public boolean commandOptionSet = false;
@@ -358,52 +364,52 @@ public class NceTrafficController extends AbstractMRTrafficController implements
     /**
      * Initializer for supported command groups
      */
-    static public final long CMDS_NONE = 0;
+    public static final long CMDS_NONE = 0;
 
     /**
      * Limit max accy decoder to addr 250
      */
-    static public final long CMDS_ACCYADDR250 = 0x0001;
+    public static final long CMDS_ACCYADDR250 = 0x0001;
 
     /**
      * Supports programming track and related commands
      */
-    static public final long CMDS_PROGTRACK = 0x0002;
+    public static final long CMDS_PROGTRACK = 0x0002;
 
     /**
      * Supports read AIU status commands {@code 0x9B}
      */
-    static public final long CMDS_AUI_READ = 0x004;
+    public static final long CMDS_AUI_READ = 0x004;
 
     /**
      * Supports USB read/write memory commands {@code 0xB3 -> 0xB5}
      */
-    static public final long CMDS_MEM = 0x0008;
+    public static final long CMDS_MEM = 0x0008;
 
     /**
      * Support Ops Mode Pgm commands {@code 0xAE -> 0xAF}
      */
-    static public final long CMDS_OPS_PGM = 0x0010;
+    public static final long CMDS_OPS_PGM = 0x0010;
 
     /**
      * Support Clock commands {@code 0x82 -> 0x87}
      */
-    static public final long CMDS_CLOCK = 0x0020;
+    public static final long CMDS_CLOCK = 0x0020;
 
     /**
      * Support USB Interface commands {@code 0xB1}
      */
-    static public final long CMDS_USB = 0x0040;
+    public static final long CMDS_USB = 0x0040;
 
     /**
      * Disable for USB commands
      */
-    static public final long CMDS_NOT_USB = 0x0080;
+    public static final long CMDS_NOT_USB = 0x0080;
 
     /**
      * All Connections Support commands
      */
-    static public final long CMDS_ALL_SYS = 0x0100;
+    public static final long CMDS_ALL_SYS = 0x0100;
 
     private long cmdGroups = CMDS_NONE;
     private boolean cmdGroupsSet = false;
@@ -541,6 +547,8 @@ public class NceTrafficController extends AbstractMRTrafficController implements
     /**
      * Forward a preformatted message to the actual interface.
      */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification = "passing exception text")
     @Override
     public void sendNceMessage(NceMessage m, NceListener reply) {
         try {
@@ -694,7 +702,12 @@ public class NceTrafficController extends AbstractMRTrafficController implements
         }
         return memo.getSystemPrefix();
     }
-
-    private final static Logger log = LoggerFactory.getLogger(NceTrafficController.class);
+    
+    /*
+     * the command station memory object
+     */
+    public NceCmdStationMemory csm;
+    
+    private static final Logger log = LoggerFactory.getLogger(NceTrafficController.class);
 
 }

@@ -7,8 +7,6 @@ import jmri.jmrit.logixng.expressions.TriggerOnce;
 
 import org.jdom2.Element;
 
-import jmri.jmrit.logixng.DigitalExpressionBean;
-
 /**
  * Handle XML configuration for ActionLightXml objects.
  *
@@ -80,5 +78,5 @@ public class TriggerOnceXml extends jmri.managers.configurexml.AbstractNamedBean
         return true;
     }
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TriggerOnceXml.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TriggerOnceXml.class);
 }

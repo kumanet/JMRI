@@ -2,9 +2,10 @@
  *  panel Servlet - Draw JMRI panels on browser screen
  *    Retrieves panel xml from JMRI and builds panel client-side from that xml, including
  *    click functions.  Sends and listens for changes to panel elements using the JSON WebSocket server.
- *    If no parm passed, page will list links to available panels.
+ *    If no parm "name" passed, page will list links to available panels.
+ *    Include parm protect=yes to treat panel as read-only
  *  Approach:  Read panel's xml and create widget objects in the browser with all needed attributes.
- *    There are 4 "widgetFamily"s: text, icon, drawn and switch.  States are handled by storing member's
+ *    There are 5 "widgetFamily"s: text, input, icon, drawn and switch.  States are handled by storing member's
  *    iconX, textX, cssX where X is the state.  The corresponding members are "shown" whenever the state changes.
  *    CSS classes are used throughout to attach events to correct widgets, as well as control appearance.
  *    The JSON type is used to send changes to JSON server and to listen for changes made elsewhere.
@@ -12,7 +13,7 @@
  *    Switch widgets are handled by drawing directly on an individual javascript "canvas", placed in a flexbox layout.
  *
  *  See java/src/jmri/server/json/JsonNamedBeanSocketService.java#onMessage() for GET method that adds a listener.
- *  See JMRI Web Server - Panel Servlet in help/en/html/web/PanelServlet.shtmlHelp for an example description of
+ *  See JMRI Web Server - Panel Servlet in help/en/html/web/PanelServlet.shtml for an example description of
  *  the interaction between the Web Servlets, the Web Browser and the JMRI application.
  *
  *  TODO: show error dialog while retrying connection
@@ -21,16 +22,11 @@
  *  TODO: update drawn track on color and width changes (would need to create system objects to reflect these chgs)
  *  TODO: research movement of locoicons ("promote" locoicon to system entity in JMRI?, add panel-level listeners?)
  *  TODO: deal with mouseleave, mouseout, touchout, etc. Slide off Stop button on rb1 for example.
- *  TODO: handle inputs/selection on various memory widgets
- *  TODO: alignment of memoryIcons without fixed width is very different.  Recommended workaround is to use fixed width.
- *  TODO:    ditto for sensorIcons with text
+ *  TODO: alignment of text sensorIcons without fixed width is very different.  Recommended workaround is to use fixed width.
  *  TODO: add support for slipturnouticon (one2beros)
  *  TODO: handle (and test) disableWhenOccupied for layoutslip
- *
- *  DONE: draw dashed curves
- *  DONE: handle drawn ellipse (see LMRC APB)
- *  DONE: address color differences between java panel and javascript panel (e.g. lightGray)
- *  DONE: make turnout, levelXing occupancy work like LE panels (more than just checking A)
+ *  TODO: handle block color and track widths for turntable raytracks
+ *  TODO: fix JMRI WARN about username on memoryicons
  *
  **********************************************************************************************/
 
@@ -41,6 +37,7 @@ var $gWidgets = {};         //array of all widget objects, key=CSSId
 var $gPanelList = {};       //store list of available panels
 var $gPanel = {};           //store overall panel info
 var whereUsed = {};         //associative array of array of elements indexed by systemName or userName
+var audioIconIDs = {};      //associative array of audio icons
 var occupancyNames = {};    //associative array of array of elements indexed by occupancy sensor name
 var $oblockNames = {};      //associative array of array of elements indexed by occupancy block name (CPE panels)
 var $gPts = {};             //array of all points, key="pointname.pointtype" (used for layoutEditor panels)
@@ -56,6 +53,10 @@ var $unknownColor = 'gray';
 var $showUserName = 'no';
 var DOWNEVENT = 'touchstart mousedown';  // check both touch and mouse events
 var UPEVENT = 'touchend mouseup';
+var BLUR = 'blur';
+var KEYUP = 'keyup';
+var CHANGE = 'change';
+
 var SIZE = 3;               // default factor for circles
 
 var UNKNOWN = '0';          // constants to match JSON Server state names
@@ -69,6 +70,11 @@ var ALLOCATED = 0x10;       // constants to match JSON Server oblock status name
 var RUNNING = 0x20;         // Oblock that running train has reached
 var OUT_OF_SERVICE = 0x40;  // Oblock that should not be used
 var TRACK_ERROR = 0x80;     // Oblock has Error
+
+var CLOSEDCLOSED = '5';     // constants for slipturnouticon
+var CLOSEDTHROWN = '7';
+var THROWNCLOSED = '9';
+var THROWNTHROWN = '11';
 
 var PT_CEN = ".POS_POINT";  // named constants for point types
 var PT_A = ".TURNOUT_A";
@@ -153,6 +159,8 @@ var requestPanelXML = function(panelName) {
         success: function(data, textStatus, jqXHR) {
             processPanelXML(data, textStatus, jqXHR);
             setTitle($gPanel["name"]);  // set final title once load completes, helps with testing
+            // set new attribute data-panel-name on the panel-area div to the panel name so that a user's css can use it.
+            $("#panel-area").attr("data-panel-name", $gPanel["name"]);
         },
         error: function( jqXHR, textStatus, errorThrown) {
             alert("Error retrieving panel xml from server.  Please press OK to retry.\n\nDetails: " +
@@ -180,24 +188,21 @@ function processPanelXML($returnedData, $success, $xhr) {
     $($panel[0].attributes).each(function() {
         $gPanel[this.name] = this.value;
     });
-    $("#panel-area").width($gPanel.panelwidth);
-    $("#panel-area").height($gPanel.panelheight);
+    $("#panel-area").width($gPanel.width);
+    $("#panel-area").height($gPanel.height);
+
+    //override "Allow Layout Control" attribute when protect parm set to "yes"
+    var protect = getParameterByName("protect");
+    if (protect == "yes") {
+        $gPanel["controlling"] = "no";
+    }
 
     // insert the canvas layer and set up context used by LayoutEditor "drawn" objects, set some defaults
     if ($gPanel.paneltype == "LayoutPanel") {
-        $("#panel-area").prepend("<canvas id='panelCanvas' width=" + $gPanel.panelwidth + "px height=" +
-            $gPanel.panelheight + "px style='position:absolute;z-index:2;'>");
-        var canvas = document.getElementById("panelCanvas");
-        $gCtx = canvas.getContext("2d");
-        $gCtx.strokeStyle = $gPanel.defaulttrackcolor;
-        $gCtx.lineWidth = $gPanel.sidelinetrackwidth;
-        //set background color from panel attribute (single hex value)
-        $("#panel-area").css({'background-color': $gPanel.backgroundcolor});
+        createPanelCanvas(); //insure canvas layer is available for drawing
     }
 
     // set up context used by SwitchboardEditor "beanswitch" objects, set some defaults
-    var $swWidthPx;
-    var $swHeightPx;
     if ($gPanel.paneltype == "Switchboard") {
         $("#panel-area").width("100%"); // reset to fill the (mobile) screen
         $("#panel-area").height("100%"); // reset to fill the (mobile) screen
@@ -208,7 +213,7 @@ function processPanelXML($returnedData, $success, $xhr) {
         $total = Number($gPanel.total);
         $rows = Number($gPanel.rows);
         if ($rows == 0) { // AutoRows set, automatically choose grid showing largest tiles using flexbox
-            $("#panel-area").css({display: "flex", 'flex-flow': "row wrap"})
+            $("#panel-area").css({'display': "flex", 'flex-flow': "row wrap"})
             $autoRows = 1;
             $rows = autoRows(window.screen.width, window.screen.height - 200); // use (mobile) screen size, leave space for header
             // check browser window (window.innerWidth) size vs whole screen (window.screen.width)
@@ -254,6 +259,11 @@ function processPanelXML($returnedData, $success, $xhr) {
             //default various css attributes to not-set, then set in later code as needed
             var $hoverText = "";
 
+            //set value as JMRI would if "Allow Layout Control" turned off
+            if ($gPanel.controlling != "yes") {
+                $widget['forcecontroloff'] = "true";
+            }
+
             // add and normalize the various type-unique values, from the various spots they are stored
             // icon names based on states returned from JSON server,
             $widget['state'] = UNKNOWN; //initial state is unknown
@@ -264,6 +274,7 @@ function processPanelXML($returnedData, $success, $xhr) {
             }
             $widget["id"] = "widget-" + $gUnique(); //set id to a unique value (since same element can be in multiple widgets)
             $widget['widgetFamily'] = $getWidgetFamily($widget, this);
+            $widget['extraAttributes'] = ""; //some type-specific attrs
             var $jc = "";
             if (isDefined($widget["class"])) {
                 var $ta = $widget["class"].split('.'); //get last part of java class name for a css class
@@ -280,6 +291,11 @@ function processPanelXML($returnedData, $success, $xhr) {
             if ($widget.hidden == "yes") {
                 $widget.classes += " hidden ";
             }
+            if (isDefined($widget.showtooltip) && $widget.showtooltip == "true") { //set tooltip for custom tooltip
+                var ht = $(this).find('tooltip').text();
+                if (ht != "") $widget['hoverText'] = ht;
+            } 
+
             // set additional values in this widget
             switch ($widget.widgetFamily) {
                 case "icon" :
@@ -290,6 +306,39 @@ function processPanelXML($returnedData, $success, $xhr) {
                             $widget['rotation'] = $(this).find('icon').find('rotation').text() * 1;
                             $widget['degrees'] = ($(this).find('icon').attr('degrees') * 1) - ($widget.rotation * 90);
                             $widget['scale'] = $(this).find('icon').attr('scale');
+                            break;
+                        case "audioicon" :
+                            $widget.jsonType = 'audio'; // JSON object type
+                            $widget['identity'] = $(this).find('Identity').text();
+                            audioIconIDs['audioicon:'+$widget['identity']] = $widget;   // Ensure the key is a string, not a number
+                            $widget['icon' + UNKNOWN] = $(this).find('icon').attr('url');
+                            $widget['sound'] = $(this).attr('sound');
+                            $widget['onClickOperation'] = $(this).attr('onClickOperation');
+                            $widget['audio_widget'] = new Audio($widget['sound']);
+                            $widget['playSoundWhenJmriPlays'] = $(this).attr('playSoundWhenJmriPlays') == "yes";
+                            $widget['stopSoundWhenJmriStops'] = $(this).attr('stopSoundWhenJmriStops') == "yes";
+                            $widget['rotation'] = $(this).find('icon').find('rotation').text() * 1;
+                            $widget['degrees'] = ($(this).find('icon').attr('degrees') * 1) - ($widget.rotation * 90);
+                            $widget['scale'] = $(this).find('icon').attr('scale');
+                            $widget.classes += " " + $widget.jsonType + " clickable"; //make it clickable
+                            if (!$('#' + $widget.id).hasClass('clickable')) {
+                                $('#' + $widget.id).addClass("clickable");
+                                $('#' + $widget.id).bind(UPEVENT, $handleClick);
+                            }
+                            jmri.getAudio($widget.systemName);
+                            jmri.getAudioIcon($widget['identity']);
+                            break;
+                        case "logixngicon" :
+                            $widget['identity'] = $(this).find('Identity').text();
+                            $widget['icon' + UNKNOWN] = $(this).find('icon').attr('url');
+                            $widget['rotation'] = $(this).find('icon').find('rotation').text() * 1;
+                            $widget['degrees'] = ($(this).find('icon').attr('degrees') * 1) - ($widget.rotation * 90);
+                            $widget['scale'] = $(this).find('icon').attr('scale');
+                            $widget.classes += " " + $widget.jsonType + " clickable"; //make it clickable
+                            if (!$('#' + $widget.id).hasClass('clickable')) {
+                                $('#' + $widget.id).addClass("clickable");
+                                $('#' + $widget.id).bind(UPEVENT, $handleClick);
+                            }
                             break;
                         case "linkinglabel" :
                             $widget['icon' + UNKNOWN] = $(this).find('icon').attr('url');
@@ -421,6 +470,21 @@ function processPanelXML($returnedData, $success, $xhr) {
                             }
                             jmri.getTurnout($widget["systemName"]);
                             break;
+                        case "outputindicator" :   
+                            $widget['name'] = $widget.turnout; //normalize name
+                            $widget.jsonType = "turnout"; // JSON object type
+                            $widget['icon' + UNKNOWN] = $(this).find('icons').find('unknown').attr('url');
+                            $widget['icon2'] = $(this).find('icons').find('closed').attr('url');
+                            $widget['icon4'] = $(this).find('icons').find('thrown').attr('url');
+                            $widget['icon8'] = $(this).find('icons').find('inconsistent').attr('url');
+                            $widget['rotation'] = $(this).find('icons').find('unknown').find('rotation').text() * 1;
+                            $widget['degrees'] = ($(this).find('icons').find('unknown').attr('degrees') * 1) - ($widget.rotation * 90);
+                            $widget['scale'] = $(this).find('icons').find('unknown').attr('scale');
+                            if ($widget.forcecontroloff != "true") {
+                                $widget.classes += " " + $widget.jsonType + " clickable ";
+                            }
+                            jmri.getTurnout($widget["systemName"]);
+                            break;
                         case "sensoricon" :
                             $widget['name'] = $widget.sensor; //normalize name
                             $widget.jsonType = "sensor"; // JSON object type
@@ -524,7 +588,7 @@ function processPanelXML($returnedData, $success, $xhr) {
                                 $widget['id'] = $widget.siblings[i];         // use id already set in sibling array
                                 $widget.name = $(item).attr('sensor');
                                 $widget['icon2'] = $(item).attr('url');
-                                if (i < actives.size() - 1) { //only save widget and make a new one if more than one active found
+                                if (i < actives.length - 1) { //only save widget and make a new one if more than one active found
                                     $preloadWidgetImages($widget); //start loading all images
                                     $widget['safeName'] = $safeName($widget.name);  //add a html-safe version of name
                                     $widget["systemName"] = $widget.name;
@@ -549,17 +613,96 @@ function processPanelXML($returnedData, $success, $xhr) {
                             $widget['name'] = $widget.memory; //normalize name
                             $widget.jsonType = "memory"; // JSON object type
                             $widget['state'] = null; //set initial state to null
-                            $widget['iconnull']="/web/images/transparent_19x16.png"; //transparent image for null value
                             var memorystates = $(this).find('memorystate');
                             memorystates.each(function(i, item) {  //get any memorystates defined
                                 //store icon url in "iconXX" where XX is the state to match
                                 $widget['icon' + item.attributes['value'].value] = item.attributes['icon'].value;
+                                $widget.state = item.attributes['value'].value; //default state to last defined value to draw icon
                             });
                             if (isUndefined($widget["systemName"]))
                                 $widget["systemName"] = $widget.name;
                             jmri.getMemory($widget["systemName"]);
                             break;
+                        case "slipturnouticon" : // added 2022, adapted from indicatorturnouticon
+                            // no direct link to a JSON/named bean (systemName = id)
+                            // also used for three way turnouts
+                            // see java/src/jmri/jmrit/display/SlipTurnoutIcon.java
+                            // and java/src/jmri/jmrit/display/configurexml/SlipTurnoutIconXml.java
+                            $widget['turnoutEast'] = $(this).find('turnoutEast').text();
+                            $widget['turnoutWest'] = $(this).find('turnoutWest').text();
+                            $widget['name'] = $widget['turnoutEast'] + " " +$widget['turnoutWest'];
+                            $widget.jsonType = "turnout"; // JSON object type, used to send commands in $handleClick(e)
+                            $widget['slipicontype'] = $(this).find('turnoutType').text();
+                            $widget['slipStateEast'] = UNKNOWN;
+                            $widget['slipStateWest'] = UNKNOWN;
+                            $widget['slipState'] = UNKNOWN; // combined state
+                            // set icons
+                            $widget['icon' + UNKNOWN] = $(this).find('unknown').attr('url');
+                            $widget['icon' + INCONSISTENT] = $(this).find('inconsistent').attr('url');
+                            $widget['icon5'] = $(this).find('upperWestToLowerEast').attr('url');
+                            $widget['icon7'] = $widget['icon' + INCONSISTENT]; // state 7 loaded later where supported
+                            $widget['icon9'] = $(this).find('lowerWestToLowerEast').attr('url');
+                            $widget['icon11'] = $(this).find('lowerWestToUpperEast').attr('url');
+
+                            switch ($widget.turnoutType) {
+                                case "singleSlip" :
+                                    // $widget['singleSlipRoute'] = "lowerWestToLowerEast" or "upperWestToUpperEast"
+                                    if ($widget.singleSlipRoute == "upperWestToUpperEast") {
+                                        $widget['icon7'] = $(this).find('upperWestToUpperEast').attr('url');
+                                    }
+                                    break;
+                                case "threeWay" :
+                                    // $widget['firstTurnoutExit'] = "upper" or "lower"
+                                    if ($widget.firstTurnoutExit == "lower") { // swap icons7 and 9
+                                        $widget['icon7'] = $widget.icon9;
+                                        $widget['icon9'] = $(this).find('lowerWestToUpperEast').attr('url');
+                                    }
+                                    break;
+                                case "scissor" :
+                                    $widget['turnoutLowerEast'] = $(this).find('turnoutLowerEast').text();
+                                    $widget['turnoutLowerWest'] = $(this).find('turnoutLowerWest').text();
+                                    if (isDefined($widget.turnoutLowerEast)) {
+                                        $widget['singleCrossOver'] = "false";
+                                        // connect 2 extra turnouts now to prevent extra switch case below, no need to listen
+                                        // jmri.getTurnout($widget['turnoutLowerEast']);
+                                        // jmri.getTurnout($widget['turnoutLowerWest']);
+                                    } else {
+                                        $widget['singleCrossOver'] = "true";
+                                    }
+                                    $widget['icon7'] = $widget.icon5;  // UWLE
+                                    $widget['icon5'] = $widget.icon9;  // LWLE
+                                    $widget['icon9'] = $widget.icon11; // LWUE
+                                    $widget['icon11'] = $widget['icon' + INCONSISTENT];
+                                    break;
+                                case "doubleSlip" : // default
+                                    $widget['icon7'] = $(this).find('upperWestToUpperEast').attr('url');
+                                    break;
+                            }
+
+                            $widget['rotation'] = $(this).find('lowerWestToLowerEast').find('rotation').text() * 1;
+                            $widget['degrees'] = ($(this).find('lowerWestToLowerEast').attr('degrees') * 1) - ($widget.rotation * 90);
+                            $widget['scale'] = $(this).find('lowerWestToLowerEast').attr('scale');
+                            if ($widget.forcecontroloff != "true") {
+                                $widget.classes += " " + $widget.jsonType + " clickable ";
+                            }
+                            jmri.getTurnout($widget['turnoutEast']);
+                            jmri.getTurnout($widget['turnoutWest']);
+
+                            // add turnout to whereUsed array (as $widget.id + 'e')
+                            if (!($widget.turnoutEast in whereUsed)) {  //set where-used for this new turnout
+                               whereUsed[$widget.turnoutEast] = new Array();
+                            }
+                            whereUsed[$widget.turnoutEast][whereUsed[$widget.turnoutEast].length] = $widget.id + "e";
+
+                            // add turnoutB to whereUsed array (as $widget + 'w')
+                            if (!($widget.turnoutWest in whereUsed)) {  //set where-used for this new turnout
+                               whereUsed[$widget.turnoutWest] = new Array();
+                            }
+                            whereUsed[$widget.turnoutWest][whereUsed[$widget.turnoutWest].length] = $widget.id + "w";
+                            // TODO add the extra 2 turnouts to whereUsed that optionally are part of a scissor?
+                            break;
                     }
+
                     $preloadWidgetImages($widget); //start loading all images
                     $widget['safeName'] = $safeName($widget.name);  //add a html-safe version of name
                     $gWidgets[$widget.id] = $widget; //store widget in persistent array
@@ -567,8 +710,33 @@ function processPanelXML($returnedData, $success, $xhr) {
                     break;
 
                 case "text" :
+                case "input" :
                     $widget['styles'] = $getTextCSSFromObj($widget);
                     switch ($widget.widgetType) {
+                        case "audioicon" :
+                            $widget.jsonType = 'audio'; // JSON object type
+                            $widget['identity'] = $(this).find('Identity').text();
+                            audioIconIDs['audioicon:'+$widget['identity']] = $widget;   // Ensure the key is a string, not a number
+                            $widget['sound'] = $(this).attr('sound');
+                            $widget['onClickOperation'] = $(this).attr('onClickOperation');
+                            $widget['audio_widget'] = new Audio($widget['sound']);
+                            $widget['playSoundWhenJmriPlays'] = $(this).attr('playSoundWhenJmriPlays') == "yes";
+                            $widget['stopSoundWhenJmriStops'] = $(this).attr('stopSoundWhenJmriStops') == "yes";
+                            $widget.styles['user-select'] = "none";
+                            $widget.classes += " " + $widget.jsonType + " clickable ";
+                            if (!$('#' + $widget.id).hasClass('clickable')) {
+                                $('#' + $widget.id).addClass("clickable");
+                                $('#' + $widget.id).bind(UPEVENT, $handleClick);
+                            }
+                            jmri.getAudio($widget.systemName);
+                            jmri.getAudioIcon($widget['identity']);
+                            break;
+                        case "logixngicon" :
+                            $widget.jsonType = "logixngicon"; // JSON object type
+                            $widget['identity'] = $(this).find('Identity').text();
+                            $widget.styles['user-select'] = "none";
+                            $widget.classes += " " + $widget.jsonType + " clickable ";
+                            break;
                         case "sensoricon" :
                             $widget['name'] = $widget.sensor; //normalize name
                             $widget.jsonType = "sensor"; // JSON object type
@@ -616,17 +784,8 @@ function processPanelXML($returnedData, $success, $xhr) {
                                 $widget["systemName"] = $widget.name;
                             jmri.getMemory($widget["systemName"]);
                             break;
-                        case "memoryicon" :
-                            $widget['name'] = $widget.memory; //normalize name
-                            $widget.jsonType = "memory"; // JSON object type
-                            $widget['text'] = $widget.memory; //use name for initial text
-                            $widget['state'] = $widget.memory; //use name for initial state as well
-                            if (isUndefined($widget["systemName"]))
-                                $widget["systemName"] = $widget.name;
-                            jmri.getMemory($widget["systemName"]);
-                            break;
                         case "reportericon" :
-                            $widget['name'] = $widget.reporter; //normalize name
+                            $widget['name'] = $widget.reporter; //normalize name    
                             $widget.jsonType = "reporter"; // JSON object type
                             $widget['text'] = $widget.reporter; //use name for initial text
                             if (isUndefined($widget["systemName"]))
@@ -640,13 +799,48 @@ function processPanelXML($returnedData, $success, $xhr) {
                             $widget['state'] = $widget.name; //use name for initial state as well
                             jmri.getBlock($widget["systemName"]);
                             break;
+                        case "blockContentsInputIcon" :    
+                            $widget['name'] = $widget.block; //normalize name                            
+                            $widget.jsonType = "block"; // JSON object type
+                            $widget['text'] = $widget.block; //use name for initial text
+                            $widget['state'] = $widget.block; //use name for initial state as well
+                            if (isUndefined($widget.styles.width)) { //set missing width
+                                if (isDefined($widget.colWidth)) { 
+                                    $widget.styles['width'] = $widget.colWidth + "em";
+                                } else {
+                                    $widget.styles['width'] = "5em";
+                                }
+                            }
+                            if (isUndefined($widget["systemName"]))
+                                $widget["systemName"] = $widget.name;
+                            jmri.getBlock($widget["systemName"]);
+                            break;
+                        case "memoryicon" :
                         case "memoryInputIcon" :
                         case "memoryComboIcon" :
+                            if ($widget.class.indexOf("MemorySpinnerIcon") >= 0) {  //fix for JMRI's bad element naming for this one
+                                $widget.widgetType = "memorySpinnerIcon";
+                                $widget.widgetFamily = "input";
+                                $widget.classes = $widget.classes.replace("memoryicon text", "memorySpinnerIcon input");
+                                $widget['extraAttributes'] = "type='number' min='0' max='100'"; 
+                            }
                             $widget['name'] = $widget.memory; //normalize name
                             $widget.jsonType = "memory"; // JSON object type
                             $widget['text'] = $widget.memory; //use name for initial text
                             $widget['state'] = $widget.memory; //use name for initial state as well
-                            $widget.styles['border'] = "1px solid black" //add border for looks (temporary)
+                            if (isUndefined($widget.styles.width)) { //set missing width
+                                if (isDefined($widget.colWidth)) { 
+                                    $widget.styles['width'] = $widget.colWidth + "em";
+                                //} else {
+                                    //$widget.styles['width'] = "5em"; //removed to let memoryComboIcon autosize to fit contents
+                                }
+                            }
+                            var items = $(this).find('itemList').children('item');
+                            $widget['items'] = [];
+                            items.each(function(i, item) {  //get any itemlist defined
+                                 //store item list in items array
+                                $widget.items[item.attributes['index'].value] = item.textContent;
+                            });                            
                             if (isUndefined($widget["systemName"]))
                                 $widget["systemName"] = $widget.name;
                             jmri.getMemory($widget["systemName"]);
@@ -667,8 +861,28 @@ function processPanelXML($returnedData, $success, $xhr) {
                     }
                     $gWidgets[$widget.id] = $widget; //store widget in persistent array
 
-                    $("#panel-area").append("<div id=" + $widget.id + " class='" + $widget.classes + "'>" +
-                        $widget.text + "</div>");
+                    var $hoverText = "";  //add html for hoverText (custom tooltip) if populated
+                    if (isDefined($widget.hoverText)) {
+                        $hoverText = " title='" + $widget.hoverText + "' alt='" + $widget.hoverText + "' ";
+                    }
+
+                    if ($widget.widgetFamily=="input") {
+                        if ($widget.widgetType=="memoryComboIcon") {
+                            var s = "<select id=" + $widget.id + " class='" + $widget.classes + 
+                                "' value='" + $widget.text + "' " + $widget.extraAttributes + $hoverText + " >";
+                            $($widget.items).each(function(i, item) {
+                                s += " <option value='"+ item + "'>" + item + "</option>";
+                            });
+                            s +="</select>";
+                            $("#panel-area").append(s);
+                        } else {                        
+                            $("#panel-area").append("<input id=" + $widget.id + " class='" + $widget.classes + 
+                                "' value='" + $widget.text + "' " + $widget.extraAttributes + $hoverText + " >");
+                        }                        
+                    } else {
+                        $("#panel-area").append("<div id=" + $widget.id + " class='" + $widget.classes + $hoverText + "'>" +
+                            $widget.text + "</div>");
+                    }
                     $("#panel-area>#" + $widget.id).css($widget.styles); // apply style array to widget
                     $setWidgetPosition($("#panel-area>#" + $widget.id));
                     break;
@@ -874,7 +1088,7 @@ function processPanelXML($returnedData, $success, $xhr) {
                             //
                             // note: the <div> areas above have their titles & alts turnouts swapped (left <-> right) also
 
-                            // add turnout to whereUsed array (as $widget + 'r')
+                            // add turnout to whereUsed array (as $widget.id + 'r')
                             if (!($widget.turnout in whereUsed)) {  //set where-used for this new turnout
                                whereUsed[$widget.turnout] = new Array();
                             }
@@ -1042,8 +1256,8 @@ function processPanelXML($returnedData, $success, $xhr) {
                             //draw the turntable
                             $drawTurntable($widget);
                             break;
-                        case "backgroundColor": // set background color of the panel itself
-                            $("#panel-area").css({"background-color": "rgb(" + $widget.red + "," + $widget.green + "," + $widget.blue + ")"});
+                        case "backgroundColor": // set background color of the window
+                            $("body").css({"background-color": "rgb(" + $widget.red + "," + $widget.green + "," + $widget.blue + ")"});
                             break;
                         case "layoutShape" :
                             //log.log("#### Layout Shape ####");
@@ -1056,8 +1270,57 @@ function processPanelXML($returnedData, $success, $xhr) {
                             //draw the LayoutShape
                             $drawLayoutShape($widget);
                             break;
+                        case "positionableRectangle" : //just like RoundRect except cornerRadius set to 0;
+                        case "positionableRoundRect" :
+                            //log.log("#### positionableRoundRect ####");
+                            //copy and reformat some attributes from children into object
+                            $widget['width'] = $(this).find('size').attr('width');
+                            $widget['height'] = $(this).find('size').attr('height');
+                            $widget['cornerRadius'] = $(this).find('size').attr('cornerRadius');
+                            if (isUndefined($widget['cornerRadius'])) {
+                                $widget['cornerRadius'] = 0; //default to no corner
+                            }                             
+                            lc = $(this).find('lineColor');
+                            $widget['lineColor'] = 
+                                'rgba('+lc.attr('red')+','+lc.attr('green')+',' +
+                                lc.attr('blue')+','+lc.attr('alpha')/256+')';
+                            fc = $(this).find('fillColor');
+                            $widget['fillColor'] = 
+                                 'rgba('+fc.attr('red')+','+fc.attr('green')+',' +
+                                fc.attr('blue')+','+fc.attr('alpha')/256+')';
+                            //store this widget in persistent array, with ident as key
+                            $widget['id'] = $widget.ident;
+                            $gWidgets[$widget.id] = $widget;
+                            //draw the positionableRoundRect
+                            $drawPositionableRoundRect($widget);
+                            break;
+                        case "positionableCircle" : //identical except circle has size radius, 
+                        case "positionableEllipse" : //ellipse has size width height
+                            //copy and reformat some attributes from children into object
+                            $widget['radius'] = ($(this).find('size').attr('radius'));
+                            if (isDefined($widget['radius'])) {
+                                $widget['height'] = $widget.radius; //use radius for height if populated
+                                $widget['width']  = $widget.radius; //use radius for width if populated                               
+                            } else {                            
+                                $widget['height'] = ($(this).find('size').attr('height'));
+                                $widget['width']  = ($(this).find('size').attr('width'));
+                            }
+                            lc = $(this).find('lineColor');
+                            $widget['lineColor'] = 
+                                'rgba('+lc.attr('red')+','+lc.attr('green')+',' +
+                                lc.attr('blue')+','+lc.attr('alpha')/256+')';
+                            fc = $(this).find('fillColor');
+                            $widget['fillColor'] = 
+                                 'rgba('+fc.attr('red')+','+fc.attr('green')+',' + 
+                                fc.attr('blue')+','+fc.attr('alpha')/256+')';
+                            //store this widget in persistent array, with ident as key
+                            $widget['id'] = $widget.ident;
+                            $gWidgets[$widget.id] = $widget;
+                            //draw the positionableEllipse
+                            $drawPositionableEllipse($widget);
+                            break;
                         default:
-                            log.log("unknown $widget.widgetType: " + $widget.widgetType + ".");
+                            log.warn("unknown $widget.widgetType: " + $widget.widgetType + ".");
                             break;
                     }
                     break;
@@ -1065,7 +1328,6 @@ function processPanelXML($returnedData, $success, $xhr) {
                 case "switch" : // Switchboard BeanSwitches
                     // they have no x,y
                     $widget['styles'] = {}; // clear built-in styles
-                    $widget.styles['background-color'] = 'inherit'; // essential to color the switches
                     $widget['name'] = $widget.label; // normalize name from label
                     $widget['text'] = $widget.label; // use label as initial button text too
                     $widget.styles['width'] = $swWidth + "px";
@@ -1126,7 +1388,7 @@ function processPanelXML($returnedData, $success, $xhr) {
                     if ($widget.connected == "true") {
                         $widget['text'] = $widget.text0; // add UNKNOWN state to label of connected switches
                         $widget.styles['border-color'] = "black"; //$widget['swColor' + UNKNOWN];
-                        $widget.classes += " " + $widget.jsonType + " clickable ";
+                        $widget.classes += " " + $widget.jsonType + " clickable connected";
                     }
 
                     $gWidgets[$widget.id] = $widget; // store widget in persistent array
@@ -1199,6 +1461,14 @@ function processPanelXML($returnedData, $success, $xhr) {
             e.preventDefault(); //prevent double-firing (touch + click)
             sendElementChange($gWidgets[this.id].jsonType, $gWidgets[this.id].systemName, INACTIVE);  //send inactive on up
         });
+
+        //check for update keys and update when needed
+        $('input.input').bind(KEYUP, $handleInputKeyUp);
+        //update when leaving the input
+        $('input.input').bind(BLUR, $handleInputBlur);
+        //and update when select input is changed
+        $('select.input').bind(CHANGE, $handleInputBlur);
+
         // Switchboard All Off/All On buttons
         $(".lightswitch#allOff").bind(UPEVENT, $handleClickAllOff); // all Lights Off
         $(".lightswitch#allOn").bind(UPEVENT, $handleClickAllOn); // all Lights On
@@ -1217,7 +1487,9 @@ function processPanelXML($returnedData, $success, $xhr) {
 
 // perform regular click-handling, bound to click event for clickable, non-momentary widgets, except for multisensor and linkinglabel.
 function $handleClick(e) {
-    if (jmri_logging) log.log("$handleClick()");
+    if (jmri_logging) {
+        log.log("$handleClick()");
+    }
 
     e.stopPropagation();
     e.preventDefault(); //prevent double-firing (touch + click)
@@ -1226,18 +1498,20 @@ function $handleClick(e) {
     //     $logProperties(this);
     // }
 
-    // special case for layoutSlips
+    // special case for LE layoutSlips
     if (this.className.startsWith('layoutSlip ')) {
         if (this.id.startsWith("SL") && (this.id.endsWith("r") || this.id.endsWith("l"))) {
-            var slipID = this.id.slice(0, -1);
-            var $widget = $gWidgets[slipID];
+            var $slipID = this.id.slice(0, -1);
+            var $widget = $gWidgets[$slipID];
 
             if (this.id.endsWith("l")) {
                 $widget["side"] = "left";
             } else if (this.id.endsWith("r")) {
                 $widget["side"] = "right";
             }
-            if (jmri_logging) log.log("\nlayoutSlip-side:" + $widget.side);
+            if (jmri_logging) {
+                log.log("\nlayoutSlip-side:" + $widget.side);
+            }
 
             // convert current slip state to current turnout states
             var $oldStateA, $oldStateB;
@@ -1263,27 +1537,87 @@ function $handleClick(e) {
             }
             //jmri_logging = false;
         } else {
-            log.log("$handleClick(e): unknown slip widget " + this.id);
+            log.warn("$handleClick(e): unknown slip widget " + this.id);
             $logProperties(this);
-        }   // special case for layoutSlips
+        }
+    // special case for LE layoutTurntable
     } else if (this.className.startsWith('layoutturntable ')) {
         var $rayID = this.id;
         var $turntableID = $rayID.split(".")[0];
         var $widget = $gWidgets[$turntableID];
         $widget.raytracks.each(function(i, item) {
             $logProperties(item);
-            //note:offset 50 is due to TrackSegment.java TURNTABLE_RAY_OFFSET
+            //note: offset 50 is due to TrackSegment.java TURNTABLE_RAY_OFFSET
             var rayID = $turntableID + ".TURNTABLE_RAY_" + (item.attributes.index.value * 1);
             if (rayID == $rayID) {
                 if (isDefined(item.attributes.turnout)) {
                     var turnout = item.attributes.turnout.value;
                     var state = item.attributes.turnoutstate.value;
                     var $newState = (state == 'thrown') ? THROWN : CLOSED;
-                    //log.log("sendElementChange(" + $widget.jsonType + ", " + turnout + ", " + $newState + ")");
                     sendElementChange($widget.jsonType, turnout, $newState);
                 }
             }
         });
+    } else if (this.className.startsWith('slipturnouticon')) {
+        // special handling of slipturnouticon, which has (at least) 2 turnouts
+        var $widget = $gWidgets[this.id];
+        var $newState = $getNextState($widget); // determine next state from current state
+        var $turnoutWestNewState = 0;
+        var $turnoutEastNewState = 0;
+        // we may need to send a command to multiple turnouts
+        switch ($newState) {
+            case 5 :
+                $turnoutWestNewState = CLOSED;
+                $turnoutEastNewState = CLOSED;
+                break;
+            case 7 :
+                $turnoutWestNewState = THROWN;
+                $turnoutEastNewState = CLOSED;
+                break;
+            case 9 :
+                $turnoutWestNewState = CLOSED;
+                $turnoutEastNewState = THROWN;
+                break;
+            case 11 :
+                $turnoutWestNewState = THROWN;
+                $turnoutEastNewState = THROWN;
+                break;
+            }
+        sendElementChange($widget.jsonType, $widget.turnoutWest, $turnoutWestNewState);
+        sendElementChange($widget.jsonType, $widget.turnoutEast, $turnoutEastNewState);
+        if (isDefined($widget.turnoutLowerWest)) {
+            sendElementChange($widget.jsonType, $widget.turnoutLowerWest, $turnoutEastNewState); // note: same as turnoutWest
+        }
+        if (isDefined($widget.turnoutLowerEast)) {
+            sendElementChange($widget.jsonType, $widget.turnoutLowerEast, $turnoutWestNewState); // note: same as turnoutEast
+        }
+        return;
+    } else if (this.className.startsWith('audioicon ')) {
+        // special handling of audioicon
+        var $widget = $gWidgets[this.id];
+        switch ($widget['onClickOperation']) {
+            case "PlaySoundLocally":
+                if ($widget['audio_widget'].paused) {   // Sound is stopped
+                    $widget['audio_widget'].loop = false;
+//                    $widget['audio_widget'].loop = (playNumLoops == -1);
+                    $widget['audio_widget'].play();
+                } else {                                // Sound is playing
+                    $widget['audio_widget'].pause();
+                    $widget['audio_widget'].currentTime = 0;
+                }
+                break;
+            case "PlaySoundGlobally":
+                if ($widget['state'] == 16) {           // Sound is stopped
+                    jmri.setAudio($widget.systemName, "Play");
+                } else if ($widget['state'] == 17) {    // Sound is playing
+                    jmri.setAudio($widget.systemName, "Stop");
+                }
+                break;
+        }
+    } else if (this.className.startsWith('logixngicon ')) {
+        // special handling of logixngicon
+        var $widget = $gWidgets[this.id];
+        jmri.clickLogixNGIcon($widget['identity']);
     } else {
         var $widget = $gWidgets[this.id];
         var $newState = $getNextState($widget); // determine next state from current state
@@ -1292,11 +1626,11 @@ function $handleClick(e) {
         if (isDefined($widget.turnoutB)) {
             sendElementChange($widget.jsonType, $widget.turnoutB, $newState);
         }
-        //used for crossover, layoutTurnout type 5
+        //used for crossover, LE layoutTurnout type 5
         if (isDefined($widget.secondturnoutname)) {
             //invert 2nd turnout if requested
             if ($widget.secondturnoutinverted == "true") {
-                $newState = ($newState==CLOSED ? THROWN : CLOSED);
+                $newState = ($newState == CLOSED ? THROWN : CLOSED);
             }
             sendElementChange($widget.jsonType, $widget.secondturnoutname, $newState);
         }
@@ -1310,8 +1644,9 @@ function $handleMultiClick(e) {
     var $widget = $gWidgets[this.id];
     var clickX = (e.offsetX || e.pageX - $(e.target).offset().left); //get click position on the widget
     var clickY = (e.offsetY || e.pageY - $(e.target).offset().top );
-    log.log("handleMultiClick X,Y on WxH: " + clickX + "," + clickY + " on " + this.width + "x" + this.height);
-
+    if (jmri_logging) {
+        log.log("handleMultiClick X,Y on WxH: " + clickX + "," + clickY + " on " + this.width + "x" + this.height);
+    }
     //increment or decrement based on where the click occurred on image
     var missed = true; //flag if click x,y outside image bounds, indicates we didn't get good values
     var dec = false;
@@ -1393,6 +1728,27 @@ function $handleClickAllOff(e) { // click button on Switchboards
     });
 };
 
+//update memory or restore the value when certain keystrokes occur
+function $handleInputKeyUp(e) {
+    if (e.keyCode == 13 || e.keyCode == 9) { //on [Enter] or [Tab], send new value to server
+        var newVal = $(this).val();
+        var $id = $(this).attr('id');
+        var $widget = $gWidgets[$id];
+        jmri.setObject($widget.jsonType, $widget.systemName, newVal);
+    } else if (e.keyCode == 27) { //on [Escape], restore the previous value
+        var oldValue = $(this).data("oldValue")
+        $(this).val(oldValue);        
+    }
+};
+
+//update memory when the focus is lost
+function $handleInputBlur(e) {
+    var newVal = $(this).val();
+    var $id = $(this).attr('id');
+    var $widget = $gWidgets[$id];
+    jmri.setObject($widget.jsonType, $widget.systemName, newVal);
+};
+
 // End of Click Handling functions
 
 
@@ -1418,14 +1774,17 @@ function $drawIcon($widget) {
         Ostate = ($widget.occupancystate & 0xF0); // binary 11110000, discards (in)active bits in occupancy which we already used above
         $state = Ostate | $widget.state; // adds Turnout state back in to fetch TO state = position icon
         // $hoverText is updated for OUT_OF_SERVICE on redraw only
+    } else if ($widget.widgetType == "slipturnouticon") { // check turnout states, compare to $redrawIcon()
+        $state = $widget.slipState; // combined Turnouts state
     } else {
         $indicator = ($widget.occupancysensor && $widget.occupancystate == ACTIVE ? "Occupied" : "");
         $state = $widget.state;
     }
+
     // add the image to the panel area, with appropriate css classes and id (skip any unsupported)
     if (isDefined($widget['icon' + $indicator + $state])) {
         $imgHtml = "<img id=" + $widget.id + " class='" + $widget.classes +
-                "' src='" + $widget["icon" + $indicator + $state] + "' " + $hoverText + "/>"
+                "' src='" + $widget["icon" + $indicator + $state].replaceAll("'","&apos;") + "' " + $hoverText + "/>"
 
         $("#panel-area").append($imgHtml); // put the html in the panel
 
@@ -1437,10 +1796,13 @@ function $drawIcon($widget) {
             ovlCSS = {position:'absolute', left: $widget.x + 'px', top: $widget.y + 'px', zIndex: $widget.level*1 + 1, pointerEvents: 'none'};
             $.extend(ovlCSS, $widget.styles); // append the styles from the widget
             delete ovlCSS['background-color'];  // clear the background color
+            if (isDefined($widget.fixedHeight)) {
+                $.extend(ovlCSS, {lineHeight: $widget.fixedHeight + 'px'}); // add lineheight for vertical centering (if set)
+            }
             $("#panel-area>#" + $widget.id + "-overlay").css(ovlCSS);
         }
     } else {
-        log.error("ERROR: image not defined for " + $widget.widgetType + " " + $widget.id + ", TOstate=" + $state + ", iconstate=" + $state + " ["+$indicator+"] (icon" + $indicator + $state + ")");
+        log.error("ERROR: image not defined for " + $widget.widgetType + " " + $widget.id + ", iconstate=" + $state + " ["+$indicator+"] (icon" + $indicator + $state + ")");
     }
     $setWidgetPosition($("#panel-area #" + $widget.id));
 }
@@ -1480,6 +1842,9 @@ var $getTextCSSFromObj = function($widget) {
     //check for new hasBackground element, ignore background colors unless set to yes
     if (isDefined($widget.hasBackground) && $widget.hasBackground == "yes") {
         $retCSS['background-color'] = "rgb(" + $widget.redBack + "," + $widget.greenBack + "," + $widget.blueBack + ") ";
+    } else {
+        // if no background specified, default to transparent
+        $retCSS['background-color'] = "transparent";
     }
     if (isUndefined($widget.hasBackground) && isDefined($widget.redBack)) {
         $retCSS['background-color'] = "rgb(" + $widget.redBack + "," + $widget.greenBack + "," + $widget.blueBack + ") ";
@@ -1487,8 +1852,8 @@ var $getTextCSSFromObj = function($widget) {
     if (isDefined($widget.size)) {
         $retCSS['font-size'] = $widget.size + "px ";
     }
-    if (isDefined($widget.fontname)) {
-        $retCSS['font-family'] = $widget.fontname;
+    if (isDefined($widget.fontFamily)) {
+        $retCSS['font-family'] = $widget.fontFamily;
     }
     if (isDefined($widget.margin)) {
         $retCSS['padding'] = $widget.margin + "px ";
@@ -1615,7 +1980,7 @@ var $setWidgetPosition = function(e) {
         // reposition on every icon load, as the icons can be different sizes.
         if (e.is("img") && ($widget.degrees !== 0 || $widget.scale != 1.0)) {
             e.unbind('load');
-            e.load(function() {
+            e.on('load', function() {
                 $setWidgetPosition($(this));
             });
         }
@@ -1633,9 +1998,21 @@ var $reDrawIcon = function($widget) {
         $state = (Ostate | $widget.state); // adds Turnout state back in to insert TO state = position icon
         if (isDefined($widget.name)) { // intended for indicatorturnouts to show they are not clickable
             $('img#' + $widget.id).attr('title', $widget.name + ((Ostate & 0x40) == OUT_OF_SERVICE ? " (off)" : ""));
-        // explain why not clickable TODO I18N tooltip for OOS + ERROR
+            // explain why not clickable TODO I18N tooltip for OOS + ERROR
         }
-    } else {
+    } else if ($widget.widgetType == "slipturnouticon") {
+        $state = $widget.slipState; // widget is not a bean, fetch combined state as stored in widget, calculated from 2 turnout states
+        //log.log("STI $redrawIcon state: " + $state);
+        // adjust some states, copied from Display/SlipTurnoutIcon#displayState(int state), not required?
+        //        if ($widget.turnoutType == "scissor") {
+        //            switch ($state) {
+        //                case 5 :
+        //                    log.log("########### STI $redrawIcon state: " + $state + " set to 0 for Scissor");
+        //                    $state = 0;
+        //                    break;
+        //            }
+        //        }
+    } else { // default handling
         $indicator = ($widget.occupancysensor && $widget.occupancystate == ACTIVE ? "Occupied" : "");
         $state = $widget.state;
     }
@@ -1653,18 +2030,81 @@ var $reDrawIcon = function($widget) {
 var $setWidgetState = function($id, $newState, data) {
     var $widget = $gWidgets[$id];
 
-    // if undefined widget this must be a slip
+    // if undefined widget this must be a LE slip or a PE slipTurnoutIcon
     if (isUndefined($widget)) {
-        // does it have "l" or "r" suffix?
-        if ($id.endsWith("l") || $id.endsWith("r")) {
+        // does it have "e" or "w" suffix? it's a slipTurnoutIcon
+        if ($id.endsWith("e") || $id.endsWith("w")) {
+            if (jmri_logging) {
+                log.log("$setWidgetState STI " + $id + " to state " + $newState);
+            }
+            // remove suffix
+            var $slipID = $id.slice(0, -1);
+            // get the slip widget
+            $widget = $gWidgets[$slipID];
+            // determine combined slipState for icon0/5/7/9/11
+            $turnoutName = data.name; // systemName
+            //log.log("change from turnout: " + $turnoutName + " to state: " + $newState);
+            if (($turnoutName == $widget.turnoutEast) || (data.userName == $widget.turnoutEast)) {
+                // east turnout                          // also compare source by userName
+                $widget.slipStateEast = $newState; // store turnout state e
+            } else if (($turnoutName == $widget.turnoutWest) || (data.userName == $widget.turnoutWest)) {
+                // west turnout                                 // also compare source by userName
+                $widget.slipStateWest = $newState; // store turnout state w
+            }
+            // handle changes from the 2 extra turnouts, if defined (they mirror the basic e and w turnouts)
+            // only CCCC, TCCT and CTTC are valid turnout state combinations (for slipState 5, 7 and 9 respectively)
+            if (($turnoutName == $widget.turnoutLowerWest) || (data.userName == $widget.turnoutLowerWest)) {
+                // scissor additional west turnout, handle like turnoutEast
+                if (($newState == CLOSED) && ((($widget.slipStateWest == CLOSED) && ($widget.slipStateEast == CLOSED)) ||
+                    (($widget.slipStateWest == THROWN) && ($widget.slipStateEast == CLOSED)))) {
+                        $widget.slipStateEast = $newState;
+                } else if (($newState == THROWN) && ($widget.slipStateWest == CLOSED) && ($widget.slipStateEast == THROWN)) {
+                        $widget.slipStateEast = $newState;
+                } else {
+                    $newState = INCONSISTENT;
+                }
+            }
+            if (($turnoutName == $widget.turnoutLowerEast) || (data.userName == $widget.turnoutLowerEast)) {
+                // scissor additional east turnout, handle like turnoutWest
+                if (($newState == CLOSED) && ((($widget.slipStateWest == CLOSED) && ($widget.slipStateEast == CLOSED)) ||
+                    (($widget.slipStateWest == CLOSED) && ($widget.slipStateEast == THROWN)))) {
+                        $widget.slipStateWest = $newState;
+                } else if (($newState == THROWN) && ($widget.slipStateWest == THROWN) && ($widget.slipStateEast == CLOSED)) {
+                        $widget.slipStateWest = $newState;
+                } else {
+                    $newState = INCONSISTENT;
+                }
+            }
+
+            if ($widget.slipStateWest == UNKNOWN || $widget.slipStateEast == UNKNOWN) {
+                $widget.slipState = UNKNOWN; // incomplete inputs, set state UNKNOWN
+            } else if ($newState == INCONSISTENT) {
+                $widget.slipState = INCONSISTENT;
+            } else {
+                // fix some special sequences, as in java/src/jmri/jmrit/display/SlipTurnoutIcon.java#displayState(state)
+                if ($widget.turnoutType == "threeWay" && $widget.slipStateWest == THROWN && $widget.slipStateEast == CLOSED) {
+                    // ignore slipStateEast CLOSED (slipstate 7), use slipstate 11 instead, like Panel SlipTurnoutIcon.java
+                    $widget.slipState = (THROWN << 1) | ($widget.slipStateWest >> 1) | 0x01;
+                } else {
+                    $widget.slipState = ($widget.slipStateEast << 1) | ($widget.slipStateWest >> 1) | 0x01;
+                }
+            }
+            log.log("#### $setWidgetState(slipturnouticon " + $slipID + ", " + $widget.slipState +
+                "); (was " + $widget.slipState + ")");
+            $newState = $widget.slipState;
+            // is overwritten by $newState at end of method, so temp only to pass next if-statement and redraw correctly
+            $id = $slipID;
+
+        // does it have "l" or "r" suffix? it's an LE slip
+        } else if ($id.endsWith("l") || $id.endsWith("r")) {
             if (jmri_logging) {
                 log.log("\n#### INFO: clicked slip " + $id + " to state " + $newState);
             }
 
             // remove suffix
-            var slipID = $id.slice(0, -1);
+            var $slipID = $id.slice(0, -1);
             // get the slip widget
-            $widget = $gWidgets[slipID];
+            $widget = $gWidgets[$slipID];
 
             // convert current slip state to current turnout states
             var $stateA, $stateB;
@@ -1673,7 +2113,7 @@ var $setWidgetState = function($id, $newState, data) {
             [$stateA, $stateB] = [$widget.stateA, $widget.stateB];
             $widget.state = getSlipStateForTurnoutStates($widget, $stateA, $stateB);
             if (jmri_logging) {
-                log.log("#### 3360 Slip " + $widget.name +
+                log.log("#### Slip " + $widget.name +
                     " before: " + slipStateToString($widget.state) +
                     ", stateA: " + turnoutStateToString($stateA) +
                     ", stateB: " + turnoutStateToString($stateB));
@@ -1683,7 +2123,7 @@ var $setWidgetState = function($id, $newState, data) {
             if ($id.endsWith("r")) {
                 if ($stateA != $newState) {
                     if (jmri_logging) {
-                        log.log("#### 3370 Changed r slip " + $widget.name +
+                        log.log("#### Changed r slip " + $widget.name +
                             " $stateA from " + turnoutStateToString($stateA) +
                             " to " + turnoutStateToString($newState));
                     }
@@ -1693,7 +2133,7 @@ var $setWidgetState = function($id, $newState, data) {
             } else if ($id.endsWith("l")) {
                 if ($stateB != $newState) {
                     if (jmri_logging) {
-                        log.log("#### 3379 Changed l slip " + $widget.name +
+                        log.log("#### Changed l slip " + $widget.name +
                             " $stateB from " + turnoutStateToString($stateB) +
                             " to " + turnoutStateToString($newState));
                     }
@@ -1705,7 +2145,7 @@ var $setWidgetState = function($id, $newState, data) {
             // turn turnout states back into slip state
             $newState = getSlipStateForTurnoutStates($widget, $stateA, $stateB);
             if (jmri_logging) {
-                log.log("#### 3390 Slip " + $widget.name +
+                log.log("#### Slip " + $widget.name +
                     " after: " + slipStateToString($newState) +
                     ", stateA: " + turnoutStateToString($stateA) +
                     ", stateB: " + turnoutStateToString($stateB));
@@ -1713,14 +2153,14 @@ var $setWidgetState = function($id, $newState, data) {
 
             if ($widget.state != $newState) {
                if (jmri_logging) {
-                   log.log("#### 3398 Changing slip " + $widget.name + " from " + slipStateToString($widget.state) +
+                   log.log("#### Changing slip " + $widget.name + " from " + slipStateToString($widget.state) +
                        " to " + slipStateToString($newState));
                }
             }
             //jmri_logging = false;
 
             // set $id to slip id
-            $id = slipID;
+            $id = $slipID;
         } else if ($id.startsWith("TUR")) {
             //log.log("$setWidgetState(" + $id + ", " + $newState + ", " + data + ")");
             $logProperties(data);
@@ -1739,12 +2179,12 @@ var $setWidgetState = function($id, $newState, data) {
             return;
         }
     } else if ($widget.widgetType == 'layoutSlip') {
+        // JMRI doesn't send slip states, it sends slip turnout states
+        // so ignore this (incorrect) slip state change
         if (jmri_logging) {
             log.log("#### $setWidgetState(slip " + $id + ", " + slipStateToString($newState) +
                 "); (was " + slipStateToString($widget.state) + ")");
         }
-        // JMRI doesn't send slip states, it sends slip turnout states
-        // so ignore this (incorrect) slip state change
         return;
     }
 
@@ -1754,7 +2194,7 @@ var $setWidgetState = function($id, $newState, data) {
         }
         if (data.type == "sensor" && ($widget.widgetType == "indicatortrackicon" || $widget.widgetType == "indicatortrackicon")) {
             $widget.occupancystate = $newState;
-        } else {
+        } else { // standard handling of icon widgets
             $widget.state = $newState;
         }
         // override the state with idTag's "name" in a very specific circumstance
@@ -1777,6 +2217,10 @@ var $setWidgetState = function($id, $newState, data) {
                     }
                 }
                 $reDrawIcon($widget);
+                break;
+            case "input" :
+                $('#' + $id).val($newState);                //update the input
+                $('#' + $id).data("oldValue", $newState);   //save the current value if needed for [Escape]
                 break;
             case "text" :
                 if ($widget.jsonType == "memory" || $widget.jsonType == "block" || $widget.jsonType == "reporter" ) {
@@ -1811,7 +2255,7 @@ var $setWidgetState = function($id, $newState, data) {
                 if ($widget.widgetType == "beanswitch" && isDefined($widget['shape'])) {
                     if ($widget.shape == "button") { // update div css
                         $('div#' + $id).text($widget['text' + $newState]); // set text to new state's text
-                        $('div#' + $id).css({"border-color": $widget['swColor' + $newState]});
+                        $('div#' + $id).css({"background-color": $widget['swColor' + $newState]});
                     } else { // icon, symbol, slider (drawing) are directly drawn on canvas
                         $widget.text = $widget['text' + $newState]; // set text in Widget to new state's text
                         $drawWidgetSymbol($id, $newState);
@@ -1882,6 +2326,7 @@ jQuery.fn.xmlClean = function() {
 var $getNextState = function($widget) {
     var $nextState = undefined;
     $logProperties($widget);
+
     if ($widget.widgetType == 'signalheadicon') { //special case for signalheadicons
         switch ($widget.clickmode * 1) {          //   logic based on SignalHeadIcon.java
             case 0 :
@@ -1924,7 +2369,7 @@ var $getNextState = function($widget) {
                 }
                 if (isUndefined($nextState))
                     $nextState = $firstState;  // if still not set, start over
-        } //end of signalheadicon clickmode switch
+        }
 
     } else if ($widget.widgetType == 'signalmasticon') { // special case for signalmasticons
         // loop through all elements, finding iconXXX and get next iconXXX, skipping special ones
@@ -1958,8 +2403,67 @@ var $getNextState = function($widget) {
                 $nextState = ($widget.state == "Held" ? "Stop" : "Held");
                 break;
 
-            }; //end of signalmasticon clickmode switch
-    } else {  // start with INACTIVE, then toggle to ACTIVE and back (same for turnout states: 2 <> 4
+            };
+
+    } else if ($widget.widgetType == 'slipturnouticon') {
+        // slipturnouticons store the current state in .slipState, not .state
+        switch ($widget.turnoutType) { // logic based on java/src/jmri/jmrit/display/SlipTurnoutIcon.java
+            case "doubleSlip" :
+                $nextState = ($widget.slipState == 11 ? 5 : $widget.slipState + 2);
+                break;
+            case "singleSlip" :
+                if ($widget.singleSlipRoute == "lowerWestToLowerEast") {
+                    switch ($widget.slipState) {
+                        case 5 :
+                            $nextState = 9;
+                            break;
+                        case 9 :
+                            $nextState = 11;
+                            break;
+                        case 11 :
+                            $nextState = 5;
+                            break;
+                    }
+                } else if ($widget.singleSlipRoute == "upperWestToUpperEast") {
+                    switch ($widget.slipState) {
+                        case 5 :
+                            $nextState = 11;
+                            break;
+                        case 7 :
+                            $nextState = 5;
+                            break;
+                        case 11 :
+                            $nextState = 7;
+                            break;
+                    }
+                }
+                break;
+            case "threeWay" :
+                if ($widget.firstTurnoutExit == "lower") {
+                    $nextState = ($widget.slipState == 9 ? 5 : $widget.slipState + 2);
+                } else { // $widget.firstTurnoutExit == "upper"
+                    switch ($widget.slipState) {
+                        case 5 :
+                            $nextState = 9;
+                            break;
+                        case 9 :
+                            $nextState = 11;
+                            break;
+                        case 11 :
+                            $nextState = 5;
+                            break;
+                    }
+                }
+                break;
+            case "scissor" :
+                $nextState = ($widget.slipState == 9 ? 5 : $widget.slipState + 2);
+                    // State 11 not allowed for a scissor
+                    // does not provide 5 after 7 as it would require extra logic
+                    $nextState = ($widget.slipState == 9 ? 5 : $widget.slipState + 2);
+                break;
+            };
+
+    } else {  // default: start with INACTIVE, then toggle to ACTIVE and back (same for turnout states: 2 <> 4)
         $nextState = ($widget.state == ACTIVE ? INACTIVE : ACTIVE);
     }
 
@@ -1982,7 +2486,8 @@ var $preloadWidgetImages = function($widget) {
 // note: not-yet-supported widgets are commented out here so as to return undefined
 var $getWidgetFamily = function($widget, $element) {
 
-    if (($widget.widgetType == "positionablelabel" || $widget.widgetType == "linkinglabel")
+    if (($widget.widgetType == "positionablelabel" || $widget.widgetType == "linkinglabel"
+            || $widget.widgetType == "audioicon" || $widget.widgetType == "logixngicon")
             && isDefined($widget.text)) {
         return "text";  //special case to distinguish text vs. icon labels
     }
@@ -1995,16 +2500,23 @@ var $getWidgetFamily = function($widget, $element) {
     switch ($widget.widgetType) {
         case "locoicon" :
         case "trainicon" :
-        case "memoryComboIcon" :
-        case "memoryInputIcon" :
         case "fastclock" :
         case "BlockContentsIcon" :
         case "reportericon" :
             return "text";
             break;
+        case "memorySpinnerIcon" :
+        case "memoryComboIcon" :
+        case "memoryInputIcon" :
+        case "blockContentsInputIcon" :
+            return "input";
+            break;
         case "positionablelabel" :
+        case "audioicon" :
+        case "logixngicon" :
         case "linkinglabel" :
         case "turnouticon" :
+        case "outputindicator" :
         case "sensoricon" :
         case "LightIcon" :
         case "multisensoricon" :
@@ -2013,6 +2525,7 @@ var $getWidgetFamily = function($widget, $element) {
         case "indicatortrackicon" :
         case "indicatorturnouticon" :
         case "memoryicon" :
+        case "slipturnouticon" :
             return "icon";
             break;
         case 'layoutSlip' :
@@ -2024,6 +2537,10 @@ var $getWidgetFamily = function($widget, $element) {
         case "levelxing" :
         case "layoutturntable" :
         case "layoutShape" :
+        case "positionableRectangle" :
+        case "positionableRoundRect" :
+        case "positionableCircle" :
+        case "positionableEllipse" :
             return "drawn";
             break;
         case "beanswitch" :
@@ -2105,7 +2622,7 @@ $(document).ready(function() {
     }
     // setup the functional menu items
     $("#navbar-panel-reload > a").attr("href", location.href);
-    $("#navbar-panel-xml > a").attr("href", location.href + "?format=xml");
+    $("#navbar-panel-xml > a").attr("href", location.pathname + "?format=xml");
     // show panel thumbnails if no panel name
     listPanels(panelName);
     if (panelName === null || typeof (panelName) === undefined) {
@@ -2114,33 +2631,61 @@ $(document).ready(function() {
         // hide the Show XML menu when listing panels
         $("#navbar-panel-xml").addClass("hidden").removeClass("show");
     } else {
-        // note: the functions and parameter names must match exactly those in jquery.jmri.js
+        // note: the functions and parameter names must match exactly those in web/js/jquery.jmri.js
+        // see for example jmri/server/json/turnout/turnout-server.json
         jmri = $.JMRI({
+            hello: function() {
+                // The JSON socket is ready only after the hello handshake.
+                jmri.socket.send("panelDisplayOptions", {
+                    name: decodeURIComponent(panelName.split("/").pop())
+                });
+            },
             didReconnect: function() {
                 // if a reconnect is triggered, reload the page - it is the
                 // simplest method to refresh every object in the panel
                 log.log("Reloading at reconnect");
                 location.reload(false);
             },
+            audio: function(name, state, data) {
+                $.each(whereUsed[name], function(index, widgetId) {
+                    $widget = $gWidgets[widgetId];
+                    $widget['state'] = state;
+
+                    if (state == 16 && $widget['stopSoundWhenJmriStops']) {         // Sound is stopped
+                        $widget['audio_widget'].pause();
+                        $widget['audio_widget'].currentTime = 0;
+                    } else if (state == 17 && $widget['playSoundWhenJmriPlays']) {  // Sound is playing
+                        $widget['audio_widget'].currentTime = 0;
+                        $widget['audio_widget'].loop = (data.playNumLoops == -1);
+                        $widget['audio_widget'].play();
+                    }
+                });
+            },
+            audioicon: function(identity, command, playNumLoops) {
+                $widget = audioIconIDs['audioicon:'+identity];
+                if (command == "Play") {
+                    $widget['audio_widget'].loop = (playNumLoops == -1);
+                    $widget['audio_widget'].play();
+                } else if (command == "Stop") {
+                    $widget['audio_widget'].pause();
+                    $widget['audio_widget'].currentTime = 0;
+                }
+            },
             light: function(name, state, data) {
                 updateWidgets(name, state, data);
             },
             block: function(name, value, data) {
                 //console.log("HEARD BLOCK " + name + " value=" + value);
-                if (value !== null) {
-                    if (value.type == "idTag") {
-                        value = value.data.userName; // for idTags, use the value in userName instead
-                    } else if (value.type == "reporter") {
-                        value = value.data.value;    // for reporters, use the value in data instead
-                    } else if (value.type == "rosterEntry") {
-                        if (value.data.icon !== null) {
-                            value = "<html><img src='" + value.data.icon + "'></html>"; // for rosterEntries, create an image tag instead
-                        } else {
-                            value = value.data.name; // if roster icon not set, just show the name
-                        }
-                    }
+                value = valueToShow(value);
+                // A Block Contents icon shows the train in the block or, when there is none, the train
+                // the block is allocated to, marked as on a JMRI panel. An input icon edits the value itself.
+                var shown = value;
+                if (value === null && isDefined(data.allocatedValue) && data.allocatedValue !== null) {
+                    shown = allocatedValueToShow(data.allocatedValue);
                 }
-                updateWidgets(name, value, data);
+                updateWidgets(name, value, data, function($widget) {
+                    return $widget.widgetType == "BlockContentsIcon" ? shown : value;
+                });
             },
             oblock: function(name, status, data) { // data contains data.status (Allocated, Occupied,... not state)
                 //console.log("HEARD JSON OBLOCK " + name + " status=" + status + " (" + data.status + ")");
@@ -2151,22 +2696,16 @@ $(document).ready(function() {
             layoutBlock: function(name, value, data) {
                 setBlockColor(name, data.blockColor);
             },
-            memory: function(name, value, data) {
-                if (value !== null) {
-                    //console.log("MEMORY " + name + " value=" + value + " data=" + data);
-                    if (value.type == "idTag") {
-                        value = value.data.userName; // for idTags, use the value in userName instead
-                    } else if (value.type == "reporter"){
-                        value = value.data.value;    // for reporters, use the value in data instead
-                    } else if (value.type == "rosterEntry") {
-                        if (value.data.icon !== null) {
-                            value = "<html><img src='" + value.data.icon + "'></html>"; // for rosterEntries, create an image tag instead
-                        } else {
-                            value = value.data.name; // if roster icon not set, just show the name
-                        }
-                    }
+            panelDisplayOptions: function(name, value) {
+                if (name === $gPanel.name) {
+                    // The XML contains the authoritative display options and
+                    // the existing renderer rebuilds the panel from that XML.
+                    location.reload(false);
                 }
-                updateWidgets(name, value, data);
+            },
+            memory: function(name, value, data) {
+                //console.log("MEMORY " + name + " value=" + value + " data=" + data);
+                updateWidgets(name, valueToShow(value), data);
             },
             reporter: function(name, value, data) {
                 //console.log("REPORTER " + name + " value=" + value + " data=" + data);
@@ -2474,8 +3013,8 @@ function $drawTrackSegment($widget) {
         $width = $gPanel.mainlinetrackwidth;
     }
 
-    //set trackcolor based on blockcolor
-    var $color = $gPanel.defaulttrackcolor;
+    var $color = $getTrackColor($widget);
+
     var $blk = $gBlks[$widget.blockname];
     if (isDefined($blk)) {
         $color = $blk.blockcolor;
@@ -2650,7 +3189,7 @@ function $drawTurntable($widget) {
         var $t1 = [];
         $t1['x'] = $t.x - (($t.x - $txcen) * f);
         $t1['y'] = $t.y - (($t.y - $tycen) * f);
-        $drawLine($t1.x, $t1.y, $t.x, $t.y, $gPanel.defaulttrackcolor, $gPanel.sidelinetrackwidth);
+        $drawLine($t1.x, $t1.y, $t.x, $t.y, $getTrackColor($widget), $gPanel.sidelinetrackwidth);
 
         if (isDefined(item.attributes.turnout) && ($gPanel.controlling == "yes")) {
             // var turnout = item.attributes.turnout.value;
@@ -2678,15 +3217,16 @@ function $drawTurntable($widget) {
             $t2['x'] = $txcen - ($tr * Math.sin($angle));
             $t2['y'] = $tycen + ($tr * Math.cos($angle));
             if (drawFlag) {
-                $drawLine($t1.x, $t1.y, $t2.x, $t2.y, $gPanel.defaulttrackcolor, $gPanel.sidelinetrackwidth);
+                $drawLine($t1.x, $t1.y, $t2.x, $t2.y, $getTrackColor($widget), $gPanel.sidelinetrackwidth);
             } else {
                 $drawLine($t1.x, $t1.y, $t2.x, $t2.y, $gPanel.backgroundcolor, $gPanel.sidelinetrackwidth);
             }
         }
     });
 
-    $drawCircle($txcen, $tycen, $tr, $gPanel.defaulttrackcolor, $gPanel.mainlinetrackwidth);
-    $drawCircle($txcen, $tycen, $tr / 4, $gPanel.defaulttrackcolor, $gPanel.sidelinetrackwidth);
+    var $turntablecirclelinewidth = 2; //matches LayoutTurntableView.java
+    $drawCircle($txcen, $tycen, $tr, $getTrackColor($widget), $turntablecirclelinewidth);
+    $drawCircle($txcen, $tycen, $tr / 4, $getTrackColor($widget), $turntablecirclelinewidth);
 }   //$drawTurntable
 
 //draw a LevelXing (pass in widget)
@@ -2695,42 +3235,11 @@ function $drawLevelXing($widget) {
     if ($widget.hidden == "yes") {
         return;
     }
-    //get track widths
-    var $widthAC = $gPanel.sidelinetrackwidth;
-    if (isDefined($gWidgets[$widget.connectaname])) {
-        if ($gWidgets[$widget.connectaname].mainline == "yes") {
-            $widthAC = $gPanel.mainlinetrackwidth;
-        }
-    }
-    if (isDefined($gWidgets[$widget.connectcname])) {
-        if ($gWidgets[$widget.connectcname].mainline == "yes") {
-            $widthAC = $gPanel.mainlinetrackwidth;
-        }
-    }
-
-    var $widthBD = $gPanel.sidelinetrackwidth;
-    if (isDefined($gWidgets[$widget.connectbname])) {
-        if ($gWidgets[$widget.connectbname].mainline == "yes") {
-            $widthBD = $gPanel.mainlinetrackwidth;
-        }
-    }
-    if (isDefined($gWidgets[$widget.connectdname])) {
-        if ($gWidgets[$widget.connectdname].mainline == "yes") {
-            $widthBD = $gPanel.mainlinetrackwidth;
-        }
-    }
-
-    //  set trackcolor based on block color
-    var $colorAC = $gPanel.defaulttrackcolor;
-    var $blkAC = $gBlks[$widget.blocknameac];
-    if (isDefined($blkAC)) {
-        $colorAC = $blkAC.blockcolor;
-    }
-    var $colorBD = $gPanel.defaulttrackcolor;
-    var $blkBD = $gBlks[$widget.blocknamebd];
-    if (isDefined($blkBD)) {
-        $colorBD = $blkBD.blockcolor;
-    }
+    //set colors and widths based on connected segments and blocks
+    var $colorAC = $getLegColor($gWidgets[$widget.connectaname], $widget.blocknameac);
+    var $colorBD = $getLegColor($gWidgets[$widget.connectbname], $widget.blocknamebd);
+    var $widthAC = $getLegWidth($gWidgets[$widget.connectaname], $widget.blocknameac);
+    var $widthBD = $getLegWidth($gWidgets[$widget.connectbname], $widget.blocknamebd);
 
     //retrieve the points
     var cen = [$widget.xcen, $widget.ycen];
@@ -2748,65 +3257,42 @@ function $drawLevelXing($widget) {
 
 //draw a Turnout (pass in widget)
 //  see LayoutTurnout.draw()
+// colors and widths based on side vs main then block color, turnout can be all one block, or several blocks
 function $drawTurnout($widget) {
     //if set to hidden, don't draw anything
     if ($widget.hidden == "yes") {
         return;
     }
-
-    //get widths
-    var $sideWidth = $gPanel.sidelinetrackwidth;
-    var $mainWidth = $gPanel.mainlinetrackwidth;
-    var $widthA = $sideWidth;
-    if (isDefined($gWidgets[$widget.connectaname])) {
-        if ($gWidgets[$widget.connectaname].mainline == "yes") {
-            $widthA = $mainWidth;
-        }
-    }
-    var $widthB = $sideWidth;
-    if (isDefined($gWidgets[$widget.connectbname])) {
-        if ($gWidgets[$widget.connectbname].mainline == "yes") {
-            $widthB = $mainWidth;
-        }
-    }
-    var $widthC = $sideWidth;
-    if (isDefined($gWidgets[$widget.connectcname])) {
-        if ($gWidgets[$widget.connectcname].mainline == "yes") {
-            $widthC = $mainWidth;
-        }
-    }
-    var $widthD = $sideWidth;
-    if (isDefined($gWidgets[$widget.connectdname])) {
-        if ($gWidgets[$widget.connectdname].mainline == "yes") {
-            $widthD = $mainWidth;
-        }
-    }
-
-    //get colors
+ 
+    //set erase color
     var $eraseColor = $gPanel.backgroundcolor;
-    var $trackColor = $gPanel.defaulttrackcolor;
+ 
+    //erase Unknown circle by saving and restoring the to-be-covered pixels
+    if ($widget.showunknown == "yes") {
+        halfsize = $gPanel.turnoutcirclesize * SIZE // circle size is radius, so this is half the copied/restored area
+        if (! isDefined($widget.unknownSnippet)) {  // first pass through, we capture the base image
+            $widget.unknownSnippet = $gCtx.getImageData($widget.xcen * 1 - halfsize, $widget.ycen * 1 - halfsize, halfsize * 2, halfsize * 2);
+        } else {
+            $gCtx.putImageData($widget.unknownSnippet, $widget.xcen * 1 - halfsize, $widget.ycen * 1 - halfsize);
+        }
+    }
 
-    //set track colors based on block colors
-    var $colorA = $trackColor;
-    var $blkA = $gBlks[$widget.blockname];
-    if (isDefined($blkA)) {
-        $colorA = $blkA.blockcolor;
-    }
-    var $colorB = $colorA;
-    var $blkB = $gBlks[$widget.blockbname];
-    if (isDefined($blkB)) {
-        $colorB = $blkB.blockcolor;
-    }
-    var $colorC = $colorA;
-    var $blkC = $gBlks[$widget.blockcname];
-    if (isDefined($blkC)) {
-        $colorC = $blkC.blockcolor;
-    }
-    var $colorD = $colorA;
-    var $blkD = $gBlks[$widget.blockdname];
-    if (isDefined($blkD)) {
-        $colorD = $blkD.blockcolor;
-    }
+    //set colors and widths based on connected segments and blocks
+    var $colorA = $getLegColor($gWidgets[$widget.connectaname], $widget.blockname);
+    var $colorB = $getLegColor($gWidgets[$widget.connectbname], 
+        ($widget.blockbname ? $widget.blockbname : $widget.blockname)); //use bname if set
+    var $colorC = $getLegColor($gWidgets[$widget.connectcname], 
+        ($widget.blockcname ? $widget.blockcname : $widget.blockname)); //use cname if set
+    var $colorD = $getLegColor($gWidgets[$widget.connectdname], 
+        ($widget.blockdname ? $widget.blockdname : $widget.blockname)); //use dname if set
+
+    var $widthA = $getLegWidth($gWidgets[$widget.connectaname], $widget.blockname);
+    var $widthB = $getLegWidth($gWidgets[$widget.connectbname], 
+        ($widget.blockbname ? $widget.blockbname : $widget.blockname)); //use bname if set
+    var $widthC = $getLegWidth($gWidgets[$widget.connectcname], 
+        ($widget.blockcname ? $widget.blockcname : $widget.blockname)); //use cname if set
+    var $widthD = $getLegWidth($gWidgets[$widget.connectdname], 
+        ($widget.blockdname ? $widget.blockdname : $widget.blockname)); //use dname if set
 
     var cen = [$widget.xcen * 1, $widget.ycen * 1]
     var a = $getPoint($widget.ident + ".TURNOUT_A");
@@ -2818,21 +3304,22 @@ function $drawTurnout($widget) {
     //turnout A--+--B
     //            \-C
     if ($widget.type == LH_TURNOUT || $widget.type == RH_TURNOUT || $widget.type == WYE_TURNOUT) {
+        
         //always draw from a to cen
         $drawLineP(a, cen, $colorA, $widthA); //a to cen
 
         //if closed or thrown, draw the selected leg and erase the other one
         if ($widget.state == CLOSED || $widget.state == THROWN) {
             if ($widget.state == $widget.continuing) {
-                $drawLineP(cen, c, $eraseColor, $widthC); //erase center to C (diverging leg)
+                $drawLineP(cen, c, $eraseColor, $widthC+1); //erase center to C (diverging leg)
                 if ($gPanel.turnoutdrawunselectedleg == 'yes') {
-                    $drawLineP(c, $point_midpoint(cen, c), $colorB, $widthC); //C to midC (diverging leg)
+                    $drawLineP(c, $point_midpoint(cen, c), $colorC, $widthC); //C to midC (diverging leg)
                 }
                 $drawLineP(cen, b, $colorB, $widthB); //center to B (straight leg)
             } else {
-                    $drawLineP(cen, b, $eraseColor, $widthB); //erase center to B (straight leg)
+                    $drawLineP(cen, b, $eraseColor, $widthB+1); //erase center to B (straight leg)
                 if ($gPanel.turnoutdrawunselectedleg == 'yes') {
-                    $drawLineP(b, $point_midpoint(cen, b), $colorC, $widthB); //B to midB (straight leg)
+                    $drawLineP(b, $point_midpoint(cen, b), $colorB, $widthB); //B to midB (straight leg)
                 }
                 $drawLineP(cen, c, $colorC, $widthC); //center to C (diverging leg)
             }
@@ -2849,12 +3336,27 @@ function $drawTurnout($widget) {
         var cd = $point_midpoint(c, d);
 
         if ($widget.state == CLOSED || $widget.state == THROWN) {
-            $drawLineP(a, b, $eraseColor, $mainWidth);      //erase A to B
-            $drawLineP(c, d, $eraseColor, $mainWidth);      //erase C to D
-            $drawLineP(ab, cd, $eraseColor, $mainWidth);    //erase midAB to midDC
-            $drawLineP(a, c, $eraseColor, $mainWidth);      //erase A to C
-            $drawLineP(b, d, $eraseColor, $mainWidth);      //erase B to D
-            if ($widget.state == $widget.continuing) {
+ 
+            // erase any existing lines
+            $drawLineP(a, ab, $eraseColor, $widthA+1);    //A to mid ab
+            $drawLineP(b, ab, $eraseColor, $widthB+1);    //B to mid ab
+            $drawLineP(c, cd, $eraseColor, $widthC+1);    //C to mid cd
+            $drawLineP(d, cd, $eraseColor, $widthD+1);    //D to mid cd
+            if ($widget.type == DOUBLE_XOVER) {
+                $drawLineP(a, cen, $eraseColor, $widthA+1);   //A to cen
+                $drawLineP(b, cen, $eraseColor, $widthB+1);   //B to cen
+                $drawLineP(c, cen, $eraseColor, $widthC+1);   //C to cen
+                $drawLineP(d, cen, $eraseColor, $widthD+1);   //D to cen
+            } else if ($widget.type == RH_XOVER) {
+                $drawLineP(ab, cen, $eraseColor, $widthA+1);  //midAB to cen
+                $drawLineP(cen, cd, $eraseColor, $widthC+1);  //cen to midDC
+            } else {  //LH_XOVER
+                $drawLineP(ab, cen, $eraseColor, $widthB+1);  //midAB to cen
+                $drawLineP(cen, cd, $eraseColor, $widthD+1);  //cen to midDC
+            }
+
+ 
+             if ($widget.state == $widget.continuing) {
                 //draw closed legs
                 $drawLineP(a, ab, $colorA, $widthA);    //A to mid ab
                 $drawLineP(b, ab, $colorB, $widthB);    //B to mid ab
@@ -2942,7 +3444,7 @@ function $drawTurnout($widget) {
         if  (($widget.disableWhenOccupied !== "yes") || ($widget.occupancystate != ACTIVE)) {
             var $color = $gPanel.turnoutcirclecolor;
 
-            if (($widget.state != UNKNOWN) && ($widget.state != $widget.continuing)) {
+            if ($widget.state != CLOSED) {
                 $color = $gPanel.turnoutcirclethrowncolor;
             }
             if ($gPanel.turnoutfillcontrolcircles == "yes") {
@@ -2962,7 +3464,67 @@ function $drawTurnout($widget) {
             }
         }
     }
+    
+    if (($widget.showunknown == "yes") && ($widget.state == UNKNOWN)) {
+        // draw the unknown indicator
+        // colors are hard to manipulate in JS, so we draw the circle as the track color
+        // and the text as the background color, assuming that this will have contrast
+        $fillCircle($widget.xcen * 1, $widget.ycen * 1, $gPanel.turnoutcirclesize * SIZE, $colorA);
+        $drawText($widget.xcen * 1, $widget.ycen * 1, "?", $eraseColor, $gPanel.turnoutcirclesize * SIZE * 2); // * 2 because circle size is radius
+    }
+
 }   // function $drawTurnout($widget)
+
+// compute width of turnout leg based on connected segment, then block type
+function $getLegWidth(cs, bn) {
+    var width = $gPanel.sidelinetrackwidth;
+    if (isDefined(cs)) {
+        if (cs.mainline == "yes") {
+            width = $gPanel.mainlinetrackwidth;
+        }
+        var blk = $gBlks[bn];
+        if (isDefined(blk)) {
+            if (cs.mainline=="yes") {        
+                width = $gPanel.mainlineblockwidth;
+            } else {
+                width = $gPanel.sidelineblockwidth;
+            }
+        }
+    }
+    return width*1.0; //insure numeric
+}
+
+// compute color of turnout leg based on connected segment, then its block color
+function $getLegColor(cs, bn) {
+    var color = $gPanel.defaulttrackcolor;
+    if (isDefined(cs)) {
+        if (isDefined($gPanel.mainRailColor) && (cs.mainline == "yes")) {
+            color = $gPanel.mainRailColor;
+        } else {
+            if (isDefined($gPanel.sideRailColor)) {
+                color = $gPanel.sideRailColor;
+            }
+        }
+        var blk = $gBlks[bn];
+        if (isDefined(blk)) {
+            color = blk.blockcolor;
+        }
+    }
+    return color;
+       
+}   // function $getLegColor()
+
+//set trackcolor by default, then main/side
+var $getTrackColor = function(e) {
+    var color = $gPanel.defaulttrackcolor;
+    if (isDefined($gPanel.mainRailColor) && (e.mainline == "yes")) {
+        color = $gPanel.mainRailColor;
+    }
+    if (isDefined($gPanel.sideRailColor) && (e.mainline != "yes")) {
+        color = $gPanel.sideRailColor;
+    }
+    return color;
+}
 
 //draw a Slip (pass in widget)
 //  see LayoutSlip.draw()
@@ -3013,7 +3575,7 @@ function $drawSlip($widget) {
     var d = $getPoint($widget.ident + SLIP_D);
 
     var $eraseColor = $gPanel.backgroundcolor;
-    var $trackColor = $gPanel.defaulttrackcolor;
+    var $trackColor = $getTrackColor($widget);
 
     var $blkA = $gBlks[$widget.blockname];
     var $colorA = isDefined($blkA) ? $blkA.blockcolor : $trackColor;
@@ -3151,6 +3713,58 @@ function $drawSlip($widget) {
     }
 }   // function $drawSlip($widget)
 
+function $drawPositionableRoundRect($widget) {
+    //log.log("drawing PositionableRoundRect")
+    createPanelCanvas(); //insure canvas layer is available for drawing
+
+    $gCtx.save();   // save current line width and color
+
+    if (isDefined($widget.lineColor)) {
+        $gCtx.strokeStyle = $widget.lineColor;
+    }
+    if (isDefined($widget.fillColor)) {
+        $gCtx.fillStyle = $widget.fillColor;
+    }
+    if (isDefined($widget.lineWidth)) {
+        $gCtx.lineWidth = $widget.lineWidth;
+    }
+
+    $gCtx.beginPath();
+//    $gCtx.rotate($toRadians($widget.degrees));
+    $gCtx.roundRect($widget.x, $widget.y, $widget.width, $widget.height, $widget.cornerRadius);
+    $gCtx.stroke()
+    $gCtx.fill()
+    $gCtx.restore();        // restore color and width back to default
+
+}   // function $drawPositionableRoundRect($widget)
+
+function $drawPositionableEllipse($widget) {
+    //log.log("drawing PositionableEllipse");
+    createPanelCanvas(); //insure canvas layer is available for drawing
+
+    $gCtx.save();   // save current line width and color
+
+    if (isDefined($widget.lineColor)) {
+        $gCtx.strokeStyle = $widget.lineColor;
+    }
+    if (isDefined($widget.fillColor)) {
+        $gCtx.fillStyle = $widget.fillColor;
+    }
+    if (isDefined($widget.lineWidth)) {
+        $gCtx.lineWidth = $widget.lineWidth;
+    }
+    rw = $widget.width/2;
+    rh = $widget.height/2;
+    x  = $widget.x * 1.0;
+    y  = $widget.y * 1.0;
+    $gCtx.beginPath();
+    $gCtx.ellipse(x + rw, y + rh, rw, rh, $toRadians($widget.degrees), 0, 2 * Math.PI);    
+    $gCtx.stroke()
+    $gCtx.fill()
+    $gCtx.restore();        // restore color and width back to default
+
+}   // function $drawPositionableEllipse($widget)
+
 function $drawLayoutShape($widget) {
     var $pts = $widget.points;   // get the points
     var len = $pts.length;
@@ -3164,7 +3778,7 @@ function $drawLayoutShape($widget) {
             $gCtx.fillStyle = $widget.fillColor;
         }
         if (isDefined($widget.linewidth)) {
-            $gCtx.lineWidth = $widget.linewidth;
+            $gCtx.lineWidth = $widget.linewidth; //TODO: check case on this
         }
 
         $gCtx.beginPath();
@@ -3393,6 +4007,8 @@ function $drawLine($p1x, $p1y, $p2x, $p2y, $color, $width, dashArray) {
     $gCtx.moveTo($p1x, $p1y);
     $gCtx.lineTo($p2x, $p2y);
 
+    $gCtx.lineCap = 'round'; 
+    
     $gCtx.stroke();
 
     if (isDefined(dashArray)) {
@@ -3604,6 +4220,21 @@ function $plotBezier(points, depth, displacement) {
     }
 }
 
+function $drawText($px, $py, $text, $color, $size) {
+    $gCtx.save();   // save current line width and color
+
+    // set color
+    $gCtx.fillStyle = $color;
+
+    $gCtx.font = 'bold '+$size+'px Arial';
+
+    // center the text on x,y and draw
+    metrics = $gCtx.measureText($text);
+    $gCtx.fillText($text, $px-metrics.width/2, $py+(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent)/2);
+
+    $gCtx.restore();        // restore color and font back to default
+}
+
 function $point_log(prefix, p) {
     log.log(prefix + ": {" + p[0] + ", " + p[1] + "}");
 }
@@ -3771,21 +4402,64 @@ var $drawAllSwitchIcons = function() {
     });
 };
 
-function updateWidgets(name, state, data) {
-    // update all widgets based on the element that changed, using systemname
+function createPanelCanvas() {
+    if ($gCtx == undefined) {  //create canvas if not already created
+        $("#panel-area").prepend("<canvas id='panelCanvas' width=" + $gPanel.panelwidth + "px height=" +
+            $gPanel.panelheight + "px style='position:absolute;z-index:2;'>");
+        var canvas = document.getElementById("panelCanvas");
+        $gCtx = canvas.getContext("2d");
+        $gCtx.strokeStyle = $gPanel.defaulttrackcolor;
+        $gCtx.lineWidth = $gPanel.sidelinetrackwidth;
+        //set background color from panel attribute (single hex value)
+        $("#panel-area").css({'background-color': $gPanel.backgroundcolor});
+    }    
+};
+
+// update all widgets based on the element that changed; stateFor, if given, picks the state for each widget
+function updateWidgets(name, state, data, stateFor) {
+    var stateOf = function(widgetId) {
+        return isDefined(stateFor) ? stateFor($gWidgets[widgetId]) : state;
+    };
+    // using systemname
     if (whereUsed[name]) {
-        //if (jmri_logging) log.log("updateWidgets(" + name + ", " + state + ", data);");
+        //log.log("updateWidgets(" + name + ", " + state + ")");
         $.each(whereUsed[name], function(index, widgetId) {
-            $setWidgetState(widgetId, state, data);
+            $setWidgetState(widgetId, stateOf(widgetId), data);
         });
     }
-    //update all widgets based on the element that changed, using username
+    // using username
     if (isDefined(data.userName) && whereUsed[data.userName]) {
-        //if (jmri_logging) log.log("updateWidgets(" + data.userName + ", " + state + ", data);");
+        //log.log("updateWidgets by username (" + data.userName + "), " + state);
         $.each(whereUsed[data.userName], function(index, widgetId) {
-            $setWidgetState(widgetId, state, data);
+            $setWidgetState(widgetId, stateOf(widgetId), data);
         });
     }
+}
+
+// the text or html to show for a memory or block value: idTags by user name, reporters by their value,
+// roster entries by their icon or name, anything else as it is
+function valueToShow(value) {
+    if (value === null || isUndefined(value)) {
+        return null;
+    } else if (value.type == "idTag") {
+        return value.data.userName;
+    } else if (value.type == "reporter") {
+        return value.data.value;
+    } else if (value.type == "rosterEntry") {
+        if (value.data.icon !== null) {
+            return "<html><img src='" + value.data.icon + "'></html>";
+        }
+        return value.data.name; // if roster icon not set, just show the name
+    }
+    return value;
+}
+
+// the html to show for the train a block is allocated to while it is not yet in the block: its name in
+// italics after an arrow, as on a JMRI panel; a roster entry by its name rather than its icon
+function allocatedValueToShow(allocatedValue) {
+    var name = (allocatedValue.type == "rosterEntry") ? allocatedValue.data.name : valueToShow(allocatedValue);
+    name = String(name).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return "<html><i>\u2192 " + name + "</i></html>";
 }
 
 function updateOccupancy(sensorName, state, data) {
@@ -4061,7 +4735,7 @@ function getNextSlipState(slipWidget) {
             log.log("getNextSlipState($widget): unknown $widget.side: " + slipWidget.side);
             break;
         }
-    }   // switch (slipWidget.side)
+    }
     return result;
 }
 // ======= End of Layout Editor functions =======
@@ -4634,13 +5308,14 @@ class BumperDecoration extends Decoration {
         var bumperLength = this.length;
         var halfLength = bumperLength / 2;
         // common points
-        var p1 = [0, -halfLength], p2 = [0, +halfLength];
         if ((this.end == "start") || (this.end == "both")) {
+            var p1 = [0, -halfLength], p2 = [0, +halfLength];
             var p1 = $point_add($point_rotate(p1, startAngleRAD), this.ep1);
             var p2 = $point_add($point_rotate(p2, startAngleRAD), this.ep1);
             $drawLineP(p1, p2);   // draw cross tie
         }
         if ((this.end == "stop") || (this.end == "both")) {
+            var p1 = [0, -halfLength], p2 = [0, +halfLength];
             var p1 = $point_add($point_rotate(p1, stopAngleRAD), this.ep2);
             var p2 = $point_add($point_rotate(p2, stopAngleRAD), this.ep2);
             $drawLineP(p1, p2);   // draw cross tie

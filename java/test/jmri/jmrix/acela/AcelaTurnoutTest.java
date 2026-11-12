@@ -129,12 +129,13 @@ public class AcelaTurnoutTest extends jmri.implementation.AbstractTurnoutTestBas
         t = new AcelaTurnout("AT11", memo);
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AcelaTurnoutTest.class);
+    private static final Logger log = LoggerFactory.getLogger(AcelaTurnoutTest.class);
 
 }

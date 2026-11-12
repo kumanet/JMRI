@@ -9,16 +9,20 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Date;
+import java.text.SimpleDateFormat;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.swing.Icon;
 import javax.swing.JFileChooser;
-import javax.swing.JOptionPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
+
 import jmri.util.FileUtil;
+import jmri.util.ThreadingUtil;
+import jmri.util.swing.CountingBusyDialog;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.WindowInterface;
+
 import org.jdom2.Element;
 
 /**
@@ -52,6 +56,12 @@ public class FullBackupImportAction extends ImportRosterItemAction {
     boolean acceptAll;
     boolean acceptAllDup;
     
+    JFileChooser chooser;
+    String filename;
+    FileInputStream inputfile;
+    ZipInputStream zipper;
+    CountingBusyDialog dialog;
+
     @Override
     public void actionPerformed(ActionEvent e) {
 
@@ -62,10 +72,7 @@ public class FullBackupImportAction extends ImportRosterItemAction {
         Roster.getDefault();
 
         // set up to read import file
-        ZipInputStream zipper = null;
-        FileInputStream inputfile = null;
-
-        JFileChooser chooser = new JFileChooser();
+        chooser = new jmri.util.swing.JmriJFileChooser();
 
         String roster_filename_extension = "roster";
         FileNameExtensionFilter filter = new FileNameExtensionFilter(
@@ -77,11 +84,22 @@ public class FullBackupImportAction extends ImportRosterItemAction {
             return;
         }
 
-        String filename = chooser.getSelectedFile().getAbsolutePath();
-        
+        filename = chooser.getSelectedFile().getAbsolutePath();
+
+        new Thread(() -> {run();}).start();
+    }
+
+    /** 
+     * actually do the processing on a separate thread
+     */
+    public void run() {    
         try {
 
             inputfile = new FileInputStream(filename);
+            
+            dialog = new CountingBusyDialog(null, "Importing Roster", true, -1);// indeterminate bar
+            ThreadingUtil.runOnGUIEventually(() -> {dialog.start();});
+            
             zipper = new ZipInputStream(inputfile) {
                 @Override
                 public void close() {
@@ -93,18 +111,23 @@ public class FullBackupImportAction extends ImportRosterItemAction {
             // entry call will return a ZipEntry for each file in the
             // stream
             ZipEntry entry;
+            int count = 0;
             acceptAll = false; // skip prompting for each entry and accept all
             acceptAllDup = false;  // skip prompting for dups and accept all
+            SimpleDateFormat isoDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); // NOI18N ISO8601
             
             while ((entry = zipper.getNextEntry()) != null) {
-                log.debug(String.format("Entry: %s len %d (%d) added %TD content: %s",
+                log.debug("Entry: {} len {} ({}) added {} content: {}",
                                         entry.getName(), 
                                         entry.getSize(), 
                                         entry.getCompressedSize(), 
-                                        new Date(entry.getTime()),
+                                        isoDateFormat.format(entry.getTime()),
                                         entry.getComment()
-                        ));
+                        );
 
+                final int thisCount = ++count;
+                ThreadingUtil.runOnGUI(() -> {dialog.count(thisCount);});
+                
                 // Once we get the entry from the stream, the stream is
                 // positioned read to read the raw data, and we keep
                 // reading until read returns 0 or less.
@@ -112,11 +135,25 @@ public class FullBackupImportAction extends ImportRosterItemAction {
                 // find type and process
                 // Unfortunately, the comment field doesn't carry through (see debug above)
                 // so we check the filename
+                final var rosterEntry = entry;
                 if (entry.getName().endsWith(".xml") || entry.getName().endsWith(".XML")) {
-                    boolean retval = processRosterFile(zipper);
+                    boolean retval = ThreadingUtil.runOnGUIwithReturn(() -> {
+                        try {
+                            return processRosterFile(zipper);
+                        } catch (IOException ex) {
+                            log.error("Unable to read {}", filename, ex);
+                            return false;
+                        }
+                    });
                     if (!retval) break;
                 } else {
-                    processImageFile(zipper, entry, entry.getName());
+                    ThreadingUtil.runOnGUI(() -> {
+                        try {
+                            processImageFile(zipper, rosterEntry, rosterEntry.getName());
+                        } catch (IOException ex) {
+                            log.error("Unable to read {}", filename, ex);
+                        }
+                    });
                 }
                 
             }
@@ -126,12 +163,20 @@ public class FullBackupImportAction extends ImportRosterItemAction {
         } catch (IOException ex) {
             log.error("Unable to read {}", filename, ex);
         } finally {
+            log.info("Writing roster index at end");
+            Roster.getDefault().writeRoster();
+            // use the new roster
+            Roster.getDefault().reloadRosterFile();
+
+            ThreadingUtil.runOnGUIEventually(() -> {dialog.finish();});
+
             if (inputfile != null) {
                 try {
                     inputfile.close(); // zipper.close() is meaningless, see above, but this will do
                 } catch (IOException ex) {
                     log.error("Unable to close {}", filename, ex);
                 }
+            log.info("Reading backup done");
             }
         }
 
@@ -153,8 +198,8 @@ public class FullBackupImportAction extends ImportRosterItemAction {
     }
 
     /**
-     * @return true if OK to continue to next entry
      * @param zipper Stream to receive output
+     * @return true if OK to continue to next entry
      * @throws IOException from underlying operations
      */
 
@@ -171,11 +216,11 @@ public class FullBackupImportAction extends ImportRosterItemAction {
             // see if user wants to do it
             int retval = 2; // accept if acceptall
             if (!acceptAll) {
-                retval = JOptionPane.showOptionDialog(mParent,
+                retval = JmriJOptionPane.showOptionDialog(mParent,
                     Bundle.getMessage("ConfirmImportID", mToID),
                     Bundle.getMessage("ConfirmImport"),
-                    0,
-                    JOptionPane.INFORMATION_MESSAGE,
+                    JmriJOptionPane.DEFAULT_OPTION,
+                    JmriJOptionPane.INFORMATION_MESSAGE,
                     null,
                     new Object[]{Bundle.getMessage("CancelImports"),
                         Bundle.getMessage("Skip"),
@@ -183,16 +228,16 @@ public class FullBackupImportAction extends ImportRosterItemAction {
                         Bundle.getMessage("ButtonAcceptAll")},
                     null);
             }
-            if (retval == 0) {
-                // cancel case
+            if (retval == 0 || retval == JmriJOptionPane.CLOSED_OPTION ) {
+                // array position 0 cancel case, or Dialog closed
                 return false;
             }
             if (retval == 1) {
-                // skip case
+                // array position 1 skip case
                 return true;
             }
             if (retval == 3) {
-                // accept all case
+                // array position 3 accept all case
                 acceptAll = true;
             }
 
@@ -201,11 +246,11 @@ public class FullBackupImportAction extends ImportRosterItemAction {
 
             if (currentEntry != null) {
                 if (!acceptAllDup) {
-                    retval = JOptionPane.showOptionDialog(mParent,
+                    retval = JmriJOptionPane.showOptionDialog(mParent,
                         Bundle.getMessage("ConfirmImportDup", mToID),
                         Bundle.getMessage("ConfirmImport"),
-                        0,
-                        JOptionPane.INFORMATION_MESSAGE,
+                        JmriJOptionPane.DEFAULT_OPTION,
+                        JmriJOptionPane.INFORMATION_MESSAGE,
                         null,
                         new Object[]{Bundle.getMessage("CancelImports"),
                             Bundle.getMessage("Skip"),
@@ -213,16 +258,16 @@ public class FullBackupImportAction extends ImportRosterItemAction {
                             Bundle.getMessage("ButtonAcceptAll")},
                         null);
                 }
-                if (retval == 0) {
-                    // cancel case
+                if (retval == 0 || retval == JmriJOptionPane.CLOSED_OPTION ) {
+                    // array position 0 cancel case or Dialog closed
                     return false;
                 }
                 if (retval == 1) {
-                    // skip case
+                    // array position 1 skip case
                     return true;
                 }
                 if (retval == 3) {
-                    // accept all case
+                    // array position 3 accept all case
                     acceptAllDup = true;
                 }
 
@@ -238,8 +283,6 @@ public class FullBackupImportAction extends ImportRosterItemAction {
             loadEntryFromElement(lroot);
             addToEntryToRoster();
 
-            // use the new roster
-            Roster.getDefault().reloadRosterFile();
         } catch (org.jdom2.JDOMException ex) {
             log.error("Unable to parse entry", ex);
         }
@@ -247,5 +290,14 @@ public class FullBackupImportAction extends ImportRosterItemAction {
         return true;
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FullBackupImportAction.class);
+    @Override
+    void addToEntryToRoster() {
+        // add the new entry to the roster
+        Roster.getDefault().addEntry(mToEntry);
+        // unlike the superclass method, this does not 
+        // write the full Roster until the end of the full import
+        // to improve speed.  
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FullBackupImportAction.class);
 }

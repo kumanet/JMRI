@@ -3,11 +3,12 @@ package jmri.jmrit.withrottle;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
+
 import jmri.InstanceManager;
-import jmri.UserPreferencesManager;
 import jmri.util.zeroconf.ZeroConfService;
 import jmri.util.zeroconf.ZeroConfServiceEvent;
 import jmri.util.zeroconf.ZeroConfServiceListener;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,17 +23,14 @@ import org.slf4j.LoggerFactory;
  */
 public class FacelessServer implements DeviceListener, DeviceManager, ZeroConfServiceListener {
 
-    private final static Logger log = LoggerFactory.getLogger(FacelessServer.class);
+    private static final Logger log = LoggerFactory.getLogger(FacelessServer.class);
 
-    UserPreferencesManager userPreferences = InstanceManager.getNullableDefault(UserPreferencesManager.class);
-
-// Server iVars
     int port;
     ZeroConfService service;
     boolean isListen = true;
     ServerSocket socket = null;
-    final private ArrayList<DeviceServer> deviceList = new ArrayList<>();
-    final private ArrayList<DeviceListener> deviceListenerList = new ArrayList<>();
+    private final ArrayList<DeviceServer> deviceList = new ArrayList<>();
+    private final ArrayList<DeviceListener> deviceListenerList = new ArrayList<>();
     private int threadNumber = 1;
 
     FacelessServer() {
@@ -140,7 +138,7 @@ public class FacelessServer implements DeviceListener, DeviceManager, ZeroConfSe
 //    }
     /**
      * Received an UDID, filter out any duplicate.
-     * <p>
+     *
      * @param device the device to filter for duplicates
      */
     @Override

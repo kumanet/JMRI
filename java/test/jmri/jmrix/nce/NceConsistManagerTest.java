@@ -11,6 +11,7 @@ import org.junit.jupiter.api.*;
 /**
  *
  * @author Paul Bender Copyright (C) 2017
+ * @author Ken Cameron Copyright (C) 2023
  */
 public class NceConsistManagerTest extends jmri.implementation.AbstractConsistManagerTestBase {
 
@@ -63,6 +64,8 @@ public class NceConsistManagerTest extends jmri.implementation.AbstractConsistMa
         tcis = new NceTrafficControlScaffold();
         memo = new NceSystemConnectionMemo();
         memo.setNceTrafficController(tcis);
+        tcis.csm = new NceCmdStationMemory();
+
         cm = new NceConsistManager(memo);
     }
 
@@ -74,5 +77,5 @@ public class NceConsistManagerTest extends jmri.implementation.AbstractConsistMa
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(NceConsistManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(NceConsistManagerTest.class);
 }

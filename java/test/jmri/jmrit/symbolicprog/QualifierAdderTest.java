@@ -4,14 +4,12 @@ import java.util.HashMap;
 
 import javax.swing.JLabel;
 
-import jmri.progdebugger.ProgDebugger;
-import jmri.util.JUnitUtil;
-
-import org.jdom2.DocType;
-import org.jdom2.Document;
-import org.jdom2.Element;
+import org.jdom2.*;
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
+
+import jmri.progdebugger.ProgDebugger;
+import jmri.util.JUnitUtil;
 
 /**
  *
@@ -36,7 +34,7 @@ public class QualifierAdderTest {
         return var;
     }
 
-    class TestArithmeticQualifier extends ArithmeticQualifier {
+    private static class TestArithmeticQualifier extends ArithmeticQualifier {
 
         TestArithmeticQualifier(VariableValue watchedVal, int value, String relation) {
             super(watchedVal, value, relation);
@@ -53,13 +51,15 @@ public class QualifierAdderTest {
     }
 
     protected HashMap<String, CvValue> createCvMap() {
-        HashMap<String, CvValue> m = new HashMap<String, CvValue>();
-        return m;
+        return new HashMap<>();
     }
 
     /**
      * If there are any modifier elements, process them by e.g. setting
      * attributes on the VariableValue
+     * @param e Element
+     * @param v VariableValue
+     * @return QualifierAdder
      */
     protected QualifierAdder processModifierElements(final Element e, final VariableValue v) {
         QualifierAdder qa = new QualifierAdder() {
@@ -300,6 +300,20 @@ public class QualifierAdderTest {
 
         Assert.assertFalse(v2.getAvailable());
         jmri.util.JUnitAppender.assertErrorMessage("Arithmetic EQ operation when watched value doesn't exist");
+    }
+
+    @Test
+    public void testArithmeticQualifierImplementation() {
+        HashMap<String, CvValue> v = createCvMap();
+        CvValue cv = new CvValue("81", p);
+        cv.setValue(3);
+        v.put("81", cv);
+        // create a variable pointed at CV 81, check name
+        VariableValue variable = makeVar("label check", "comment", "", false, false, false, false, "81", "XXVVVVVV", 0, 255, v, null, "item check");
+
+        // test exists
+        ArithmeticQualifier aq1 = new TestArithmeticQualifier(variable, 1, "ne");
+        Assertions.assertNotNull(aq1);
     }
 
     @BeforeEach

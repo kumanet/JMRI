@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implement SensorManager for DCC++ systems.
+ * Implement SensorManager for DCC-EX systems.
  * <p>
  * System names are "DSnnn", where D is the user configurable system prefix,
  * nnn is the sensor number without padding.
@@ -23,8 +23,8 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
     protected DCCppTrafficController tc = null;
 
     /**
-     * Create an new DCC++ SensorManager.
-     * Has to register for DCC++ events.
+     * Create an new DCC-EX SensorManager.
+     * Has to register for DCC-EX events.
      *
      * @param memo the supporting system connection memo
      */
@@ -70,14 +70,14 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Can't convert " +  // NOI18N
                     systemName.substring(getSystemNamePrefix().length()) +
-                    " to DCC++ sensor address"); // NOI18N
+                    " to DCC-EX sensor address"); // NOI18N
         }
         return new DCCppSensor(getSystemNamePrefix() + addr, userName, tc);
     }
 
     /**
      * Listen for sensors, creating them as needed.
-     * 
+     *
      * @param l the message to parse
      */
     @Override
@@ -88,7 +88,7 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
             if (log.isDebugEnabled()) {
                 log.debug("SensorDef Reply for Encoder {}", Integer.toString(addr));
             }
-            
+
         } else if (l.isSensorReply()) {
             addr = l.getSensorNumInt();
             if (log.isDebugEnabled()) {
@@ -98,11 +98,12 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
         if (addr >= 0) {
             String s = getSystemNamePrefix() + (addr);
             if (null == getBySystemName(s)) {
-                // The sensor doesn't exist.  We need to create a 
+                // The sensor doesn't exist.  We need to create a
                 // new sensor, and forward this message to it.
-                ((DCCppSensor) provideSensor(s)).initmessage(l);
+                DCCppSensor sn = (DCCppSensor) provideSensor(s);
+                sn.initmessage(l);
             } else {
-                // The sensor exists.  We need to forward this 
+                // The sensor exists.  We need to forward this
                 // message to it.
                 Sensor sen = getBySystemName(s);
                 if (sen == null) {
@@ -116,7 +117,7 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
 
     /**
      * Listen for the outgoing messages (to the command station)
-     * 
+     *
      * @param l the message to parse
      */
     @Override
@@ -131,7 +132,7 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
         if (msg.getRetries() > 0) {
             msg.setRetries(msg.getRetries() - 1);
             tc.sendDCCppMessage(msg, this);
-        }        
+        }
     }
 
     @Override
@@ -168,35 +169,6 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
     }
 
     int iName; // must synchronize to avoid race conditions.
-
-    /**
-     * Provide next valid DCC++ address. Does not enforce any rules on the
-     * encoder or input values.
-     *
-     * @param curAddress the current address
-     * @param prefix     the system connection prefix
-     * @return the next valid address after the current address
-     */
-    @Override
-    synchronized public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix, boolean ignoreInitialExisting) throws JmriException {
-
-        String tmpSName = createSystemName(curAddress, prefix);
-        //Check to determine if the systemName is in use, return null if it is,
-        //otherwise return the next valid address.
-        Sensor s = getBySystemName(tmpSName);
-        if (s != null || ignoreInitialExisting) {
-            for (int x = 1; x < 10; x++) {
-                iName = iName + 1;
-                s = getBySystemName(prefix + typeLetter() + iName);
-                if (s == null) {
-                    return Integer.toString(iName);
-                }
-            }
-            throw new JmriException(Bundle.getMessage("InvalidNextValidTenInUse",getBeanTypeHandled(true),curAddress,iName));
-        } else {
-            return Integer.toString(iName);
-        }
-    }
 
     /**
      * {@inheritDoc}
@@ -236,6 +208,6 @@ public class DCCppSensorManager extends jmri.managers.AbstractSensorManager impl
         return Bundle.getMessage("AddOutputEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppSensorManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppSensorManager.class);
 
 }

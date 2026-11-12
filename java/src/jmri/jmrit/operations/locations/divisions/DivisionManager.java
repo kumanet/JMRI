@@ -1,9 +1,6 @@
 package jmri.jmrit.operations.locations.divisions;
 
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
 
 import javax.swing.JComboBox;
 
@@ -11,11 +8,12 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jmri.InstanceManager;
-import jmri.InstanceManagerAutoDefault;
-import jmri.InstanceManagerAutoInitialize;
+import jmri.*;
 import jmri.beans.PropertyChangeSupport;
+import jmri.jmrit.operations.OperationsPanel;
 import jmri.jmrit.operations.locations.LocationManagerXml;
+import jmri.jmrit.operations.setup.Control;
+import jmri.jmrit.operations.trains.TrainManifestHeaderText;
 
 /**
  * Manages divisions.
@@ -76,46 +74,45 @@ public class DivisionManager extends PropertyChangeSupport implements InstanceMa
      * @return new Division or existing Division
      */
     public Division newDivision(String name) {
-        Division Division = getDivisionByName(name);
-        if (Division == null) {
+        Division division = getDivisionByName(name);
+        if (division == null) {
             _id++;
-            Division = new Division(Integer.toString(_id), name);
-            Integer oldSize = Integer.valueOf(_divisionHashTable.size());
-            _divisionHashTable.put(Division.getId(), Division);
-            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize,
-                    Integer.valueOf(_divisionHashTable.size()));
+            division = new Division(Integer.toString(_id), name);
+            int oldSize = _divisionHashTable.size();
+            _divisionHashTable.put(division.getId(), division);
+            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _divisionHashTable.size());
         }
-        return Division;
+        return division;
     }
 
     /**
      * Remember a NamedBean Object created outside the manager.
      *
-     * @param Division The Division to add.
+     * @param division The Division to add.
      */
-    public void register(Division Division) {
-        Integer oldSize = Integer.valueOf(_divisionHashTable.size());
-        _divisionHashTable.put(Division.getId(), Division);
+    public void register(Division division) {
+        int oldSize = _divisionHashTable.size();
+        _divisionHashTable.put(division.getId(), division);
         // find last id created
-        int id = Integer.parseInt(Division.getId());
+        int id = Integer.parseInt(division.getId());
         if (id > _id) {
             _id = id;
         }
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_divisionHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _divisionHashTable.size());
     }
 
     /**
      * Forget a NamedBean Object created outside the manager.
      *
-     * @param Division The Division to delete.
+     * @param division The Division to delete.
      */
-    public void deregister(Division Division) {
-        if (Division == null) {
+    public void deregister(Division division) {
+        if (division == null) {
             return;
         }
-        Integer oldSize = Integer.valueOf(_divisionHashTable.size());
-        _divisionHashTable.remove(Division.getId());
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_divisionHashTable.size()));
+        int oldSize = _divisionHashTable.size();
+        _divisionHashTable.remove(division.getId());
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _divisionHashTable.size());
     }
 
     /**
@@ -128,15 +125,15 @@ public class DivisionManager extends PropertyChangeSupport implements InstanceMa
         List<Division> sortList = getList();
         // now re-sort
         List<Division> out = new ArrayList<Division>();
-        for (Division Division : sortList) {
+        for (Division division : sortList) {
             for (int j = 0; j < out.size(); j++) {
-                if (Division.getName().compareToIgnoreCase(out.get(j).getName()) < 0) {
-                    out.add(j, Division);
+                if (division.getName().compareToIgnoreCase(out.get(j).getName()) < 0) {
+                    out.add(j, division);
                     break;
                 }
             }
-            if (!out.contains(Division)) {
-                out.add(Division);
+            if (!out.contains(division)) {
+                out.add(division);
             }
         }
         return out;
@@ -191,6 +188,7 @@ public class DivisionManager extends PropertyChangeSupport implements InstanceMa
     public JComboBox<Division> getComboBox() {
         JComboBox<Division> box = new JComboBox<>();
         updateComboBox(box);
+        OperationsPanel.padComboBox(box, Control.max_len_string_location_name);
         return box;
     }
 
@@ -200,6 +198,24 @@ public class DivisionManager extends PropertyChangeSupport implements InstanceMa
         for (Division division : getDivisionsByNameList()) {
             box.addItem(division);
         }
+    }
+    
+    protected int _maxDivisionNameLength = 0;
+    
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+            justification="I18N of Info Message")
+    public int getMaxDivisionNameLength() {
+        String maxName = TrainManifestHeaderText.getStringHeader_Division();
+        for (Division div : getList()) {
+            if (div.getName().length() > maxName.length()) {
+                maxName = div.getName();
+            }
+        }
+        if (maxName.length() != _maxDivisionNameLength) {
+            log.info(Bundle.getMessage("InfoMaxDivisionName", maxName, maxName.length()));
+            _maxDivisionNameLength = maxName.length();
+        }
+        return _maxDivisionNameLength;
     }
 
     public void load(Element root) {
@@ -228,7 +244,7 @@ public class DivisionManager extends PropertyChangeSupport implements InstanceMa
         firePropertyChange(p, old, n);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DivisionManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DivisionManager.class);
 
     @Override
     public void initialize() {

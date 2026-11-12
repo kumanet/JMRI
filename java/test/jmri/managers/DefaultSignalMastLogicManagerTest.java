@@ -4,7 +4,6 @@ import jmri.InstanceManager;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -15,7 +14,7 @@ public class DefaultSignalMastLogicManagerTest extends AbstractManagerTestBase<j
 
     @Test
     public void testCTor() {
-        Assert.assertNotNull("exists",l);
+        Assertions.assertNotNull( l, "exists" );
     }
 
     @Test
@@ -36,14 +35,14 @@ public class DefaultSignalMastLogicManagerTest extends AbstractManagerTestBase<j
     public void testMakeSystemNameWithPrefix() {
     }
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithNoPrefixNotASystemName() {}
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithPrefixNotASystemName() {}
 
     @BeforeEach
@@ -54,10 +53,11 @@ public class DefaultSignalMastLogicManagerTest extends AbstractManagerTestBase<j
 
     @AfterEach
     public void tearDown() {
+        l.dispose();
         l = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(DefaultSignalMastLogicManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(DefaultSignalMastLogicManagerTest.class);
 
 }

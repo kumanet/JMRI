@@ -105,7 +105,6 @@ public class DoubleTurnoutSignalHead extends DefaultSignalHead {
         }
         mRed = null;
         mGreen = null;
-        jmri.InstanceManager.turnoutManagerInstance().removeVetoableChangeListener(this);
         super.dispose();
     }
 
@@ -143,7 +142,7 @@ public class DoubleTurnoutSignalHead extends DefaultSignalHead {
     }
 
     @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         if (getRed() != null && t.equals(getRed().getBean())) {
             return true;
         }
@@ -208,5 +207,5 @@ public class DoubleTurnoutSignalHead extends DefaultSignalHead {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DoubleTurnoutSignalHead.class);
+    private static final Logger log = LoggerFactory.getLogger(DoubleTurnoutSignalHead.class);
 }

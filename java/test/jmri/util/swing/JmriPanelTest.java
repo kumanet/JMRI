@@ -1,9 +1,12 @@
 package jmri.util.swing;
 
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  *
@@ -17,7 +20,7 @@ public class JmriPanelTest {
 
     @Test
     public void testCTor() {
-        Assert.assertNotNull("exists", panel);
+        assertNotNull( panel, "exists");
     }
 
     @Test
@@ -26,14 +29,27 @@ public class JmriPanelTest {
         panel.initComponents();
     }
 
+    @DisabledIfHeadless
+    @Test
+    public void testAccessibility() throws Exception{
+        panel.initComponents();
+        jmri.util.AccessibilityChecks.check(panel);
+    }
+
     @Test
     public void testGetHelpTarget(){
-        Assert.assertEquals("help target", helpTarget, panel.getHelpTarget());
+        assertEquals( helpTarget, panel.getHelpTarget(), "help target");
     }
 
     @Test
     public void testGetTitle(){
-        Assert.assertEquals("title", title, panel.getTitle());
+        assertEquals( title, panel.getTitle(), "title");
+    }
+
+    @Test
+    @DisabledIfHeadless
+    public void testGetMenus() {
+        assertNotNull(panel.getMenus());
     }
 
     @BeforeEach
@@ -54,6 +70,6 @@ public class JmriPanelTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(JmriPanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(JmriPanelTest.class);
 
 }

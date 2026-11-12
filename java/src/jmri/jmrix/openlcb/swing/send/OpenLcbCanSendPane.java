@@ -1,6 +1,10 @@
 package jmri.jmrix.openlcb.swing.send;
 
-import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -12,6 +16,7 @@ import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
+
 import jmri.jmrix.can.CanListener;
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanReply;
@@ -19,26 +24,16 @@ import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.TrafficController;
 import jmri.jmrix.can.cbus.CbusAddress;
 import jmri.jmrix.openlcb.swing.ClientActions;
+import jmri.jmrix.openlcb.swing.NamedEventIdTextField;
 import jmri.util.StringUtil;
 import jmri.util.javaworld.GridLayout2;
-import org.openlcb.Connection;
-import org.openlcb.DatagramAcknowledgedMessage;
-import org.openlcb.DatagramMessage;
-import org.openlcb.EventID;
-import org.openlcb.IdentifyConsumersMessage;
-import org.openlcb.IdentifyEventsAddressedMessage;
-import org.openlcb.IdentifyProducersMessage;
-import org.openlcb.Message;
-import org.openlcb.MimicNodeStore;
-import org.openlcb.NodeID;
-import org.openlcb.OlcbInterface;
-import org.openlcb.ProducerConsumerEventReportMessage;
-import org.openlcb.VerifyNodeIDNumberMessage;
+import jmri.util.swing.WrapLayout;
+
+import org.openlcb.*;
 import org.openlcb.can.AliasMap;
 import org.openlcb.implementations.MemoryConfigurationService;
 import org.openlcb.swing.NodeSelector;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.openlcb.swing.MemorySpaceSelector;
 
 /**
  * User interface for sending OpenLCB CAN frames to exercise the system
@@ -57,25 +52,29 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
     // member declarations
     final JLabel jLabel1 = new JLabel();
     final JButton sendButton = new JButton();
-    final JTextField packetTextField = new JTextField(12);
+    final JTextField packetTextField = new JTextField(60);
 
     // internal members to hold sequence widgets
     static final int MAXSEQUENCE = 4;
     final JTextField[] mPacketField = new JTextField[MAXSEQUENCE];
     final JCheckBox[] mUseField = new JCheckBox[MAXSEQUENCE];
     final JTextField[] mDelayField = new JTextField[MAXSEQUENCE];
-    final JToggleButton mRunButton = new JToggleButton("Go");
+    final JToggleButton mRunButton = new JToggleButton(Bundle.getMessage("ButtonGo"));
 
     final JTextField srcAliasField = new JTextField(4);
     NodeSelector nodeSelector;
-    final JTextField sendEventField = new JTextField("02 03 04 05 06 07 00 01 ");     // NOI18N
+    NamedEventIdTextField sendEventField;
     final JTextField datagramContentsField = new JTextField("20 61 00 00 00 00 08");  // NOI18N
     final JTextField configNumberField = new JTextField("40");                        // NOI18N
     final JTextField configAddressField = new JTextField("000000");                   // NOI18N
-    final JTextField readDataField = new JTextField(80);
-    final JTextField writeDataField = new JTextField(80);
-    final JComboBox<String> addrSpace = new JComboBox<>(new String[]{"CDI", "All", "Config", "None"});
-
+    final JTextField readDataField = new JTextField(60);
+    final JTextField writeDataField = new JTextField(60);
+    final MemorySpaceSelector addrSpace = new MemorySpaceSelector(0xFF);
+    final JComboBox<String> validitySelector = new JComboBox<String>(new String[]{Bundle.getMessage("ValiditySelectorUnknown"), 
+        Bundle.getMessage("ValiditySelectorValid"), Bundle.getMessage("ValiditySelectorInvalid")});
+    
+    JButton cdiButton;
+    
     Connection connection;
     AliasMap aliasMap;
     NodeID srcNodeID;
@@ -92,13 +91,15 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
     public void initComponents(CanSystemConnectionMemo memo) {
         super.initComponents(memo);
         iface = memo.get(OlcbInterface.class);
-        actions = new ClientActions(iface);
+        actions = new ClientActions(iface, memo);
         tc = memo.getTrafficController();
         tc.addCanListener(this);
         connection = memo.get(org.openlcb.Connection.class);
         srcNodeID = memo.get(org.openlcb.NodeID.class);
         aliasMap = memo.get(org.openlcb.can.AliasMap.class);
 
+        sendEventField = new NamedEventIdTextField(memo);
+        
         // register request for notification
         Connection.ConnectionListener cl = new Connection.ConnectionListener() {
             @Override
@@ -113,7 +114,17 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         mcs = memo.get(MemoryConfigurationService.class);
         store = memo.get(MimicNodeStore.class);
         nodeSelector = new NodeSelector(store);
+        nodeSelector.addActionListener (new ActionListener () {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                setCdiButton();
+                jmri.util.ThreadingUtil.runOnGUIDelayed( ()->{ 
+                    setCdiButton(); 
+                }, 500);
+            }
+        });
 
+        // start window layout
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 
         // handle single-packet part
@@ -122,148 +133,220 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         add(new JSeparator());
 
         // Configure the sequence
-        add(new JLabel("Send sequence of frames:"));
+        add(new JLabel(Bundle.getMessage("ConfigureSendSequence")));
         JPanel pane2 = new JPanel();
         pane2.setLayout(new GridLayout2(MAXSEQUENCE + 2, 4));
         pane2.add(new JLabel(""));
-        pane2.add(new JLabel("Send"));
-        pane2.add(new JLabel("packet"));
-        pane2.add(new JLabel("wait (msec)"));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigureSend")));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigureSendPacket")));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigureWait")));
         for (int i = 0; i < MAXSEQUENCE; i++) {
             pane2.add(new JLabel(Integer.toString(i + 1)));
             mUseField[i] = new JCheckBox();
-            mPacketField[i] = new JTextField(10);
+            mPacketField[i] = new JTextField(20);
             mDelayField[i] = new JTextField(10);
             pane2.add(mUseField[i]);
             pane2.add(mPacketField[i]);
             pane2.add(mDelayField[i]);
         }
-        pane2.add(mRunButton); // starts a new row in layout
         add(pane2);
+        add(mRunButton); // below rows
 
         mRunButton.addActionListener(this::runButtonActionPerformed);
 
         // special packet forms
         add(new JSeparator());
-        add(new JLabel("Send special frame:"));
-
+        
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
-        pane2.add(new JLabel("Src Node alias:"));
+        pane2.setLayout(new WrapLayout());
+        add(pane2);
+        pane2.add(new JLabel(Bundle.getMessage("SpecialSendControlFrame")));
         pane2.add(srcAliasField);
-        add(pane2);
-
-        pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
-        add(pane2);
         JButton b;
-        b = new JButton("Send CIM");
+        b = new JButton(Bundle.getMessage("SpecialSendCIM"));
         b.addActionListener(this::sendCimPerformed);
-
         pane2.add(b);
 
         // send OpenLCB messages
         add(new JSeparator());
-        add(addLineLabel("Send OpenLCB global message:"));
 
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        b = new JButton("Send Verify Nodes Global");
+        pane2.add(new JLabel(Bundle.getMessage("OpenLCBMessagesGlobal")));
+        b = new JButton(Bundle.getMessage("OpenLCBMessagesVerify"));
         b.addActionListener(this::sendVerifyNodeGlobal);
         pane2.add(b);
-        b = new JButton("Send Verify Node Global with NodeID");
+        b = new JButton(Bundle.getMessage("OpenLCBMessagesNodeID"));
         b.addActionListener(this::sendVerifyNodeGlobalID);
         pane2.add(b);
 
+        // event messages 
         add(new JSeparator());
-        add(addLineLabel("Send OpenLCB event message:"));
+        
+        var insert = new JPanel();
+        insert.setLayout(new WrapLayout());
+        insert.add(sendEventField);
+        insert.add(validitySelector);
+        
+        
+        add(addLineLabel(Bundle.getMessage("EventMessagesEventID"), insert));
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        b = new JButton("Send Request Consumers");
-        b.addActionListener(this::sendReqConsumers);
+        b = new JButton(Bundle.getMessage("EventMessagesGlobalIdentify"));
+        b.addActionListener(this::sendGlobalIdentifyEvents);
         pane2.add(b);
-        b = new JButton("Send Request Producers");
-        b.addActionListener(this::sendReqProducers);
-        pane2.add(b);
-        b = new JButton("Send Event Produced");
+        b = new JButton(Bundle.getMessage("EventMessagesEventProduced"));
         b.addActionListener(this::sendEventPerformed);
         pane2.add(b);
-        pane2.add(new JLabel("Event ID (8 bytes):"));
-        pane2.add(sendEventField);
-
-        add(new JSeparator());
-        add(addLineLabel("Send OpenLCB addressed message to:", nodeSelector));
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        b = new JButton("Send Request Events");
+        b = new JButton(Bundle.getMessage("EventMessagesIdentifyConsumers"));
+        b.addActionListener(this::sendReqConsumers);
+        pane2.add(b);
+        b = new JButton(Bundle.getMessage("EventMessagesConsumerIdentified"));
+        b.addActionListener(this::sendConsumerID);
+        pane2.add(b);
+        b = new JButton(Bundle.getMessage("EventMessagesIdentifyProducers"));
+        b.addActionListener(this::sendReqProducers);
+        pane2.add(b);
+        b = new JButton(Bundle.getMessage("EventMessagesProducerIdentified"));
+        b.addActionListener(this::sendProducerID);
+        pane2.add(b);
+
+        // addressed messages
+        add(new JSeparator());
+        add(addLineLabel(Bundle.getMessage("AddressedMessagesMessageTo"), nodeSelector));
+        pane2 = new JPanel();
+        pane2.setLayout(new WrapLayout());
+        add(pane2);
+        b = new JButton(Bundle.getMessage("AddressedMessagesIdentifyEvents"));
         b.addActionListener(this::sendRequestEvents);
         pane2.add(b);
+        b = new JButton(Bundle.getMessage("AddressedMessagesPIPRequest"));
+        b.addActionListener(this::sendRequestPip);
+        pane2.add(b);
+        b = new JButton(Bundle.getMessage("AddressedMessagesSNIPRequest"));
+        b.addActionListener(this::sendRequestSnip);
+        pane2.add(b);
+
+        add(new JSeparator());
 
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        b = new JButton("Send Datagram");
+        b = new JButton(Bundle.getMessage("AddressedMessagesDatagram"));
         b.addActionListener(this::sendDatagramPerformed);
         pane2.add(b);
-        pane2.add(new JLabel("Contents: "));
+        pane2.add(new JLabel(Bundle.getMessage("AddressedMessagesContents")));
+        datagramContentsField.setColumns(45);
         pane2.add(datagramContentsField);
-        b = new JButton("Send Datagram Reply");
+        b = new JButton(Bundle.getMessage("AddressedMessagesPositiveReply"));
         b.addActionListener(this::sendDatagramReply);
         pane2.add(b);
 
         // send OpenLCB Configuration message
         add(new JSeparator());
-        add(addLineLabel("Send OpenLCB Configuration Command:"));
 
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        pane2.add(new JLabel("Memory Address: "));
+        
+        pane2.add(new JLabel(Bundle.getMessage("ConfigMessagesMemoryRequest")));
         pane2.add(configAddressField);
-        pane2.add(new JLabel("Address Space: "));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigMessagesAddressSpace")));
         pane2.add(addrSpace);
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        pane2.add(new JLabel("Byte Count: "));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigMessagesByteCount")));
         pane2.add(configNumberField);
-        b = new JButton("Read");
+        b = new JButton(Bundle.getMessage("ConfigMessagesRead"));
         b.addActionListener(this::readPerformed);
         pane2.add(b);
-        pane2.add(new JLabel("Data: "));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigMessagesData")));
         pane2.add(readDataField);
 
         pane2 = new JPanel();
-        pane2.setLayout(new FlowLayout());
+        pane2.setLayout(new WrapLayout());
         add(pane2);
-        b = new JButton("Write");
+        b = new JButton(Bundle.getMessage("ConfigMessagesWrite"));
         b.addActionListener(this::writePerformed);
         pane2.add(b);
-        pane2.add(new JLabel("Data: "));
+        pane2.add(new JLabel(Bundle.getMessage("ConfigMessagesData")));
         writeDataField.setText("00 00");   // NOI18N
         pane2.add(writeDataField);
 
-        b = new JButton("Open CDI Config Tool");
-        add(b);
-        b.addActionListener(e -> openCdiPane());
+        pane2 = new JPanel();
+        pane2.setLayout(new WrapLayout());
+        add(pane2);
 
+        var restartButton = new JButton(Bundle.getMessage("ConfigMessagesRestart"));
+        pane2.add(restartButton);
+        restartButton.addActionListener(this::restartNode);
+        
+        cdiButton = new JButton(Bundle.getMessage("ConfigMessagesOpenCDI"));
+        pane2.add(cdiButton);
+        cdiButton.addActionListener(e -> openCdiPane());
+        cdiButton.setToolTipText(Bundle.getMessage("ConfigMessagesOpenCDItt"));
+        setCdiButton(); // get initial state
+
+        var clearCacheButton = new JButton(Bundle.getMessage("ConfigMessagesClearCDI"));
+        pane2.add(clearCacheButton);
+        clearCacheButton.addActionListener(this::clearCache);
+        clearCacheButton.setToolTipText(Bundle.getMessage("ConfigMessagesClearCDItt"));
+
+        // listen for mimic store changes to set CDI button
+        store.addPropertyChangeListener(e -> {
+            setCdiButton();
+        });
+        jmri.util.ThreadingUtil.runOnGUIDelayed( ()->{ 
+            setCdiButton(); 
+        }, 500);
     }
 
+    /**
+     * Set whether Open CDI button is enabled based on whether
+     * the selected node has CDI in its PIP
+     */
+    protected void setCdiButton() {
+        var nodeID = nodeSelector.getSelectedNodeID();
+        if (nodeID == null) { 
+            cdiButton.setEnabled(false);
+            log.debug("null nodeID disables cdiButton");
+            return;
+        }
+        var pip = store.getProtocolIdentification(nodeID);
+        if (pip == null || pip.getProtocols() == null) { 
+            cdiButton.setEnabled(false);
+            log.debug("null pip info disables cdiButton");
+            return;
+        }
+        boolean setValue = 
+            pip.getProtocols()
+                .contains(org.openlcb.ProtocolIdentification.Protocol.ConfigurationDescription);
+        cdiButton.setEnabled(setValue);
+        log.debug("cdiButton set {} from PIP info", setValue);
+    }
+    
     private JPanel getSendSinglePacketJPanel() {
+        JPanel outer = new JPanel();
+        outer.setLayout(new BoxLayout(outer, BoxLayout.X_AXIS));
+        
         JPanel pane1 = new JPanel();
         pane1.setLayout(new BoxLayout(pane1, BoxLayout.Y_AXIS));
 
-        jLabel1.setText("Single Frame:  (Raw input format is [123] 12 34 56) ");
+        jLabel1.setText(Bundle.getMessage("SinglePacketLabel"));
         jLabel1.setVisible(true);
 
-        sendButton.setText("Send");
+        sendButton.setText(Bundle.getMessage("SinglePacketSend"));
         sendButton.setVisible(true);
-        sendButton.setToolTipText("Send frame");
+        sendButton.setToolTipText(Bundle.getMessage("SinglePacketSendTt"));
 
-        packetTextField.setToolTipText("Frame as hex pairs, e.g. 82 7D; standard header in (), extended in []");
+        packetTextField.setToolTipText(Bundle.getMessage("SinglePacketText"));
+        packetTextField.setMaximumSize(packetTextField.getPreferredSize());
 
         pane1.add(jLabel1);
         pane1.add(packetTextField);
@@ -271,7 +354,11 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         pane1.add(Box.createVerticalGlue());
 
         sendButton.addActionListener(this::sendButtonActionPerformed);
-        return pane1;
+        
+        outer.add(Box.createHorizontalGlue());
+        outer.add(pane1);
+        outer.add(Box.createHorizontalGlue());
+        return outer;
     }
 
     @Override
@@ -282,9 +369,9 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
     @Override
     public String getTitle() {
         if (memo != null) {
-            return (memo.getUserName() + " Send Can Frame");
+            return (memo.getUserName() + " " + Bundle.getMessage("Title"));
         }
-        return "Send CAN Frames and OpenLCB Messages";
+        return Bundle.getMessage("Title");
     }
 
     JComponent addLineLabel(String text) {
@@ -296,10 +383,16 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS));
         if (c != null) {
-            p.add(lab);
+            p.add(lab, BorderLayout.EAST);
+            if (c instanceof JTextField) {
+                int height = lab.getMinimumSize().height+4;
+                int width = c.getMinimumSize().width;
+                Dimension d = new Dimension(width, height);
+                c.setMaximumSize(d);
+            }
             p.add(c);
         } else {
-            p.add(lab);
+            p.add(lab, BorderLayout.EAST);
         }
         p.add(Box.createHorizontalGlue());
         return p;
@@ -315,33 +408,47 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
 
     public void sendCimPerformed(java.awt.event.ActionEvent e) {
         String data = "[10700" + srcAliasField.getText() + "]";  // NOI18N
-        log.debug("|{}|",data);
+        log.debug("sendCimPerformed: |{}|",data);
         CanMessage m = createPacket(data);
         log.debug("sendCimPerformed");
         tc.sendCanMessage(m, this);
     }
 
     NodeID destNodeID() {
-        return nodeSelector.getSelectedItem();
+        return nodeSelector.getSelectedNodeID();
     }
 
     EventID eventID() {
-        return new EventID(jmri.util.StringUtil.bytesFromHexString(sendEventField.getText()
-                .replace(".", " ")));
+        return sendEventField.getEventID();
     }
 
     public void sendVerifyNodeGlobal(java.awt.event.ActionEvent e) {
-        Message m = new VerifyNodeIDNumberMessage(srcNodeID);
+        Message m = new VerifyNodeIDNumberGlobalMessage(srcNodeID);
         connection.put(m, null);
     }
 
     public void sendVerifyNodeGlobalID(java.awt.event.ActionEvent e) {
-        Message m = new VerifyNodeIDNumberMessage(srcNodeID, destNodeID());
+        Message m = new VerifyNodeIDNumberGlobalMessage(srcNodeID, destNodeID());
         connection.put(m, null);
     }
 
     public void sendRequestEvents(java.awt.event.ActionEvent e) {
         Message m = new IdentifyEventsAddressedMessage(srcNodeID, destNodeID());
+        connection.put(m, null);
+    }
+
+    public void sendRequestPip(java.awt.event.ActionEvent e) {
+        Message m = new ProtocolIdentificationRequestMessage(srcNodeID, destNodeID());
+        connection.put(m, null);
+    }
+
+    public void sendRequestSnip(java.awt.event.ActionEvent e) {
+        Message m = new SimpleNodeIdentInfoRequestMessage(srcNodeID, destNodeID());
+        connection.put(m, null);
+    }
+
+    public void sendGlobalIdentifyEvents(java.awt.event.ActionEvent e) {
+        Message m = new IdentifyEventsGlobalMessage(srcNodeID);
         connection.put(m, null);
     }
 
@@ -355,8 +462,27 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         connection.put(m, null);
     }
 
+    EventState validity() {
+        switch (validitySelector.getSelectedIndex()) {
+            case 1 : return EventState.Valid;
+            case 2 : return EventState.Invalid;
+            case 0 : 
+            default: return EventState.Unknown;
+        }
+    }
+    
+    public void sendConsumerID(java.awt.event.ActionEvent e) {
+        Message m = new ConsumerIdentifiedMessage(srcNodeID, eventID(), validity());
+        connection.put(m, null);
+    }
+
     public void sendReqProducers(java.awt.event.ActionEvent e) {
         Message m = new IdentifyProducersMessage(srcNodeID, eventID());
+        connection.put(m, null);
+    }
+
+    public void sendProducerID(java.awt.event.ActionEvent e) {
+        Message m = new ProducerIdentifiedMessage(srcNodeID, eventID(), validity());
         connection.put(m, null);
     }
 
@@ -371,8 +497,18 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
         connection.put(m, null);
     }
 
+    public void restartNode(java.awt.event.ActionEvent e) {
+        Message m = new DatagramMessage(srcNodeID, destNodeID(),
+                new byte[] {0x20, (byte) 0xA9});
+        connection.put(m, null);        
+    }
+    
+    public void clearCache(java.awt.event.ActionEvent e) {
+        jmri.jmrix.openlcb.swing.DropCdiCache.drop(destNodeID(), memo.get(OlcbInterface.class));
+    }
+    
     public void readPerformed(java.awt.event.ActionEvent e) {
-        int space = 0xFF - addrSpace.getSelectedIndex();
+        int space = addrSpace.getMemorySpace();
         long addr = Integer.parseInt(configAddressField.getText(), 16);
         int length = Integer.parseInt(configNumberField.getText());
         mcs.requestRead(destNodeID(), space, addr,
@@ -392,7 +528,7 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
     }
 
     public void writePerformed(java.awt.event.ActionEvent e) {
-        int space = 0xFF - addrSpace.getSelectedIndex();
+        int space = addrSpace.getMemorySpace();
         long addr = Integer.parseInt(configAddressField.getText(), 16);
         byte[] content = jmri.util.StringUtil.bytesFromHexString(writeDataField.getText());
         mcs.requestWrite(destNodeID(), space, addr, content, new MemoryConfigurationService.McsWriteHandler() {
@@ -570,7 +706,7 @@ public class OpenLcbCanSendPane extends jmri.jmrix.can.swing.CanPanel implements
     }
 
     // private data
-    private TrafficController tc = null; //was CanInterface
-    private final static Logger log = LoggerFactory.getLogger(OpenLcbCanSendPane.class);
+    private TrafficController tc = null; // was CanInterface
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OpenLcbCanSendPane.class);
 
 }

@@ -1,16 +1,19 @@
 package jmri.jmrit.display.layoutEditor;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import java.awt.geom.Rectangle2D;
-import jmri.JmriException;
-import jmri.util.*;
-
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
-
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.netbeans.jemmy.operators.Operator;
+
+import jmri.JmriException;
+import jmri.util.JUnitAppender;
 
 /**
  * Test simple functioning of TrackSegment.
@@ -27,19 +30,20 @@ import org.netbeans.jemmy.operators.Operator;
  *
  * @author Paul Bender Copyright (C) 2016
  */
+@DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
 public class TrackSegmentTest extends LayoutTrackTest {
 
     // the amount of variation allowed floating point values in order to be considered equal
-    static final double tolerance = 0.000001;
+    // static final double TOLERANCE = 0.000001;
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
         // Invalid parameters in TrackSegment constructor call
-        TrackSegment ts = new TrackSegment("TS01", (TrackSegment) null, HitPointType.NONE, (TrackSegment) null, HitPointType.NONE, false, layoutEditor);
-        Assert.assertNotNull("TrackSegment TS01 not null", ts);
+        TrackSegment ts = new TrackSegment("TS01", null, HitPointType.NONE, (TrackSegment) null, HitPointType.NONE, false, layoutEditor);
+        assertNotNull( ts, "TrackSegment TS01 not null");
         JUnitAppender.assertErrorMessage("Invalid object in TrackSegment constructor call - TS01");
         JUnitAppender.assertErrorMessage("Invalid connect type 1 ('NONE') in TrackSegment constructor - TS01");
         JUnitAppender.assertErrorMessage("Invalid connect type 2 ('NONE') in TrackSegment constructor - TS01");
@@ -47,89 +51,95 @@ public class TrackSegmentTest extends LayoutTrackTest {
 
     @Test
     public void testReplaceTrackConnection() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
-        Assert.assertFalse("trackSegment.replaceTrackConnection(null, null, NONE) fail", trackSegment.replaceTrackConnection(null, null, HitPointType.NONE));
+        assertFalse( trackSegment.replaceTrackConnection(null, null, HitPointType.NONE),
+                "trackSegment.replaceTrackConnection(null, null, NONE) fail");
         JUnitAppender.assertWarnMessage("TS1.replaceTrackConnection(null, null, NONE); Can't replace null track connection with null");
 
         LayoutTrack c1 = trackSegment.getConnect1();
         HitPointType t1 = trackSegment.getType1();
-        Assert.assertTrue("trackSegment.replaceTrackConnection(c1, null, NONE) fail", trackSegment.replaceTrackConnection(c1, null, HitPointType.NONE));
-        Assert.assertNull("trackSegment.replaceTrackConnection(c1, null, NONE) fail", trackSegment.getConnect1());
+        assertTrue( trackSegment.replaceTrackConnection(c1, null, HitPointType.NONE),
+                "trackSegment.replaceTrackConnection(c1, null, NONE) fail");
+        assertNull( trackSegment.getConnect1(),
+                "trackSegment.replaceTrackConnection(c1, null, NONE) fail");
 
-        Assert.assertTrue("trackSegment.replaceTrackConnection(null, c1, t1) fail", trackSegment.replaceTrackConnection(null, c1, t1));
-        Assert.assertEquals("trackSegment.replaceTrackConnection(null, c1, t1) fail", c1, trackSegment.getConnect1());
+        assertTrue( trackSegment.replaceTrackConnection(null, c1, t1),
+                "trackSegment.replaceTrackConnection(null, c1, t1) fail");
+        assertEquals( c1, trackSegment.getConnect1(),
+                "trackSegment.replaceTrackConnection(null, c1, t1) fail");
 
         // PositionablePoint a3 = new PositionablePoint("A3", PositionablePoint.PointType.ANCHOR, new Point2D.Double(10.0, 10.0), layoutEditor);
         PositionablePoint a3 = new PositionablePoint("A3", PositionablePoint.PointType.ANCHOR, layoutEditor);
-        Assert.assertTrue("trackSegment.replaceTrackConnection(c1, a3, POS_POINT) fail", trackSegment.replaceTrackConnection(c1, a3, HitPointType.POS_POINT));
+        assertTrue( trackSegment.replaceTrackConnection(c1, a3, HitPointType.POS_POINT),
+                "trackSegment.replaceTrackConnection(c1, a3, POS_POINT) fail");
     }
 
     @Test
     public void testToString() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
-        Assert.assertEquals("trackSegment.toString()", "TrackSegment TS1 c1:{A1 (POS_POINT)}, c2:{A2 (POS_POINT)}", trackSegment.toString());
+        assertEquals( "TrackSegment TS1 c1:{A1 (POS_POINT)}, c2:{A2 (POS_POINT)}",
+                trackSegment.toString(), "trackSegment.toString()");
     }
 
     @Test
     public void testSetNewConnect() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
         trackSegment.setNewConnect1(null, HitPointType.NONE);
-        Assert.assertEquals("trackSegment.setNewConnect1(null, NONE)", null, trackSegment.getConnect1());
-        Assert.assertEquals("trackSegment.setNewConnect1(null, NONE)", HitPointType.NONE, trackSegment.getType1());
+        assertNull(  trackSegment.getConnect1(), "trackSegment.setNewConnect1(null, NONE)");
+        assertEquals( HitPointType.NONE, trackSegment.getType1(), "trackSegment.setNewConnect1(null, NONE)");
 
         trackSegment.setNewConnect2(null, HitPointType.NONE);
-        Assert.assertEquals("trackSegment.setNewConnect1(null, NONE)", null, trackSegment.getConnect2());
-        Assert.assertEquals("trackSegment.setNewConnect1(null, NONE)", HitPointType.NONE, trackSegment.getType2());
+        assertNull( trackSegment.getConnect2(), "trackSegment.setNewConnect1(null, NONE)");
+        assertEquals( HitPointType.NONE, trackSegment.getType2(), "trackSegment.setNewConnect1(null, NONE)");
     }
 
     @Test
     public void test_getConnection() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
-        boolean fail = true;
-        try {
-            Assert.assertNull("trackSegment.getConnection()", trackSegment.getConnection(HitPointType.NONE));
-        } catch (JmriException e) {
-            fail = false;
-        }
-        Assert.assertFalse("trackSegment.getConnection(NONE) threw JmriException", fail);
+        JmriException ex = assertThrows( JmriException.class, () -> {
+            var t = trackSegment.getConnection(HitPointType.NONE);
+            fail("Should have thrown, created " + t);
+        }, "trackSegment.getConnection(NONE) threw JmriException");
+        assertNotNull( ex);
     }
 
     @Test
     public void test_getSetLayoutBlock() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
-        Assert.assertNull("trackSegment.getLayoutBlock()", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock()");
         trackSegment.setLayoutBlock(null);
-        Assert.assertNull("trackSegment.getLayoutBlock()", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock()");
 
         LayoutBlock layoutBlock = new LayoutBlock("ILB999", "Test Block");
         trackSegment.setLayoutBlock(layoutBlock);
-        Assert.assertEquals("trackSegment.getLayoutBlock()", layoutBlock, trackSegment.getLayoutBlock());
+        assertEquals( layoutBlock, trackSegment.getLayoutBlock(),
+                "trackSegment.getLayoutBlock()");
 
         trackSegment.setLayoutBlock(null);
-        Assert.assertNull("trackSegment.getLayoutBlock()", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock()");
     }
 
     @Test
     public void test_setLayoutBlockByName() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        Assert.assertTrue((layoutEditor != null) && (trackSegment != null));
+        assertNotNull(layoutEditor);
+        assertNotNull(trackSegment);
 
-        Assert.assertNull("trackSegment.getLayoutBlock() == null (default)", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock() == null (default)");
         trackSegment.setLayoutBlockByName(null);
-        Assert.assertNull("trackSegment.getLayoutBlock(null) == null", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock(null) == null");
         trackSegment.setLayoutBlockByName("");
-        Assert.assertNull("trackSegment.getLayoutBlock('') == null", trackSegment.getLayoutBlock());
+        assertNull( trackSegment.getLayoutBlock(), "trackSegment.getLayoutBlock('') == null");
 
         trackSegment.setLayoutBlockByName("invalid name");    //note: invalid name
         JUnitAppender.assertErrorMessage("provideLayoutBlock: The block name 'invalid name' does not return a block.");
@@ -142,82 +152,59 @@ public class TrackSegmentTest extends LayoutTrackTest {
     //
 
 
-    static private LayoutEditor layoutEditor = null;
-    static private TrackSegment trackSegment = null;
-    //static private TrackSegmentView trackSegmentView = null;
+    protected TrackSegment trackSegment = null;
+    //private static TrackSegmentView trackSegmentView = null;
 
 
     /**
-     * This is called once before all tests
-     *
-     * @throws Exception
+     * This is called once before all tests.
      */
     @BeforeAll
-    public static void setUpClass() throws Exception {
-        if (!GraphicsEnvironment.isHeadless()) {
-            // save the old string comparator
-            stringComparator = Operator.getDefaultStringComparator();
-            // set default string matching comparator to one that exactly matches and is case sensitive
-            Operator.setDefaultStringComparator(new Operator.DefaultStringComparator(true, true));
-        }
+    public static void setUpClass() {
+
+        // save the old string comparator
+        stringComparator = Operator.getDefaultStringComparator();
+        // set default string matching comparator to one that exactly matches and is case sensitive
+        Operator.setDefaultStringComparator(new Operator.DefaultStringComparator(true, true));
+
     }
 
     /**
-     * This is called once after all tests
-     *
-     * @throws Exception
+     * This is called once after all tests.
      */
     @AfterAll
-    public static void tearDownClass() throws Exception {
-        if (!GraphicsEnvironment.isHeadless()) {
-            //restore the default string matching comparator
-            Operator.setDefaultStringComparator(stringComparator);
-        }
+    public static void tearDownClass() {
+
+        //restore the default string matching comparator
+        Operator.setDefaultStringComparator(stringComparator);
+
     }
     private static Operator.StringComparator stringComparator = null;
 
     /**
-     * This is called before each test
-     *
-     * @throws Exception
+     * This is called before each test.
      */
     @BeforeEach
-    public void setUpEach() throws Exception {
+    @Override
+    public void setUp() {
         super.setUp();
-        jmri.util.JUnitUtil.resetProfileManager();
-        jmri.util.JUnitUtil.resetInstanceManager();
 
-        if (!GraphicsEnvironment.isHeadless()) {
-            layoutEditor = new LayoutEditor();
+        PositionablePoint p1 = new PositionablePoint("A1", PositionablePoint.PointType.ANCHOR, layoutEditor);
+        // PositionablePointView p1v = new PositionablePointView(p1, new Point2D.Double(10.0, 20.0), layoutEditor);
 
-            PositionablePoint p1 = new PositionablePoint("A1", PositionablePoint.PointType.ANCHOR, layoutEditor);
-            // PositionablePointView p1v = new PositionablePointView(p1, new Point2D.Double(10.0, 20.0), layoutEditor);
+        PositionablePoint p2 = new PositionablePoint("A2", PositionablePoint.PointType.ANCHOR, layoutEditor);
+        // PositionablePointView p2v = new PositionablePointView(p2, new Point2D.Double(20.0, 33.0), layoutEditor);
 
-            PositionablePoint p2 = new PositionablePoint("A2", PositionablePoint.PointType.ANCHOR, layoutEditor);
-            // PositionablePointView p2v = new PositionablePointView(p2, new Point2D.Double(20.0, 33.0), layoutEditor);
+        trackSegment = new TrackSegment("TS1", p1, HitPointType.POS_POINT, p2, HitPointType.POS_POINT, true, layoutEditor);
+        // trackSegmentView = new TrackSegmentView(trackSegment, layoutEditor);
 
-            trackSegment = new TrackSegment("TS1", p1, HitPointType.POS_POINT, p2, HitPointType.POS_POINT, true, layoutEditor);
-            // trackSegmentView = new TrackSegmentView(trackSegment, layoutEditor);
-        }
     }
 
-    /**
-     * This is called after each test
-     *
-     * @throws Exception
-     */
     @AfterEach
-    public void tearDownEach() throws Exception {
-        if (layoutEditor != null) {
-            JUnitUtil.dispose(layoutEditor);
-            // release refereces to layout editor
-            layoutEditor = null;
-        }
-
+    @Override
+    public void tearDown() {
         // release refereces to track segment
         trackSegment = null;
-        JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         super.tearDown();
     }
 }

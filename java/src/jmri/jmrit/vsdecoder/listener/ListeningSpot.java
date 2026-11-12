@@ -1,28 +1,5 @@
 package jmri.jmrit.vsdecoder.listener;
 
-/**
- * class ListeningSpot
- *
- * Represents a defined spot for viewing (and therefore listening to) a layout.
- *
- */
-
-/*
- * <hr>
- * This file is part of JMRI.
- * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
- * by the Free Software Foundation. See the "COPYING" file for a copy
- * of this license.
- * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
- * for more details.
- *
- * @author   Mark Underwood Copyright (C) 2012
- */
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -30,9 +7,26 @@ import javax.vecmath.Vector3d;
 import javax.vecmath.Vector3f;
 import jmri.util.PhysicalLocation;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+/**
+ * Represents a defined spot for viewing (and therefore listening to) a layout.
+ *
+ * <hr>
+ * This file is part of JMRI.
+ * <p>
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
+ * by the Free Software Foundation. See the "COPYING" file for a copy
+ * of this license.
+ * <p>
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
+ *
+ * @author Mark Underwood Copyright (C) 2012
+ * @author Klaus Killinger Copyright (C) 2025
+ */
 public class ListeningSpot {
 
     private Vector3d _location;
@@ -42,10 +36,11 @@ public class ListeningSpot {
 
     private static final Vector3d _atVector = new Vector3d(0.0d, 1.0d, 0.0d);
     private static final Vector3d _upVector = new Vector3d(0.0d, 0.0d, 1.0d);
+    private static final Vector3d _locVector = new Vector3d(0.0d, 0.0d, 0.0d);
 
     public ListeningSpot() {
         _name = null;
-        _location = new Vector3d();
+        _location = _locVector;
         _up = _upVector;
         _lookAt = _atVector;
     }
@@ -57,17 +52,6 @@ public class ListeningSpot {
         _lookAt = _atVector;
     }
 
-    public ListeningSpot(Vector3d position) {
-        this(null, position);
-    }
-
-    public ListeningSpot(String name, Vector3d position) {
-        _name = name;
-        _location = position;
-        _lookAt = _atVector;
-        _up = _upVector;
-    }
-
     public ListeningSpot(String name, Vector3d loc, Vector3d up, Vector3d at) {
         _name = name;
         _location = loc;
@@ -75,16 +59,12 @@ public class ListeningSpot {
         _lookAt = at;
     }
 
-    public ListeningSpot(Element e) {
-        this.setXml(e);
-    }
-
     public String getName() {
-        return (_name);
+        return _name;
     }
 
     public Vector3d getLocation() {
-        return (_location);
+        return _location;
     }
 
     public PhysicalLocation getPhysicalLocation() {
@@ -92,11 +72,11 @@ public class ListeningSpot {
     }
 
     public Vector3d getUpVector() {
-        return (_up);
+        return _up;
     }
 
     public Vector3d getLookAtVector() {
-        return (_lookAt);
+        return _lookAt;
     }
 
     /* TRig notes
@@ -192,7 +172,7 @@ public class ListeningSpot {
         up.cross(_la, _upVector);
         up.cross(up, _la);
         up.normalize();
-        return (up);
+        return up;
     }
 
     public void setOrientation(Double bearing, Double azimuth) {
@@ -217,12 +197,12 @@ public class ListeningSpot {
            azimuth = -180.0d - azimuth;
         }
 
-        double y = Math.sin(Math.toRadians(90 - azimuth)) * Math.cos(Math.toRadians(bearing)); 
+        double y = Math.sin(Math.toRadians(90 - azimuth)) * Math.cos(Math.toRadians(bearing));
         double x = Math.sin(Math.toRadians(90 - azimuth)) * Math.sin(Math.toRadians(bearing));
         double z = Math.cos(Math.toRadians(90 - azimuth));
         _lookAt = new Vector3d(x, y, z);
         _up = calcUpFromLookAt(_lookAt);
- 
+
         _lookAt.x = roundDecimal(_lookAt.x);
         _lookAt.y = roundDecimal(_lookAt.y);
         _lookAt.z = roundDecimal(_lookAt.z);
@@ -237,15 +217,15 @@ public class ListeningSpot {
                 && (this._location == other.getLocation())
                 && (this._up == other.getUpVector())
                 && (this._lookAt == other.getLookAtVector())) {
-            return (true);
+            return true;
         } else {
-            return (false);
+            return false;
         }
     }
 
     private Vector3d parseVector3d(String pos) {
         if (pos == null) {
-            return (null);
+            return null;
         }
 
         // position is stored as a tuple string "(x,y,z)"
@@ -255,8 +235,8 @@ public class ListeningSpot {
             Pattern p = Pattern.compile(syntax);
             Matcher m = p.matcher(pos);
             if (!m.matches()) {
-                log.error("String does not match a valid position pattern. syntax= {} string = {}", syntax, pos);
-                return (null);
+                log.error("String does not match a valid position pattern. syntax: {}, string: {}", syntax, pos);
+                return null;
             }
             // ++debug
             String xs = m.group(1);
@@ -267,23 +247,29 @@ public class ListeningSpot {
             return (new Vector3d(Double.parseDouble(m.group(1)), Double.parseDouble(m.group(2)), Double.parseDouble(m.group(3))));
         } catch (PatternSyntaxException e) {
             log.error("Malformed Vector3d syntax! {}", syntax);
-            return (null);
+            return null;
         } catch (IllegalStateException e) {
-            log.error("Group called before match operation executed syntax={} string= {} {}", syntax, pos, e.toString());
-            return (null);
+            log.error("Group called before match operation executed syntax: {}, string: {}, {}", syntax, pos, e.toString());
+            return null;
         } catch (IndexOutOfBoundsException e) {
-            log.error("Index out of bounds {} string= {} {}", syntax, pos, e.toString());
-            return (null);
+            log.error("Index out of bounds: {}, string: {}, {}", syntax, pos, e.toString());
+            return null;
         }
     }
 
     @Override
     public String toString() {
         if ((_location == null) || (_lookAt == null) || (_up == null)) {
-            return ("ListeningSpot (undefined)");
+            return "ListeningSpot (undefined)";
         } else {
-            return ("ListeningSpot Name: " + _name + " Location: " + _location.toString() + " LookAt: " + _lookAt.toString() + " Up: " + _up.toString());
+            return ("ListeningSpot Name: " + _name + " Location: " + _location.toString() +
+                    " LookAt: " + _lookAt.toString() + " Up: " + _up.toString());
         }
+    }
+
+    public ListeningSpot parseListeningSpot(Element e) {
+        setXml(e);
+        return new ListeningSpot(_name, _location, _up, _lookAt);
     }
 
     public Element getXml(String elementName) {
@@ -292,16 +278,17 @@ public class ListeningSpot {
         me.setAttribute("location", _location.toString());
         me.setAttribute("up", _up.toString());
         me.setAttribute("look_at", _lookAt.toString());
-        return (me);
+        return me;
     }
 
     public void setXml(Element e) {
         if (e != null) {
-            log.debug("ListeningSpot: {}", e.getAttributeValue("name"));
             _name = e.getAttributeValue("name");
             _location = parseVector3d(e.getAttributeValue("location"));
             _up = parseVector3d(e.getAttributeValue("up"));
             _lookAt = parseVector3d(e.getAttributeValue("look_at"));
+            log.debug("ListeningSpot: name: {}, location: {}, up: {}, lookAt: {}",
+                    _name, _location, _up, _lookAt);
         }
     }
 
@@ -317,6 +304,6 @@ public class ListeningSpot {
         return value;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(ListeningSpot.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ListeningSpot.class);
 
 }

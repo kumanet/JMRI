@@ -11,11 +11,12 @@ import org.junit.jupiter.api.*;
  *
  * @author Bob Jacobsen
  */
+@SuppressWarnings("deprecation")
 public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
-    SRCPBusConnectionMemo memo;
-    SRCPTrafficController tc;
-    SRCPThrottleManager tm;
+    private SRCPBusConnectionMemo memo;
+    private SRCPTrafficController tc;
+    private SRCPThrottleManager tm;
 
     @Test
     public void testCtor() {
@@ -350,6 +351,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup1() {
     }
 
@@ -358,6 +360,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup2() {
     }
 
@@ -366,6 +369,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup3() {
     }
 
@@ -374,6 +378,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup4() {
     }
 
@@ -382,6 +387,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup5() {
     }
 
@@ -398,6 +404,7 @@ public class SRCPThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         memo = new SRCPBusConnectionMemo(tc, "TEST", 1);
         tm = new SRCPThrottleManager(memo);
         jmri.InstanceManager.setDefault(jmri.ThrottleManager.class, tm);
+        memo.store(tm, jmri.ThrottleManager.class);
         instance = new SRCPThrottle(memo, new jmri.DccLocoAddress(1, true));
     }
 

@@ -2,6 +2,7 @@ package jmri.jmrix;
 
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -9,13 +10,13 @@ import java.io.PrintStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+
 import javax.annotation.concurrent.GuardedBy;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -26,14 +27,15 @@ import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
+
 import jmri.InstanceManager;
 import jmri.UserPreferencesManager;
 import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.JmriPanel;
 import jmri.util.swing.TextAreaFIFO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.WrapLayout;
 
 /**
  * Abstract base class for JPanels displaying communications monitor
@@ -75,6 +77,7 @@ public abstract class AbstractMonPane extends JmriPanel {
     // these should call nextLine(String line, String raw) with their updates
 
     // member declarations
+    protected JButton copyToClipBoardButton = new JButton();
     protected JButton clearButton = new JButton();
     protected JToggleButton freezeButton = new JToggleButton();
     protected JScrollPane jScrollPane1 = new JScrollPane();
@@ -96,8 +99,8 @@ public abstract class AbstractMonPane extends JmriPanel {
     String autoScrollCheck = this.getClass().getName() + ".AutoScroll"; // NOI18N
     String filterFieldCheck = this.getClass().getName() + ".FilterField"; // NOI18N
 
-    // to find and remember the log file
-    final javax.swing.JFileChooser logFileChooser = new JFileChooser(FileUtil.getUserFilesPath());
+    // to find and remember the log file. Public for script access
+    public final javax.swing.JFileChooser logFileChooser = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
 
     public AbstractMonPane() {
         super();
@@ -168,6 +171,9 @@ public abstract class AbstractMonPane extends JmriPanel {
         UserPreferencesManager pm = InstanceManager.getDefault(UserPreferencesManager.class);
 
         // the following code sets the frame's initial state
+        copyToClipBoardButton.setText(java.util.ResourceBundle.getBundle("apps.AppsBundle").getString("ButtonCopyClip"));
+        copyToClipBoardButton.setVisible(true);
+
         clearButton.setText(Bundle.getMessage("ButtonClearScreen")); // NOI18N
         clearButton.setVisible(true);
         clearButton.setToolTipText(Bundle.getMessage("TooltipClearMonHistory")); // NOI18N
@@ -199,7 +205,7 @@ public abstract class AbstractMonPane extends JmriPanel {
         }
         //automatically uppercase input in filterField, and only accept spaces and valid hex characters
         ((AbstractDocument) filterField.getDocument()).setDocumentFilter(new DocumentFilter() {
-            final private static String PATTERN = "[0-9a-fA-F ]*+"; // typing inserts individual characters
+            private static final String PATTERN = "[0-9a-fA-F ]*+"; // typing inserts individual characters
 
             @Override
             public void insertString(DocumentFilter.FilterBypass fb, int offset, String text,
@@ -290,8 +296,20 @@ public abstract class AbstractMonPane extends JmriPanel {
         JPanel paneA = new JPanel();
         paneA.setLayout(new BoxLayout(paneA, BoxLayout.Y_AXIS));
 
-        JPanel pane1 = new JPanel();
-        pane1.setLayout(new BoxLayout(pane1, BoxLayout.X_AXIS));
+        JPanel pane1 = new JPanel(){
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension min = super.getMinimumSize();
+                Dimension max = super.getMaximumSize();
+                return new Dimension(max.width, min.height);
+            }
+            @Override
+            public Dimension getMaximumSize() {
+                return getPreferredSize();
+            }
+        };
+        pane1.setLayout(new WrapLayout());
+        pane1.add(copyToClipBoardButton);
         pane1.add(clearButton);
         pane1.add(freezeButton);
         pane1.add(rawCheckBox);
@@ -320,6 +338,8 @@ public abstract class AbstractMonPane extends JmriPanel {
         add(paneA);
 
         // connect actions to buttons
+        copyToClipBoardButton.addActionListener(this::copyToClipBoardButtonActionPerformed);
+
         clearButton.addActionListener((java.awt.event.ActionEvent e) -> {
             clearButtonActionPerformed(e);
         });
@@ -550,6 +570,11 @@ public abstract class AbstractMonPane extends JmriPanel {
         monTextPane.setText("");
     }
 
+    public synchronized void copyToClipBoardButtonActionPerformed(java.awt.event.ActionEvent e) {
+        StringSelection text = new StringSelection(monTextPane.getText());
+        java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(text, text);
+    }
+
     public String getFilePathAndName() {
         String returnString = "";
         java.nio.file.Path p = logFileChooser.getSelectedFile().toPath();
@@ -587,11 +612,11 @@ public abstract class AbstractMonPane extends JmriPanel {
             } catch (java.io.FileNotFoundException ex) {
                 stopLogButtonActionPerformed(null);
                 log.error("startLogButtonActionPerformed: FileOutputStream cannot open the file '{}'.  Exception: {}", logFileChooser.getSelectedFile().getName(), ex.getMessage());
-                JOptionPane.showMessageDialog(this,
+                JmriJOptionPane.showMessageDialog(this,
                         (Bundle.getMessage("ErrorCannotOpenFileForWriting",
                                 logFileChooser.getSelectedFile().getName(),
                                 Bundle.getMessage("ErrorPossibleCauseCannotOpenForWrite"))),
-                        Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
             }
         } else {
             startLogButton.setSelected(true); // keep toggle on
@@ -662,6 +687,6 @@ public abstract class AbstractMonPane extends JmriPanel {
     protected StringBuffer linesBuffer = new StringBuffer();
     private static final int MAX_LINES = 500;
 
-    private static final Logger log = LoggerFactory.getLogger(AbstractMonPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractMonPane.class);
 
 }

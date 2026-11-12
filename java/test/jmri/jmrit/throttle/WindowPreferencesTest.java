@@ -1,8 +1,12 @@
 package jmri.jmrit.throttle;
 
+import javax.swing.JInternalFrame;
+
+import jmri.jmrit.throttle.implementation.WindowPreferences;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
+import org.jdom2.Element;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -12,9 +16,12 @@ import org.junit.jupiter.api.*;
 public class WindowPreferencesTest {
 
     @Test
-    public void testCTor() {
-        WindowPreferences t = new WindowPreferences();
-        Assert.assertNotNull("exists", t);
+    public void testGetPreferencesJInternalFrame() {
+
+        JInternalFrame f = new JInternalFrame("my_Frame");
+        Element e = WindowPreferences.getPreferences(f);
+        Assertions.assertNotNull(e, "exists");
+
     }
 
     @BeforeEach
@@ -27,5 +34,5 @@ public class WindowPreferencesTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(WindowPreferencesTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(WindowPreferencesTest.class);
 }

@@ -2,7 +2,6 @@ package jmri.configurexml;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -11,16 +10,12 @@ import org.junit.jupiter.api.*;
  */
 public class ScaleConfigXMLTest {
 
-    @Test
-    public void ctorTest() {
-        ScaleConfigXML sxml = new ScaleConfigXML();
-        Assert.assertNotNull(sxml);
-    }
+    // no testCtor as tested class only supplies static methods
 
     @Test
     public void testLoad() {
-        boolean loadResult = ScaleConfigXML.doLoad();
-        Assert.assertTrue("load worked", loadResult);
+        Assertions.assertTrue(ScaleConfigXML.doLoad(), "load worked");
+        Assertions.assertTrue( jmri.ScaleManager.getScales().size() > 11, "scales present" );
     }
 
     @BeforeEach
@@ -34,6 +29,6 @@ public class ScaleConfigXMLTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ClassMigrationManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ClassMigrationManagerTest.class);
 
 }

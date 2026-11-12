@@ -2,7 +2,6 @@ package jmri.jmrit.throttle;
 
 import java.awt.Container;
 import java.awt.Component;
-import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 
 import javax.swing.JDesktopPane;
@@ -15,39 +14,41 @@ import jmri.InstanceManager;
 import jmri.LocoAddress;
 import jmri.SpeedStepMode;
 import jmri.ThrottleListener;
+import jmri.jmrit.throttle.preferences.ThrottlesPreferences;
+import jmri.jmrit.throttle.panels.ControlPanel;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import org.junit.Assume;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test simple functioning of ControlPanel
  *
  * @author Paul Bender Copyright (C) 2016
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class ControlPanelTest {
-    ControlPanel panel;
-    JFrame frame;
-    DccThrottle throttle;
+
+    private ControlPanel panel;
+    private JFrame frame;
+    private DccThrottle throttle;
 
     private void setupControlPanel() {
         panel = new ControlPanel();
-        Assert.assertNotNull("exists", panel);
-        
+        assertNotNull( panel, "exists");
+
         frame = new JFrame("ControlPanelTest");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
         frame.setSize(200, 400);
-        
+
         JPanel mainPanel = new JPanel();
         mainPanel.setOpaque(true);
         mainPanel.add(new JDesktopPane());
         mainPanel.add(panel);
-
-        panel.toFront();
+        
         panel.setVisible(true);
 
         frame.add(mainPanel);
@@ -71,14 +72,12 @@ public class ControlPanelTest {
                     }
                     Rectangle r1 = c1.getBounds();
                     Rectangle r2 = c2.getBounds();
-                    if (r1.intersects(r2)) {
-                        System.out.printf("Components %s(%s) and %s(%s) overlap%n",
+                    assertFalse(r1.intersects(r2),
+                        () -> String.format("Components %s(%s) and %s(%s) overlap%n",
                             c1.getName(), c1.getClass().getName(),
-                            c2.getName(), c2.getClass().getName());
-                    }
-                    Assert.assertFalse(r1.intersects(r2));
+                            c2.getName(), c2.getClass().getName()));
                 }
-                
+
                 if (c1 instanceof Container) {
                     checkFrameOverlap((Container)c1);
                 }
@@ -88,56 +87,57 @@ public class ControlPanelTest {
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         setupControlPanel();
 
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
+        assertNotNull(panel.getSpeedSlider());
+
     }
 
     @Test
     public void testExtendedThrottle() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+
         InstanceManager.getDefault(ThrottlesPreferences.class).setUsingFunctionIcon(false);
         setupControlPanel();
 
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.STEPDISPLAY);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.SLIDERDISPLAY);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.SLIDERDISPLAYCONTINUOUS);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
     }
 
     @Test
     public void testIconThrottle() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+
         InstanceManager.throttleManagerInstance().supportedSpeedModes();
         InstanceManager.getDefault(ThrottlesPreferences.class).setUsingFunctionIcon(true);
         setupControlPanel();
 
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.STEPDISPLAY);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.SLIDERDISPLAY);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
 
         panel.setSpeedController(ControlPanel.SLIDERDISPLAYCONTINUOUS);
-        checkFrameOverlap(panel.getContentPane());
+        checkFrameOverlap(panel);
     }
 
     @ParameterizedTest
     @EnumSource(SpeedStepMode.class)
     public void testSpeedStepModes(SpeedStepMode mode) {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+
         InstanceManager.getDefault(ThrottlesPreferences.class).setUsingFunctionIcon(true);
         setupControlPanel();
-        throttle = null;
+
         InstanceManager.throttleManagerInstance().requestThrottle(3,
             new ThrottleListener(){
               @Override
@@ -157,9 +157,9 @@ public class ControlPanelTest {
               }
             });
 
-        Assert.assertTrue(throttle != null);
-        Assert.assertEquals(throttle.getSpeedSetting(), 0.0, 1e-7);
-        Assert.assertEquals(throttle.getSpeedStepMode(), mode);
+        assertNotNull(throttle);
+        assertEquals( 0.0, throttle.getSpeedSetting(), 1e-7);
+        assertEquals(mode, throttle.getSpeedStepMode());
 
     }
 
@@ -168,12 +168,8 @@ public class ControlPanelTest {
         JUnitUtil.setUp();
         JUnitUtil.resetProfileManager();
         JUnitUtil.initDebugThrottleManager();
-        if (!GraphicsEnvironment.isHeadless()) {
-            if (jmri.InstanceManager.getNullableDefault(ThrottlesPreferences.class) == null) {         
-                jmri.InstanceManager.store(new ThrottlesPreferences(), ThrottlesPreferences.class);
-            }        
-            InstanceManager.getDefault(ThrottlesPreferences.class).setUseExThrottle(true);
-        }
+        InstanceManager.getDefault(ThrottlesPreferences.class).setUseExThrottle(true);
+        throttle = null;
     }
 
     @AfterEach

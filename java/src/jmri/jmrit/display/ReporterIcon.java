@@ -1,7 +1,10 @@
 package jmri.jmrit.display;
 
 import java.awt.event.ActionListener;
+
+import javax.annotation.Nonnull;
 import javax.swing.JPopupMenu;
+
 import jmri.InstanceManager;
 import jmri.Reporter;
 import jmri.NamedBean.DisplayOptions;
@@ -90,6 +93,11 @@ public class ReporterIcon extends PositionableLabel implements java.beans.Proper
         return reporter;
     }
 
+    @Override
+    public jmri.NamedBean getNamedBean() {
+        return getReporter();
+    }
+
     // update icon as state changes
     @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
@@ -97,6 +105,12 @@ public class ReporterIcon extends PositionableLabel implements java.beans.Proper
             log.debug("property change: {} is now {}", e.getPropertyName(), e.getNewValue());
         }
         displayState();
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_ReporterIcon");
     }
 
     @Override
@@ -162,13 +176,13 @@ public class ReporterIcon extends PositionableLabel implements java.beans.Proper
 
     @Override
     public int maxHeight() {
-        return ((javax.swing.JLabel) this).getMaximumSize().height;  // defer to superclass
+        return getMaximumSize().height;  // defer to superclass
     }
 
     @Override
     public int maxWidth() {
-        return ((javax.swing.JLabel) this).getMaximumSize().width;  // defer to superclass
+        return getMaximumSize().width;  // defer to superclass
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ReporterIcon.class);
+    private static final Logger log = LoggerFactory.getLogger(ReporterIcon.class);
 }

@@ -22,8 +22,13 @@ public class SlotMonPaneTest extends jmri.util.swing.JmriPanelTest {
         SlotManager slotmanager = new SlotManager(lnis);
         LocoNetSystemConnectionMemo memo = new LocoNetSystemConnectionMemo(lnis,slotmanager);
         // we are just making sure that initComponents doesn't cause an exception.
-        t.initComponents(memo);
+        Assertions.assertDoesNotThrow( () -> { t.initComponents(memo); });
+
+        t.dispose();
+        // slotmanager.dispose();
         memo.dispose();
+        JUnitUtil.waitFor(50);
+        JUnitUtil.waitThreadTerminated(slotmanager.getUserName() + SlotManager.READ_ALL_SLOTS_THREADNAME);
     }
 
     @Override
@@ -41,6 +46,6 @@ public class SlotMonPaneTest extends jmri.util.swing.JmriPanelTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SlotMonPaneTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SlotMonPaneTest.class);
 
 }

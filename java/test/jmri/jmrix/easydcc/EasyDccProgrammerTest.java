@@ -5,12 +5,11 @@
  */
 package jmri.jmrix.easydcc;
 
-import jmri.JmriException;
-import jmri.ProgrammingMode;
-import jmri.util.JUnitUtil;
-
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
+
+import jmri.*;
+import jmri.util.JUnitUtil;
 
 public class EasyDccProgrammerTest extends jmri.jmrix.AbstractProgrammerTest {
         
@@ -83,6 +82,7 @@ public class EasyDccProgrammerTest extends jmri.jmrix.AbstractProgrammerTest {
         t.sendTestReply(r);
         Assert.assertEquals(" programmer listener invoked", 1, rcvdInvoked);
         Assert.assertEquals(" value read", 20, rcvdValue);
+        Assert.assertEquals(" Status read", ProgListener.OK, rcvdStatus);
     }
 
     @Test
@@ -107,13 +107,14 @@ public class EasyDccProgrammerTest extends jmri.jmrix.AbstractProgrammerTest {
 
         Assert.assertEquals(" programmer listener invoked", 1, rcvdInvoked);
         Assert.assertEquals(" value read", 20, rcvdValue);
+        Assert.assertEquals(" Status read", ProgListener.OK, rcvdStatus);
     }
 
     /**
      * The command station will return a CV001-- format message if programming
      * fails. Test handling of that.
      *
-     * @throws JmriException
+     * @throws JmriException when needed
      */
     @Test
     public void testReadFailSequence() throws JmriException {
@@ -139,10 +140,10 @@ public class EasyDccProgrammerTest extends jmri.jmrix.AbstractProgrammerTest {
         Assert.assertEquals(" programmer listener not invoked again", 1, rcvdInvoked);
     }
 
-    // internal class to simulate an EasyDccListener
-    class EasyDccListenerScaffold implements jmri.ProgListener {
+    // internal class to simulate a Programming Listener
+    private class EasyDccListenerScaffold implements ProgListener {
 
-        public EasyDccListenerScaffold() {
+        EasyDccListenerScaffold() {
             rcvdInvoked = 0;
             rcvdValue = 0;
             rcvdStatus = 0;
@@ -175,10 +176,11 @@ public class EasyDccProgrammerTest extends jmri.jmrix.AbstractProgrammerTest {
     public void tearDown() {
         t.terminateThreads();
         programmer = p = null;
+        memo.dispose();
         memo = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EasyDccProgrammerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EasyDccProgrammerTest.class);
 
 }

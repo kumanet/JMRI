@@ -30,18 +30,18 @@ public class SerialSystemConnectionMemo extends jmri.jmrix.ieee802154.IEEE802154
         if (getDisabled()) {
             return false;
         }
-        return false; // nothing, by default
+        return super.provides(type);
     }
 
     /**
      * Provide manager by class
      */
     @Override
-    public <T> T get(Class<?> T) {
+    public <T> T get(Class<T> T) {
         if (getDisabled()) {
             return null;
         }
-        return null; // nothing, by default
+        return super.get(T);
     }
 
     /**

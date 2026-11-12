@@ -6,18 +6,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+
 import jmri.SystemConnectionMemo;
 import jmri.jmrix.dcc4pc.Dcc4PcConnectionTypeList;
 import jmri.jmrix.dcc4pc.Dcc4PcPortController;
 import jmri.jmrix.dcc4pc.Dcc4PcSystemConnectionMemo;
 import jmri.jmrix.dcc4pc.Dcc4PcTrafficController;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import purejavacomm.CommPortIdentifier;
-import purejavacomm.NoSuchPortException;
-import purejavacomm.PortInUseException;
-import purejavacomm.SerialPort;
-import purejavacomm.UnsupportedCommOperationException;
+
+import jmri.jmrix.purejavacomm.CommPortIdentifier;
+import jmri.jmrix.purejavacomm.NoSuchPortException;
+import jmri.jmrix.purejavacomm.PortInUseException;
+import jmri.jmrix.purejavacomm.UnsupportedCommOperationException;
 
 /**
  * Implements SerialPortAdapter for the Dcc4Pc system.
@@ -35,7 +37,7 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         setManufacturer(Dcc4PcConnectionTypeList.DCC4PC);
     }
 
-    SerialPort activeSerialPort = null;
+    jmri.jmrix.purejavacomm.SerialPort activeSerialPort = null;
 
     @Override
     public String openPort(String portName, String appName) {
@@ -43,13 +45,17 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         try {
             CommPortIdentifier portID = CommPortIdentifier.getPortIdentifier(portName);
             try {
-                activeSerialPort = (SerialPort) portID.open(appName, 2000);
+                activeSerialPort = portID.open(getSystemConnectionMemo(), 2000);
             } catch (PortInUseException p) {
                 return handlePortBusy(p, portName, log);
             }
             try {
-                activeSerialPort.setSerialPortParams(115200, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-                configureLeadsAndFlowControl(activeSerialPort, SerialPort.FLOWCONTROL_NONE);
+                activeSerialPort.setSerialPortParams(115200,
+                        jmri.jmrix.purejavacomm.SerialPort.DATABITS_8,
+                        jmri.jmrix.purejavacomm.SerialPort.STOPBITS_1,
+                        jmri.jmrix.purejavacomm.SerialPort.PARITY_NONE);
+                configureLeadsAndFlowControl(activeSerialPort,
+                        jmri.jmrix.purejavacomm.SerialPort.FLOWCONTROL_NONE);
             } catch (UnsupportedCommOperationException e) {
                 log.error("Cannot set serial parameters on port {}: {}", portName, e.getMessage());
             }
@@ -83,8 +89,32 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         }
     }
 
-    public SerialPort getSerialPort() {
+    public jmri.jmrix.purejavacomm.SerialPort getSerialPort() {
         return activeSerialPort;
+    }
+
+    /**
+     * Close the port after it has failed, so it can be opened again with
+     * {@link #openPort}.
+     */
+    public void closeSerialPort() {
+        opened = false;
+        jmri.jmrix.purejavacomm.SerialPort p = activeSerialPort;
+        if (p != null) {
+            try {
+                p.close();
+            } catch (RuntimeException e) {
+                log.debug("Closing the failed port", e);
+            }
+        }
+    }
+
+    /**
+     * @return true if the operating system lists this connection's port. A
+     *         USB interface's port disappears while it is unplugged.
+     */
+    public boolean isPortPresent() {
+        return getActualPortNames().contains(getCurrentPortName());
     }
 
     /**
@@ -111,6 +141,27 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         } else {
             return new String[]{""};
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The Programmer choices are worked out each time: the list made when
+     * this connection was created can't include connections that start after
+     * it, and LocoNet often does. The saved choice stays in the list even if
+     * that connection isn't running, so opening Preferences doesn't clear it.
+     */
+    @Override
+    public String[] getOptionChoices(String option) {
+        if (!option1Name.equals(option)) {
+            return super.getOptionChoices(option);
+        }
+        List<String> choices = new ArrayList<>(java.util.Arrays.asList(validOption1()));
+        String current = getOptionState(option1Name);
+        if (current != null && !current.isEmpty() && !choices.contains(current)) {
+            choices.add(current);
+        }
+        return choices.toArray(new String[choices.size()]);
     }
 
     /**
@@ -155,7 +206,7 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         try {
             return new DataOutputStream(activeSerialPort.getOutputStream());
         } catch (java.io.IOException e) {
-            log.error("getOutputStream exception: {}", e);
+            log.error("getOutputStream exception", e);
         }
         return null;
     }
@@ -186,26 +237,6 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
     InputStream serialStream = null;
 
     /**
-     * @return instance.
-     * @deprecated JMRI Since 4.4 instance() shouldn't be used, convert to JMRI multi-system support structure
-     */
-    @Deprecated
-    static public SerialDriverAdapter instance() {
-        if (mInstance == null) {
-            SerialDriverAdapter m = new SerialDriverAdapter();
-            m.setManufacturer(Dcc4PcConnectionTypeList.DCC4PC);
-            mInstance = m;
-        }
-        return mInstance;
-    }
-
-    /**
-     * @deprecated JMRI Since 4.4 instance() shouldn't be used, convert to JMRI multi-system support structure
-     */
-    @Deprecated
-    static volatile SerialDriverAdapter mInstance = null;
-
-    /**
      * set up all of the other objects to operate with an Dcc4Pc command station
      * connected to this port
      */
@@ -214,12 +245,14 @@ public class SerialDriverAdapter extends Dcc4PcPortController {
         // connect to the traffic controller
         Dcc4PcTrafficController control = new Dcc4PcTrafficController();
         this.getSystemConnectionMemo().setDcc4PcTrafficController(control);
-        this.getSystemConnectionMemo().setDefaultProgrammer(getOptionState(option1Name));
         control.connectPort(this);
         this.getSystemConnectionMemo().configureManagers();
+        // Programming on Main goes out through another connection (by default, the default
+        // command station's); RailCom brings the reply back
+        this.getSystemConnectionMemo().useProgrammerFrom(getOptionState(option1Name));
 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialDriverAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialDriverAdapter.class);
 
 }

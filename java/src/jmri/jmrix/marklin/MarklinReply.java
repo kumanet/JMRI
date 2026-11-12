@@ -9,6 +9,8 @@ package jmri.jmrix.marklin;
  */
 public class MarklinReply extends jmri.jmrix.AbstractMRReply {
 
+    private final McanFrameCache frameCache = new McanFrameCache();
+
     // create a new one
     public MarklinReply() {
         super();
@@ -80,7 +82,7 @@ public class MarklinReply extends jmri.jmrix.AbstractMRReply {
      */
     @Override
     public String toMonitorString(){
-        // eventually, the MarklinMon class should probably be integrated here.
+        // eventually the MarklinMon class should probably be integrated here.
         return jmri.jmrix.marklin.swing.monitor.MarklinMon.displayReply(this);
     }
 
@@ -108,6 +110,10 @@ public class MarklinReply extends jmri.jmrix.AbstractMRReply {
         return arr;
     }
 
+    /**
+     * Get the 4-Byte Address.
+     * @return the value from CANADDRESSBYTE1 (hi) to CANADDRESSBYTE4 (low)
+     */
     public long getAddress() {
         long addr = (getElement(MarklinConstants.CANADDRESSBYTE1));
         addr = (addr << 8) + (getElement(MarklinConstants.CANADDRESSBYTE2));
@@ -116,20 +122,72 @@ public class MarklinReply extends jmri.jmrix.AbstractMRReply {
         return addr;
     }
 
-    public int getPriority() {
-        return (getElement(0) >> 4);
+    /**
+     * Sets the 4-byte address by splitting an integer into four bytes.
+     * @param address the 32-bit integer representing the full address
+     */
+    public void setAddress(long address) {
+        // Set 32-bit address field (big-endian)
+        setElement(MarklinConstants.CANADDRESSBYTE1, (int) ((address >> 24) & 0xFF)); // hi
+        setElement(MarklinConstants.CANADDRESSBYTE2, (int) ((address >> 16) & 0xFF));
+        setElement(MarklinConstants.CANADDRESSBYTE3, (int) ((address >> 8) & 0xFF));
+        setElement(MarklinConstants.CANADDRESSBYTE4, (int) (address & 0xFF)); // lo
     }
 
+    public int getPriority() {
+        return (getElement(0) >> 4) & 0x0F;
+    }
+
+    /**
+     * Get the Control Command.
+     * @return command, e.g. MarklinConstants.CMDHALTSYS
+     */
     public int getCommand() {
-        int result = getElement(0) << 7;
-        result = result + getElement(1) >> 1;
-        return result;
+        // Extract 11-bit command field:
+        // Byte 0 bits 3-0 contain command bits 10-7
+        // Byte 1 bits 7-1 contain command bits 6-0
+        return ((getElement(0) & 0x0F) << 7) | ((getElement(1) >> 1) & 0x7F);
+    }
+
+    /**
+     * Set the Command value.
+     * @param command new value.
+     */
+    public void setCommand(int command) {
+        // Set 11-bit command field while preserving priority and response flag:
+        // Byte 0: preserve bits 7-4 (priority), set bits 3-0 (command bits 10-7)
+        int element0 = (getElement(0) & 0xF0) | ((command >> 7) & 0x0F);
+        // Byte 1: preserve bit 0 (response flag), set bits 7-1 (command bits 6-0)
+        int element1 = (getElement(1) & 0x01) | ((command & 0x7F) << 1);
+        setElement(0, element0);
+        setElement(1, element1);
     }
 
     public int[] getHash() {
         int[] arr = new int[2];
         arr[0] = getElement(2);
         arr[1] = getElement(3);
+        return arr;
+    }
+
+    /**
+     * Classified view of this reply. The result is cached and reused until the
+     * reply's bytes change.
+     *
+     * @return a {@link jmri.jmrix.marklin.mcan.cs2.Cs2Frame},
+     *         {@link jmri.jmrix.marklin.mcan.cdb.CdBFrameParser.CdBFrame} or
+     *         {@link jmri.jmrix.marklin.mcan.UnknownFrame}
+     */
+    public jmri.jmrix.marklin.mcan.McanFrame getFrame() {
+        return frameCache.get(toIntArray());
+    }
+
+    /** Returns the raw 13-byte frame as an int array for mcan parsing. */
+    public int[] toIntArray() {
+        int[] arr = new int[13];
+        for (int i = 0; i < 13; i++) {
+            arr[i] = getElement(i);
+        }
         return arr;
     }
 }

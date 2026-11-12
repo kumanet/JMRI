@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaValidatorsConfig;
+import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -32,6 +32,7 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
 
     private Map<String, Map<String, Set<JsonHttpService>>> services = new HashMap<>();
     private SchemaValidatorsConfig config = new SchemaValidatorsConfig();
+    private Map<String, String> schemaMappings = new HashMap<>();
     private final Map<String, Set<String>> clientTypes = new HashMap<>();
     private final Map<String, Set<String>> serverTypes = new HashMap<>();
     private final Map<String, Map<String, JsonSchema>> clientSchemas = new HashMap<>();
@@ -39,22 +40,20 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public JsonSchemaServiceCache() {
-        Map<String, String> map = new HashMap<>();
-        try {
+        try (var resourceStream = JsonSchemaServiceCache.class.getResourceAsStream("/jmri/server/json/schema-map.json")) {
             for (JsonNode mapping : mapper
-                    .readTree(JsonSchemaServiceCache.class.getResource("/jmri/server/json/schema-map.json"))) {
-                map.put(mapping.get("publicURL").asText(),
+                    .readTree(resourceStream)) {
+                schemaMappings.put(mapping.get("publicURL").asText(),
                         mapping.get("localURL").asText());
             }
         } catch (IOException ex) {
             log.error("Unable to read JMRI resources for JSON schema mapping", ex);
         }
-        config.setUriMappings(map);
     }
 
     /**
      * Get the services known to this cache that support a specific JSON type.
-     * 
+     *
      * @param type    the JSON type requested
      * @param version the JSON protocol version requested
      * @return the supporting services or an empty set if none
@@ -67,26 +66,11 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
     }
 
     /**
-     * Get the services known to this cache that support a specific JSON type
-     * for version 5 of the JSON protocol.
-     * 
-     * @param type the JSON type requested
-     * @return the supporting services or an empty set if none
-     * @deprecated since 4.19.2; use {@link #getServices(String, String)}
-     *             instead
-     */
-    @Deprecated
-    @Nonnull
-    public synchronized Set<JsonHttpService> getServices(@Nonnull String type) {
-        return getServices(type, JSON.V5);
-    }
-
-    /**
      * Get all types of JSON messages.
      *
      * @param version the JSON protocol version
-     * @return the union of the results from {@link #getClientTypes()} and
-     *         {@link #getServerTypes()}
+     * @return the union of the results from {@link #getClientTypes} and
+     *         {@link #getServerTypes}
      */
     @Nonnull
     public synchronized Set<String> getTypes(String version) {
@@ -120,43 +104,6 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
     }
 
     /**
-     * Get all types of JSON messages.
-     *
-     * @return the union of the results from {@link #getClientTypes()} and
-     *         {@link #getServerTypes()}
-     * @deprecated since 4.19.2; use {@link #getTypes(String)} instead
-     */
-    @Deprecated
-    @Nonnull
-    public synchronized Set<String> getTypes() {
-        return getTypes(JSON.V5);
-    }
-
-    /**
-     * Get the types of JSON messages expected from clients.
-     *
-     * @return the message types
-     * @deprecated since 4.19.2; use {@link #getClientTypes(String)} instead
-     */
-    @Deprecated
-    @Nonnull
-    public synchronized Set<String> getClientTypes() {
-        return getClientTypes(JSON.V5);
-    }
-
-    /**
-     * Get the types of JSON messages this application sends.
-     *
-     * @return the message types
-     * @deprecated since 4.19.2; use {@link #getServerTypes(String)} instead
-     */
-    @Deprecated
-    @Nonnull
-    public synchronized Set<String> getServerTypes() {
-        return getServerTypes(JSON.V5);
-    }
-
-    /**
      * Get the client schema for JSON messages or for specific JSON data schema.
      *
      * @param type    the type; use {@link JSON#JSON} to get the schema for
@@ -171,27 +118,6 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
     @Nonnull
     public JsonSchema getClientSchema(@Nonnull String type, @Nonnull JsonRequest request) throws JsonException {
         return getSchema(type, false, clientSchemas, request);
-    }
-
-    /**
-     * Get the client schema for JSON messages or for specific JSON data schema.
-     *
-     * @param type   the type; use {@link JSON#JSON} to get the schema for
-     *               messages, or any other value for a data schema
-     * @param locale the locale for error messages, if any
-     * @param id     message id set by client
-     * @return the requested schema
-     * @throws JsonException            if unable to get schema due to errors
-     *                                  processing schema
-     * @throws IllegalArgumentException if no JSON service provides schemas for
-     *                                  type
-     * @deprecated since 4.19.2; use
-     *             {@link #getClientSchema(String, JsonRequest)} instead
-     */
-    @Deprecated
-    @Nonnull
-    public JsonSchema getClientSchema(@Nonnull String type, @Nonnull Locale locale, int id) throws JsonException {
-        return getClientSchema(type, new JsonRequest(locale, JSON.V5, JSON.GET, id));
     }
 
     /**
@@ -211,27 +137,6 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
         return getSchema(type, true, serverSchemas, request);
     }
 
-    /**
-     * Get the server schema for JSON messages or for specific JSON data schema.
-     *
-     * @param type   the type; use {@link JSON#JSON} to get the schema for
-     *               messages, or any other value for a data schema
-     * @param locale the locale for error messages, if any
-     * @param id     message id set by client
-     * @return the requested schema
-     * @throws JsonException            if unable to get schema due to errors
-     *                                  processing schema
-     * @throws IllegalArgumentException if no JSON service provides schemas for
-     *                                  type
-     * @deprecated since 4.19.2; use
-     *             {@link #getServerSchema(String, JsonRequest)} instead
-     */
-    @Deprecated
-    @Nonnull
-    public JsonSchema getServerSchema(@Nonnull String type, @Nonnull Locale locale, int id) throws JsonException {
-        return getServerSchema(type, new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
     private synchronized JsonSchema getSchema(@Nonnull String type, boolean server,
             @Nonnull Map<String, Map<String, JsonSchema>> map, @Nonnull JsonRequest request) throws JsonException {
         cacheServices(request.version);
@@ -239,7 +144,8 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
         if (result == null) {
             for (JsonHttpService service : getServices(type, request.version)) {
                 log.debug("Processing {} with {}", type, service);
-                result = JsonSchemaFactory.getInstance()
+                result = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012, builder ->
+                        builder.schemaMappers(schemaMappers -> schemaMappers.mappings(schemaMappings)))
                         .getSchema(service.doSchema(type, server, request).path(JSON.DATA).path(JSON.SCHEMA), config);
                 if (result != null) {
                     map.get(request.version).put(type, result);
@@ -285,26 +191,6 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
     }
 
     /**
-     * Validate a JSON message against the schema for JSON messages and data.
-     *
-     * @param message the message to validate
-     * @param server  true if message is from the JSON server; false otherwise
-     * @param locale  the locale for any exceptions that need to be reported to
-     *                clients
-     * @param id      the id to be included with any exceptions reported to
-     *                clients
-     * @throws JsonException if the message does not validate
-     * @deprecated since 4.19.2; use
-     *             {@link #validateMessage(JsonNode, boolean, JsonRequest)}
-     *             instead
-     */
-    @Deprecated
-    public void validateMessage(@Nonnull JsonNode message, boolean server, @Nonnull Locale locale, int id)
-            throws JsonException {
-        validateMessage(message, server, new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * Validate a JSON data object against the schema for JSON messages and
      * data.
      *
@@ -327,28 +213,6 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
         }
     }
 
-    /**
-     * Validate a JSON data object against the schema for JSON messages and
-     * data.
-     *
-     * @param type   the type of data object
-     * @param data   the data object to validate
-     * @param server true if message is from the JSON server; false otherwise
-     * @param locale the locale for any exceptions that need to be reported to
-     *               clients
-     * @param id     the id to be included with any exceptions reported to
-     *               clients
-     * @throws JsonException if the message does not validate
-     * @deprecated since 4.19.2; use
-     *             {@link #validateData(String, JsonNode, boolean, JsonRequest)}
-     *             instead
-     */
-    @Deprecated
-    public void validateData(@Nonnull String type, @Nonnull JsonNode data, boolean server, @Nonnull Locale locale,
-            int id) throws JsonException {
-        validateData(type, data, server, new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
     private void validateJsonNode(@Nonnull JsonNode node, @Nonnull String type, boolean server,
             @Nonnull Map<String, Map<String, JsonSchema>> map, @Nonnull JsonRequest request) throws JsonException {
         log.trace("validateJsonNode(\"{}\", \"{}\", \"{}\", ...)", node, type, server);
@@ -362,7 +226,7 @@ public class JsonSchemaServiceCache implements InstanceManagerAutoDefault {
             log.warn("Errors validating {}", node);
             errors.forEach(error -> log.warn("JSON Validation Error: {}\n\t{}\n\t{}\n\t{}", error.getCode(),
                     error.getMessage(),
-                    error.getPath(), error.getType()));
+                    error.getEvaluationPath(), error.getType()));
             throw new JsonException(server ? 500 : 400, Bundle.getMessage(request.locale, JsonException.LOGGED_ERROR),
                     request.id);
         }

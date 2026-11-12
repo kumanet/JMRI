@@ -2,7 +2,6 @@ package jmri.jmrit.display.layoutEditor;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
 import java.awt.geom.*;
 import java.util.List;
 import java.util.*;
@@ -15,6 +14,7 @@ import javax.swing.*;
 import jmri.jmrit.display.layoutEditor.blockRoutingTable.LayoutBlockRouteTableAction;
 import jmri.util.*;
 import jmri.util.swing.JmriColorChooser;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * MVC View component for the TrackSegment class.
@@ -66,7 +66,7 @@ public class TrackSegmentView extends LayoutTrackView {
     // temporary reference to the Editor that will eventually be part of View
     private final jmri.jmrit.display.layoutEditor.LayoutEditorDialogs.TrackSegmentEditor editor;
 
-    final private TrackSegment trackSegment;
+    private final TrackSegment trackSegment;
 
     // temporary?
     @Nonnull
@@ -467,12 +467,6 @@ public class TrackSegmentView extends LayoutTrackView {
         }
     }
 
-    // initialization instance variables (used when loading a LayoutEditor)
-    public String tConnect1Name = "";
-    public String tConnect2Name = "";
-
-    public String tLayoutBlockName = "";
-
     public void updateBlockInfo() {
         trackSegment.updateBlockInfo();
     }
@@ -577,6 +571,32 @@ public class TrackSegmentView extends LayoutTrackView {
         return result;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean usesLayoutBlock(@Nonnull LayoutBlock layoutBlock) {
+        return getLayoutBlock() == layoutBlock;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * An arc is drawn as part of a circle or ellipse, and an arc of more than
+     * half a turn goes outside the box round its ends and middle, so for an arc
+     * this adds the box round the whole circle or ellipse.
+     */
+    @Override
+    @Nonnull
+    public Rectangle2D getRepaintBounds() {
+        Rectangle2D result = getBounds();
+        if (isArc() && (getConnect1() != null) && (getConnect2() != null)) {
+            calculateTrackSegmentAngle();
+            result.add(new Rectangle2D.Double(getCX(), getCY(), getCW(), getCH()));
+        }
+        return result;
+    }
+
     private JPopupMenu popupMenu = null;
     private final JCheckBoxMenuItem mainlineCheckBoxMenuItem = new JCheckBoxMenuItem(Bundle.getMessage("MainlineCheckBoxMenuItemTitle"));
     private final JCheckBoxMenuItem hiddenCheckBoxMenuItem = new JCheckBoxMenuItem(Bundle.getMessage("HiddenCheckBoxMenuItemTitle"));
@@ -653,7 +673,7 @@ public class TrackSegmentView extends LayoutTrackView {
      */
     @Override
     @Nonnull
-    protected JPopupMenu showPopup(@Nonnull MouseEvent mouseEvent) {
+    protected JPopupMenu showPopup(@Nonnull JmriMouseEvent mouseEvent) {
         if (popupMenu != null) {
             popupMenu.removeAll();
         } else {
@@ -1295,7 +1315,7 @@ public class TrackSegmentView extends LayoutTrackView {
         popupMenu.add(new AbstractAction(Bundle.getMessage("ButtonDelete")) {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (canRemove()) {
+                if (canRemove() && removeInlineLogixNG()) {
                     layoutEditor.removeTrackSegment(trackSegment);
                     remove();
                     dispose();
@@ -1370,6 +1390,7 @@ public class TrackSegmentView extends LayoutTrackView {
                 }
             });
         }
+        addCommonPopupItems(mouseEvent, popupMenu);
         popupMenu.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
         return popupMenu;
     }   // showPopup
@@ -1587,7 +1608,7 @@ public class TrackSegmentView extends LayoutTrackView {
      * @param e            The original event causing this
      * @param hitPointType the type of the underlying hit
      */
-    protected void showBezierPopUp(MouseEvent e, HitPointType hitPointType) {
+    protected void showBezierPopUp(JmriMouseEvent e, HitPointType hitPointType) {
         int bezierControlPointIndex = hitPointType.bezierPointIndex();
         if (popupMenu != null) {
             popupMenu.removeAll();
@@ -1625,6 +1646,7 @@ public class TrackSegmentView extends LayoutTrackView {
                 }
             });
         }
+        addCommonPopupItems(e, popupMenu);
         popupMenu.show(e.getComponent(), e.getX(), e.getY());
     }
 
@@ -2168,6 +2190,24 @@ public class TrackSegmentView extends LayoutTrackView {
                 g2.draw(new Line2D.Double(end1, end2));
             }
         }
+    }
+
+    /**
+     * The centre line of the track as drawn: a line, an arc or a Bezier
+     * curve.
+     *
+     * @return the shape, in panel coordinates
+     */
+    @Nonnull
+    public java.awt.Shape getCentreLine() {
+        if (isArc()) {
+            calculateTrackSegmentAngle();
+            return new Arc2D.Double(getCX(), getCY(), getCW(), getCH(), getStartAdj(), getTmpAngle(), Arc2D.OPEN);
+        } else if (isBezier()) {
+            return MathUtil.getBezierPath(getBezierPoints());
+        }
+        return new Line2D.Double(layoutEditor.getCoords(getConnect1(), getType1()),
+                layoutEditor.getCoords(getConnect2(), getType2()));
     }
 
     /**
@@ -3809,5 +3849,5 @@ public class TrackSegmentView extends LayoutTrackView {
         setLayoutBlock(layoutBlock);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegmentView.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegmentView.class);
 }

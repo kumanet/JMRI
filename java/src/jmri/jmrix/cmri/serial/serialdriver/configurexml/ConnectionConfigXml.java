@@ -1,7 +1,12 @@
 package jmri.jmrix.cmri.serial.serialdriver.configurexml;
 
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.StringTokenizer;
+
+import jmri.JmriUncheckedException;
+import jmri.jmrit.XmlFile;
 import jmri.jmrix.AbstractSerialConnectionConfig;
 import jmri.jmrix.cmri.CMRISystemConnectionMemo;
 import jmri.jmrix.cmri.serial.SerialNode;
@@ -9,10 +14,14 @@ import jmri.jmrix.cmri.serial.SerialTrafficController;
 import jmri.jmrix.cmri.serial.serialdriver.ConnectionConfig;
 import jmri.jmrix.cmri.serial.serialdriver.SerialDriverAdapter;
 import jmri.jmrix.configurexml.AbstractSerialConnectionConfigXml;
-import jmri.jmrix.cmri.serial.cmrinetmetrics.CMRInetMetricsCollector;
+import jmri.util.FileUtil;
+import jmri.util.jdom.JDOMUtil;
+import jmri.util.prefs.JmriConfigurationProvider;
+import jmri.util.xml.XMLUtil;
+
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jdom2.JDOMException;
+import org.w3c.dom.Document;
 
 /**
  * Handle XML persistence of layout connections by persisting the
@@ -33,8 +42,6 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
     public ConnectionConfigXml() {
         super();
     }
-    
-    CMRInetMetricsCollector metricsCollector;
 
     /**
      * Write out the SerialNode objects too
@@ -43,6 +50,36 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
      */
     @Override
     protected void extendElement(Element e) {
+        var memo = ((CMRISystemConnectionMemo) adapter.getSystemConnectionMemo());
+        String externalConfig = memo.getExternalConfig();
+        if (externalConfig != null) {
+            Element element = new Element("external-config");
+            element.addContent(externalConfig);
+            e.addContent(element);
+            storeExternalConfig(externalConfig);
+        } else {
+            storeConfig(e);
+        }
+    }
+
+    private void storeExternalConfig(String externalConfig) {
+        try {
+            Document doc = XMLUtil.createDocument("external-cmri-configuration", JmriConfigurationProvider.NAMESPACE, null, null); // NOI18N
+            var root = doc.getDocumentElement();
+            Element config = new Element("config");
+            storeConfig(config);
+            var w3cElement = JDOMUtil.toW3CElement(config);
+            root.appendChild(root.getOwnerDocument().importNode(w3cElement, true));
+            String filename = FileUtil.getExternalFilename(externalConfig);
+            try (final OutputStream os = new FileOutputStream(filename)) {
+                XMLUtil.write(doc, os, StandardCharsets.UTF_8.name());
+            }
+        } catch (IOException | JDOMException e) {
+            throw new JmriUncheckedException(e);
+        }
+    }
+
+    private void storeConfig(Element e) {
         // Create a polling list from the configured nodes
         StringBuilder polllist = new StringBuilder("");
         SerialTrafficController tcPL = ((CMRISystemConnectionMemo) adapter.getSystemConnectionMemo()).getTrafficController();
@@ -98,7 +135,8 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
             log.debug("Node {} NET Options Written = {}", node.nodeAddress, value);
 
             // cpNode Options  Classic CMRI nodes do not have options
-            if (node.getNodeType() == SerialNode.CPNODE || node.getNodeType() == SerialNode.CPMEGA) {
+            if (node.getNodeType() == SerialNode.CPNODE || node.getNodeType() == SerialNode.CPMEGA
+                    || node.getNodeType() == SerialNode.ESP32NODE) {
                 value = new StringBuilder();
                 for (int i = 0; i < SerialNode.NUMCPNODEOPTS; i++) {
                     value.append(Integer.toHexString((node.getcpnodeOpts(i) & 0xF)));
@@ -137,6 +175,29 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
 
     @Override
     protected void unpackElement(Element shared, Element perNode) {
+        Element externalConfig = shared.getChild("external-config");
+        if (externalConfig != null) {
+            loadExternalConfig(externalConfig);
+        } else {
+            loadConfig(shared);
+        }
+    }
+
+    private void loadExternalConfig(Element externalConfig) {
+        try {
+            String filename = externalConfig.getTextTrim();
+            ((CMRISystemConnectionMemo) adapter.getSystemConnectionMemo())
+                    .setExternalConfig(filename);
+            File file = new File(FileUtil.getExternalFilename(filename));
+            Element root = new XmlFile().rootFromURL(FileUtil.fileToURL(file));
+            Element config = root.getChild("config");
+            loadConfig(config);
+        } catch (IOException | JDOMException e) {
+            throw new JmriUncheckedException(e);
+        }
+    }
+
+    private void loadConfig(Element shared) {
         // --------------------------------------
         // Load the poll list sequence if present
         // --------------------------------------
@@ -228,7 +289,7 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
                 node.setCardTypeLocation(j, (ctl.charAt(j) - '0'));
             }
 
-            if (type == SerialNode.CPNODE || type == SerialNode.CPMEGA) {
+            if (type == SerialNode.CPNODE || type == SerialNode.CPMEGA || type == SerialNode.ESP32NODE) {
                 // cpNode Options
                 if (findParmValue(n, "cpnodeoptions") != null) {
                     opts = findParmValue(n, "cpnodeoptions");
@@ -257,5 +318,5 @@ public class ConnectionConfigXml extends AbstractSerialConnectionConfigXml {
         this.register(new ConnectionConfig(adapter));
     }
 
-    private static final Logger log = LoggerFactory.getLogger(ConnectionConfigXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConnectionConfigXml.class);
 }

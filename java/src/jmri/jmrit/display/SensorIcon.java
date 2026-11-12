@@ -1,13 +1,14 @@
 package jmri.jmrit.display;
 
 import java.awt.Color;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map.Entry;
+
 import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.JCheckBoxMenuItem;
@@ -16,6 +17,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.Timer;
+
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.Sensor;
@@ -24,8 +26,7 @@ import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.palette.TableItemPanel;
 import jmri.jmrit.picker.PickListModel;
 import jmri.util.swing.JmriColorChooser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * An icon to display a status of a Sensor.
@@ -35,14 +36,14 @@ import org.slf4j.LoggerFactory;
  */
 public class SensorIcon extends PositionableIcon implements java.beans.PropertyChangeListener {
 
-    static final public int UNKOWN_FONT_COLOR = 0x03;
-    static final public int UNKOWN_BACKGROUND_COLOR = 0x04;
-    static final public int ACTIVE_FONT_COLOR = 0x05;
-    static final public int ACTIVE_BACKGROUND_COLOR = 0x06;
-    static final public int INACTIVE_FONT_COLOR = 0x07;
-    static final public int INACTIVE_BACKGROUND_COLOR = 0x08;
-    static final public int INCONSISTENT_FONT_COLOR = 0x0A;
-    static final public int INCONSISTENT_BACKGROUND_COLOR = 0x0B;
+    public static final int UNKOWN_FONT_COLOR = 0x03;
+    public static final int UNKOWN_BACKGROUND_COLOR = 0x04;
+    public static final int ACTIVE_FONT_COLOR = 0x05;
+    public static final int ACTIVE_BACKGROUND_COLOR = 0x06;
+    public static final int INACTIVE_FONT_COLOR = 0x07;
+    public static final int INACTIVE_BACKGROUND_COLOR = 0x08;
+    public static final int INCONSISTENT_FONT_COLOR = 0x0A;
+    public static final int INCONSISTENT_BACKGROUND_COLOR = 0x0B;
 
     protected HashMap<String, Integer> _name2stateMap;       // name to state
     protected HashMap<Integer, String> _state2nameMap;       // state to name
@@ -295,9 +296,17 @@ public class SensorIcon extends PositionableIcon implements java.beans.PropertyC
         log.debug("property change: {}", e);
         if (e.getPropertyName().equals("KnownState")) {
             int now = ((Integer) e.getNewValue());
+            Rectangle dirty = getBounds();
             displayState(now);
-            _editor.repaint();
+            dirty.add(getBounds()); // union with the new bounds, in case displayState resized this icon
+            _editor.repaintTargetPanel(dirty);
         }
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_SensorIcon");
     }
 
     @Override
@@ -578,34 +587,45 @@ public class SensorIcon extends PositionableIcon implements java.beans.PropertyC
     }
 
     @Override
-    public void doMousePressed(MouseEvent e) {
-        log.debug("doMousePressed buttonLive={}, getMomentary={}", buttonLive(), getMomentary());
+    public void doMousePressed(JmriMouseEvent e) {
+        log.debug("doMousePressed {},{} clicks={}, buttonLive={}, getMomentary={}", 
+            e.getX(), e.getY(), e.getClickCount(),
+            buttonLive(), getMomentary());
+            
         if (getMomentary() && buttonLive() && !e.isMetaDown() && !e.isAltDown()) {
             // this is a momentary button press
             try {
                 getSensor().setKnownState(jmri.Sensor.ACTIVE);
             } catch (jmri.JmriException reason) {
-                log.warn("Exception setting momentary sensor: {}", reason);
+                log.warn("Exception setting momentary sensor", reason);
             }
         }
         super.doMousePressed(e);
     }
 
     @Override
-    public void doMouseReleased(MouseEvent e) {
+    public void doMouseReleased(JmriMouseEvent e) {
+        log.debug("doMouseReleased {},{} clicks={}, buttonLive={}, getMomentary={}", 
+            e.getX(), e.getY(), e.getClickCount(),
+            buttonLive(), getMomentary());
+        
         if (getMomentary() && buttonLive() && !e.isMetaDown() && !e.isAltDown()) {
             // this is a momentary button release
             try {
                 getSensor().setKnownState(jmri.Sensor.INACTIVE);
             } catch (jmri.JmriException reason) {
-                log.warn("Exception setting momentary sensor: {}", reason);
+                log.warn("Exception setting momentary sensor", reason);
             }
         }
         super.doMouseReleased(e);
     }
 
     @Override
-    public void doMouseClicked(MouseEvent e) {
+    public void doMouseClicked(JmriMouseEvent e) {
+        log.debug("doMouseClicked {},{} clicks={}, buttonLive={}, getMomentary={}", 
+            e.getX(), e.getY(), e.getClickCount(),
+            buttonLive(), getMomentary());
+
         if (buttonLive() && !getMomentary()) {
             // this button responds to clicks
             if (!e.isMetaDown() && !e.isAltDown()) {
@@ -616,7 +636,7 @@ public class SensorIcon extends PositionableIcon implements java.beans.PropertyC
                         getSensor().setKnownState(jmri.Sensor.INACTIVE);
                     }
                 } catch (jmri.JmriException reason) {
-                    log.warn("Exception flipping sensor: {}", reason);
+                    log.warn("Exception flipping sensor", reason);
                 }
             }
         }
@@ -1044,6 +1064,6 @@ public class SensorIcon extends PositionableIcon implements java.beans.PropertyC
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SensorIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SensorIcon.class);
 
 }

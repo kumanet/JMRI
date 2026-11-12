@@ -31,14 +31,8 @@ public class True extends AbstractDigitalExpression {
     
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.OTHER;
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.OTHER;
     }
     
     /** {@inheritDoc} */

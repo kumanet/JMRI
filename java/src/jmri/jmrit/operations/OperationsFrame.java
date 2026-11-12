@@ -79,9 +79,13 @@ public class OperationsFrame extends JmriJFrame {
         this.getContentPane().addItemWidth(p, c, width, x, y);
     }
 
+    protected JPanel getColorChooserPanel(String text, JColorChooser chooser, JCheckBox checkBox) {
+        return this.getContentPane().getColorChooserPanel(text, chooser, checkBox);
+    }
+
     /**
      * Gets the number of checkboxes(+1) that can fix in one row see
-     * OperationsFrame.minCheckboxes and OperationsFrame.maxCheckboxes
+     * OperationsFrame.MIN_CHECKBOXES and OperationsFrame.MAX_CHECKBOXES
      *
      * @return the number of checkboxes, minimum is 5 (6 checkboxes)
      */
@@ -143,6 +147,10 @@ public class OperationsFrame extends JmriJFrame {
     protected void adjustTextAreaColumnWidth(JScrollPane scrollPane, JTextArea textArea) {
         this.getContentPane().adjustTextAreaColumnWidth(scrollPane, textArea, this.getPreferredSize());
     }
+    
+    protected void adjustTextAreaColumnWidth(JScrollPane scrollPane, JTextArea textArea, Dimension size) {
+        this.getContentPane().adjustTextAreaColumnWidth(scrollPane, textArea, size);
+    }
 
     /**
      * Load the table width, position, and sorting status from the user
@@ -160,27 +168,27 @@ public class OperationsFrame extends JmriJFrame {
     }
 
     /**
-     * Code at frame level to clear modified flag
+     * Checks at shutdown if operations files need to be saved
      */
     protected synchronized void createShutDownTask() {
         InstanceManager.getDefault(OperationsManager.class)
-        .setShutDownTask(new SwingShutDownTask("Operations Train Window Check", // NOI18N
-                Bundle.getMessage("PromptQuitWindowNotWritten"), Bundle.getMessage("PromptSaveQuit"), this) {
-            @Override
-            public boolean checkPromptNeeded() {
-                setModifiedFlag(false); // allow only one popup requesting save operation files
-                if (Setup.isAutoSaveEnabled()) {
-                    storeValues();
-                    return true;
-                }
-                return !OperationsXml.areFilesDirty();
-            }
+                .setShutDownTask(new SwingShutDownTask("Operations Train Window Check", // NOI18N
+                        Bundle.getMessage("PromptQuitWindowNotWritten"), Bundle.getMessage("PromptSaveQuit"), this) {
+                    @Override
+                    public boolean checkPromptNeeded() {
+                        setModifiedFlag(false);
+                        if (Setup.isAutoSaveEnabled()) {
+                            storeValues();
+                            return true; // no prompt needed
+                        }
+                        return !OperationsXml.areFilesDirty();
+                    }
 
-            @Override
-            public void didPrompt() {
-                storeValues();
-            }
-        });
+                    @Override
+                    public void didPrompt() {
+                        storeValues();
+                    }
+                });
     }
     
     @Override

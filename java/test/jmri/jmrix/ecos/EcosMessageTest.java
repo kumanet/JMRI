@@ -17,12 +17,13 @@ public class EcosMessageTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new EcosMessage();
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EcosMessageTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EcosMessageTest.class);
 
 }

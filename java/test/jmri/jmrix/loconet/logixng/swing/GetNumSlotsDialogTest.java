@@ -1,24 +1,22 @@
 package jmri.jmrix.loconet.logixng.swing;
 
-import java.awt.GraphicsEnvironment;
-
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 /**
  * Tests for the ExpressionSlotUsageSwing class
  *
  * @author Daniel Bergqvist Copyright 2020
  */
+@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")
 public class GetNumSlotsDialogTest {
     
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        
+
         GetNumSlotsDialog e = new GetNumSlotsDialog(null, null);
         Assert.assertNotNull(e);
     }
@@ -40,10 +38,11 @@ public class GetNumSlotsDialogTest {
     
     @AfterEach
     public void tearDown() {
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
     
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionSlotUsageSwingTest.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionSlotUsageSwingTest.class);
 
 }

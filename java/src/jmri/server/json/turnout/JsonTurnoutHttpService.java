@@ -49,7 +49,7 @@ public class JsonTurnoutHttpService extends JsonNamedBeanHttpService<Turnout> {
     @Override
     public ObjectNode doGet(Turnout turnout, String name, String type, JsonRequest request) throws JsonException {
         ObjectNode root = this.getNamedBean(turnout, name, getType(), request); // throws JsonException if turnout == null
-        ObjectNode data = root.with(JSON.DATA);
+        ObjectNode data = root.withObject(JSON.DATA);
         if (turnout != null) {
             data.put(INVERTED, turnout.getInverted());
             switch (turnout.getKnownState()) {
@@ -172,7 +172,7 @@ public class JsonTurnoutHttpService extends JsonNamedBeanHttpService<Turnout> {
     }
 
     @Override
-    protected ProvidingManager<Turnout> getManager() {
+    protected ProvidingManager<Turnout> getProvidingManager() {
         return InstanceManager.getDefault(TurnoutManager.class);
     }
 }

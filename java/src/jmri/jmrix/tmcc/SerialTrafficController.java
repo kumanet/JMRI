@@ -88,19 +88,6 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
     }
 
     /**
-     * Static function returning the SerialTrafficController instance to use.
-     *
-     * @return The registered SerialTrafficController instance for general use,
-     *         if need be creating one.
-     * @deprecated JMRI Since 4.4 instance() shouldn't be used
-     */
-    @Deprecated
-    static public SerialTrafficController instance() {
-        log.warn("deprecated instance() call for TMCCTrafficController");
-        return null;
-    }
-
-    /**
      * Forward a SerialMessage to all registered SerialInterface listeners.
      */
     @Override
@@ -156,7 +143,7 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
         byte char1;
         char1 = readByteProtected(istream);
         msg.setElement(0, char1 & 0xFE);
-        if ((char1 & 0xFF) != 0xFE) {
+        if ( ((char1 & 0xFF) != 0xFE) && ((char1 & 0xFF) != 0xF8)  && ((char1 & 0xFF) != 0xF9) ) {
             log.warn("return short message as 1st byte is {}", char1 & 0xFF);
             return;
         }
@@ -206,6 +193,13 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
     }
 
     /**
+     * Skip warning message, as timeouts are routine in this protocol
+     */
+    @Override
+    protected void warnOnTimeout(AbstractMRMessage msg, AbstractMRListener l) {
+    }
+
+    /**
      * Actually transmits the next message to the port
      */
     @Override
@@ -249,12 +243,12 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
                         for (int i = 0; i < len; i++) {
                             ostream.write(msg[i]);
                             try {
-                                synchronized (xmtRunnable) {
-                                    xmtRunnable.wait(10);
+                                synchronized (XMT_RUNNABLE_LOCK) {
+                                    XMT_RUNNABLE_LOCK.wait(10);
                                 }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt(); // retain if needed later
-                                log.error("char send wait interrupted");
+                                log.warn("char send wait interrupted");
                             }
                         }
                         break;
@@ -262,8 +256,8 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
                         log.debug("Retry message: {} attempts remaining: {}", m, m.getRetries());
                         m.setRetries(m.getRetries() - 1);
                         try {
-                            synchronized (xmtRunnable) {
-                                xmtRunnable.wait(m.getTimeout());
+                            synchronized (XMT_RUNNABLE_LOCK) {
+                                XMT_RUNNABLE_LOCK.wait(m.getTimeout());
                             }
                         } catch (InterruptedException e) {
                             log.error("retry wait interrupted");
@@ -281,6 +275,6 @@ public class SerialTrafficController extends AbstractMRTrafficController impleme
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
 
 }

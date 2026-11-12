@@ -1,7 +1,10 @@
 package jmri.jmrix.anyma;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.util.Comparator;
 import java.util.ResourceBundle;
+
 import javax.annotation.Nonnull;
 
 import jmri.*;
@@ -9,6 +12,7 @@ import jmri.Manager.NameValidity;
 import jmri.jmrix.ConfiguringSystemConnectionMemo;
 import jmri.jmrix.DefaultSystemConnectionMemo;
 import jmri.util.NamedBeanComparator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -269,6 +273,8 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
      * {@inheritDoc}
      */
     @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "This system connection doesn't support ConsistManager from the super class")
     public boolean provides(Class<?> c) {
         return (get(c) != null);
     }
@@ -276,9 +282,11 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
     /**
      * {@inheritDoc}
      */
-    @SuppressWarnings("unchecked")
     @Override
-    public <T> T get(Class<?> T) {
+    @SuppressWarnings("unchecked")
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "This system connection doesn't support ConsistManager from the super class")
+    public <T> T get(Class<T> T) {
         T result = null; // nothing by default
         log.debug("* get({})", T.toString());
         if (!getDisabled()) {
@@ -296,6 +304,7 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
      * Configure the common managers for anyma dmx connections. This puts the
      * common manager config in one place.
      */
+    @Override
     public void configureManagers() {
         log.debug("* configureManagers()");
         InstanceManager.setLightManager(getLightManager());
@@ -316,7 +325,7 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
         if (getDisabled()) {
             return null;
         }
-        return (UsbLightManager) classObjectMap.computeIfAbsent(LightManager.class, (Class c) -> new UsbLightManager(this));
+        return (UsbLightManager) classObjectMap.computeIfAbsent(LightManager.class, (Class<?> c) -> new UsbLightManager(this));
     }
 
     /**
@@ -334,7 +343,7 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
     public <B extends NamedBean> Comparator<B> getNamedBeanComparator(Class<B> type) {
         return new NamedBeanComparator<>();
     }
-    
+
     /**
      * dispose
      */
@@ -345,6 +354,6 @@ public class AnymaDMX_SystemConnectionMemo extends DefaultSystemConnectionMemo i
         super.dispose();
     }
 
-    private final static Logger log
+    private static final Logger log
             = LoggerFactory.getLogger(AnymaDMX_SystemConnectionMemo.class);
 }

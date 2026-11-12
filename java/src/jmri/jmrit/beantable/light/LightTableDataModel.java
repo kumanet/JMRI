@@ -17,9 +17,6 @@ import jmri.*;
 import jmri.jmrit.beantable.BeanTableDataModel;
 import static jmri.jmrit.beantable.LightTableAction.getDescriptionText;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Data model for a Light Table.
  * Code originally within LightTableAction.
@@ -30,10 +27,10 @@ import org.slf4j.LoggerFactory;
  */
 public class LightTableDataModel extends BeanTableDataModel<Light> {
     
-    static public final int ENABLECOL = BeanTableDataModel.NUMCOLUMN;
-    static public final int INTENSITYCOL = ENABLECOL + 1;
-    static public final int EDITCOL = INTENSITYCOL + 1;
-    static public final int CONTROLCOL = EDITCOL + 1;
+    public static final int ENABLECOL = BeanTableDataModel.NUMCOLUMN;
+    public static final int INTENSITYCOL = ENABLECOL + 1;
+    public static final int EDITCOL = INTENSITYCOL + 1;
+    public static final int CONTROLCOL = EDITCOL + 1;
 
     // for icon state col
     protected boolean _graphicState = false; // updated from prefs
@@ -245,7 +242,7 @@ public class LightTableDataModel extends BeanTableDataModel<Light> {
                         l.setCommandedState( intensity > 0.5 ? Light.ON : Light.OFF);
                     }
                 } catch (IllegalArgumentException e1) {
-                    JOptionPane.showMessageDialog(null,  e1.getMessage());
+                    jmri.util.swing.JmriJOptionPane.showMessageDialog(null,  e1.getMessage());
                 }
                 break;
             case ENABLECOL:
@@ -460,6 +457,6 @@ public class LightTableDataModel extends BeanTableDataModel<Light> {
 
     }
     
-    private final static Logger log = LoggerFactory.getLogger(LightTableDataModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LightTableDataModel.class);
             
 }

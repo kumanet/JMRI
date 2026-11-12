@@ -7,22 +7,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
-import javax.swing.JOptionPane;
 
 import jmri.InstanceManager;
 import jmri.NamedBean;
 import jmri.ShutDownTask;
-import jmri.jmrit.roster.Roster;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.roster.RosterSpeedProfile;
 import jmri.jmrit.roster.RosterSpeedProfile.SpeedStep;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.managers.AbstractManager;
 import jmri.util.ThreadingUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Basic Implementation of a WarrantManager.
@@ -33,10 +30,9 @@ import org.slf4j.LoggerFactory;
  */
 public class WarrantManager extends AbstractManager<Warrant>
         implements jmri.InstanceManagerAutoDefault {
-    
+
     private HashMap<String, RosterSpeedProfile> _mergeProfiles = new HashMap<>();
-    private HashMap<String, RosterSpeedProfile> _sessionProfiles = new HashMap<>();
-    ShutDownTask _shutDownTask = null;
+    private ShutDownTask _shutDownTask = null;
     private boolean _suppressWarnings = false;
 
     public WarrantManager() {
@@ -61,12 +57,12 @@ public class WarrantManager extends AbstractManager<Warrant>
      *
      * @param systemName the system name.
      * @param userName   the user name.
-     * @param SCWa       true for a new SCWarrant, false for a new Warrant.
-     * @param TTP        the time to platform.
+     * @param sCWa       true for a new SCWarrant, false for a new Warrant.
+     * @param tTP        the time to platform.
      * @return an existing warrant if found or a new warrant, may be null.
      */
-    public Warrant createNewWarrant(String systemName, String userName, boolean SCWa, long TTP) {
-        log.debug("createNewWarrant {} SCWa= {}",systemName,SCWa);
+    public Warrant createNewWarrant(String systemName, String userName, boolean sCWa, long tTP) {
+        log.debug("createNewWarrant {} SCWa= {}",systemName,sCWa);
         // Check that Warrant does not already exist
         Warrant r;
         if (userName != null && userName.trim().length() > 0) {
@@ -75,7 +71,7 @@ public class WarrantManager extends AbstractManager<Warrant>
                 r = getBySystemName(systemName);
             }
             if (r != null) {
-                log.warn("Warrant {}  exits.",r.getDisplayName());
+                log.warn("Warrant \"{}\" already exists.",r.getDisplayName());
                 return null;
             }
         }
@@ -85,8 +81,8 @@ public class WarrantManager extends AbstractManager<Warrant>
             return null;
         }
         // Warrant does not exist, create a new Warrant
-        if (SCWa) {
-            r = new SCWarrant(systemName, userName, TTP);
+        if (sCWa) {
+            r = new SCWarrant(systemName, userName, tTP);
         } else {
             r = new Warrant(systemName, userName);
         }
@@ -125,7 +121,7 @@ public class WarrantManager extends AbstractManager<Warrant>
         return w;
     }
 
-    protected boolean okToRemoveBlock(OBlock block) {
+    protected boolean okToRemoveBlock( @Nonnull OBlock block) {
         String name = block.getDisplayName();
         List<Warrant> list = warrantsUsing(block);
         boolean ok = true;
@@ -222,28 +218,26 @@ public class WarrantManager extends AbstractManager<Warrant>
             log.warn("Cannot delete portal \"{}\" from this thread", name);
             return false;
         }
-        int val = JOptionPane.showOptionDialog(null, message,
-                Bundle.getMessage("WarningTitle"), JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE, null,
+        int val = JmriJOptionPane.showOptionDialog(null, message,
+                Bundle.getMessage("WarningTitle"), JmriJOptionPane.DEFAULT_OPTION,
+                JmriJOptionPane.QUESTION_MESSAGE, null,
                 new Object[]{Bundle.getMessage("ButtonYes"),
                         Bundle.getMessage("ButtonYesPlus"),
                         Bundle.getMessage("ButtonNo"),},
                 Bundle.getMessage("ButtonNo")); // default NO
-        if (val == 2) {
+        if (val == 2 || val == JmriJOptionPane.CLOSED_OPTION ) { // array position 2 No, or Dialog closed
             return false;
         }
-        if (val == 1) { // suppress future warnings
+        if (val == 1) { // array position 1 ButtonYesPlus suppress future warnings
             _suppressWarnings = true;
         }
         return true;
     }
 
-    synchronized protected void portalNameChange(String oldName, String newName) {
+    protected synchronized void portalNameChange(String oldName, String newName) {
         for (Warrant w : getNamedBeanSet()) {
             List<BlockOrder> orders = w.getBlockOrders();
-            Iterator<BlockOrder> it = orders.iterator();
-            while (it.hasNext()) {
-                BlockOrder bo = it.next();
+            for (BlockOrder bo : orders) {
                 if (oldName.equals(bo.getEntryName())) {
                     bo.setEntryName(newName);
                 }
@@ -260,8 +254,9 @@ public class WarrantManager extends AbstractManager<Warrant>
             List<BlockOrder> orders = w.getBlockOrders();
             Iterator<BlockOrder> it = orders.iterator();
             while (it.hasNext()) {
-                if (block.equals(it.next().getBlock()))
+                if (block.equals(it.next().getBlock())) {
                     list.add(w);
+                }
             }
         }
         return list;
@@ -272,12 +267,9 @@ public class WarrantManager extends AbstractManager<Warrant>
         String name = portal.getName();
         for (Warrant w : getNamedBeanSet()) {
             List<BlockOrder> orders = w.getBlockOrders();
-            Iterator<BlockOrder> it = orders.iterator();
-            while (it.hasNext()) {
-                BlockOrder bo = it.next();
-                if (name.equals(bo.getEntryName()) && !list.contains(w)) {
-                    list.add(w);
-                } else if (name.equals(bo.getExitName()) && !list.contains(w)) {
+            for (BlockOrder bo : orders) {
+                if (( name.equals(bo.getEntryName()) && !list.contains(w))
+                    || ( name.equals(bo.getExitName()) && !list.contains(w))) {
                     list.add(w);
                 }
             }
@@ -303,9 +295,7 @@ public class WarrantManager extends AbstractManager<Warrant>
         String name = path.getName();
         for (Warrant w : getNamedBeanSet()) {
             List<BlockOrder> orders = w.getBlockOrders();
-            Iterator<BlockOrder> it = orders.iterator();
-            while (it.hasNext()) {
-                BlockOrder bo = it.next();
+            for (BlockOrder bo : orders) {
                 if (block.equals(bo.getBlock()) && name.equals(bo.getPathName())) {
                     list.add(w);
                 }
@@ -314,12 +304,10 @@ public class WarrantManager extends AbstractManager<Warrant>
         return list;
     }
 
-    synchronized protected void pathNameChange(OBlock block, String oldName, String newName) {
+    protected synchronized void pathNameChange(OBlock block, String oldName, String newName) {
         for (Warrant w : getNamedBeanSet()) {
             List<BlockOrder> orders = w.getBlockOrders();
-            Iterator<BlockOrder> it = orders.iterator();
-            while (it.hasNext()) {
-                BlockOrder bo = it.next();
+            for (BlockOrder bo : orders) {
                 if (bo.getBlock().equals(block) && bo.getPathName().equals(oldName)) {
                     bo.setPathName(newName);
                 }
@@ -333,9 +321,9 @@ public class WarrantManager extends AbstractManager<Warrant>
      * @return the default WarrantManager, creating it if necessary
      */
     public static WarrantManager getDefault() {
-        return InstanceManager.getOptionalDefault(WarrantManager.class).orElseGet(() -> {
-            return InstanceManager.setDefault(WarrantManager.class, new WarrantManager());
-        });
+        return InstanceManager.getOptionalDefault(WarrantManager.class).orElseGet(() -> 
+            InstanceManager.setDefault(WarrantManager.class, new WarrantManager())
+        );
     }
 
     @Override
@@ -351,71 +339,60 @@ public class WarrantManager extends AbstractManager<Warrant>
     public Class<Warrant> getNamedBeanClass() {
         return Warrant.class;
     }
-    
-    protected void setSpeedProfiles(String id, RosterSpeedProfile merge, RosterSpeedProfile session) {
+
+    protected void setMergeProfile(String id, RosterSpeedProfile merge) {
         if (_shutDownTask == null) {
             if (!WarrantPreferences.getDefault().getShutdown().equals((WarrantPreferences.Shutdown.NO_MERGE))) {
                 _shutDownTask = new WarrantShutdownTask("WarrantRosterSpeedProfileCheck");
-                jmri.InstanceManager.getDefault(jmri.ShutDownManager.class).register(_shutDownTask);
+                InstanceManager.getDefault(jmri.ShutDownManager.class).register(_shutDownTask);
             }
         }
-        if (id != null) {
+        log.debug("setMergeProfile id = {}", id);
+        if (id != null && merge != null) {
+            _mergeProfiles.remove(id);
             _mergeProfiles.put(id, merge);
-            _sessionProfiles.put(id, session);
         }
     }
 
-    @Nonnull
+    /**
+     * Return a copy of the RosterSpeedProfile for Roster entry
+     * @param id roster id
+     * @return RosterSpeedProfile
+     */
     protected RosterSpeedProfile getMergeProfile(String id) {
-        RosterSpeedProfile mergeProfile = _mergeProfiles.get(id);
-        if (mergeProfile != null) {
-            return mergeProfile;
-        }
-        if (id == null || id.isEmpty()) {
-            mergeProfile = new RosterSpeedProfile(null);
-            _mergeProfiles.put(id, mergeProfile);
-            return mergeProfile;
-        }
-        RosterEntry rosterEntry = Roster.getDefault().getEntryForId(id);
-        if (rosterEntry == null) {
-            mergeProfile = new RosterSpeedProfile(null);
-            _mergeProfiles.put(id, mergeProfile);
-            return mergeProfile;
-        }
-        mergeProfile = new RosterSpeedProfile(rosterEntry);
-        RosterSpeedProfile rosterProfile = rosterEntry.getSpeedProfile();
-        if (rosterProfile != null) { // make copy of tree
-            TreeMap<Integer, SpeedStep> rosterTree = rosterProfile.getProfileSpeeds();
-            for (Map.Entry<Integer, SpeedStep> entry : rosterTree.entrySet()) {
-                mergeProfile.setSpeed(entry.getKey(), entry.getValue().getForwardSpeed(), entry.getValue().getReverseSpeed());
+        log.debug("getMergeProfile id = {}", id);
+        return _mergeProfiles.get(id);
+    }
+
+    protected RosterSpeedProfile makeProfileCopy(@CheckForNull RosterSpeedProfile mergeProfile, @Nonnull RosterEntry re) {
+        RosterSpeedProfile profile = new RosterSpeedProfile(re);
+        if (mergeProfile == null) {
+            mergeProfile = re.getSpeedProfile();
+            if (mergeProfile == null) {
+                mergeProfile = new RosterSpeedProfile(re);
+                re.setSpeedProfile(mergeProfile);
             }
         }
-        return mergeProfile;
-    }
-    @Nonnull
-    protected RosterSpeedProfile getSessionProfile(String id) {
-        RosterSpeedProfile profile = _sessionProfiles.get(id);
-        if (profile == null) {
-            profile = new RosterSpeedProfile(null);
-            _sessionProfiles.put(id, profile);
+        // make copy of mergeProfile
+        TreeMap<Integer, SpeedStep> rosterTree = mergeProfile.getProfileSpeeds();
+        for (Map.Entry<Integer, SpeedStep> entry : rosterTree.entrySet()) {
+            profile.setSpeed(entry.getKey(), entry.getValue().getForwardSpeed(), entry.getValue().getReverseSpeed());
         }
         return profile;
     }
-    
+
     protected HashMap<String, RosterSpeedProfile> getMergeProfiles() {
         return _mergeProfiles;
-    }
-    protected HashMap<String, RosterSpeedProfile> getSessionProfiles() {
-        return _sessionProfiles;
     }
 
     @Override
     public void dispose(){
         for(Warrant w:_beans){
-            w.stopWarrant(true, true);
+            w.dispose();
         }
         super.dispose();
     }
 
-    private static final Logger log = LoggerFactory.getLogger(WarrantManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WarrantManager.class);
+
 }

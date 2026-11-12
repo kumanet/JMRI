@@ -6,9 +6,10 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.util.Iterator;
-import java.util.ResourceBundle;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.Vector;
+
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -16,9 +17,18 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+
+import jmri.BooleanPermission;
+import jmri.InstanceManager;
+import jmri.PermissionManager;
+import jmri.PermissionsProgrammer;
+import jmri.util.gui.GuiLafPreferencesManager;
 import jmri.util.swing.EditableResizableImagePanel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.MultiLineCellEditor;
+import jmri.util.swing.MultiLineCellRenderer;
+import jmri.util.swing.ResizableRowDataModel;
 
 /**
  * A media pane for roster configuration tool. It contains:<ul>
@@ -53,7 +63,7 @@ public class RosterMediaPane extends JPanel {
     JTextField _URL = new JTextField(30);
     RosterAttributesTableModel rosterAttributesModel;
 
-    final ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle");
+    private static final PermissionManager permissionManager = InstanceManager.getDefault(PermissionManager.class);
 
     /**
      * This constructor allows the panel to be used in visual bean editors, but
@@ -67,22 +77,41 @@ public class RosterMediaPane extends JPanel {
         super();
         _imageFilePath = new EditableResizableImagePanel(r.getImagePath(), 320, 240);
         _imageFilePath.setDropFolder(Roster.getDefault().getRosterFilesLocation());
-        _imageFilePath.setToolTipText(rb.getString("MediaRosterImageToolTip"));
+        _imageFilePath.setToolTipText(Bundle.getMessage("MediaRosterImageToolTip"));
         _imageFilePath.setBorder(BorderFactory.createLineBorder(Color.blue));
-        _imageFPlabel.setText(rb.getString("MediaRosterImageLabel"));
+        _imageFPlabel.setText(Bundle.getMessage("MediaRosterImageLabel"));
 
         _iconFilePath = new EditableResizableImagePanel(r.getIconPath(), 160, 120);
         _iconFilePath.setDropFolder(Roster.getDefault().getRosterFilesLocation());
-        _iconFilePath.setToolTipText(rb.getString("MediaRosterIconToolTip"));
+        _iconFilePath.setToolTipText(Bundle.getMessage("MediaRosterIconToolTip"));
         _iconFilePath.setBorder(BorderFactory.createLineBorder(Color.blue));
-        _iconFPlabel.setText(rb.getString("MediaRosterIconLabel"));
+        _iconFPlabel.setText(Bundle.getMessage("MediaRosterIconLabel"));
 
         _URL.setText(r.getURL());
-        _URL.setToolTipText(rb.getString("MediaRosterURLToolTip"));
-        _URLlabel.setText(rb.getString("MediaRosterURLLabel"));
+        _URL.setToolTipText(Bundle.getMessage("MediaRosterURLToolTip"));
+        _URLlabel.setText(Bundle.getMessage("MediaRosterURLLabel"));
 
         rosterAttributesModel = new RosterAttributesTableModel(r); //t, columnNames);
-        JTable jtAttributes = new JTable();
+        JTable jtAttributes = new JTable(){
+            // MultiLineRenderer and MultiLineCellEditor for value column
+            @Override
+            public TableCellRenderer getCellRenderer(int row, int column) {
+                // no remapping of model vs view columns
+                if (column == 1) {
+                    return new MultiLineCellRenderer();
+                }
+                return super.getCellRenderer(row, column);
+            }
+            @Override
+            public TableCellEditor getCellEditor(int row, int column) {
+                // no remapping of model vs view columns
+                if (column == 1) {
+                    return new MultiLineCellEditor();
+                }
+                return super.getCellEditor(row, column);
+            }
+        };
+        rosterAttributesModel.associatedTable = jtAttributes;
         jtAttributes.setModel(rosterAttributesModel);
         JScrollPane jsp = new JScrollPane(jtAttributes);
         jtAttributes.setFillsViewportHeight(true);
@@ -137,7 +166,7 @@ public class RosterMediaPane extends JPanel {
 
         this.setLayout(new BorderLayout());
         add(mediap, BorderLayout.NORTH);
-        add(new JLabel(rb.getString("MediaRosterAttributeTableDescription")), BorderLayout.CENTER); // some nothing in the middle
+        add(new JLabel(Bundle.getMessage("MediaRosterAttributeTableDescription")), BorderLayout.CENTER); // some nothing in the middle
         jsp.setMinimumSize(tableDim);
         jsp.setMaximumSize(tableDim);
         jsp.setPreferredSize(tableDim);
@@ -170,37 +199,65 @@ public class RosterMediaPane extends JPanel {
         if (log.isDebugEnabled()) {
             log.debug("dispose");
         }
+        if (_imageFilePath != null) {
+            _imageFilePath.removeDnd();
+        }
+        if (_iconFilePath != null) {
+            _iconFilePath.removeDnd();
+        }
     }
 
-    private class RosterAttributesTableModel extends AbstractTableModel {
+    private static class RosterAttributesTableModel extends AbstractTableModel implements ResizableRowDataModel, PropertyChangeListener {
 
         Vector<KeyValueModel> attributes;
-        String titles[];
+        String[] titles;
         boolean wasModified;
+        boolean isUpdatingModel = false;
+        JTable associatedTable;
+        private static final String EMPTY_FIELD = "...";
 
-        private class KeyValueModel {
+        private static class KeyValueModel {
+            public String key, value;
 
             public KeyValueModel(String k, String v) {
                 key = k;
                 value = v;
-            }
-            public String key, value;
+            }            
         }
 
         public RosterAttributesTableModel(RosterEntry r) {
             setModel(r);
-
             titles = new String[2];
-            titles[0] = rb.getString("MediaRosterAttributeName");
-            titles[1] = rb.getString("MediaRosterAttributeValue");
+            titles[0] = Bundle.getMessage("MediaRosterAttributeName");
+            titles[1] = Bundle.getMessage("MediaRosterAttributeValue");
         }
 
         public void setModel(RosterEntry r) {
-            attributes = new Vector<KeyValueModel>(r.getAttributes().size());
+            attributes = new Vector<>(r.getAttributes().size());
             for (String key : r.getAttributes()) {
                 attributes.add(new KeyValueModel(key, r.getAttribute(key)));
             }
             wasModified = false;
+            r.addPropertyChangeListener(this);
+        }
+
+        @Override
+        public void propertyChange(PropertyChangeEvent evt) {
+            if (isUpdatingModel) {
+                return;
+            }
+            if (evt.getPropertyName().startsWith(RosterEntry.ATTRIBUTE_UPDATED) && (evt.getNewValue() instanceof String)) {
+                String key = evt.getPropertyName().substring(RosterEntry.ATTRIBUTE_UPDATED.length());
+                keyDelete(key);
+                attributes.add(new KeyValueModel(key, (String) evt.getNewValue()));
+                wasModified = true; 
+            } else if (evt.getPropertyName().startsWith(RosterEntry.ATTRIBUTE_DELETED) && (evt.getOldValue() instanceof String)) {
+                keyDelete((String) evt.getOldValue());
+                wasModified = true; 
+            }
+            if (wasModified) {
+                fireTableDataChanged();
+            }
         }
 
         public void updateModel(RosterEntry r) {
@@ -211,13 +268,8 @@ public class RosterMediaPane extends JPanel {
                 }
             }
             //remove undefined keys
-            Iterator<String> ite = r.getAttributes().iterator();
-            while (ite.hasNext()) {
-                if (!keyExist(ite.next())) // not very efficient algorithm!
-                {
-                    ite.remove();
-                }
-            }
+            // not very efficient algorithm!
+            r.getAttributes().removeIf(s -> !keyExist(s));
             wasModified = false;
         }
 
@@ -227,6 +279,19 @@ public class RosterMediaPane extends JPanel {
             }
             for (KeyValueModel attribute : attributes) {
                 if (k.compareTo(attribute.key) == 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean keyDelete(String k) {
+            if (k == null) {
+                return false;
+            }
+            for (int i = 0; i < attributes.size(); i++) {
+                if (k.compareTo(attributes.get(i).key) == 0) {
+                    attributes.remove(i);
                     return true;
                 }
             }
@@ -255,15 +320,31 @@ public class RosterMediaPane extends JPanel {
                     return attributes.get(row).key;
                 }
                 if (col == 1) {
-                    return attributes.get(row).value;
+                    String content = attributes.get(row).value;
+                    int lines = content.split("\n").length;
+                    resizeRowToText(row, lines);
+                    return content;
                 }
             }
-            return "...";
+            return EMPTY_FIELD;
+        }
+
+        @Override
+        public void resizeRowToText(int modelRow, int heightInLines) {
+            if (heightInLines < 1 ) heightInLines = 1;
+            int height = heightInLines * (InstanceManager.getDefault(GuiLafPreferencesManager.class).getFontSize() + 4); // same line height as in RosterTable
+            if (height != associatedTable.getRowHeight(modelRow)) {
+                associatedTable.setRowHeight(modelRow, height);
+            }
         }
 
         @Override
         public void setValueAt(Object value, int row, int col) {
             KeyValueModel kv;
+
+            if ((value == null) || (value.toString().equals(EMPTY_FIELD))) {
+                return; // don't allow empty key or value
+            }
 
             if (row < attributes.size()) // already exist?
             {
@@ -303,7 +384,25 @@ public class RosterMediaPane extends JPanel {
 
         @Override
         public boolean isCellEditable(int row, int col) {
-            return true;
+            // permission to edit optional columns?
+            switch (col) {
+                case 0:
+                    return permissionManager.hasAtLeastPermission(
+                            PermissionsProgrammer.PERMISSION_ROSTER_ADD_EDIT_REMOVE_ADDITIONAL_COLUMNS,
+                            BooleanPermission.BooleanValue.TRUE);
+                case 1:
+                    if (row >= attributes.size()) { // doesn't already exist?
+                        return permissionManager.hasAtLeastPermission(
+                                PermissionsProgrammer.PERMISSION_ROSTER_ADD_EDIT_REMOVE_ADDITIONAL_COLUMNS,
+                                BooleanPermission.BooleanValue.TRUE);
+                    }
+                    return permissionManager.hasAtLeastPermission(
+                            PermissionsProgrammer.PERMISSION_ROSTER_ADDED_COLUMNS,
+                            BooleanPermission.BooleanValue.TRUE);
+                default:
+                    log.error("Unknown column: {}", col, new IllegalArgumentException("Unknown column"));
+                    return false;
+            }
         }
 
         public boolean wasModified() {
@@ -311,5 +410,5 @@ public class RosterMediaPane extends JPanel {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RosterMediaPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RosterMediaPane.class);
 }

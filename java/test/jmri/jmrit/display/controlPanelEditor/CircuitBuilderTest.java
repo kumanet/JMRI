@@ -1,28 +1,29 @@
 package jmri.jmrit.display.controlPanelEditor;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.io.File;
 import java.util.List;
+import java.util.ResourceBundle;
 
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
-import jmri.JmriException;
 import jmri.ShutDownManager;
 import jmri.ShutDownTask;
 import jmri.jmrit.logix.OBlock;
 import jmri.jmrit.logix.OBlockManager;
 import jmri.jmrit.logix.Portal;
 import jmri.util.JUnitUtil;
+import jmri.util.ThreadingUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 import jmri.util.swing.JemmyUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
-import org.junit.Assume;
+
 import org.netbeans.jemmy.operators.JFrameOperator;
 import org.netbeans.jemmy.operators.JButtonOperator;
 import org.netbeans.jemmy.operators.JDialogOperator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test simple functioning of the CircuitBuilder class.
@@ -32,20 +33,20 @@ import org.slf4j.LoggerFactory;
  */
 public class CircuitBuilderTest {
 
-    ControlPanelEditor cpe;
-    CircuitBuilder cb;
+    private ControlPanelEditor cpe;
+    private CircuitBuilder cb;
 
     @Test
+    @DisabledIfHeadless
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         ControlPanelEditor f = new ControlPanelEditor();
         CircuitBuilder builder = new CircuitBuilder(f);
-        Assert.assertNotNull("exists", builder);
-        f.dispose();
+        assertNotNull( builder, "exists");
         JUnitUtil.dispose(f);
     }
 
     @Test
+    @DisabledIfHeadless
     public void testOpenCBWindow() {
         getCPEandCB();
 
@@ -55,14 +56,15 @@ public class CircuitBuilderTest {
 
 
     @Test
+    @DisabledIfHeadless
     public void testEditCircuitFrame() {
         getCPEandCB();
 
         OBlock ob3 = InstanceManager.getDefault(OBlockManager.class).getOBlock("OB3");
         cb.setCurrentBlock(ob3);
 
-        cb.editCircuit("editCircuitItem", false);
-        Assert.assertNotNull("exists", cb.getEditFrame());
+        ThreadingUtil.runOnGUI(() -> cb.editCircuit("editCircuitItem", false));
+        assertNotNull( cb.getEditFrame(), "exists");
 /*
         cb.editCircuit("editCircuitItem", true);
         JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("editCircuitItem"));
@@ -77,68 +79,74 @@ public class CircuitBuilderTest {
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditCircuitError() {
         getCPEandCB();
 
-        cb.editCircuitError("OB1");
+        ThreadingUtil.runOnGUI(() -> cb.editCircuitError("OB1"));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditPortals() {
         getCPEandCB();
 
         OBlock ob3 = InstanceManager.getDefault(OBlockManager.class).getOBlock("OB2");
         cb.setCurrentBlock(ob3);
 
-        cb.editPortals("editPortalsItem", false);
+        ThreadingUtil.runOnGUI(() -> cb.editPortals("editPortalsItem", false));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditCircuitPaths() {
         getCPEandCB();
 
         OBlock ob3 = InstanceManager.getDefault(OBlockManager.class).getOBlock("OB3");
         cb.setCurrentBlock(ob3);
 
-        cb.editCircuitPaths("editCircuitPathsItem", false);
+        ThreadingUtil.runOnGUI(() -> cb.editCircuitPaths("editCircuitPathsItem", false));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditPortalDirection() {
         getCPEandCB();
 
         OBlock ob3 = InstanceManager.getDefault(OBlockManager.class).getOBlock("OB5");
         cb.setCurrentBlock(ob3);
 
-        cb.editPortalDirection("editDirectionItem", false);
+        ThreadingUtil.runOnGUI(() -> cb.editPortalDirection("editDirectionItem", false));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditSignalFrame() {
         getCPEandCB();
 
         OBlock ob3 = InstanceManager.getDefault(OBlockManager.class).getOBlock("OB4");
         cb.setCurrentBlock(ob3);
 
-        cb.editSignalFrame("editSignalItem", false);
+        ThreadingUtil.runOnGUI(() -> cb.editSignalFrame("editSignalItem", false));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testEditPortalError() {
         getCPEandCB();
 /*
@@ -149,16 +157,17 @@ public class CircuitBuilderTest {
             jbo.push();
         }).start();*/
 
-        cb.editPortalError("EastExit-EastJunction");
+        ThreadingUtil.runOnGUI(() -> cb.editPortalError("EastExit-EastJunction"));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
-        new org.netbeans.jemmy.QueueTool().waitEmpty(100);
+        new org.netbeans.jemmy.QueueTool().waitEmpty();
         cpe.dispose();
     }
 
     @Test
-    public void testEditPortalErrorIcon() throws Exception{
+    @DisabledIfHeadless
+    public void testEditPortalErrorIcon() {
         getCPEandCB();
 
         OBlock block = InstanceManager.getDefault(OBlockManager.class).getByUserName("WestSiding");
@@ -170,14 +179,22 @@ public class CircuitBuilderTest {
             jbo.push();
         }).start();
 
-        cb.editPortalError(block, portal, null);
+        ThreadingUtil.runOnGUI(() -> cb.editPortalError(block, portal, null));
 
         JFrameOperator nfo = new JFrameOperator(cb.getEditFrame());
+
+        // continue or exit?
+        // Yes to ignore message and continue
+        Thread t = JemmyUtil.createModalDialogOperatorThread(
+            Bundle.getMessage("continue"), "Yes");
+
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonDone"));
+        JUnitUtil.waitThreadTerminated(t);
     }
 
     @Test
     @Disabled("Cannot get button pushed!")
+    @DisabledIfHeadless
     public void testNoBlock() {
         getCPEandCB();
         cb.editCircuitPaths("editCircuitPathsItem", false);
@@ -189,18 +206,21 @@ public class CircuitBuilderTest {
     }
 
     void getCPEandCB() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+
+        ResourceBundle rbxWarrant = ResourceBundle.getBundle("jmri.jmrit.logix.WarrantBundle");
+        Thread t = JemmyUtil.createModalDialogOperatorThread(
+            rbxWarrant.getString("ErrorDialogTitle"), "OK");
+
         File f = new File("java/test/jmri/jmrit/display/controlPanelEditor/valid/CircuitBuilderTest.xml");
-        try {
-            InstanceManager.getDefault(ConfigureManager.class).load(f);
-        } catch(JmriException je) {
-            log.error("CircuitBuilderTest can't load CircuitBuilderTester.xml;", je);
-        }
+        assertDoesNotThrow( () ->
+            InstanceManager.getDefault(ConfigureManager.class).load(f));
+        JUnitUtil.waitThreadTerminated(t);
+
         cpe = (ControlPanelEditor) jmri.util.JmriJFrame.getFrame("CircuitBuilderTest Editor");
-        Assert.assertNotNull("exists", cpe );
+        assertNotNull( cpe, "exists");
         cb = cpe.getCircuitBuilder();
-        Assert.assertNotNull("exists", cb );
-        //fixed: jmri.util.JUnitAppender.assertWarnMessage("getIconMap failed. family \"null\" not found in item type \"Portal\"");
+        assertNotNull( cb, "exists");
+
     }
 
     @BeforeEach
@@ -215,10 +235,10 @@ public class CircuitBuilderTest {
     @AfterEach
     public void tearDown() {
         if (cpe != null) {
-            cpe.dispose();
+            JUnitUtil.dispose(cpe);
+            cpe = null;
         }
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         if (InstanceManager.containsDefault(ShutDownManager.class)) {
             ShutDownManager sm = InstanceManager.getDefault(jmri.ShutDownManager.class);
             List<Runnable> rlist = sm.getRunnables();
@@ -226,7 +246,10 @@ public class CircuitBuilderTest {
                 sm.deregister((ShutDownTask)rlist.get(0));
             }
         }
+        // cleaning up nameless invisible frame created by creating a dialog with a null parent
+        JUnitUtil.resetWindows(false, false);
         JUnitUtil.tearDown();
     }
-    private final static Logger log = LoggerFactory.getLogger(CircuitBuilderTest.class);
+
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CircuitBuilderTest.class);
 }

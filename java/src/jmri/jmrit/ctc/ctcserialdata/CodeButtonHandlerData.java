@@ -5,8 +5,6 @@ package jmri.jmrit.ctc.ctcserialdata;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import javax.swing.ButtonGroup;
 import jmri.jmrit.ctc.*;
 
@@ -22,7 +20,7 @@ public class CodeButtonHandlerData {
 // gotten by calling "CommonSubs.getButtonSelectedInt".
         GREGS(0), OTHER(1);
         private final int _mRadioGroupValue;
-        private final static HashMap<Integer, LOCK_IMPLEMENTATION> map = new HashMap<>();
+        private static final HashMap<Integer, LOCK_IMPLEMENTATION> map = new HashMap<>();
         private LOCK_IMPLEMENTATION (int radioGroupValue) { _mRadioGroupValue = radioGroupValue; }
         static { for (LOCK_IMPLEMENTATION value : LOCK_IMPLEMENTATION.values()) { map.put(value._mRadioGroupValue, value); }}
         public int getInt() { return _mRadioGroupValue; }
@@ -35,7 +33,7 @@ public class CodeButtonHandlerData {
 // gotten by calling "CommonSubs.getButtonSelectedInt".
         TURNOUT(0), CROSSOVER(1), DOUBLE_CROSSOVER(2);
         private final int _mRadioGroupValue;
-        private final static HashMap<Integer, TURNOUT_TYPE> map = new HashMap<>();
+        private static final HashMap<Integer, TURNOUT_TYPE> map = new HashMap<>();
         private TURNOUT_TYPE (int radioGroupValue) { _mRadioGroupValue = radioGroupValue; }
         static { for (TURNOUT_TYPE value : TURNOUT_TYPE.values()) { map.put(value._mRadioGroupValue, value); }}
         public int getInt() { return _mRadioGroupValue; }

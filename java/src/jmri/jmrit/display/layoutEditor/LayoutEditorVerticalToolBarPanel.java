@@ -1,6 +1,5 @@
 package jmri.jmrit.display.layoutEditor;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -99,6 +98,8 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
         JPanel vTop8Panel = new JPanel(verticalContentLayout);
         vTop8Panel.add(levelXingButton);
         vTop8Panel.add(trackButton);
+        vTop8Panel.add(turntableButton);
+        vTop8Panel.add(traverserButton);
         vTop8Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop8Panel.getPreferredSize().height));
         outerBorderPanel.add(vTop8Panel);
 
@@ -164,6 +165,12 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
         vTop15Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop15Panel.getPreferredSize().height));
         labelsBorderPanel.add(vTop15Panel);
 
+        JPanel vTop17Panel = new JPanel(verticalContentLayout);
+        vTop17Panel.add(globalVariableButton);
+        vTop17Panel.add(textGlobalVariableComboBox);
+        vTop17Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop17Panel.getPreferredSize().height));
+        labelsBorderPanel.add(vTop17Panel);
+
         JPanel vTop16Panel = new JPanel(verticalContentLayout);
         vTop16Panel.add(blockContentsButton);
         vTop16Panel.add(blockContentsComboBox);
@@ -181,6 +188,7 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
 
         JPanel vTop18Panel = new JPanel(verticalContentLayout);
         vTop18Panel.add(multiSensorButton);
+        vTop18Panel.add(changeIconsButton);
         vTop18Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop18Panel.getPreferredSize().height));
         iconsBorderPanel.add(vTop18Panel);
 
@@ -189,6 +197,12 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
         vTop20Panel.add(sensorComboBox);
         vTop20Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop20Panel.getPreferredSize().height));
         iconsBorderPanel.add(vTop20Panel);
+
+        JPanel vTop20tPanel = new JPanel(verticalContentLayout);
+        vTop20tPanel.add(turnoutButton);
+        vTop20tPanel.add(turnoutComboBox);
+        vTop20tPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop20tPanel.getPreferredSize().height));
+        iconsBorderPanel.add(vTop20tPanel);
 
         JPanel vTop19Panel = new JPanel(verticalContentLayout);
         vTop19Panel.add(signalMastButton);
@@ -204,10 +218,16 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
 
         JPanel vTop22Panel = new JPanel(verticalContentLayout);
         vTop22Panel.add(iconLabelButton);
+        vTop22Panel.add(logixngButton);
         vTop22Panel.add(shapeButton);
         vTop22Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop22Panel.getPreferredSize().height));
-        vTop22Panel.add(changeIconsButton);
         iconsBorderPanel.add(vTop22Panel);
+
+        JPanel vTop23Panel = new JPanel(verticalContentLayout);
+        vTop23Panel.add(audioButton);
+        vTop23Panel.add(textAudioComboBox);
+        vTop23Panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, vTop23Panel.getPreferredSize().height));
+        iconsBorderPanel.add(vTop23Panel);
 
         add(iconsBorderPanel);
         add(Box.createVerticalGlue());
@@ -222,5 +242,5 @@ public class LayoutEditorVerticalToolBarPanel extends LayoutEditorToolBarPanel {
     }   //layoutComponents
 
     //initialize logging
-    //private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorVerticalToolBarPanel.class);
+    //private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorVerticalToolBarPanel.class);
 }

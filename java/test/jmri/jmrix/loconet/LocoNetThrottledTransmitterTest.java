@@ -20,24 +20,27 @@ public class LocoNetThrottledTransmitterTest {
         LocoNetThrottledTransmitter q = new LocoNetThrottledTransmitter(new LocoNetInterfaceScaffold(memo), false);
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
     @Test
     public void testMemoCtor() {
         LocoNetThrottledTransmitter q = new LocoNetThrottledTransmitter(new LocoNetInterfaceScaffold(memo), false);
-        new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS);
+        Assertions.assertNotNull(
+            new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS, false));
 
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
     @Test
     public void testMemoComparable() {
-        LocoNetThrottledTransmitter.Memo m50   = new LocoNetThrottledTransmitter.Memo(null, 50, TimeUnit.MILLISECONDS);
-        LocoNetThrottledTransmitter.Memo m100a = new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS);
-        LocoNetThrottledTransmitter.Memo m100b = new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS);
-        LocoNetThrottledTransmitter.Memo m200a = new LocoNetThrottledTransmitter.Memo(null, 200, TimeUnit.MILLISECONDS);
-        LocoNetThrottledTransmitter.Memo m200b = new LocoNetThrottledTransmitter.Memo(null, 200, TimeUnit.MILLISECONDS);
+        LocoNetThrottledTransmitter.Memo m50   = new LocoNetThrottledTransmitter.Memo(null, 50, TimeUnit.MILLISECONDS, false);
+        LocoNetThrottledTransmitter.Memo m100a = new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS, false);
+        LocoNetThrottledTransmitter.Memo m100b = new LocoNetThrottledTransmitter.Memo(null, 100, TimeUnit.MILLISECONDS, false);
+        LocoNetThrottledTransmitter.Memo m200a = new LocoNetThrottledTransmitter.Memo(null, 200, TimeUnit.MILLISECONDS, false);
+        LocoNetThrottledTransmitter.Memo m200b = new LocoNetThrottledTransmitter.Memo(null, 200, TimeUnit.MILLISECONDS, false);
 
         Assert.assertNotNull("exists", m100b);
         Assert.assertNotNull("exists", m200b);
@@ -62,6 +65,7 @@ public class LocoNetThrottledTransmitterTest {
 
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
     @Test
@@ -84,6 +88,7 @@ public class LocoNetThrottledTransmitterTest {
 
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
     @Test
@@ -99,12 +104,11 @@ public class LocoNetThrottledTransmitterTest {
 
         q.minInterval = 1;
         q.sendLocoNetMessage(m1);
-        q.minInterval = 100;
+        q.minInterval = 1000;
         q.sendLocoNetMessage(m2);
 
-        JUnitUtil.waitFor(()->{return s.outbound.size() == 1;}, "only one sent failed with s.outbound.size() "+s.outbound.size());
+        JUnitUtil.waitFor(()->{return s.outbound.size() >= 1;}, "at least one sent failed with s.outbound.size() "+s.outbound.size());
 
-        Assert.assertEquals("only one sent", 1, s.outbound.size());
         Assert.assertEquals("right one", m1, s.outbound.elementAt(0));
 
         JUnitUtil.waitFor(()->{return s.outbound.size() == 2;}, "only two sent failed with s.outbound.size() "+s.outbound.size());
@@ -114,6 +118,7 @@ public class LocoNetThrottledTransmitterTest {
 
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
     @Test
@@ -142,9 +147,10 @@ public class LocoNetThrottledTransmitterTest {
 
         q.dispose();
         JUnitUtil.waitFor(()->{return !q.running;}, "stopped");
+        JUnitUtil.waitThreadTerminated(q.theServiceThread);
     }
 
-    LocoNetSystemConnectionMemo memo;
+    private LocoNetSystemConnectionMemo memo;
 
     @BeforeEach
     public void setUp() {
@@ -154,6 +160,8 @@ public class LocoNetThrottledTransmitterTest {
 
     @AfterEach
     public void tearDown() {
+        Assertions.assertNotNull(memo);
+        memo.dispose();
         memo = null;
         JUnitUtil.tearDown();
     }

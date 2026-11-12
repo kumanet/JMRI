@@ -1,15 +1,17 @@
 package jmri.jmrix.sprog.console;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBox;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+
 import jmri.jmrix.sprog.SprogConstants;
 import jmri.jmrix.sprog.SprogListener;
 import jmri.jmrix.sprog.SprogMessage;
@@ -19,8 +21,7 @@ import jmri.jmrix.sprog.SprogTrafficController;
 import jmri.jmrix.sprog.update.SprogType;
 import jmri.jmrix.sprog.update.SprogVersion;
 import jmri.jmrix.sprog.update.SprogVersionListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Frame for Sprog Console
@@ -106,6 +107,7 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
      */
     @Override
     public void dispose() {
+        stopTimer();
         if (tc != null) {
             tc.removeSprogListener(this);
         }
@@ -272,7 +274,6 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
      * Validate the current limit value entered by the user, depending on the
      * SPROG version.
      */
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC")
     // validateCurrent() is called from synchronised code
     public void validateCurrent() {
         String currentRange = "200 - 996";
@@ -285,14 +286,14 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
             currentLimit = Integer.parseInt(currentTextField.getText());
         }
         catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("CurrentLimitDialogString", currentRange),
-                    Bundle.getMessage("SprogConsoleTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("CurrentLimitDialogString", currentRange),
+                    Bundle.getMessage("SprogConsoleTitle"), JmriJOptionPane.ERROR_MESSAGE);
             currentLimit = validLimit;
             return;
         }
         if ((currentLimit > validLimit) || (currentLimit < 200)) {
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("CurrentLimitDialogString", currentRange),
-                    Bundle.getMessage("SprogConsoleTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("CurrentLimitDialogString", currentRange),
+                    Bundle.getMessage("SprogConsoleTitle"), JmriJOptionPane.ERROR_MESSAGE);
             currentLimit = validLimit;
         }
     }
@@ -322,25 +323,21 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
         // Further messages will be sent from state machine
     }
 
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC")
     // Called from synchronised code
     public boolean isCurrentLimitPossible() {
         return sv.hasCurrentLimit();
     }
 
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC")
     // Called from synchronised code
     public boolean isBlueLineSupportPossible() {
         return sv.hasBlueLine();
     }
 
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC")
     // Called from synchronised code
     public boolean isFirmwareUnlockPossible() {
         return sv.hasFirmwareLock();
     }
 
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC")
     // Called from synchronised code
     public boolean isZTCModePossible() {
         return sv.hasZTCMode();
@@ -355,18 +352,16 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
      * @param v The SprogVersion being handled
      */
     @Override
-    synchronized public void notifyVersion(SprogVersion v) {
+    public synchronized void notifyVersion(SprogVersion v) {
         SprogMessage msg;
         sv = v;
         // Save it for others
         _memo.setSprogVersion(v);
-        if (log.isDebugEnabled()) {
-            log.debug("Found: {}", sv.toString());
-        }
+        log.debug("Found: {}", sv );
         if (sv.sprogType.isSprog() == false) {
             // Didn't recognize a SPROG so check if it is in boot mode already
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("TypeNoSprogPromptFound"),
-                    Bundle.getMessage("SprogConsoleTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("TypeNoSprogPromptFound"),
+                    Bundle.getMessage("SprogConsoleTitle"), JmriJOptionPane.ERROR_MESSAGE);
         } else {
             if ((sv.sprogType.sprogType > SprogType.SPROGIIv3) && (sv.sprogType.sprogType < SprogType.NANO)) {
                 currentTextField.setToolTipText(Bundle.getMessage("CurrentLimitFieldTooltip2500"));
@@ -376,21 +371,17 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
 
             // Enable blueline & firmware unlock check boxes
             if (isBlueLineSupportPossible()) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Enable blueline check box");
-                }
+                log.debug("Enable blueline check box");
                 blueCheckBox.setEnabled(true);
                 if (log.isDebugEnabled()) {
-                    log.debug(Boolean.toString(blueCheckBox.isEnabled()));
+                    log.debug("blueCheckBox isEnabled: {}", blueCheckBox.isEnabled() );
                 }
             }
             if (isFirmwareUnlockPossible()) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Enable firmware check box");
-                }
+                log.debug("Enable firmware check box");
                 unlockCheckBox.setEnabled(true);
                 if (log.isDebugEnabled()) {
-                    log.debug(Boolean.toString(unlockCheckBox.isEnabled()));
+                    log.debug("unlockCheckBox isEnabled: {}", unlockCheckBox.isEnabled() );
                 }
             }
 
@@ -464,8 +455,8 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
                         currentLimitFromHardware = Integer.parseInt(tmpString);
                     }
                     catch (NumberFormatException e) {
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("ErrorFrameDialogLimit"),
-                                Bundle.getMessage("SprogConsoleTitle"), JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("ErrorFrameDialogLimit"),
+                                Bundle.getMessage("SprogConsoleTitle"), JmriJOptionPane.ERROR_MESSAGE);
                         state = State.IDLE;
                         return;
                     }
@@ -496,8 +487,8 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
                         modeWord = Integer.parseInt(tmpString, 16);
                     }
                     catch (NumberFormatException e) {
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("ErrorFrameDialogWord"),
-                                Bundle.getMessage("SprogConsoleTitle"), JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("ErrorFrameDialogWord"),
+                                Bundle.getMessage("SprogConsoleTitle"), JmriJOptionPane.ERROR_MESSAGE);
                         state = State.IDLE;
                         return;
                     }
@@ -574,9 +565,9 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
     /**
      * Internal routine to handle a timeout.
      */
-    synchronized protected void timeout() {
-        JOptionPane.showMessageDialog(null, Bundle.getMessage("TypeTimeoutTalkingToSPROG"),
-                Bundle.getMessage("Timeout"), JOptionPane.ERROR_MESSAGE);
+    protected synchronized void timeout() {
+        JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("TypeTimeoutTalkingToSPROG"),
+                Bundle.getMessage("Timeout"), JmriJOptionPane.ERROR_MESSAGE);
         state = State.IDLE;
     }
 
@@ -617,6 +608,6 @@ public class SprogConsoleFrame extends jmri.jmrix.AbstractMonFrame implements Sp
         timer.start();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SprogConsoleFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SprogConsoleFrame.class);
 
 }

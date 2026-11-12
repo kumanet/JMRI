@@ -1,15 +1,15 @@
 package jmri.jmrit.display;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import jmri.NamedBeanHandle;
 import jmri.Turnout;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
-import org.junit.Assume;
+
 import org.netbeans.jemmy.operators.JComponentOperator;
 import org.netbeans.jemmy.operators.JFrameOperator;
 
@@ -18,19 +18,18 @@ import org.netbeans.jemmy.operators.JFrameOperator;
  *
  * @author Bob Jacobsen Copyright 2009, 2010
  */
+@DisabledIfHeadless
 public class TurnoutIconWindowTest {
 
     @Test
-    public void testPanelEditor() throws Exception {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+    public void testPanelEditor() throws Positionable.DuplicateIdException {
+
         jmri.jmrit.display.panelEditor.PanelEditor panel
                 = new jmri.jmrit.display.panelEditor.PanelEditor("TurnoutIconWindowTest.testPanelEditor");
 
-        panel.getTargetPanel();
-
         TurnoutIcon icon = new TurnoutIcon(panel);
         Turnout sn = jmri.InstanceManager.turnoutManagerInstance().provideTurnout("IT1");
-        icon.setTurnout(new NamedBeanHandle<Turnout>("IT1", sn));
+        icon.setTurnout(new NamedBeanHandle<>("IT1", sn));
 
         icon.setDisplayLevel(Editor.TURNOUTS);
 
@@ -50,7 +49,7 @@ public class TurnoutIconWindowTest {
         panel.putItem(icon);
         panel.setVisible(true);
 
-        Assert.assertEquals("initial state", Turnout.UNKNOWN, sn.getState());
+        assertEquals( Turnout.UNKNOWN, sn.getState(), "initial state");
 
         // Click icon change state to Active
         JComponentOperator co = new JComponentOperator(panel.getTargetPanel());
@@ -78,15 +77,15 @@ public class TurnoutIconWindowTest {
         // close the panel target frame.
         EditorFrameOperator to = new EditorFrameOperator(panel.getTargetFrame());
         to.closeFrameWithConfirmations();
+        JUnitUtil.dispose(panel);
+        EditorFrameOperator.clearEditorFrameOperatorThreads();
     }
 
     @Test
-    public void testLayoutEditor() throws Exception {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+    public void testLayoutEditor() throws Positionable.DuplicateIdException {
+
         jmri.jmrit.display.layoutEditor.LayoutEditor panel
                 = new jmri.jmrit.display.layoutEditor.LayoutEditor("TurnoutIconWindowTest.testLayoutEditor");
-
-        panel.getTargetPanel();
 
         TurnoutIcon icon = new TurnoutIcon(panel);
         icon.setDisplayLevel(Editor.TURNOUTS);
@@ -110,7 +109,7 @@ public class TurnoutIconWindowTest {
         panel.putItem(icon);
         panel.setVisible(true);
 
-        Assert.assertEquals("initial state", Turnout.UNKNOWN, sn.getState());
+        assertEquals( Turnout.UNKNOWN, sn.getState(), "initial state");
 
         // Click icon change state to Active
         JComponentOperator co = new JComponentOperator(panel.getTargetPanel());
@@ -136,21 +135,21 @@ public class TurnoutIconWindowTest {
         // close the panel editor frame
         EditorFrameOperator to = new EditorFrameOperator(panel);
         to.closeFrameWithConfirmations();
+        JUnitUtil.dispose(panel);
+        EditorFrameOperator.clearEditorFrameOperatorThreads();
     }
 
     @BeforeEach
-    public void setUp() throws Exception {
+    public void setUp() {
         JUnitUtil.setUp();
-        jmri.util.JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initInternalSensorManager();
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
-        JUnitUtil.resetWindows(false,false);
+    public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 }

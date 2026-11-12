@@ -8,14 +8,13 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Locale;
 
 import org.eclipse.jetty.util.resource.EmptyResource;
 import org.eclipse.jetty.util.resource.PathResource;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 /**
  *
@@ -24,7 +23,7 @@ import org.junit.jupiter.api.Test;
  */
 public class DirectoryResourceTest {
 
-    DirectoryResource instance;
+    DirectoryResource instance = null;
 
     @Test
     public void testCTor() throws IOException {
@@ -34,6 +33,7 @@ public class DirectoryResourceTest {
     @Test
     public void testGetListHTML() throws IOException {
         // test File that is directory resource
+        Assertions.assertNotNull(instance);
         assertThat(instance.getListHTML(null, false, "")).isNull();
         assertThat(instance.getListHTML("", false, "")).isNotNull();
         // test File that is not directory resource
@@ -46,7 +46,7 @@ public class DirectoryResourceTest {
     }
 
     @Test
-    public void testHrefEncodeURI() throws Exception {
+    public void testHrefEncodeURI() throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         Method method = DirectoryResource.class.getDeclaredMethod("hrefEncodeURI", String.class);
         method.setAccessible(true);
         assertThat(method.invoke(instance, "foobar")).isEqualTo("foobar");

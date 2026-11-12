@@ -2,14 +2,17 @@ package jmri.jmrix.dccpp;
 
 import static jmri.jmrix.dccpp.DCCppConstants.MAX_TURNOUT_ADDRESS;
 
+import java.util.ArrayDeque;
 import java.util.Locale;
+import java.util.Queue;
+
 import javax.annotation.Nonnull;
 import jmri.Turnout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implement TurnoutManager for DCC++ systems.
+ * Implement TurnoutManager for DCC-EX systems.
  * <p>
  * System names are "DxppTnnn", where Dx is the system prefix and nnn is the turnout number without padding.
  *
@@ -20,10 +23,11 @@ import org.slf4j.LoggerFactory;
 public class DCCppTurnoutManager extends jmri.managers.AbstractTurnoutManager implements DCCppListener {
 
     protected DCCppTrafficController tc = null;
+    private final Queue<Integer> _pendingTurnoutIds = new ArrayDeque<>();
 
     /**
-     * Create a new DCC++ TurnoutManager.
-     * Has to register for DCC++ events.
+     * Create a new DCC-EX TurnoutManager.
+     * Has to register for DCC-EX events.
      *
      * @param memo the supporting system connection memo
      */
@@ -36,6 +40,8 @@ public class DCCppTurnoutManager extends jmri.managers.AbstractTurnoutManager im
         tc.sendDCCppMessage(DCCppMessage.makeTurnoutListMsg(), this);
         // request list of outputs
         tc.sendDCCppMessage(DCCppMessage.makeOutputListMsg(), this);
+        // request list of Turnout IDs
+        tc.sendDCCppMessage(DCCppMessage.makeTurnoutIDsMsg(), this);
     }
 
     /**
@@ -85,18 +91,19 @@ public class DCCppTurnoutManager extends jmri.managers.AbstractTurnoutManager im
                 String s = getSystemNamePrefix() + addr;
                 DCCppTurnout found = (DCCppTurnout) getBySystemName(s);
                 if ( found == null) {
-                    // need to create a new one, and send the message on 
-                    // to the newly created object.
-                    ((DCCppTurnout) provideTurnout(s)).setFeedbackMode(Turnout.MONITORING);
-                    ((DCCppTurnout) provideTurnout(s)).initmessage(l);
+                    // need to create a new one, set some attributes, 
+                    //  and send the message on to the newly created object.
+                    DCCppTurnout t = (DCCppTurnout) provideTurnout(s);
+                    t.setFeedbackMode(Turnout.MONITORING);
+                    t.initmessage(l);
                 } else {
                     // The turnout exists, forward this message to the 
                     // turnout
                     found.message(l);
                 }
             }
-        } else if (l.isOutputCmdReply()) {
-            log.debug("received Output Cmd Reply message: '{}'", l);
+        } else if (l.isOutputReply()) {
+            log.debug("received Output Reply message: '{}'", l);
             // parse message type
             int addr = l.getOutputNumInt();
             if (addr >= 0) {
@@ -110,17 +117,56 @@ public class DCCppTurnoutManager extends jmri.managers.AbstractTurnoutManager im
                 if (found == null) {
                     // need to create a new one, and send the message on 
                     // to the newly created object.
-                    ((DCCppTurnout) provideTurnout(s)).setFeedbackMode(Turnout.EXACT);
-                    ((DCCppTurnout) provideTurnout(s)).initmessage(l);
+                    DCCppTurnout t = (DCCppTurnout) provideTurnout(s);
+                    t.setFeedbackMode(Turnout.EXACT);
+                    t.initmessage(l);
                 } else {
                     // The turnout exists, forward this message to the 
                     // turnout
                     found.message(l);
                 }
             }
+        } else if (l.isTurnoutIDsReply()) {
+            log.debug("received Turnout ID List message: '{}'", l);
+            for (Integer id : l.getTurnoutIDList()) {
+                if (!_pendingTurnoutIds.contains(id)) {
+                    _pendingTurnoutIds.add(id);
+                }
+            }
+            requestNextTurnoutDetail();
+        } else if (l.isTurnoutIDReply()) {
+            log.debug("received Turnout ID Detail message: '{}'", l);
+            // parse message type
+            int addr = l.getTOIDInt();
+            if (addr >= 0) {
+                log.debug("message has address: {}", addr);
+                String s = getSystemNamePrefix() + addr;
+                DCCppTurnout found = (DCCppTurnout) getBySystemName(s);
+                if ( found == null) { //create new turnout
+                    DCCppTurnout t = (DCCppTurnout) provideTurnout(s);
+                    t.setFeedbackMode(Turnout.MONITORING);
+                    if (!l.getTurnoutDescString().isEmpty()) {
+                        t.setUserName(l.getTurnoutDescString()); //add username if available
+                    }
+                    t.initmessage(l); //forward message to turnout
+                } else { // The turnout already exists                    
+                    if (!l.getTurnoutDescString().isEmpty() && found.getUserName()==null) {
+                        found.setUserName(l.getTurnoutDescString()); //set userName if needed and available
+                    }
+                    found.message(l); //forward message to turnout
+                }
+            }
+            requestNextTurnoutDetail();
         }
     }
-    
+
+    private void requestNextTurnoutDetail() {
+        Integer id = _pendingTurnoutIds.poll();
+        if (id != null) {
+            tc.sendDCCppMessage(DCCppMessage.makeTurnoutIDMsg(id), this);
+        }
+    }
+
     /**
      * Get text to be used for the Turnout.CLOSED state in user communication.
      * Allows text other than "CLOSED" to be use with certain hardware system to
@@ -205,6 +251,6 @@ public class DCCppTurnoutManager extends jmri.managers.AbstractTurnoutManager im
         return Bundle.getMessage("AddOutputEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppTurnoutManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppTurnoutManager.class);
 
 }

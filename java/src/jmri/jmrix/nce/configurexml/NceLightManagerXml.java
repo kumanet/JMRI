@@ -1,8 +1,6 @@
 package jmri.jmrix.nce.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring NceLightManagers.
@@ -29,5 +27,5 @@ public class NceLightManagerXml extends jmri.managers.configurexml.AbstractLight
         return loadLights(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(NceLightManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(NceLightManagerXml.class);
 }

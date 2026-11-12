@@ -77,21 +77,21 @@ public class GraphPane extends JPanel implements Printable {
         _grid = b;
     }
 
-    int units = Speed.MPH;
+    Speed.Unit unit = Speed.Unit.MPH;
 //    String unitString = "Speed (MPH)";
 
     void setUnitsMph() {
-        units = Speed.MPH;
+        unit = Speed.Unit.MPH;
         setYLabel(Bundle.getMessage("SpeedMPH"));
     }
 
     void setUnitsKph() {
-        units = Speed.KPH;
+         unit = Speed.Unit.KPH;
         setYLabel(Bundle.getMessage("SpeedKPH"));
     }
 
-    public int getUnits() {
-        return units;
+    public Speed.Unit getUnits() {
+        return unit;
     }
 
     @Override
@@ -160,12 +160,11 @@ public class GraphPane extends JPanel implements Printable {
         float yInc = scale;
         int yMod = 10;
         int gridMod = 2;
-        if (units == Speed.MPH) {
+        if (unit == Speed.Unit.MPH) {
             // need inverse transform here
             yInc = Speed.mphToKph(yInc);
         }
-        if ((units == Speed.KPH) && (maxSpeed > 100)
-                || (units == Speed.MPH) && (maxSpeed > 160)) {
+        if ((unit == Speed.Unit.KPH) && (maxSpeed > 100) || (unit == Speed.Unit.MPH) && (maxSpeed > 160)) {
             log.debug("Adjusting Y axis spacing for max speed");
             yMod *= 2;
             gridMod *= 2;
@@ -269,7 +268,7 @@ public class GraphPane extends JPanel implements Printable {
         if (!(g instanceof Graphics2D) ) {
               throw new IllegalArgumentException("Graphics object passed is not the correct type");
         }
-           
+
         Graphics2D g2 = (Graphics2D) g;
         /* User (0,0) is typically outside the imageable area, so we must
          * translate by the X and Y values in the PageFormat to avoid clipping.
@@ -306,10 +305,10 @@ public class GraphPane extends JPanel implements Printable {
             try {
                 job.print();
             } catch (PrinterException ex) {
-                log.error("Exception whilst printing profile {}", ex);
+                log.error("Exception whilst printing profile", ex);
             }
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(GraphPane.class);
+    private static final Logger log = LoggerFactory.getLogger(GraphPane.class);
 }

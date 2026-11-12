@@ -1,8 +1,5 @@
 package jmri.jmrit.logixng.implementation;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyVetoException;
 import java.util.*;
 
 import javax.annotation.Nonnull;
@@ -84,10 +81,10 @@ public class DefaultMaleAnalogExpressionSocket extends AbstractMaleSocket implem
             }
         } catch (RuntimeException e) {
             handleError(this, Bundle.getMessage("ExceptionEvaluate", e.getLocalizedMessage()), e, log);
+        } finally {
+            conditionalNG.getStack().setCount(currentStackPos);
+            conditionalNG.getSymbolTable().removeSymbols(_localVariables);
         }
-        
-        conditionalNG.getStack().setCount(currentStackPos);
-        conditionalNG.getSymbolTable().removeSymbols(_localVariables);
         
         return result;
     }
@@ -112,7 +109,7 @@ public class DefaultMaleAnalogExpressionSocket extends AbstractMaleSocket implem
      */
     @Override
     public void registerListenersForThisClass() {
-        ((AnalogExpressionBean)getObject()).registerListeners();
+        getObject().registerListeners();
     }
     
     /**
@@ -120,7 +117,7 @@ public class DefaultMaleAnalogExpressionSocket extends AbstractMaleSocket implem
      */
     @Override
     public void unregisterListenersForThisClass() {
-        ((AnalogExpressionBean)getObject()).unregisterListeners();
+        getObject().unregisterListeners();
     }
     
     @Override
@@ -235,6 +232,6 @@ public class DefaultMaleAnalogExpressionSocket extends AbstractMaleSocket implem
         
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleAnalogExpressionSocket.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleAnalogExpressionSocket.class);
 
 }

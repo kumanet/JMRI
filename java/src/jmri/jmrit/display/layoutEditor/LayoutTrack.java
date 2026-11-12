@@ -11,7 +11,7 @@ import jmri.Turnout;
  * Abstract base class for all layout track objects (PositionablePoint,
  * TrackSegment, LayoutTurnout, LayoutSlip, LevelXing and LayoutTurntable)
  * <p>
- * This is the connectivity/topology information for the layout; the 
+ * This is the connectivity/topology information for the layout; the
  * display information, including screen geometry, is held in {@link LayoutTrackView} subclasses.
  * <ul>
  *   <li>One or more connections, consisting of a LayoutTrack name and {@link HitPointType}
@@ -31,8 +31,8 @@ import jmri.Turnout;
  */
 abstract public class LayoutTrack {
 
-    // final protected LayoutModels models;  // preferred
-    final protected LayoutEditor models; // temporary type
+    // protected final LayoutModels models;  // preferred
+    protected final LayoutEditor models; // temporary type
 
     /**
      * Constructor method.
@@ -49,24 +49,30 @@ abstract public class LayoutTrack {
      * Get the track ID.
      * @return track ident.
      */
-    @Nonnull 
-    final public String getId() {
+    @Nonnull
+    public final String getId() {
         return ident;
     }
 
-    @Nonnull 
-    final public String getName() {
+    @Nonnull
+    public final String getName() {
         return ident;
     }
+
+    /**
+     * Get the type of this item.
+     * @return the type
+     */
+    public abstract String getTypeName();
 
     private String ident = "";
 
-    final protected void setIdent(@Nonnull String ident) {
+    protected final void setIdent(@Nonnull String ident) {
         this.ident = ident;
     }
-    
+
     abstract public boolean isMainline();
- 
+
     /*
     * non-accessor methods
      */
@@ -76,7 +82,7 @@ abstract public class LayoutTrack {
      * @param turnoutState of the turnout
      * @return the turnout state string
      */
-    final public String getTurnoutStateString(int turnoutState) {
+    public final String getTurnoutStateString(int turnoutState) {
         String result = "";
         if (turnoutState == Turnout.CLOSED) {
             result = Bundle.getMessage("TurnoutStateClosed");
@@ -219,5 +225,5 @@ abstract public class LayoutTrack {
      */
     abstract public void setAllLayoutBlocks(LayoutBlock layoutBlock);
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTrack.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTrack.class);
 }

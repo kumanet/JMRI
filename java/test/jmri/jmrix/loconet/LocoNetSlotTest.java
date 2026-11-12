@@ -1,5 +1,7 @@
 package jmri.jmrix.loconet;
 
+import jmri.jmrix.loconet.SlotMapEntry.SlotType;
+import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
@@ -35,6 +37,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertNotNull("exists", t);
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -296,6 +299,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("decoder type", LnConstants.DEC_MODE_128, t.decoderType());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -305,6 +309,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("Slot Status", LnConstants.LOCO_IN_USE, t.slotStatus());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -314,6 +319,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("Slot Status", 0x00, t.ss2());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -323,6 +329,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("Consist Status", LnConstants.CONSIST_NO, t.consistStatus());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -332,6 +339,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertTrue("is Forward", t.isForward());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -341,6 +349,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F0", t.isF0());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -350,6 +359,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F1", t.isF1());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -359,6 +369,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F2", t.isF2());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -368,6 +379,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F3", t.isF3());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -377,6 +389,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F4", t.isF4());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -386,6 +399,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F5", t.isF5());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -395,6 +409,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F6", t.isF6());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -404,6 +419,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F7", t.isF7());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -413,6 +429,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F8", t.isF8());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -422,6 +439,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F9", t.isF9());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -431,6 +449,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F10", t.isF10());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -440,6 +459,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F11", t.isF11());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -449,6 +469,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F12", t.isF12());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -458,6 +479,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F13", t.isF13());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -467,6 +489,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F14", t.isF14());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -476,6 +499,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F15", t.isF15());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -485,6 +509,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F16", t.isF16());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -494,6 +519,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F17", t.isF17());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -503,6 +529,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F18", t.isF18());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -512,6 +539,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F19", t.isF19());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -521,6 +549,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F20", t.isF20());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -530,6 +559,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F21", t.isF21());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -539,6 +569,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F22", t.isF22());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -548,6 +579,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F23", t.isF23());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -557,6 +589,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F24", t.isF24());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -566,6 +599,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F25", t.isF25());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -575,6 +609,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F26", t.isF26());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -584,6 +619,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F27", t.isF27());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -593,6 +629,20 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertFalse("is F28", t.isF28());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
+    }
+
+    @Test
+    public void testIbIsF28() throws LocoNetException {
+        int ia[] = {0xD4, 0x20, 0x01, 0x05, 0x40, 0x4F};
+        LocoNetMessage lm = new LocoNetMessage(ia);
+        // you can nolonger set up a slot from anything other than a slot message
+        // as you have to know the protocol.
+        // LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
+        LocoNetSlot t = new LocoNetSlot(2);
+        t.setSlotType(SlotType.LOCO);
+        t.setSlot(lm);
+        Assert.assertTrue("is F28", t.isF28());
     }
 
     @Test
@@ -602,6 +652,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("address", 5544, t.locoAddr());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -611,6 +662,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("speed", 0, t.speed());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -620,6 +672,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("directions and Functions", 0x00, t.dirf());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -629,6 +682,7 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("snd", 0x00, t.snd());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -638,11 +692,12 @@ public class LocoNetSlotTest {
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
         Assert.assertEquals("ID", 0x00, t.id());
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
     }
 
     @Test
     public void testWriteSlot() throws LocoNetException {
-        int ia[] = {0xE7, 0x0E, 0x01, 0x33, 0x28, 0x00, 0x00, 0x47,
+        int ia[] = {0xE7, 0x0E, 0x01, 0x33, 0x28, 0x00, 0x00, 0x07,
             0x00, 0x2B, 0x00, 0x00, 0x00, 0x60};
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
@@ -651,11 +706,26 @@ public class LocoNetSlotTest {
         for (int i = 1; i <= 12; i++) {
             Assert.assertEquals("Element " + i, lm.getElement(i), lm2.getElement(i));
         }
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
+    }
+
+    @Test
+    public void testExpWriteSlot() throws LocoNetException {
+        int ia[] = {0xE6, 0x15, 0x01, 0x00, 0x03, 0x00, 0x02, 0x47,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        LocoNetMessage lm = new LocoNetMessage(ia);
+        LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
+        LocoNetMessage lm2 = t.writeSlot();
+        Assert.assertEquals("Opcode", LnConstants.OPC_EXP_WR_SL_DATA, lm2.getOpCode());
+        for (int i = 1; i <= 19; i++) {
+            Assert.assertEquals("Element " + i, lm.getElement(i), lm2.getElement(i));
+        }
+        JUnitAppender.assertWarnMessage("Slot [128] not in map but reports loco, check command station type");
     }
 
     @Test
     public void testWriteThrottleID() throws LocoNetException {
-        int ia[] = {0xE7, 0x0E, 0x01, 0x33, 0x28, 0x00, 0x00, 0x47,
+        int ia[] = {0xE7, 0x0E, 0x01, 0x33, 0x28, 0x00, 0x00, 0x07,
             0x00, 0x2B, 0x00, 0x00, 0x00, 0x60};
         LocoNetMessage lm = new LocoNetMessage(ia);
         LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
@@ -666,6 +736,23 @@ public class LocoNetSlotTest {
         }
         Assert.assertEquals("Element 11", 0x71, lm2.getElement(11));
         Assert.assertEquals("Element 12", 0x02, lm2.getElement(12));
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
+    }
+
+    @Test
+    public void testExpWriteThrottleID() throws LocoNetException {
+        int ia[]={0xE6, 0x15, 0x01, 0x02, 0x03, 0x00, 0x02, 0x47,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x4C, 0x49 };
+        LocoNetMessage lm =new LocoNetMessage(ia);
+        LocoNetSlot t = new LocoNetSlot(new LocoNetMessage(lm));
+        LocoNetMessage lm2 = t.writeThrottleID(0x0171);
+        Assert.assertEquals("Opcode",LnConstants.OPC_EXP_WR_SL_DATA,lm2.getOpCode());
+        for(int i = 1;i<=17;i++){
+            Assert.assertEquals("Element " + i,lm.getElement(i),lm2.getElement(i));
+        }
+        Assert.assertEquals("Element 18",0x71,lm2.getElement(18));
+        Assert.assertEquals("Element 19",0x02,lm2.getElement(19));
+        JUnitAppender.assertWarnMessage("Slot [130] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -765,8 +852,118 @@ public class LocoNetSlotTest {
         id[2] = 0x3F;
         lm = new LocoNetMessage(id);
         t.setSlot(lm);
-        Assert.assertEquals("Change F0, F4-F1, for consist-top slot", 0x3F, t.dirf());
+        Assert.assertEquals("Change F0, F4-F1, for consist-sub slot", 0x3F, t.dirf());
 
+        JUnitAppender.assertWarnMessage("Slot [1] not in map but reports loco, check command station type");
+    }
+
+    @Test
+    public void testExpConsistingStateVsSpeedAccept() throws LocoNetException {
+        int ia[]={0xE6, 0x15, 0x01, 0x02, 0x33, 0x28, 0x2B, 0x47,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1D, 0x43, 0x49 };
+        LocoNetMessage lm =new LocoNetMessage(ia);
+        LocoNetSlot t = new LocoNetSlot(lm);
+        Assert.assertEquals("Consist-mode is unconsisted", LnConstants.CONSIST_NO, t.consistStatus());
+        Assert.assertEquals("Speed Set from slot read",0, t.speed());
+        int ib[] = {0xD5, 0x01, 0x02, 0x1C, 14, 0x30};  // set speed 14 using wrong throttle ID.
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("Ignore speed from wrong throttle ID",0, t.speed());
+        ib[3] = 0x1D;  // set speed 14 for correct throttle ID
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("Speed Set for Unconsisted slot",14, t.speed());
+        int id[] = {0xD5, 0x11, 0x02, 0x1C, 0x02, 0x23};  //function 2 on
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Ignore Function 2 set for Unconsisted slot from wrong throttle",0, t.dirf());
+        id[3] = 0x1D;  //function 2 on for correct throttle id
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Function 2 set for Unconsisted slot",2, t.dirf());
+        id[4] = 0x01; // modify message to F2 off F1 on
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("F1 ON for unconsisted slot", 0x01, t.dirf());
+        ib[1] = 0x09;    // set speed/dir reverse
+        ib[4] = 64;      // set speed 64
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("Direction Reverse and F1 ON for unconsisted slot", 0x21, t.dirf());
+        Assert.assertEquals("Speed Set for Unconsisted slot in reverse",64, t.speed());
+
+        // Start of Top
+        // set up slot 130, loco 5544, fwd 12, f2 on, top consist
+        int ic[] = {0xE6, 0x15, 0x01, 0x03, 0x3B, 0x28, 0x2B, 0x47,
+                0x0C, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1D, 0x42, 0x34};
+        lm = new LocoNetMessage(ic);
+        t.setSlot(lm);
+        Assert.assertEquals("Consist-mode is consist-top", LnConstants.CONSIST_TOP, t.consistStatus());
+        Assert.assertEquals("Speed Set for consist-top from slot read",12, t.speed());
+        Assert.assertEquals("OPC_LOCO_SPD from slot read for consist-top",2, t.dirf());
+        ib[1] = 0x01;    // set speed/dir fwd
+        ib[4] = 3;      // set speed 3
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("OPC_LOCO_SPD accepted for consist-top",3, t.speed());
+        id[4] = 0x07;
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Function F1-F3 set for consist-top slot",7, t.dirf());
+        ib[1] = 0x09;    // set speed/dir rev
+        ib[4] = 18;       // set speed 18
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        id[4] = 0x05;    // F1 & F3 ON
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Direction Rev and F1 & F3 for consist-top slot", 0x25, t.dirf());
+
+        //Start of Mid Consist
+        ic[4] = 0x4b;   // make slot consist_mid, common
+        lm = new LocoNetMessage(ic); // also resets functions, speed etc
+        t.setSlot(lm);
+        Assert.assertEquals("Consist-mode is consist-mid", LnConstants.CONSIST_MID, t.consistStatus());
+        Assert.assertEquals("'Speed' (slot pointer) set for consist-mid from slot read",12, t.speed());
+        ib[4] = 50;      // speed 50
+        ib[2] = 0x09;    // Direction fwd
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("Speed ignored when consist-mid",12, t.speed());
+        Assert.assertEquals("Direction ignored for consist-mid slot", 0x02, t.dirf());
+        id[4] = 0x13; // F0,F1, F2 on
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Function F0, F2, F1 set for consist-mid slot",19, t.dirf());
+        id[4] = 0x07;  //F1 F2 F3 on
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Function F0 OFF, F3 OFF but NOT direction for consist-mid slot", 0x07, t.dirf());
+
+        // Start of Sub Consist
+        ic[4] = 0x43;   // make slot consist_sub, common
+        ic[10] = 0x28;   // DIRF: reverse, F4 on
+        lm = new LocoNetMessage(ic);
+        t.setSlot(lm);   // resets everything else
+        Assert.assertEquals("Consist-mode is consist-sub", LnConstants.CONSIST_SUB, t.consistStatus());
+        Assert.assertEquals("'Speed' (slot pointer) set for consist-sub from slot read",12, t.speed());
+        Assert.assertEquals("DIRF for consist-sub from slot read", 0x28, t.dirf());
+        ib[4] = 50;      // speed 50
+        ib[2] = 0x09;    // Direction fwd
+        lm = new LocoNetMessage(ib);
+        t.setSlot(lm);
+        Assert.assertEquals("Speed ignored when consist-sub",12, t.speed());
+        Assert.assertEquals("Direction ignored for consist-sub slot", 0x28, t.dirf());
+        id[4] = 0x1f;
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Functions F0, F4-F1 set but not direction for consist-sub slot",63, t.dirf());
+        id[4] = 0x02;
+        lm = new LocoNetMessage(id);
+        t.setSlot(lm);
+        Assert.assertEquals("Change F0, F4-F3, F1 for consist-sub slot", 0x22, t.dirf());
+
+        JUnitAppender.assertWarnMessage("Slot [130] not in map but reports loco, check command station type");
     }
 
     @Test
@@ -868,6 +1065,127 @@ public class LocoNetSlotTest {
     }
 
     @Test
+    public void checkExpFunctionMessage()  throws LocoNetException {
+        LocoNetSlot s = new LocoNetSlot(130); //will have default throttle id = 0
+        Assert.assertEquals("initial slot function value - F0", false, s.isF0());
+        Assert.assertEquals("initial slot function value - F1", false, s.isF1());
+        Assert.assertEquals("initial slot function value - F2", false, s.isF2());
+        Assert.assertEquals("initial slot function value - F3", false, s.isF3());
+        Assert.assertEquals("initial slot function value - F4", false, s.isF4());
+        Assert.assertEquals("initial slot function value - F5", false, s.isF5());
+        Assert.assertEquals("initial slot function value - F6", false, s.isF6());
+        Assert.assertEquals("initial slot function value - F7", false, s.isF7());
+        Assert.assertEquals("initial slot function value - F8", false, s.isF8());
+        Assert.assertEquals("initial slot function value - F9", false, s.isF9());
+        Assert.assertEquals("initial slot function value - F10", false, s.isF10());
+        Assert.assertEquals("initial slot function value - F11", false, s.isF11());
+        Assert.assertEquals("initial slot function value - F12", false, s.isF12());
+        Assert.assertEquals("initial slot function value - F13", false, s.isF13());
+        Assert.assertEquals("initial slot function value - F14", false, s.isF14());
+        Assert.assertEquals("initial slot function value - F15", false, s.isF15());
+        Assert.assertEquals("initial slot function value - F16", false, s.isF16());
+        Assert.assertEquals("initial slot function value - F17", false, s.isF17());
+        Assert.assertEquals("initial slot function value - F18", false, s.isF18());
+        Assert.assertEquals("initial slot function value - F19", false, s.isF19());
+        Assert.assertEquals("initial slot function value - F20", false, s.isF20());
+        Assert.assertEquals("initial slot function value - F21", false, s.isF21());
+        Assert.assertEquals("initial slot function value - F22", false, s.isF22());
+        Assert.assertEquals("initial slot function value - F23", false, s.isF23());
+        Assert.assertEquals("initial slot function value - F24", false, s.isF24());
+        Assert.assertEquals("initial slot function value - F25", false, s.isF25());
+        Assert.assertEquals("initial slot function value - F26", false, s.isF26());
+        Assert.assertEquals("initial slot function value - F27", false, s.isF27());
+        Assert.assertEquals("initial slot function value - F28", false, s.isF28());
+        int funcF0F06[] = {0xD5, 0x11, 0x02, 0x00, 0x10, 0x21}; // F0 On
+        LocoNetMessage lM = new LocoNetMessage(funcF0F06);
+        s.setSlot(lM);
+        Assert.assertEquals("initial slot function value - F0", true, s.isF0());
+        funcF0F06[4] =  0x5A; // ON F0,2,4, 6
+        lM = new LocoNetMessage(funcF0F06);
+        s.setSlot(lM);
+        Assert.assertEquals("F0 Now", true, s.isF0());
+        Assert.assertEquals("F1 Now", false, s.isF1());
+        Assert.assertEquals("F2 Now", true, s.isF2());
+        Assert.assertEquals("F3 Now", false, s.isF3());
+        Assert.assertEquals("F4 Now", true, s.isF4());
+        Assert.assertEquals("F5 Now", false, s.isF5());
+        Assert.assertEquals("F6 Now", true, s.isF6());
+        funcF0F06[4] =  0x25; // ON F1,3,5
+        lM = new LocoNetMessage(funcF0F06);
+        s.setSlot(lM);
+        Assert.assertEquals("F0 Now", false, s.isF0());
+        Assert.assertEquals("F1 Now", true, s.isF1());
+        Assert.assertEquals("F2 Now", false, s.isF2());
+        Assert.assertEquals("F3 Now", true, s.isF3());
+        Assert.assertEquals("F4 Now", false, s.isF4());
+        Assert.assertEquals("F5 Now", true, s.isF5());
+        Assert.assertEquals("F6 Now", false, s.isF6());
+        int funcF7F13[] = {0xD5, 0x19, 0x03, 0x00, 0x55, 0x21}; // F7,9,11,13 ON
+        lM = new LocoNetMessage(funcF7F13);
+        s.setSlot(lM);
+        Assert.assertEquals("F7 Now", true, s.isF7());
+        Assert.assertEquals("F8 Now", false, s.isF8());
+        Assert.assertEquals("F9 Now", true, s.isF9());
+        Assert.assertEquals("F10 Now", false, s.isF10());
+        Assert.assertEquals("F11 Now", true, s.isF11());
+        Assert.assertEquals("F12 Now", false, s.isF12());
+        Assert.assertEquals("F13 Now", true, s.isF13());
+        funcF7F13[4] =  0x2A; // ON F1,3,5
+        lM = new LocoNetMessage(funcF7F13);
+        s.setSlot(lM);
+        Assert.assertEquals("F7 Now", false, s.isF7());
+        Assert.assertEquals("F8 Now", true, s.isF8());
+        Assert.assertEquals("F9 Now", false, s.isF9());
+        Assert.assertEquals("F10 Now", true, s.isF10());
+        Assert.assertEquals("F11 Now", false, s.isF11());
+        Assert.assertEquals("F12 Now", true, s.isF12());
+        Assert.assertEquals("F13 Now", false, s.isF13());
+        int funcF14F20[] = {0xD5, 0x21, 0x03, 0x00, 0x55, 0x21}; // F7,9,11,13 ON
+        lM = new LocoNetMessage(funcF14F20);
+        s.setSlot(lM);
+        Assert.assertEquals("F14 Now", true, s.isF14());
+        Assert.assertEquals("F15 Now", false, s.isF15());
+        Assert.assertEquals("F16 Now", true, s.isF16());
+        Assert.assertEquals("F17 Now", false, s.isF17());
+        Assert.assertEquals("F18 Now", true, s.isF18());
+        Assert.assertEquals("F19 Now", false, s.isF19());
+        Assert.assertEquals("F20 Now", true, s.isF20());
+        funcF14F20[4] =  0x2A; // ON F1,3,5
+        lM = new LocoNetMessage(funcF14F20);
+        s.setSlot(lM);
+        Assert.assertEquals("F14 Now", false, s.isF14());
+        Assert.assertEquals("F15 Now", true, s.isF15());
+        Assert.assertEquals("F16 Now", false, s.isF16());
+        Assert.assertEquals("F17 Now", true, s.isF17());
+        Assert.assertEquals("F18 Now", false, s.isF18());
+        Assert.assertEquals("F19 Now", true, s.isF19());
+        Assert.assertEquals("F20 Now", false, s.isF20());
+        int funcF2128[] = {0xD5, 0x29, 0x03, 0x00, 0x55, 0x21}; // F7,9,11,13 ON
+        lM = new LocoNetMessage(funcF2128);
+        s.setSlot(lM);
+        Assert.assertEquals("F21 Now", true, s.isF21());
+        Assert.assertEquals("F22 Now", false, s.isF22());
+        Assert.assertEquals("F23 Now", true, s.isF23());
+        Assert.assertEquals("F24 Now", false, s.isF24());
+        Assert.assertEquals("F25 Now", true, s.isF25());
+        Assert.assertEquals("F26 Now", false, s.isF26());
+        Assert.assertEquals("F27 Now", true, s.isF27());
+        Assert.assertEquals("F28 Now", false, s.isF28());
+        funcF2128[1] =  0x31; // ON F1,3,5
+        funcF2128[4] =  0x2A; // ON F1,3,5
+        lM = new LocoNetMessage(funcF2128);
+        s.setSlot(lM);
+        Assert.assertEquals("F21 Now", false, s.isF21());
+        Assert.assertEquals("F22 Now", true, s.isF22());
+        Assert.assertEquals("F23 Now", false, s.isF23());
+        Assert.assertEquals("F24 Now", true, s.isF24());
+        Assert.assertEquals("F25 Now", false, s.isF25());
+        Assert.assertEquals("F26 Now", true, s.isF26());
+        Assert.assertEquals("F27 Now", false, s.isF27());
+        Assert.assertEquals("F28 Now", true, s.isF28());
+    }
+
+    @Test
     public void checkFastClockGetSetMethods() {
         LocoNetSlot s = new LocoNetSlot(15);
         s.setFcFracMins(12);
@@ -893,7 +1211,7 @@ public class LocoNetSlotTest {
         jmri.util.JUnitAppender.assertErrorMessage("getFcRate invalid for slot 15");
 
         s = new LocoNetSlot(123);
-        Assert.assertEquals("FcFracMins initial value", 0x3FFF, s.getFcFracMins());
+        Assert.assertEquals("FcFracMins initial value", 0x0, s.getFcFracMins());
         Assert.assertEquals("FcMinutes initial value", 53, s.getFcMinutes());
         Assert.assertEquals("FcHours initial value", 0, s.getFcHours());
         Assert.assertEquals("FcDays initial value", 0, s.getFcDays());

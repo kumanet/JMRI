@@ -2,7 +2,6 @@ package jmri.jmrix.sprog;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -12,9 +11,13 @@ import org.junit.jupiter.api.*;
 public class SprogConstantsTest {
 
     @Test
-    public void testCTor() {
-        SprogConstants t = new SprogConstants();
-        Assert.assertNotNull("exists",t);
+    public void testSprogConstants() {
+        Assertions.assertEquals(50, SprogConstants.PACKET_DELAY_WARN_THRESHOLD);
+    }
+
+    @Test
+    public void testCSMaxTimeoutCount() {
+        Assertions.assertEquals(3, SprogConstants.CS_MAX_TIMEOUT_COUNT);
     }
 
     @BeforeEach
@@ -27,6 +30,6 @@ public class SprogConstantsTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SprogConstantsTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SprogConstantsTest.class);
 
 }

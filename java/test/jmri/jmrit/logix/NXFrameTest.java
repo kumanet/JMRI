@@ -1,27 +1,21 @@
 package jmri.jmrit.logix;
 
-import java.awt.GraphicsEnvironment;
 import java.io.File;
-import jmri.ConfigureManager;
-import jmri.InstanceManager;
-import jmri.Sensor;
-import jmri.SensorManager;
+
+import jmri.*;
 import jmri.jmrit.display.controlPanelEditor.ControlPanelEditor;
+import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 import jmri.util.swing.JemmyUtil;
+import jmri.util.ThreadingUtil;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.netbeans.jemmy.QueueTool;
 import org.netbeans.jemmy.operators.JDialogOperator;
 import org.netbeans.jemmy.operators.JFrameOperator;
 import org.netbeans.jemmy.operators.JRadioButtonOperator;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for the NXFrame class, and its interactions with Warrants.
@@ -31,29 +25,28 @@ import static org.assertj.core.api.Assertions.catchThrowable;
  * TODO - test error conditions
  */
 @Timeout(30)
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class NXFrameTest {
 
-    OBlockManager _OBlockMgr;
-    SensorManager _sensorMgr;
+    private OBlockManager _OBlockMgr;
+    private SensorManager _sensorMgr;
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     public void testGetDefault() {
         NXFrame nxFrame = new NXFrame();
-        assertThat(nxFrame).withFailMessage("NXFrame").isNotNull();
+        assertNotNull( nxFrame, "NXFrame");
         JUnitUtil.dispose(nxFrame);
     }
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
-    public void testRoutePanel() throws Exception {
+    public void testRoutePanel() {
         NXFrame nxFrame = new NXFrame();
-        assertThat(nxFrame).withFailMessage("NXFrame").isNotNull();
+        assertNotNull( nxFrame, "NXFrame");
 
         JFrameOperator jfo = new JFrameOperator(nxFrame);
 
-        nxFrame.setVisible(true);
+        ThreadingUtil.runOnGUI( () -> nxFrame.setVisible(true));
         JemmyUtil.pressButton(jfo, Bundle.getMessage("Calculate"));
 
         JemmyUtil.confirmJOptionPane(jfo, Bundle.getMessage("WarningTitle"), Bundle.getMessage("SetEndPoint", Bundle.getMessage("OriginBlock")), "OK");
@@ -67,16 +60,16 @@ public class NXFrameTest {
         JemmyUtil.confirmJOptionPane(jfo, Bundle.getMessage("WarningTitle"), Bundle.getMessage("SetEndPoint", Bundle.getMessage("OriginBlock")), "OK");
 
         jfo.requestClose();
+        jfo.waitClosed();
     }
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
-    public void testNXWarrantSetup() throws Exception {
+    public void testNXWarrantSetup() throws JmriException {
         // load and display
         File f = new File("java/test/jmri/jmrit/logix/valid/NXWarrantTest.xml");
         InstanceManager.getDefault(ConfigureManager.class).load(f);
-        jmri.util.JUnitAppender.suppressErrorMessage("Portal elem = null");
+        JUnitAppender.suppressErrorMessage("Portal elem = null");
 
         WarrantPreferences.getDefault().setShutdown(WarrantPreferences.Shutdown.NO_MERGE);
 
@@ -131,14 +124,24 @@ public class NXFrameTest {
         nfo.requestClose();
         // we may want to use jemmy to close the panel as well.
         ControlPanelEditor panel = (ControlPanelEditor) jmri.util.JmriJFrame.getFrame("NXWarrantTest");
-        panel.dispose();    // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        Boolean retVal = ThreadingUtil.runOnGUIwithReturn(() -> {
+            panel.dispose();
+            return true;
+        });
+        assertTrue(retVal);
+
+        // close Warrant Table
+        JFrameOperator jfo = new JFrameOperator(WarrantTableFrame.getDefault());
+        JUnitUtil.dispose(jfo.getWindow());
+        jfo.waitClosed();
+
     }
 
     @Test
     @Timeout(60)
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
-    public void testNXWarrant() throws Exception {
+    public void testNXWarrant() throws JmriException {
         // The first part of this test duplicates testNXWarrantSetup().  It
         // then goes on to test a Warrant through the WarrantTableFrame.
         // it is the WarrantTableframe portion of this test that hangs.
@@ -146,7 +149,7 @@ public class NXFrameTest {
         // load and display
         File f = new File("java/test/jmri/jmrit/logix/valid/NXWarrantTest.xml");
         InstanceManager.getDefault(ConfigureManager.class).load(f);
-        jmri.util.JUnitAppender.suppressErrorMessage("Portal elem = null");
+        JUnitAppender.suppressErrorMessage("Portal elem = null");
 
         WarrantPreferences.getDefault().setShutdown(WarrantPreferences.Shutdown.NO_MERGE);
 
@@ -155,7 +158,7 @@ public class NXFrameTest {
         OBlock block = _OBlockMgr.getBySystemName("OB0");
 
         NXFrame nxFrame = new NXFrame();
-        nxFrame.setVisible(true);
+        ThreadingUtil.runOnGUI( () -> nxFrame.setVisible(true));
 
         JFrameOperator nfo = new JFrameOperator(nxFrame);
 
@@ -193,29 +196,27 @@ public class NXFrameTest {
         JemmyUtil.pressButton(nfo, Bundle.getMessage("ButtonRunNX"));
 
         WarrantTableFrame tableFrame = WarrantTableFrame.getDefault();
-        assertThat(tableFrame).withFailMessage("tableFrame").isNotNull();
+        assertNotNull( tableFrame, "tableFrame");
 
         WarrantTableModel model = tableFrame.getModel();
-        assertThat(model).withFailMessage("tableFrame model").isNotNull();
+        assertNotNull( model, "tableFrame model");
 
-        JUnitUtil.waitFor(() -> {
-            return model.getRowCount() > 1;
-        }, "NXWarrant loaded into table");
+        JUnitUtil.waitFor(() -> model.getRowCount() > 1, "NXWarrant loaded into table");
 
         Warrant warrant = tableFrame.getModel().getWarrantAt(model.getRowCount()-1);
 
-        assertThat(warrant).withFailMessage("warrant").isNotNull();
-        assertThat(warrant.getBlockOrders()).withFailMessage("warrant.getBlockOrders(").isNotNull();
-        warrant.getBlockOrders();
-        assertThat(warrant.getBlockOrders().size()).withFailMessage("Num Blocks in Route").isEqualTo(7);
-        assertThat(warrant.getThrottleCommands().size()>5).withFailMessage("Num Comands").isTrue();
+        assertNotNull( warrant, "warrant");
+        assertNotNull( warrant.getBlockOrders(), "warrant.getBlockOrders()");
+        assertEquals( 7, warrant.getBlockOrders().size(),"7 Blocks in Route");
+        assertTrue( warrant.getThrottleCommands().size()>5 , "Num Comands");
 
+        assertNotNull(block);
         String name = block.getDisplayName();
-        jmri.util.JUnitUtil.waitFor(
-            ()->{return warrant.getRunningMessage().equals(Bundle.getMessage("waitForDelayStart", warrant.getTrainName(), name));},
+        JUnitUtil.waitFor(()->{
+            return warrant.getRunningMessage().equals(Bundle.getMessage("waitForDelayStart", warrant.getTrainName(), name));},
             "Waiting message");
         Sensor sensor0 = _sensorMgr.getBySystemName("IS0");
-        assertThat(sensor0).withFailMessage("Senor IS0 not found").isNotNull();
+        assertNotNull( sensor0, "Senor IS0 not found");
 
         NXFrameTest.setAndConfirmSensorAction(sensor0, Sensor.ACTIVE, block);
 
@@ -225,46 +226,57 @@ public class NXFrameTest {
         }, "Start Block Active");
 
         JUnitUtil.waitFor(() -> {
-            return Bundle.getMessage("Halted", name, "1").equals(warrant.getRunningMessage());
+            JUnitUtil.waitFor(200);
+            return Bundle.getMessage("RampHalt", warrant.getTrainName(), testblock.getDisplayName()).equals(warrant.getRunningMessage());
         }, "Warrant processed sensor change");
 
-        assertThat(Bundle.getMessage("Halted", block.getDisplayName(), "1")).withFailMessage("Halted/Resume message").isEqualTo(warrant.getRunningMessage());
-
-        jmri.util.ThreadingUtil.runOnGUI(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             warrant.controlRunTrain(Warrant.RESUME);
         });
 
-        jmri.util.JUnitUtil.waitFor(() -> {
-            String m =  warrant.getRunningMessage();
-            return m.endsWith("Cmd #8.");
-        }, "Train starts to move at 8th command");
+        JUnitUtil.waitFor(() -> WarrantTest.atOrPastCommand(warrant, 8), "Train starts to move at 8th command");
 
         // OBlock sensor names
         String[] route = {"OB0", "OB1", "OB2", "OB3", "OB7", "OB5", "OB10"};
         block = _OBlockMgr.getOBlock("OB10");
-        // runtimes() in next line runs the train, then checks location
-        assertThat(runtimes(route, _OBlockMgr).getDisplayName()).withFailMessage("Train in last block").isEqualTo(block.getSensor().getDisplayName());
+        assertNotNull(block);
+        Sensor sb10 = block.getSensor();
+        assertNotNull(sb10);
 
-        jmri.util.ThreadingUtil.runOnGUI(() -> {
+        // runtimes() in next line runs the train, then checks location
+        assertEquals( sb10.getDisplayName(),
+            runtimes(route, _OBlockMgr).getDisplayName(), "Train in last block");
+
+        ThreadingUtil.runOnGUI(() -> {
             warrant.controlRunTrain(Warrant.ABORT);
         });
 
         // passed test - cleanup.  Do it here so failure leaves traces.
         JFrameOperator jfo = new JFrameOperator(tableFrame);
         jfo.requestClose();
+        jfo.waitClosed();
         // we may want to use jemmy to close the panel as well.
         ControlPanelEditor panel = (ControlPanelEditor) jmri.util.JmriJFrame.getFrame("NXWarrantTest");
-        panel.dispose();    // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        Boolean retVal = jmri.util.ThreadingUtil.runOnGUIwithReturn(() -> {
+            panel.dispose();
+            return true;
+        });
+        assertTrue(retVal);
+
+        // close Create eNtry/eXit Warrant
+        JUnitUtil.dispose(nxFrame);
+        jfo.waitClosed();
+
     }
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
-    public void testWarrantLoopRun() throws Exception {
+    public void testWarrantLoopRun() throws JmriException {
         // load and display
         File f = new File("java/test/jmri/jmrit/logix/valid/NXWarrantTest.xml");
         InstanceManager.getDefault(ConfigureManager.class).load(f);
-        jmri.util.JUnitAppender.suppressErrorMessage("Portal elem = null");
+        JUnitAppender.suppressErrorMessage("Portal elem = null");
 
         WarrantPreferences.getDefault().setShutdown(WarrantPreferences.Shutdown.NO_MERGE);
 
@@ -272,44 +284,55 @@ public class NXFrameTest {
         _sensorMgr = InstanceManager.getDefault(SensorManager.class);
 
         Sensor sensor3 = _sensorMgr.getBySystemName("IS3");
-        assertThat(sensor3).withFailMessage("Senor IS3 not found").isNotNull();
+        assertNotNull( sensor3, "Senor IS3 not found");
 
         NXFrameTest.setAndConfirmSensorAction(sensor3, Sensor.ACTIVE, _OBlockMgr.getBySystemName("OB3"));
 
         WarrantTableFrame tableFrame = WarrantTableFrame.getDefault();
-        assertThat(tableFrame).withFailMessage("tableFrame").isNotNull();
+        assertNotNull( tableFrame, "tableFrame");
 
         Warrant warrant = tableFrame.getModel().getWarrantAt(0);
-        assertThat(warrant).withFailMessage("warrant").isNotNull();
+        assertNotNull( warrant, "warrant");
 
         tableFrame.runTrain(warrant, Warrant.MODE_RUN);
-        jmri.util.JUnitUtil.waitFor(() -> {
-            String m =  warrant.getRunningMessage();
-            return m.endsWith("Cmd #3.");
-        }, "Train is moving at 3rd command");
+        JUnitUtil.waitFor(() -> WarrantTest.atOrPastCommand(warrant, 3), "Train is moving at 3rd command");
 
        // OBlock sensor names
         String[] route = {"OB3", "OB4", "OB5", "OB10", "OB0", "OB1", "OB2", "OB3"};
         OBlock block = _OBlockMgr.getOBlock("OB3");
+        assertNotNull(block);
+        Sensor sb3 = block.getSensor();
+        assertNotNull(sb3);
+
         // runtimes() in next line runs the train, then checks location
-        assertThat(runtimes(route, _OBlockMgr).getDisplayName()).withFailMessage("Train in last block").isEqualTo(block.getSensor().getDisplayName());
+        assertEquals( sb3.getDisplayName(),
+            runtimes(route, _OBlockMgr).getDisplayName(), "Train in last block");
 
         // passed test - cleanup.  Do it here so failure leaves traces.
+        warrant.dispose();
         JFrameOperator jfo = new JFrameOperator(tableFrame);
         jfo.requestClose();
+        jfo.waitClosed();
         // we may want to use jemmy to close the panel as well.
         ControlPanelEditor panel = (ControlPanelEditor) jmri.util.JmriJFrame.getFrame("NXWarrantTest");
-        panel.dispose();    // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        Boolean retVal = jmri.util.ThreadingUtil.runOnGUIwithReturn(() -> {
+            panel.dispose();
+            return true;
+        });
+        assertTrue(retVal);
+
+        JUnitUtil.waitThreadTerminated("Loop Killer");
+
     }
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     @DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
-    public void testWarrantRampHalt() throws Exception {
+    public void testWarrantRampHalt() throws JmriException {
         // load and display
         File f = new File("java/test/jmri/jmrit/logix/valid/NXWarrantTest.xml");
         InstanceManager.getDefault(ConfigureManager.class).load(f);
-        jmri.util.JUnitAppender.suppressErrorMessage("Portal elem = null");
+        JUnitAppender.suppressErrorMessage("Portal elem = null");
 
         WarrantPreferences.getDefault().setShutdown(WarrantPreferences.Shutdown.NO_MERGE);
 
@@ -317,15 +340,15 @@ public class NXFrameTest {
         _sensorMgr = InstanceManager.getDefault(SensorManager.class);
 
         Sensor sensor1 = _sensorMgr.getBySystemName("IS1");
-        assertThat(sensor1).withFailMessage("Senor IS1 not found").isNotNull();
+        assertNotNull( sensor1, "Senor IS1 not found");
 
         NXFrameTest.setAndConfirmSensorAction(sensor1, Sensor.ACTIVE, _OBlockMgr.getBySystemName("OB1"));
 
         WarrantTableFrame tableFrame = WarrantTableFrame.getDefault();
-        assertThat(tableFrame).withFailMessage("tableFrame").isNotNull();
+        assertNotNull( tableFrame, "tableFrame");
 
         Warrant warrant = tableFrame.getModel().getWarrantAt(1);
-        assertThat(warrant).withFailMessage("warrant").isNotNull();
+        assertNotNull( warrant, "warrant");
 
         tableFrame.runTrain(warrant, Warrant.MODE_RUN);
 
@@ -333,47 +356,63 @@ public class NXFrameTest {
         sp.setRampThrottleIncrement(0.15f);
         sp.setRampTimeIncrement(100);
 
-        jmri.util.JUnitUtil.waitFor(() -> {
-            String m =  warrant.getRunningMessage();
-            return m.endsWith("Cmd #8.");
-        }, "Train starts to move at 8th command");
+        JUnitUtil.waitFor(() -> WarrantTest.atOrPastCommand(warrant, 8), "Train starts to move at 8th command");
 
        // OBlock sensor names
         String[] route1 = {"OB1", "OB6", "OB3"};
-        OBlock block = _OBlockMgr.getOBlock("OB3");
-        // runtimes() in next line runs the train, then checks location
-        assertThat(runtimes(route1,_OBlockMgr).getDisplayName()).withFailMessage("Train in block OB3").isEqualTo(block.getSensor().getDisplayName());
+        final OBlock block3 = _OBlockMgr.getOBlock("OB3");
+        assertNotNull(block3);
+        Sensor sb3 = block3.getSensor();
+        assertNotNull(sb3);
 
-        warrant.controlRunTrain(Warrant.RAMP_HALT); // user interrupts script
+        // runtimes() in next line runs the train, then checks location
+        assertEquals( sb3.getDisplayName(),
+            runtimes(route1,_OBlockMgr).getDisplayName(), "Train in block OB3");
+
+        warrant.controlRunTrain(Warrant.HALT); // user interrupts script
         JUnitUtil.waitFor(100);     // waitEmpty(10) causes a lot of failures on Travis GUI
-//        new QueueTool().waitEmpty(10);
-        jmri.util.JUnitUtil.waitFor(() -> {
+        JUnitUtil.waitFor(() -> {
             String m =  warrant.getRunningMessage();
-            return (m.startsWith("Halted in block"));
+            return (m.equals(Bundle.getMessage("RampHalt", warrant.getTrainName(), block3.getDisplayName())));
         }, "Train Halted");
 
         warrant.controlRunTrain(Warrant.RESUME);
-        JUnitUtil.waitFor(100);     // waitEmpty(10) causes a lot of failures on Travis GUI
-//        new QueueTool().waitEmpty(10);
 
-
-        jmri.util.JUnitUtil.waitFor(() -> {
+        JUnitUtil.waitFor(() -> {
             String m =  warrant.getRunningMessage();
-            return m.startsWith("Running in Block OB3") ||
+            if ( m == null ) {
+                return false;
+            }
+            return m.startsWith("At speed Normal") ||
                     m.startsWith("Overdue for arrival at block");
         }, "Train Resumed");
 
         String[] route2 = {"OB3", "OB7", "OB5"};
-        block = _OBlockMgr.getOBlock("OB5");
+        OBlock block5 = _OBlockMgr.getOBlock("OB5");
+        assertNotNull(block5);
+        Sensor sb5 = block5.getSensor();
+        assertNotNull(sb5);
+
         // runtimes() in next line runs the train, then checks location
-        assertThat(runtimes(route2, _OBlockMgr).getDisplayName()).withFailMessage("Train in last block").isEqualTo(block.getSensor().getDisplayName());
+        assertEquals( sb5.getDisplayName(),
+            runtimes(route2, _OBlockMgr).getDisplayName(), "Train in last block");
 
         // passed test - cleanup.  Do it here so failure leaves traces.
+        warrant.dispose();
         JFrameOperator jfo = new JFrameOperator(tableFrame);
         jfo.requestClose();
+        jfo.waitClosed();
         // we may want to use jemmy to close the panel as well.
         ControlPanelEditor panel = (ControlPanelEditor) jmri.util.JmriJFrame.getFrame("NXWarrantTest");
-        panel.dispose();    // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        // disposing this way allows test to be rerun (i.e. reload panel file) multiple times
+        Boolean retVal = jmri.util.ThreadingUtil.runOnGUIwithReturn(() -> {
+            panel.dispose();
+            return true;
+        });
+        assertTrue(retVal);
+
+        JUnitUtil.waitThreadTerminated("RampHalt Killer");
+
     }
 
     /**
@@ -384,65 +423,87 @@ public class NXFrameTest {
      * @param route Array of OBlock names of the route
      * @param mgr OBLock manager
      * @return active end sensor
-     * @throws Exception exception thrown
      */
-    protected static  Sensor runtimes(String[] route, OBlockManager mgr) throws Exception {
-        OBlock block = mgr.getOBlock(route[0]);
-        Sensor sensor = block.getSensor();
+    protected static Sensor runtimes(String[] route, OBlockManager mgr) {
+        Sensor sensor = null;
         for (int i = 1; i < route.length; i++) {
-            JUnitUtil.waitFor(150);     // waitEmpty(150) causes a lot of failures on Travis GUI
-//            new org.netbeans.jemmy.QueueTool().waitEmpty(150);
-
-            OBlock nextBlock = mgr.getOBlock(route[i]);
-            Sensor nextSensor;
-            boolean dark = (block.getState() & OBlock.UNDETECTED) != 0;
-            if (!dark) {
-                nextSensor = nextBlock.getSensor();
-                nextSensor.setState(Sensor.ACTIVE);
-                NXFrameTest.setAndConfirmSensorAction(nextSensor, Sensor.ACTIVE, nextBlock);
-            } else {
-                nextSensor = null;
-            }
-            if (sensor != null) {
-                JUnitUtil.waitFor(150);     // waitEmpty(150) causes a lot of failures on Travis GUI
-//                new org.netbeans.jemmy.QueueTool().waitEmpty(150);
-                sensor.setState(Sensor.INACTIVE);
-                NXFrameTest.setAndConfirmSensorAction(sensor, Sensor.INACTIVE, block);
-            }
-            if (!dark) {
-                sensor = nextSensor;
-                block = nextBlock;
-            }
+            sensor = moveToNextBlock(i, route, mgr);
         }
-        JUnitUtil.waitFor(150);     // waitEmpty(150) causes a lot of failures on Travis GUI
-//        new org.netbeans.jemmy.QueueTool().waitEmpty(150);
         return sensor;
     }
 
-    protected static void setAndConfirmSensorAction(Sensor sensor, int state, OBlock block)  {
+    /**
+     * Simulates the movement of a warranted train over its route.
+     * <p>Works through a list of OBlocks, gets its sensor,
+     * activates it, then inactivates the previous OBlock sensor.
+     * Leaves last sensor ACTIVE to show the train stopped there.
+     * @param route Array of OBlock names of the route
+     * @param penultimateBlockSensor the Sensor to set active when train in the penultimate block of the route.
+     * @param penultimateBlock the OBlock to ensure occupied when the penultimateBlockSensor goes active.
+     * @param mgr OBLock manager
+     * @return active end sensor
+     */
+    protected static Sensor runtimesActionPenultimate(String[] route, Sensor penultimateBlockSensor,
+            String penultimateBlock, OBlockManager mgr) {
+        Sensor sensor = null;
+        for (int i = 1; i < route.length; i++) {
+            if ( i == route.length-2 ) { // penultimate OBlock of route
+                setAndConfirmSensorAction(penultimateBlockSensor, Sensor.ACTIVE, mgr.getBySystemName(penultimateBlock));
+            }
+            sensor = moveToNextBlock(i, route, mgr);
+        }
+        return sensor;
+    }
+
+    protected static Sensor moveToNextBlock(int idx, String[] route, OBlockManager mgr) {
+        assertTrue( idx > 0 && idx < route.length , "Index "+ idx + " invalid ");
+
+        OBlock fromBlock = mgr.getOBlock(route[idx - 1]);
+        assertNotNull(fromBlock);
+        Sensor fromSensor = fromBlock.getSensor();
+        assertNotNull( fromSensor, "fromSensor not found");
+
+        OBlock toBlock = mgr.getOBlock(route[idx]);
+        assertNotNull(toBlock);
+        Sensor toSensor = toBlock.getSensor();
+        assertNotNull( toSensor, "toSensor not found");
+
+        JUnitUtil.waitFor(300);
+        NXFrameTest.setAndConfirmSensorAction(toSensor, Sensor.ACTIVE, toBlock);
+
+        JUnitUtil.waitFor(200);
+        NXFrameTest.setAndConfirmSensorAction(fromSensor, Sensor.INACTIVE, fromBlock);
+
+        return toSensor;
+    }
+
+
+    protected static void setAndConfirmSensorAction(final Sensor sensor, final int state, final OBlock b)  {
         if (state == Sensor.ACTIVE) {
-            jmri.util.ThreadingUtil.runOnLayout(() -> {
-                Throwable thrown = catchThrowable( () -> sensor.setState(Sensor.ACTIVE));
-                assertThat(thrown).withFailMessage("Set "+ sensor.getDisplayName()+" ACTIVE Exception: " + thrown).isNull();
-            });
-            OBlock b = block;
-            jmri.util.JUnitUtil.waitFor(() -> {
+            ThreadingUtil.runOnLayout(() ->
+                setSensor(sensor, Sensor.ACTIVE));
+
+
+            JUnitUtil.waitFor(() -> {
                 return (b.getState() & OBlock.OCCUPIED) != 0;
             }, b.getDisplayName() + " occupied");
         } else if (state == Sensor.INACTIVE) {
-            jmri.util.ThreadingUtil.runOnLayout(() -> {
-                Throwable thrown = catchThrowable( () -> sensor.setState(Sensor.INACTIVE));
-                assertThat(thrown).withFailMessage("Set "+ sensor.getDisplayName()+" INACTIVE Exception: " + thrown).isNull();
-            });
-            OBlock b = block;
-            jmri.util.JUnitUtil.waitFor(() -> {
+            ThreadingUtil.runOnLayout(() ->
+                setSensor(sensor, Sensor.INACTIVE));
+
+            JUnitUtil.waitFor(() -> {
                 return (b.getState() & OBlock.OCCUPIED) == 0;
             }, b.getDisplayName() + " unoccupied");
         }
     }
 
+    private static void setSensor( Sensor sensor, int state ) {
+        assertDoesNotThrow( () ->
+            sensor.setState(state), () -> "Exception setting Sensor " + sensor + " to " + sensor.describeState(state));
+    }
+
     @BeforeEach
-    public void setUp() throws Exception {
+    public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
         JUnitUtil.resetProfileManager();
@@ -463,11 +524,10 @@ public class NXFrameTest {
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
+    public void tearDown() {
+        JUnitUtil.removeMatchingThreads("Engineer(");
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         InstanceManager.getDefault(WarrantManager.class).dispose();
-        JUnitUtil.resetWindows(false,false);
         JUnitUtil.tearDown();
     }
 

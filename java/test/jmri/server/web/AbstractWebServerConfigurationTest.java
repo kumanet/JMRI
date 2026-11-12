@@ -1,35 +1,17 @@
 package jmri.server.web;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
+import jmri.util.JUnitUtil;
+
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.BeforeAll;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
  * @author Randall Wood (C) 2016
  */
 public class AbstractWebServerConfigurationTest {
-    
-    public AbstractWebServerConfigurationTest() {
-    }
-    
-    @BeforeAll
-    public static void setUpClass() {
-    }
-    
-    @AfterAll
-    public static void tearDownClass() {
-    }
-    
-    @BeforeEach
-    public void setUp() {
-    }
-    
-    @AfterEach
-    public void tearDown() {
-    }
-
 
     /**
      * Test of getFilePaths method, of class AbstractWebServerConfiguration.
@@ -37,8 +19,8 @@ public class AbstractWebServerConfigurationTest {
     @Test
     public void testGetFilePaths() {
         AbstractWebServerConfiguration instance = new AbstractWebServerConfigurationImpl();
-        Assert.assertNotNull("Empty Map", instance.getFilePaths());
-        Assert.assertTrue("Empty Map", instance.getFilePaths().isEmpty());
+        assertNotNull( instance.getFilePaths(), "Empty Map");
+        assertTrue( instance.getFilePaths().isEmpty(), "Empty Map");
     }
 
     /**
@@ -47,8 +29,8 @@ public class AbstractWebServerConfigurationTest {
     @Test
     public void testGetRedirectedPaths() {
         AbstractWebServerConfiguration instance = new AbstractWebServerConfigurationImpl();
-        Assert.assertNotNull("Empty Map", instance.getRedirectedPaths());
-        Assert.assertTrue("Empty Map", instance.getRedirectedPaths().isEmpty());
+        assertNotNull( instance.getRedirectedPaths(), "Empty Map");
+        assertTrue( instance.getRedirectedPaths().isEmpty(), "Empty Map");
     }
 
     /**
@@ -57,11 +39,21 @@ public class AbstractWebServerConfigurationTest {
     @Test
     public void testGetForbiddenPaths() {
         AbstractWebServerConfiguration instance = new AbstractWebServerConfigurationImpl();
-        Assert.assertNotNull("Empty List", instance.getForbiddenPaths());
-        Assert.assertTrue("Empty List", instance.getForbiddenPaths().isEmpty());
+        assertNotNull( instance.getForbiddenPaths(), "Empty List");
+        assertTrue( instance.getForbiddenPaths().isEmpty(), "Empty List");
     }
 
-    public class AbstractWebServerConfigurationImpl extends AbstractWebServerConfiguration {
+    private static class AbstractWebServerConfigurationImpl extends AbstractWebServerConfiguration {
     }
-    
+
+    @BeforeEach
+    public void setUp() {
+        JUnitUtil.setUp();
+    }
+
+    @AfterEach
+    public void tearDown() {
+        JUnitUtil.tearDown();
+    }
+
 }

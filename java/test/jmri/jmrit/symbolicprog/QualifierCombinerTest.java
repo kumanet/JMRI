@@ -23,14 +23,14 @@ import org.junit.jupiter.api.*;
 public class QualifierCombinerTest {
 
     // Service routine for tests
-    ProgDebugger p = new ProgDebugger();
-    CvTableModel cvtable;
-    VariableTableModel model;
-    VariableValue v1;
-    VariableValue v2;
-    VariableValue v3;
+    private ProgDebugger p = new ProgDebugger();
+    private CvTableModel cvtable;
+    private VariableTableModel model;
+    // VariableValue v1;
+    // VariableValue v2;
+    // VariableValue v3;
 
-    class TestArithmeticQualifier extends ArithmeticQualifier {
+    private static class TestArithmeticQualifier extends ArithmeticQualifier {
 
         TestArithmeticQualifier(VariableValue watchedVal, int value, String relation) {
             super(watchedVal, value, relation);
@@ -59,7 +59,7 @@ public class QualifierCombinerTest {
         ArithmeticQualifier aq1 = new TestArithmeticQualifier(variable, 10, "ge");
         ArithmeticQualifier aq2 = new TestArithmeticQualifier(variable, 20, "le");
 
-        ArrayList<Qualifier> q=new ArrayList<Qualifier>();
+        ArrayList<Qualifier> q=new ArrayList<>();
         q.add(aq1);
         q.add(aq2);
         QualifierCombiner qc = new QualifierCombiner(q);
@@ -93,7 +93,7 @@ public class QualifierCombinerTest {
         ArithmeticQualifier aq1 = new TestArithmeticQualifier(variable, 1, "ne");
         ArithmeticQualifier aq2 = new TestArithmeticQualifier(variable, 7, "ne");
 
-        ArrayList<Qualifier> q=new ArrayList<Qualifier>();
+        ArrayList<Qualifier> q=new ArrayList<>();
         q.add(aq1);
         q.add(aq2);
         QualifierCombiner qc = new QualifierCombiner(q);
@@ -115,12 +115,12 @@ public class QualifierCombinerTest {
     }
 
     @Test
+    @Disabled("Test requires further development")
     public void testVariableNeAndNeFromXml() {
     }
 
     protected HashMap<String, CvValue> createCvMap() {
-        HashMap<String, CvValue> m = new HashMap<String, CvValue>();
-        return m;
+        return new HashMap<>();
     }
 
     VariableValue makeVar(String label, String comment, String cvName,
@@ -184,9 +184,9 @@ public class QualifierCombinerTest {
         model.setRow(1, el2);
         model.setRow(1, el3);
 
-        v1 = model.findVar("one");
-        v2 = model.findVar("two");
-        v3 = model.findVar("three");
+        // v1 = model.findVar("one");
+        // v2 = model.findVar("two");
+        // v3 = model.findVar("three");
     }
 
     @AfterEach

@@ -11,35 +11,37 @@ import org.jdom2.Element;
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2011
+ * @author Klaus Killinger Copyright (C) 2025
  */
 abstract public class VSDSound {
 
-    public final static String SrcSysNamePrefix = "IAS$VSD:";
-    public final static String BufSysNamePrefix = "IAB$VSD:";
-    public final static String SrcUserNamePrefix = "IVSDS_";
-    public final static String BufUserNamePrefix = "IVSDB_";
+    static final String SrcSysNamePrefix = "IAS$VSD:";
+    static final String BufSysNamePrefix = "IAB$VSD:";
+    static final String SrcUserNamePrefix = "IVSDS_";
+    static final String BufUserNamePrefix = "IVSDB_";
 
-    public final static float default_gain = 0.8f;
-    public final static float default_reference_distance = 1.0f;
-    public final static float tunnel_volume = 0.5f;
+    static final float default_exponent = 1.0f;
+    static final float default_gain = 0.8f;
+    static final float default_reference_distance = 1.0f;
+    static final float tunnel_volume = 0.5f;
+    static final int default_sleep_interval = 50; // time in ms
 
     Timer t;
 
-    boolean is_playing;
     boolean is_tunnel;
     String name;
-    float gain;  // this is the (fixed) gain relative to the other sounds in this Profile
+    float gain; // this is the (fixed) gain relative to the other sounds in this Profile
     float volume; // this is the (active) volume level (product of fixed gain and volume slider).
 
     PhysicalLocation myposition;
@@ -47,14 +49,11 @@ abstract public class VSDSound {
     public VSDSound(String name) {
         this.name = name;
         gain = default_gain;
-    }
-
-    public boolean isPlaying() {
-        return is_playing;
+        t = null;
     }
 
     protected Timer newTimer(int time, boolean repeat, ActionListener al) {
-        time = Math.max(1, time);  // make sure the time is > zero
+        time = Math.max(1, time); // make sure the time is > zero
         t = new Timer(time, al);
         t.setInitialDelay(time);
         t.setRepeats(repeat);
@@ -109,16 +108,29 @@ abstract public class VSDSound {
         gain = g;
     }
 
-    double speedCurve(float s) {
-        return s;
+    int attachSourcesToEffects() {
+        return 1;
     }
 
-    public void setTunnel(boolean t) {
+    int detachSourcesToEffects() {
+        return 1;
+    }
+
+    void setTunnel(boolean t) {
         is_tunnel = t;
     }
 
     boolean getTunnel() {
         return is_tunnel;
+    }
+
+    boolean checkForFreeBuffer() {
+        jmri.AudioManager am = jmri.InstanceManager.getDefault(jmri.AudioManager.class);
+        if (am.getNamedBeanSet(jmri.Audio.BUFFER).size() < jmri.AudioManager.MAX_BUFFERS) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public Element getXml() {
@@ -133,5 +145,4 @@ abstract public class VSDSound {
         // Default: do nothing
     }
 
-    //private static final Logger log = LoggerFactory.getLogger(VSDSound.class);
 }

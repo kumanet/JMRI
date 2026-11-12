@@ -58,17 +58,6 @@ public class SRCPSystemConnectionMemo extends DefaultSystemConnectionMemo {
     private SRCPTrafficController et;
 
     /**
-     * Configure the common managers for SRCP connections.  Currently the
-     * SRCP memo configures no managers directly.  Managers are configured
-     * for each bus.
-     * @deprecated since 4.21.1 without replacement.
-     */
-    @Deprecated
-    public void configureManagers() {
-      // no managers to configure for base SRCP connection.
-    }
-
-    /**
      * Configure the programming manager and "command station" objects
      */
     public void configureCommandStation() {
@@ -94,8 +83,8 @@ public class SRCPSystemConnectionMemo extends DefaultSystemConnectionMemo {
     }
 
     @Override
-    public <T> T get(Class<?> T) {
-        return null; // nothing, by default
+    public <T> T get(Class<T> T) {
+        return super.get(T);
     }
 
     /**
@@ -103,7 +92,7 @@ public class SRCPSystemConnectionMemo extends DefaultSystemConnectionMemo {
      */
     @Override
     public boolean provides(Class<?> type) {
-        return false; // nothing, by default
+        return super.provides(type);
     }
 
     @Override

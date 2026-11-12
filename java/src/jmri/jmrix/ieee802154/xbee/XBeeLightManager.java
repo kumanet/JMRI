@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Implement LightManager for XBee connections.
- * <p>
  *
  * @author Paul Bender Copyright (C) 2014
  */
@@ -200,6 +199,6 @@ public class XBeeLightManager extends AbstractLightManager {
         return Bundle.getMessage("AddEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(XBeeLightManager.class);
+    private static final Logger log = LoggerFactory.getLogger(XBeeLightManager.class);
 
 }

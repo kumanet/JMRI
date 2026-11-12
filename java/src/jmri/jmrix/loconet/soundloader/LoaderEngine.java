@@ -143,6 +143,8 @@ public class LoaderEngine {
      * method to allow easy overloading.
      * @param message string form of message.
      */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification = "passing debug message String unchanged")
     public void notify(String message) {
         log.debug(message);
     }
@@ -378,6 +380,6 @@ public class LoaderEngine {
     public void dispose() {
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LoaderEngine.class);
+    private static final Logger log = LoggerFactory.getLogger(LoaderEngine.class);
 
 }

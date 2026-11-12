@@ -6,8 +6,6 @@ import jmri.DccLocoAddress;
 import jmri.InstanceManager;
 import jmri.RailCom;
 import jmri.RailComManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Z21CanReporter implements the Reporter Manager interface
@@ -25,14 +23,14 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
     private int moduleAddress=-1; // User assigned address associated with this reporter's module.
     private int port; // module port (0-7) associated with this reporter.
 
-    private ArrayList<RailCom> idTags;
+    private ArrayList<Object> idTags;
 
-    /**  
+    /**
      * Create a new Z21CanReporter.
      *
      * @param systemName the system name of the new reporter.
      * @param userName the user name of the new reporter.
-     * @param memo an instance of Z21SystemConnectionMemo this reporter 
+     * @param memo an instance of Z21SystemConnectionMemo this reporter
      *             is associated with.
      *
      */
@@ -40,7 +38,7 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
         super(systemName,userName);
         _memo = memo;
         _memo.getTrafficController().addz21Listener(this);
-        //Address format passed is in the form of moduleAddress:pin 
+        //Address format passed is in the form of moduleAddress:pin
         try {
             setIdentifiersFromSystemName(systemName);
         } catch (NumberFormatException ex) {
@@ -53,6 +51,14 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
         //leave commented out for now, causing loop that needs investigation.
         //   _memo.getTrafficController().sendz21Message(Z21Message.getLanCanDetector(networkID),this);
         //}
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean hasExitReports() {
+        return true;
     }
 
     private void setIdentifiersFromSystemName(String systemName){
@@ -91,13 +97,13 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
             }
             int value1 = (msg.getElement(10)&0xFF) + ((msg.getElement(11)&0xFF) << 8);
             int value2 = (msg.getElement(12)&0xFF) + ((msg.getElement(13)&0xFF) << 8);
-            RailCom tag = getRailComTagFromValue(msg,value1);
+            RailCom tag = getRailComTagFromValue(value1);
             if(tag != null ) {
                log.trace("add tag {}",tag);
                notify(tag);
                idTags.add(tag);
                // add the tag to the collection
-               tag = getRailComTagFromValue(msg,value2);
+               tag = getRailComTagFromValue(value2);
                if(tag != null ) {
                   log.trace("add tag {} ",tag);
                   notify(tag);
@@ -108,8 +114,8 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
             if(log.isDebugEnabled()){
                log.debug("after message, new list size {}",idTags.size());
                int i = 0;
-               for(RailCom id:idTags){
-                  log.debug("{}: {}",i++,id);
+               for(Object id:idTags){
+                  log.debug("tag {}: {}",i++,id);
                }
             }
          }
@@ -119,11 +125,11 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
         return (address == moduleAddress || netId == networkID) &&  msgPort == port;
     }
     /*
-     * private method to get and update a railcom tag based on the value 
+     * private method to get and update a railcom tag based on the value
      * bytes from the message.
      */
-    private RailCom getRailComTagFromValue(Z21Reply msg,int value){
-       DccLocoAddress l = msg.getCanDetectorLocoAddress(value);
+    private RailCom getRailComTagFromValue(int value){
+       DccLocoAddress l = Z21MessageUtils.getCanDetectorLocoAddress(value);
        if (l != null ) { // 0 represents end of list or no railcom address.
           // get the first locomotive address from the message.
           log.debug("reporting tag for address 1 {}",l);
@@ -132,16 +138,16 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
           int direction = (0xC000&value);
           switch (direction) {
              case 0x8000:
-                tag.setOrientation(RailCom.ORIENTA);
+                tag.setOrientation(RailCom.Orientation.EAST);
                 break;
              case 0xC000:
-                tag.setOrientation(RailCom.ORIENTB);
+                tag.setOrientation(RailCom.Orientation.WEST);
                 break;
              default:
-                tag.setOrientation(0);
+                tag.setOrientation(RailCom.Orientation.UNKNOWN);
           }
           return tag;
-       } 
+       }
        return null; // address in the message indicates end of list.
     }
 
@@ -157,11 +163,11 @@ public class Z21CanReporter extends jmri.implementation.AbstractRailComReporter 
     /**
      * {@inheritDoc}
      */
-    @Override 
-    public java.util.Collection getCollection(){
+    @Override
+    public java.util.Collection<Object> getCollection(){
         return idTags;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(Z21CanReporter.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Z21CanReporter.class);
 
 }

@@ -50,6 +50,9 @@ public class SensorIconXml extends PositionableLabelXml {
 
         storeIconInfo(p, element);
         storeTextInfo(p, element);
+
+        storeLogixNG_Data(p, element);
+
         element.setAttribute("class", "jmri.jmrit.display.configurexml.SensorIconXml");
         return element;
     }
@@ -236,6 +239,9 @@ public class SensorIconXml extends PositionableLabelXml {
         } catch (Positionable.DuplicateIdException e) {
             throw new JmriConfigureXmlException("Positionable id is not unique", e);
         }
+
+        loadLogixNG_Data(l, element);
+
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, Editor.SENSORS, element);
         if (l.isIcon() && l.getText()!=null) {
@@ -387,6 +393,6 @@ public class SensorIconXml extends PositionableLabelXml {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SensorIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(SensorIconXml.class);
 
 }

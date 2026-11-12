@@ -1,6 +1,5 @@
 package jmri.jmrix.loconet;
 
-import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +37,8 @@ public class LnPacketizerStrict extends LnPacketizer {
     // retry required, lost echo, bad IMM, general busy
     private boolean reTryRequired;
 
+    public static int maxWaitCount = 150; // public for script access
+
     public LnPacketizerStrict(LocoNetSystemConnectionMemo m) {
         super(m);
     }
@@ -67,24 +68,20 @@ public class LnPacketizerStrict extends LnPacketizer {
         @Override
         public void run() {
             int opCode;
-            while (true) {  // loop permanently, program close will exit
+            while (!threadStopRequest && ! Thread.interrupted() ) {  // loop until asked to stop
                 try {
                     // start by looking for command -  skip if bit not set
                     while (((opCode = (readByteProtected(istream) & 0xFF)) & 0x80) == 0) {
                         log.trace("Skipping: {}", Integer.toHexString(opCode)); // NOI18N
                     }
                     // here opCode is OK. Create output message
-                    if (log.isTraceEnabled()) {
-                        log.trace(" (RcvHandler) Start message with opcode: {}", Integer.toHexString(opCode)); // NOI18N
-                    }
+                    log.trace(" (RcvHandler) Start message with opcode: {}", Integer.toHexString(opCode)); // NOI18N
                     LocoNetMessage msg = null;
                     while (msg == null) {
                         try {
                             // Capture 2nd byte, always present
                             int byte2 = readByteProtected(istream) & 0xFF;
-                            if (log.isTraceEnabled()) {
-                                log.trace("Byte2: {}", Integer.toHexString(byte2)); // NOI18N
-                            }   // Decide length
+                            log.trace("Byte2: {}", Integer.toHexString(byte2)); // NOI18N
                             int len = 2;
                             switch ((opCode & 0x60) >> 5) {
                                 case 0:
@@ -119,9 +116,7 @@ public class LnPacketizerStrict extends LnPacketizer {
                             for (int i = 2; i < len; i++) {
                                 // check for message-blocking error
                                 int b = readByteProtected(istream) & 0xFF;
-                                if (log.isTraceEnabled()) {
-                                    log.trace("char {} is: {}", i, Integer.toHexString(b)); // NOI18N
-                                }
+                                log.trace("char {} is: {}", i, Integer.toHexString(b)); // NOI18N
                                 if ((b & 0x80) != 0) {
                                     log.warn("LocoNet message with opCode: {} ended early. Expected length: {} seen length: {} unexpected byte: {}", Integer.toHexString(opCode), len, i, Integer.toHexString(b)); // NOI18N
                                     opCode = b;
@@ -141,10 +136,10 @@ public class LnPacketizerStrict extends LnPacketizer {
                         throw new LocoNetMessageException();
                     }
                     // message is complete, dispatch it !!
+                    msg.setReceivedTime(System.nanoTime());
                     {
-                        if (log.isDebugEnabled()) { // avoid String building if not needed
-                            log.debug("queue message for notification: {}", msg.toString());  // NOI18N
-                        }
+                        log.trace("message complete: {}", msg);
+
                         // check for XmtHandler waiting on return values
                         if (waitForMsg != null) {
                             if (waitForMsg.equals(msg)) {
@@ -174,25 +169,42 @@ public class LnPacketizerStrict extends LnPacketizer {
                             reTryRequired = true;
                             // check for waiting on echo
                         }
-                        jmri.util.ThreadingUtil.runOnLayoutEventually(new RcvMemo(msg, trafficController));
+                        // check if this message was supposed to be ignored
+                        // sentList will be empty if preference "LoconetUpdateSlotOnMessageCreation" is not activated
+                        if(trafficController.getSentList().contains(msg)) {
+                            trafficController.getSentList().remove(msg);
+                            log.trace("found packet {} in sentList, ignoring. {} packets in sentList remaining.", msg, trafficController.getSentList().size());
+                        }
+                        else {
+                            log.trace("queue message for notification: {}", msg);
+                            jmri.util.ThreadingUtil.runOnLayoutEventually(new RcvMemo(msg, trafficController));
+                        }
                     }
                     // done with this one
                 } catch (LocoNetMessageException e) {
                     // just let it ride for now
-                    log.warn("run: unexpected LocoNetMessageException: {}", e); // NOI18N
-                } catch (java.io.EOFException e) {
-                    // posted from idle port when enableReceiveTimeout used
-                    log.trace("EOFException, is LocoNet serial I/O using timeouts?"); // NOI18N
+                    log.warn("run: unexpected LocoNetMessageException", e); // NOI18N
+                    continue;
+                } catch (java.io.InterruptedIOException e) {
+                    // being requested to stop
+                    // will be process in while clause
                 } catch (java.io.IOException e) {
-                    // fired when write-end of HexFile reaches end
-                    log.debug("IOException, should only happen with HexFIle: {}", e); // NOI18N
-                    log.info("End of file"); // NOI18N
-                    disconnectPort(controller);
+                    if (controller.getAllowConnectionRecovery()) {
+                        log.info("run: server closed connection, attempting recovery");
+                        controller.closePort();
+                        controller.recover();
+                    } else {
+                        // fired when read detects end-of-file
+                        log.info("End of file", e); // NOI18N
+                        dispose();
+                        disconnectPort(controller);
+                    }
                     return;
-                } // normally, we don't catch RuntimeException, but in this
-                // permanently running loop it seems wise.
-                catch (RuntimeException e) {
-                    log.warn("run: unexpected Exception: {}", e); // NOI18N
+                } catch (RuntimeException e) {
+                    // normally, we don't catch RuntimeException, but in this
+                    // permanently running loop it seems wise.
+                    log.warn("run: unexpected Exception", e); // NOI18N
+                    continue;
                 }
             } // end of permanent loop
         }
@@ -230,24 +242,21 @@ public class LnPacketizerStrict extends LnPacketizer {
         @Override
         public void run() {
             int waitCount;
-            while (true) { // loop permanently
+            while (!threadStopRequest) {   // loop until asked to stop)
                 // any input?
                 try {
-                    // get content; failure is a NoSuchElementException
+                    // get content; blocks until present
                     log.trace("check for input"); // NOI18N
-                    byte msg[] = null;
-                    synchronized (this) {
-                        msg = xmtList.removeFirst();
-                    }
+
+                    byte msg[] = xmtList.take();
+
                     // input - now send
                     try {
                         if (ostream != null) {
                             if (!controller.okToSend()) {
                                 log.debug("LocoNet port not ready to receive"); // NOI18N
                             }
-                            if (log.isDebugEnabled()) { // avoid String building if not needed
-                                log.debug("start write to stream: {}", jmri.util.StringUtil.hexStringFromBytes(msg)); // NOI18N
-                            }
+                            log.debug("start write to stream: {}", jmri.util.StringUtil.hexStringFromBytes(msg)); // NOI18N
                             // get it started
                             reTryRequired = true;
                             int reTryCount = 0;
@@ -262,9 +271,7 @@ public class LnPacketizerStrict extends LnPacketizer {
                                     // we do it this way as during our sleep the waitBusy time can be reset
                                     int waitTime = waitBusy;
                                     waitBusy = 0;
-                                    //if (log.isDebugEnabled()) {
                                     //    log.debug("waitBusy");
-                                    //}
                                     // for now so we know how prevalent this is over a long time span
                                     log.warn("Waitbusy");
                                     try {
@@ -275,14 +282,12 @@ public class LnPacketizerStrict extends LnPacketizer {
                                 }
                                 ostream.write(msg);
                                 ostream.flush();
-                                if (log.isTraceEnabled()) {
-                                    log.trace("end write to stream: {}", jmri.util.StringUtil.hexStringFromBytes(msg)); // NOI18N
-                                }
+                                log.trace("end write to stream: {}", jmri.util.StringUtil.hexStringFromBytes(msg)); // NOI18N
                                 // loop waiting for echo message and or LACK
                                 // minimal sleeps so as to exit fast
                                 waitCount = 0;
                                 // echo as really fast
-                                while ((waitForMsg != null) && waitCount < 20) {
+                                while ((waitForMsg != null) && waitCount < maxWaitCount) {
                                     try {
                                         Thread.sleep(1);
                                     } catch (InterruptedException ee) {
@@ -291,7 +296,7 @@ public class LnPacketizerStrict extends LnPacketizer {
                                     waitCount++;
                                 }
                                 // Oh my lost the echo...
-                                if (waitCount > 19) {
+                                if (waitCount >= maxWaitCount) {
                                     log.warn("Retry Send for Lost Packet [{}] Count[{}]", waitForMsg,
                                                 reTryCount); // NOI18N
                                     if (reTryCount < 5) {
@@ -304,7 +309,7 @@ public class LnPacketizerStrict extends LnPacketizer {
                                     }
                                 } else {
                                     // LACKs / a response can be slow
-                                    while (waitingOnLack && waitCount < 50) {
+                                    while (waitingOnLack && waitCount < 3*maxWaitCount) {
                                         try {
                                             Thread.sleep(1);
                                         } catch (InterruptedException ee) {
@@ -313,7 +318,7 @@ public class LnPacketizerStrict extends LnPacketizer {
                                         waitCount++;
                                     }
                                     // Oh my lost the LACK / response...
-                                    if (waitCount > 49) {
+                                    if (waitCount >= 3*maxWaitCount) {
                                         try {
                                             log.warn("Retry Send for Lost Response Count[{}]", reTryCount); // NOI18N
                                         } catch (NullPointerException npe) {
@@ -337,12 +342,16 @@ public class LnPacketizerStrict extends LnPacketizer {
                         }
                     } catch (java.io.IOException e) {
                         log.warn("sendLocoNetMessage: IOException: {}", e.toString()); // NOI18N
+                        if (controller.getAllowConnectionRecovery()) {
+                            log.info("run: server closed connection, attempting recovery");
+                            controller.closePort();
+                            controller.recover();
+                        }
                     }
-                } catch (NoSuchElementException e) {
-                    // message queue was empty, wait for input
-                    log.trace("start wait"); // NOI18N
-                    new jmri.util.WaitHandler(this); // handle synchronization, spurious wake, interruption
-                    log.trace("end wait"); // NOI18N
+                } catch (InterruptedException ie) {
+                    return; // ending the thread
+                } catch (RuntimeException rt) {
+                    log.error("Exception on take() call", rt);
                 }
             }
         }
@@ -364,7 +373,7 @@ public class LnPacketizerStrict extends LnPacketizer {
         if (xmtHandler == null) {
             xmtHandler = new XmtHandlerStrict();
         }
-        xmtThread = new Thread(xmtHandler, "LocoNet transmit handler"); // NOI18N
+        xmtThread = jmri.util.ThreadingUtil.newThread(xmtHandler, "LocoNet transmit handler"); // NOI18N
         log.debug("Xmt thread starts at priority {}", xmtpriority); // NOI18N
         xmtThread.setDaemon(true);
         xmtThread.setPriority(Thread.MAX_PRIORITY - 1);
@@ -374,7 +383,7 @@ public class LnPacketizerStrict extends LnPacketizer {
         if (rcvHandler == null) {
             rcvHandler = new RcvHandlerStrict(this);
         }
-        rcvThread = new Thread(rcvHandler, "LocoNet receive handler"); // NOI18N
+        rcvThread = jmri.util.ThreadingUtil.newThread(rcvHandler, "LocoNet receive handler"); // NOI18N
         rcvThread.setDaemon(true);
         rcvThread.setPriority(Thread.MAX_PRIORITY);
         rcvThread.start();
@@ -383,6 +392,6 @@ public class LnPacketizerStrict extends LnPacketizer {
 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnPacketizerStrict.class);
+    private static final Logger log = LoggerFactory.getLogger(LnPacketizerStrict.class);
 
 }

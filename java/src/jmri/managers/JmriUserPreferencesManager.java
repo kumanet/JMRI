@@ -1,5 +1,8 @@
 package jmri.managers;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Toolkit;
@@ -19,7 +22,6 @@ import javax.annotation.CheckForNull;
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import jmri.ConfigureManager;
 import jmri.InstanceInitializer;
@@ -37,22 +39,111 @@ import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
 import jmri.util.jdom.JDOMUtil;
 import jmri.util.node.NodeIdentity;
+import jmri.util.swing.JmriJOptionPane;
 import org.jdom2.DataConversionException;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.openide.util.lookup.ServiceProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of {@link UserPreferencesManager} that saves user interface
  * preferences that should be automatically remembered as they are set.
- * <p>
- * This class is intended to be a transitional class from a single user
+ * <p>This class is intended to be a transitional class from a single user
  * interface preferences manager to multiple, domain-specific (windows, tables,
  * dialogs, etc) user interface preferences managers. Domain-specific managers
  * can more efficiently, both in the API and at runtime, handle each user
- * interface preference need than a single monolithic manager.
+ * interface preference need than a single monolithic manager.</p>
+ *
+ * <p>The following items are available.  Each item has its own section in the
+ * <b>user-interface.xml</b> file.</p>
+ *
+ * <dl>
+ *   <dt><b>Class Preferences</b></dt>
+ *   <dd>This contains reminders and selections from dialogs displayed to users.  These are normally
+ *      related to the JMRI NamedBeans represented by the various PanelPro tables. The
+ *      responses are shown in <b>Preferences -&gt; Messages</b>.  This provides the ability to
+ *      revert previous choices.  See {@link jmri.jmrit.beantable.usermessagepreferences.UserMessagePreferencesPane}
+ *
+ *      <p>The dialogs are invoked by the various <b>show&lt;Info|Warning|Error&gt;Message</b> dialogs.
+ *
+ *      There are two types of messages created by the dialogs.</p>
+ *      <dl>
+ *        <dt><b>multipleChoice</b></dt>
+ *        <dd>The multiple choice message has a keyword and the selected option. It only exists when the
+ *          selected option index is greater than zero.</dd>
+ *
+ *        <dt><b>reminderPrompts</b></dt>
+ *        <dd>The reminder prompt message has a keyword, such as <i>remindSaveRoute</i>.  It only exists when
+ *          the reminder is active.</dd>
+ *      </dl>
+ *
+ *      <p>When the <i>Skip message in future?</i> or <i>Remember this setting for next time?</i> is selected,
+ *      an entry will be added.  The {@link #setClassDescription(String)} method will use Java reflection
+ *      to request additional information from the class that was used to the show dialog.  This requires some
+ *      specific changes to the originating class.</p>
+ *
+ *      <dl>
+ *        <dt><b>Class Constructor</b></dt>
+ *        <dd>A constructor without parameters is required.  This is used to get the class so that
+ *        the following public methods can be invoked.</dd>
+ *
+ *        <dt><b>getClassDescription()</b></dt>
+ *        <dd>This returns a string that will be used by <b>Preferences -&gt; Messages</b>.</dd>
+ *
+ *        <dt><b>setMessagePreferenceDetails()</b></dt>
+ *        <dd>This does not return anything directly.  It makes call backs using two methods.
+ *          <dl>
+ *            <dt>{@link #setMessageItemDetails(String, String, String, HashMap, int)}</dt>
+ *            <dd>Descriptive information, the items for a combo box and the current selection are sent.
+ *            This information is used to create the <b>multipleChoice</b> item.</dd>
+ *
+ *            <dt>{@link #setPreferenceItemDetails(String, String, String)}</dt>
+ *            <dd>Descriptive information is sent to create the <b>reminderPrompt</b> item.</dd>
+ *          </dl>
+ *        </dd>
+ *      </dl>
+ *      <p>The messages are normally created by the various NamedBean classes.  LogixNG uses a
+ *      separate class instead of changing each affected class.  This provides a concise example
+ *      of the required changes at
+ * <a href="https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrit/logixng/LogixNG_UserPreferences.java">LogixNG_UserPreferences</a></p>
+ *   </dd>
+ *
+ *   <dt><b>Checkbox State</b></dt>
+ *   <dd>Contains the last checkbox state.<br>Methods:
+ *     <ul>
+ *       <li>{@link #getCheckboxPreferenceState(String, boolean)}</li>
+ *       <li>{@link #setCheckboxPreferenceState(String, boolean)}</li>
+ *     </ul>
+ *   </dd>
+ *
+ *   <dt><b>Combobox Selection</b></dt>
+ *   <dd>Contains the last combo box selection.<br>Methods:
+ *     <ul>
+ *       <li>{@link #getComboBoxLastSelection(String)}</li>
+ *       <li>{@link #setComboBoxLastSelection(String, String)}</li>
+ *     </ul>
+ *   </dd>
+ *
+ *   <dt><b>Settings</b></dt>
+ *   <dd>The existence of an entry indicates a true state.<br>Methods:
+ *     <ul>
+ *       <li>{@link #getSimplePreferenceState(String)}</li>
+ *       <li>{@link #setSimplePreferenceState(String, boolean)}</li>
+ *     </ul>
+ *   </dd>
+ *
+ *   <dt><b>Window Details</b></dt>
+ *   <dd>The main data is the window location and size.  This is handled by
+ *     {@link jmri.util.JmriJFrame}.  The window details can also include
+ *     window specific properties.<br>Methods:
+ *     <ul>
+ *       <li>{@link #getProperty(String, String)}</li>
+ *       <li>{@link #setProperty(String, String, Object)}</li>
+ *     </ul>
+ *   </dd>
+ * </dl>
+ *
+ *
  *
  * @author Randall Wood (C) 2016
  */
@@ -70,7 +161,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
     private static final String SETTINGS_ELEMENT = "settings"; // NOI18N
     private static final String WINDOWS_NAMESPACE = "http://jmri.org/xml/schema/auxiliary-configuration/window-details-4-3-5.xsd"; // NOI18N
     private static final String WINDOWS_ELEMENT = "windowDetails"; // NOI18N
-    private static final Logger log = LoggerFactory.getLogger(JmriUserPreferencesManager.class);
+
     private static final String REMINDER = "reminder";
     private static final String JMRI_UTIL_JMRI_JFRAME = "jmri.util.JmriJFrame";
     private static final String CLASS = "class";
@@ -157,11 +248,16 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         return simplePreferenceList.contains(name);
     }
 
+    @Nonnull
     @Override
     public ArrayList<String> getSimplePreferenceStateList() {
         return new ArrayList<>(simplePreferenceList);
     }
 
+    /**
+     * Displays remember dialogue on save.
+     * {@inheritDoc}
+     */
     @Override
     public void setPreferenceState(String strClass, String item, boolean state) {
         // convert old manager preferences to new manager preferences
@@ -216,6 +312,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         a.add(new PreferenceList(item, description));
     }
 
+    @Nonnull
     @Override
     public ArrayList<String> getPreferenceList(String strClass) {
         if (classPreferenceList.containsKey(strClass)) {
@@ -231,6 +328,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
     }
 
     @Override
+    @CheckForNull
     public String getPreferenceItemName(String strClass, int n) {
         if (classPreferenceList.containsKey(strClass)) {
             return classPreferenceList.get(strClass).getPreferenceName(n);
@@ -239,6 +337,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
     }
 
     @Override
+    @CheckForNull
     public String getPreferenceItemDescription(String strClass, String item) {
         if (classPreferenceList.containsKey(strClass)) {
             ArrayList<PreferenceList> a = classPreferenceList.get(strClass).getPreferenceList();
@@ -262,7 +361,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
      * should start with the package name (package.Class) for the primary using
      * class.
      *
-     * @param name A unique identifer for preference.
+     * @param name A unique identifier for preference.
      */
     @Override
     public void setSessionPreferenceState(String name, boolean state) {
@@ -275,21 +374,16 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean getSessionPreferenceState(String name) {
         return sessionPreferenceList.contains(name);
     }
 
     /**
-     * Show an info message ("don't forget ...") with a given dialog title and
-     * user message. Use a given preference name to determine whether to show it
-     * in the future. The combination of the classString and item parameters
-     * should form a unique value.
-     *
-     * @param title    message Box title
-     * @param message  message to be displayed
-     * @param strClass name of the calling class
-     * @param item     name of the specific item this is used for
+     * {@inheritDoc}
      */
     @Override
     public void showInfoMessage(String title, String message, String strClass, String item) {
@@ -297,69 +391,63 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
     }
 
     /**
-     * Show an info message ("don't forget ...") with a given dialog title and
-     * user message. Use a given preference name to determine whether to show it
-     * in the future. added flag to indicate that the message should be
-     * suppressed JMRI session only. The classString and item
-     * parameters should form a unique value
-     *
-     * @param title          Message Box title
-     * @param message        Message to be displayed
-     * @param strClass       String value of the calling class
-     * @param item           String value of the specific item this is used for
-     * @param sessionOnly    Means this message will be suppressed in this JMRI
-     *                       session and not be remembered
-     * @param alwaysRemember Means that the suppression of the message will be
-     *                       saved
+     * {@inheritDoc}
+     */
+    @Override
+    public void showInfoMessage(@CheckForNull Component parentComponent, String title, String message, String strClass, String item) {
+        showInfoMessage(parentComponent, title, message, strClass, item, false, true);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     @Override
     public void showErrorMessage(String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
-        this.showMessage(title, message, strClass, item, sessionOnly, alwaysRemember, JOptionPane.ERROR_MESSAGE);
+        this.showMessage(null, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.ERROR_MESSAGE);
     }
 
     /**
-     * Show an info message ("don't forget ...") with a given dialog title and
-     * user message. Use a given preference name to determine whether to show it
-     * in the future. added flag to indicate that the message should be
-     * suppressed JMRI session only. The classString and item
-     * parameters should form a unique value
-     *
-     * @param title          Message Box title
-     * @param message        Message to be displayed
-     * @param strClass       String value of the calling class
-     * @param item           String value of the specific item this is used for
-     * @param sessionOnly    Means this message will be suppressed in this JMRI
-     *                       session and not be remembered
-     * @param alwaysRemember Means that the suppression of the message will be
-     *                       saved
+     * {@inheritDoc}
+     */
+    @Override
+    public void showErrorMessage(@CheckForNull Component parentComponent, String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
+        this.showMessage(parentComponent, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.ERROR_MESSAGE);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     @Override
     public void showInfoMessage(String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
-        this.showMessage(title, message, strClass, item, sessionOnly, alwaysRemember, JOptionPane.INFORMATION_MESSAGE);
+        this.showMessage(null, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.INFORMATION_MESSAGE);
     }
 
     /**
-     * Show an info message ("don't forget ...") with a given dialog title and
-     * user message. Use a given preference name to determine whether to show it
-     * in the future. added flag to indicate that the message should be
-     * suppressed JMRI session only. The classString and item
-     * parameters should form a unique value
-     *
-     * @param title          Message Box title
-     * @param message        Message to be displayed
-     * @param strClass       String value of the calling class
-     * @param item           String value of the specific item this is used for
-     * @param sessionOnly    Means this message will be suppressed in this JMRI
-     *                       session and not be remembered
-     * @param alwaysRemember Means that the suppression of the message will be
-     *                       saved
+     * {@inheritDoc}
+     */
+    @Override
+    public void showInfoMessage(@CheckForNull Component parentComponent, String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
+        this.showMessage(parentComponent, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     @Override
     public void showWarningMessage(String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
-        this.showMessage(title, message, strClass, item, sessionOnly, alwaysRemember, JOptionPane.WARNING_MESSAGE);
+        this.showMessage(null, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.WARNING_MESSAGE);
     }
 
-    protected void showMessage(String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember, int type) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void showWarningMessage(@CheckForNull Component parentComponent, String title, String message, final String strClass, final String item, final boolean sessionOnly, final boolean alwaysRemember) {
+        this.showMessage(parentComponent, title, message, strClass, item, sessionOnly, alwaysRemember, JmriJOptionPane.WARNING_MESSAGE);
+    }
+
+    protected void showMessage(@CheckForNull Component parentComponent, String title, String message, final String strClass,
+        final String item, final boolean sessionOnly, final boolean alwaysRemember, int type) {
         final String preference = strClass + "." + item;
 
         if (this.getSessionPreferenceState(preference)) {
@@ -381,7 +469,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 remember.setFont(remember.getFont().deriveFont(10f));
                 container.add(remember);
             }
-            JOptionPane.showMessageDialog(null, // center over parent component
+            JmriJOptionPane.showMessageDialog(parentComponent, // center over parent component if present
                     container,
                     title,
                     type);
@@ -396,6 +484,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
     }
 
     @Override
+    @CheckForNull
     public String getComboBoxLastSelection(String comboBoxName) {
         return this.comboBoxLastSelection.get(comboBoxName);
     }
@@ -581,6 +670,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         return windowDetails.containsKey(strClass);
     }
 
+    @Nonnull
     @Override
     public String getClassDescription(String strClass) {
         if (classPreferenceList.containsKey(strClass)) {
@@ -589,6 +679,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         return "";
     }
 
+    @Nonnull
     @Override
     public ArrayList<String> getPreferencesClasses() {
         return new ArrayList<>(this.classPreferenceList.keySet());
@@ -794,6 +885,16 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
 
     @Override
     public void setMultipleChoiceOption(String strClass, String choice, int value) {
+
+        // LogixNG bug fix:
+        // The class 'strClass' must have a default constructor. Otherwise,
+        // an error is logged to the log. Early versions of LogixNG used
+        // AbstractLogixNGTableAction and ??? as strClass, which didn't work.
+        // Now, LogixNG uses the class jmri.jmrit.logixng.LogixNG_UserPreferences
+        // for this purpose.
+        if ("jmri.jmrit.beantable.AbstractLogixNGTableAction".equals(strClass)) return;
+        if ("jmri.jmrit.logixng.tools.swing.TreeEditor".equals(strClass)) return;
+
         if (!classPreferenceList.containsKey(strClass)) {
             classPreferenceList.put(strClass, new ClassPreferences());
         }
@@ -861,7 +962,10 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 if (file.exists()) {
                     log.debug("start load user pref file: {}", file.getPath());
                     try {
-                        InstanceManager.getDefault(ConfigureManager.class).load(file, true);
+                        boolean result = InstanceManager.getDefault(ConfigureManager.class).load(file, true);
+                        if (!result) {
+                            log.error("Failed to load file:{}", file);
+                        }
                         this.allowSave = true;
                         this.savePreferences(); // write new preferences format immediately
                     } catch (JmriException e) {
@@ -903,7 +1007,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 combo.setAttribute("lastSelected", cbls.getValue());
                 return combo;
             }).forEach(element::addContent);
-            this.saveElement(element);
+            this.storeElement(element);
             this.resetChangeMade();
         }
     }
@@ -928,7 +1032,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 checkbox.setAttribute("lastChecked", cbls.getValue() ? "yes" : "no");
                 return checkbox;
             }).forEach(element::addContent);
-            this.saveElement(element);
+            this.storeElement(element);
             this.resetChangeMade();
         }
     }
@@ -943,7 +1047,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                     mc.getChildren("option").stream().forEach(option -> {
                         int value = 0;
                         try {
-                            option.getAttribute(VALUE).getIntValue();
+                            value = option.getAttribute(VALUE).getIntValue();
                         } catch (DataConversionException ex) {
                             log.error("failed to convert positional attribute");
                         }
@@ -990,7 +1094,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 }
             });
             if (!element.getChildren().isEmpty()) {
-                this.saveElement(element);
+                this.storeElement(element);
             }
         }
     }
@@ -1009,7 +1113,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
             Element element = new Element(SETTINGS_ELEMENT, SETTINGS_NAMESPACE);
             getSimplePreferenceStateList().stream().forEach(setting ->
                 element.addContent(new Element("setting").addContent(setting)));
-            this.saveElement(element);
+            this.storeElement(element);
             this.resetChangeMade();
         }
     }
@@ -1056,6 +1160,8 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         }
     }
 
+    @SuppressFBWarnings(value = "DMI_ENTRY_SETS_MAY_REUSE_ENTRY_OBJECTS",
+            justification = "needs to copy the items of the hashmap windowDetails")
     private void saveWindowDetails() {
         this.setChangeMade(false);
         if (this.allowSave) {
@@ -1063,7 +1169,8 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                 Element element = new Element(WINDOWS_ELEMENT, WINDOWS_NAMESPACE);
                 // Copy the entries before iterate over them since
                 // ConcurrentModificationException may happen otherwise
-                for (Entry<String, WindowLocations> entry : windowDetails.entrySet()) {
+                Set<Entry<String, WindowLocations>> entries = new HashSet<>(windowDetails.entrySet());
+                for (Entry<String, WindowLocations> entry : entries) {
                     Element window = new Element("window");
                     window.setAttribute(CLASS, entry.getKey());
                     if (entry.getValue().getSaveLocation()) {
@@ -1104,7 +1211,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
                     }
                     element.addContent(window);
                 }
-                this.saveElement(element);
+                this.storeElement(element);
                 this.resetChangeMade();
             }
         }
@@ -1123,13 +1230,21 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
         return null;
     }
 
-    protected void saveElement(@Nonnull Element element) {
+    @Override
+    public void storeElement(@Nonnull Element element) {
         log.trace("Saving {} element.", element.getName());
         try {
             ProfileUtils.getUserInterfaceConfiguration(ProfileManager.getDefault().getActiveProfile()).putConfigurationFragment(JDOMUtil.toW3CElement(element), false);
         } catch (JDOMException ex) {
             log.error("Unable to save user preferences", ex);
         }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @CheckForNull
+    public Element loadElement(@Nonnull String elementName) {
+        return readElement(elementName, GENERIC_NAMESPACE);
     }
 
     private void savePreferences() {
@@ -1394,4 +1509,7 @@ public class JmriUserPreferencesManager extends Bean implements UserPreferencesM
             return set;
         }
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JmriUserPreferencesManager.class);
+
 }

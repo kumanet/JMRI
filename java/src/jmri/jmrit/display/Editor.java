@@ -11,6 +11,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 import javax.swing.*;
@@ -22,12 +23,17 @@ import javax.swing.event.ListSelectionEvent;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import javax.annotation.CheckForNull;
+
 import jmri.*;
 import jmri.jmrit.catalog.CatalogPanel;
 import jmri.jmrit.catalog.DirectorySearcher;
 import jmri.jmrit.catalog.ImageIndexEditor;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.controlPanelEditor.shape.PositionableShape;
+import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.tools.swing.DeleteBean;
+import jmri.jmrit.logixng.tools.swing.LogixNGEditor;
 import jmri.jmrit.operations.trains.TrainIcon;
 import jmri.jmrit.picker.PickListModel;
 import jmri.jmrit.roster.Roster;
@@ -35,7 +41,12 @@ import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.roster.swing.RosterEntrySelectorPanel;
 import jmri.util.DnDStringImportHandler;
 import jmri.util.JmriJFrame;
+import jmri.util.ThreadingUtil;
 import jmri.util.swing.JmriColorChooser;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
+import jmri.util.swing.JmriMouseListener;
+import jmri.util.swing.JmriMouseMotionListener;
 
 /**
  * This is the Model and a Controller for panel editor Views. (Panel Editor,
@@ -76,30 +87,31 @@ import jmri.util.swing.JmriColorChooser;
  * @author Pete Cressman Copyright: Copyright (c) 2009, 2010, 2011
  *
  */
-abstract public class Editor extends JmriJFrame implements MouseListener, MouseMotionListener,
-        ActionListener, KeyListener, VetoableChangeListener {
+public abstract class Editor extends JmriJFrameWithPermissions
+        implements JmriMouseListener, JmriMouseMotionListener, ActionListener,
+                KeyListener, VetoableChangeListener {
 
-    final public static int BKG = 1;
-    final public static int TEMP = 2;
-    final public static int ICONS = 3;
-    final public static int LABELS = 4;
-    final public static int MEMORIES = 5;
-    final public static int REPORTERS = 5;
-    final public static int SECURITY = 6;
-    final public static int TURNOUTS = 7;
-    final public static int LIGHTS = 8;
-    final public static int SIGNALS = 9;
-    final public static int SENSORS = 10;
-    final public static int CLOCK = 10;
-    final public static int MARKERS = 10;
-    final public static int NUM_LEVELS = 10;
+    public static final int BKG = 1;
+    public static final int TEMP = 2;
+    public static final int ICONS = 3;
+    public static final int LABELS = 4;
+    public static final int MEMORIES = 5;
+    public static final int REPORTERS = 5;
+    public static final int SECURITY = 6;
+    public static final int TURNOUTS = 7;
+    public static final int LIGHTS = 8;
+    public static final int SIGNALS = 9;
+    public static final int SENSORS = 10;
+    public static final int CLOCK = 10;
+    public static final int MARKERS = 10;
+    public static final int NUM_LEVELS = 10;
 
-    final public static int SCROLL_NONE = 0;
-    final public static int SCROLL_BOTH = 1;
-    final public static int SCROLL_HORIZONTAL = 2;
-    final public static int SCROLL_VERTICAL = 3;
+    public static final int SCROLL_NONE = 0;
+    public static final int SCROLL_BOTH = 1;
+    public static final int SCROLL_HORIZONTAL = 2;
+    public static final int SCROLL_VERTICAL = 3;
 
-    final public static Color HIGHLIGHT_COLOR = new Color(204, 207, 88);
+    public static final Color HIGHLIGHT_COLOR = new Color(204, 207, 88);
 
     public static final String POSITIONABLE_FLAVOR = DataFlavor.javaJVMLocalObjectMimeType
             + ";class=jmri.jmrit.display.Positionable";
@@ -108,6 +120,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 
     private ArrayList<Positionable> _contents = new ArrayList<>();
     private Map<String, Positionable> _idContents = new HashMap<>();
+    private Map<String, Set<Positionable>> _classContents = new HashMap<>();
     protected JLayeredPane _targetPanel;
     private JFrame _targetFrame;
     private JScrollPane _panelScrollPane;
@@ -121,11 +134,11 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     private boolean _showToolTip = true;
 //    private boolean _showCoordinates = true;
 
-    final public static int OPTION_POSITION = 1;
-    final public static int OPTION_CONTROLS = 2;
-    final public static int OPTION_HIDDEN = 3;
-    final public static int OPTION_TOOLTIP = 4;
-//    final public static int OPTION_COORDS = 5;
+    public static final int OPTION_POSITION = 1;
+    public static final int OPTION_CONTROLS = 2;
+    public static final int OPTION_HIDDEN = 3;
+    public static final int OPTION_TOOLTIP = 4;
+//    public static final int OPTION_COORDS = 5;
 
     private boolean _globalSetsLocal = true;    // pre 2.9.6 behavior
     private boolean _useGlobalFlag = false;     // pre 2.9.6 behavior
@@ -164,13 +177,16 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     // store panelMenu state so preference is retained on headless systems
     private boolean panelMenuIsVisible = true;
 
+    private boolean _inEditInlineLogixNGMode = false;
+    private LogixNGEditor _inlineLogixNGEdit;
+
     public Editor() {
     }
 
     public Editor(String name, boolean saveSize, boolean savePosition) {
         super(name, saveSize, savePosition);
         setName(name);
-        _defaultToolTip = new ToolTip(null, 0, 0);
+        _defaultToolTip = new ToolTip(null, 0, 0, null);
         setVisible(false);
         InstanceManager.getDefault(SignalHeadManager.class).addVetoableChangeListener(this);
         InstanceManager.getDefault(SignalMastManager.class).addVetoableChangeListener(this);
@@ -229,11 +245,31 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         return _newIcon;
     }
 
+    private String getDisableLocoMarkerPopupRef() {
+        return "DisableLocoMarkerPopup__"+getWindowFrameRef();
+    }
+
+    public void setLocoMarkerPopupDisabled(boolean value) {
+        var prefsMgr = InstanceManager.getOptionalDefault(UserPreferencesManager.class);
+        if (prefsMgr.isPresent()) {
+            prefsMgr.get().setCheckboxPreferenceState(getDisableLocoMarkerPopupRef(), value);
+        }
+    }
+
+    public boolean isLocoMarkerPopupDisabled() {
+        var prefsMgr = InstanceManager.getOptionalDefault(UserPreferencesManager.class);
+        if (prefsMgr.isPresent()) {
+            return prefsMgr.get().getCheckboxPreferenceState(getDisableLocoMarkerPopupRef(), false);
+        } else {
+            return false;
+        }
+    }
+
     public class UrlErrorDialog extends JDialog {
 
-        JTextField _urlField;
-        CatalogPanel _catalog;
-        String _badUrl;
+        private final JTextField _urlField;
+        private final CatalogPanel _catalog;
+        private final String _badUrl;
 
         UrlErrorDialog(String msg, String url) {
             super(_targetFrame, Bundle.getMessage("BadIcon"), true);
@@ -269,7 +305,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             pack();
         }
 
-        protected JPanel makeDoneButtonPanel() {
+        private JPanel makeDoneButtonPanel() {
             JPanel result = new JPanel();
             result.setLayout(new FlowLayout());
             JButton doneButton = new JButton(Bundle.getMessage("ButtonContinue"));
@@ -278,7 +314,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 if (_newIcon != null) {
                     _urlMap.put(_badUrl, _urlField.getText());
                 }
-                dispose();
+                UrlErrorDialog.this.dispose();
             });
             doneButton.setToolTipText(Bundle.getMessage("TooltipContinue"));
             result.add(doneButton);
@@ -286,7 +322,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             JButton deleteButton = new JButton(Bundle.getMessage("ButtonDelete"));
             deleteButton.addActionListener(a -> {
                 _delete = true;
-                dispose();
+                UrlErrorDialog.this.dispose();
             });
             result.add(deleteButton);
             deleteButton.setToolTipText(Bundle.getMessage("TooltipDelete"));
@@ -294,7 +330,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             JButton cancelButton = new JButton(Bundle.getMessage("ButtonIgnore"));
             cancelButton.addActionListener(a -> {
                 _ignore = true;
-                dispose();
+                UrlErrorDialog.this.dispose();
             });
             result.add(cancelButton);
             cancelButton.setToolTipText(Bundle.getMessage("TooltipIgnore"));
@@ -316,6 +352,18 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 
     public Map<String, Positionable> getIdContents() {
         return Collections.unmodifiableMap(_idContents);
+    }
+
+    public Set<String> getClassNames() {
+        return Collections.unmodifiableSet(_classContents.keySet());
+    }
+
+    public Set<Positionable> getPositionablesByClassName(String className) {
+        Set<Positionable> set = _classContents.get(className);
+        if (set == null) {
+            return null;
+        }
+        return Collections.unmodifiableSet(set);
     }
 
     public void setDefaultToolTip(ToolTip dtt) {
@@ -362,8 +410,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 targetWindowClosingEvent(e);
             }
         });
-        _targetPanel.addMouseListener(this);
-        _targetPanel.addMouseMotionListener(this);
+        _targetPanel.addMouseListener(JmriMouseListener.adapt(this));
+        _targetPanel.addMouseMotionListener(JmriMouseMotionListener.adapt(this));
         _targetPanel.setFocusable(true);
         _targetPanel.addKeyListener(this);
         //_targetFrame.pack();
@@ -373,6 +421,60 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 //        log.debug("setTargetPanelSize now w={}, h={}", w, h);
         _targetPanel.setSize(w, h);
         _targetPanel.invalidate();
+    }
+
+    /**
+     * Move focus from an input field to the panel on Tab or Shift+Tab, leaving
+     * no input field selected.
+     */
+    protected void setInputFocusTraversal() {
+        _targetPanel.setFocusTraversalPolicyProvider(true);
+        _targetPanel.setFocusTraversalPolicy(new FocusTraversalPolicy() {
+
+            private List<Component> getInputFields() {
+                return getContents().stream()
+                        .filter(positionable -> positionable instanceof MemoryInputIcon
+                                || positionable instanceof BlockContentsInputIcon
+                                || positionable instanceof GlobalVariableInputIcon)
+                        .map(Positionable::getTextComponent)
+                        .filter(Objects::nonNull)
+                        .filter(component -> component.isFocusable() && component.isEnabled() && component.isVisible())
+                        .collect(Collectors.toList());
+            }
+
+            @Override
+            public Component getComponentAfter(Container focusCycleRoot, Component component) {
+                List<Component> fields = getInputFields();
+                if (fields.isEmpty() || component == _targetPanel) {
+                    return null;
+                }
+                return fields.contains(component) ? _targetPanel : null;
+            }
+
+            @Override
+            public Component getComponentBefore(Container focusCycleRoot, Component component) {
+                List<Component> fields = getInputFields();
+                if (fields.isEmpty() || component == _targetPanel) {
+                    return null;
+                }
+                return fields.contains(component) ? _targetPanel : null;
+            }
+
+            @Override
+            public Component getFirstComponent(Container focusCycleRoot) {
+                return getInputFields().isEmpty() ? null : _targetPanel;
+            }
+
+            @Override
+            public Component getLastComponent(Container focusCycleRoot) {
+                return getInputFields().isEmpty() ? null : _targetPanel;
+            }
+
+            @Override
+            public Component getDefaultComponent(Container focusCycleRoot) {
+                return getFirstComponent(focusCycleRoot);
+            }
+        });
     }
 
     protected Dimension getTargetPanelSize() {
@@ -418,12 +520,23 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             tmp.setBackgroundColor(col);
         }
         JmriColorChooser.addRecentColor(col);
+        notifyWebPanelDisplayOptionsChanged();
     }
 
     public void clearBackgroundColor() {
         if (_targetPanel instanceof TargetPane) {
             TargetPane tmp = (TargetPane) _targetPanel;
             tmp.clearBackgroundColor();
+        }
+        notifyWebPanelDisplayOptionsChanged();
+    }
+
+    /** Notify web clients that a display option on this panel has changed. */
+    public void notifyWebPanelDisplayOptionsChanged() {
+        // This cast includes LayoutEditor which inherits from PanelEditor
+        if (this instanceof jmri.jmrit.display.panelEditor.PanelEditor
+                || this instanceof jmri.jmrit.display.controlPanelEditor.ControlPanelEditor) {
+            firePropertyChange("webPanelDisplayOptions", false, true);
         }
     }
 
@@ -442,17 +555,59 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         setScrollbarScale(ratio);
     }
 
-    ToolTipTimer _tooltipTimer;
+    /**
+     * Repaint a limited area of the target panel.
+     * <p>
+     * The rectangle is given in panel (unscaled) coordinates, e.g. the bounds
+     * of a child of the target panel: children are laid out in unscaled
+     * coordinates while painting is scaled by the paint scale, so the dirty
+     * region is scaled here. The region is grown by a pixel on each side to
+     * cover rounding and antialiasing.
+     * <p>
+     * Use this instead of a full {@code repaint()} of the Editor frame when
+     * the changed area is known, e.g. to show a state change of a single
+     * icon. Safe to call from any thread, as it only posts a dirty region.
+     *
+     * @param rect area to repaint, in unscaled target panel coordinates
+     */
+    public void repaintTargetPanel(@Nonnull Rectangle rect) {
+        JLayeredPane panel = _targetPanel;
+        if (panel == null) { // too early in construction, fall back to a full repaint
+            repaint();
+            return;
+        }
+        double scale = _paintScale;
+        int x = (int) Math.floor(rect.x * scale) - 1;
+        int y = (int) Math.floor(rect.y * scale) - 1;
+        // +2 for the margin pixels, +1 for the flooring of x and y
+        int width = (int) Math.ceil(rect.width * scale) + 3;
+        int height = (int) Math.ceil(rect.height * scale) + 3;
+        panel.repaint(x, y, width, height);
+    }
+
+    private ToolTipTimer _tooltipTimer;
 
     protected void setToolTip(ToolTip tt) {
+        if (tt != null) {
+            var pos = tt.getPositionable();
+            if (pos != null) {  // LE turnout tooltips do not have a Positionable
+                if (pos.isHidden() && !isEditable()) {
+                    // Skip hidden objects
+                    return;
+                }
+            }
+        }
+
         if (tt == null) {
             _tooltip = null;
             if (_tooltipTimer != null) {
                 _tooltipTimer.stop();
                 _tooltipTimer = null;
+                _targetPanel.repaint();
             }
 
         } else if (_tooltip == null && _tooltipTimer == null) {
+            log.debug("start :: tt = {}, tooltip = {}, timer = {}", tt, _tooltip, _tooltipTimer);
             _tooltipTimer = new ToolTipTimer(TOOLTIPSHOWDELAY, this, tt);
             _tooltipTimer.setRepeats(false);
             _tooltipTimer.start();
@@ -485,7 +640,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 
     static class ToolTipTimer extends Timer {
 
-        ToolTip tooltip;
+        private final ToolTip tooltip;
 
         ToolTipTimer(int delay, ActionListener listener, ToolTip tip) {
             super(delay, listener);
@@ -503,8 +658,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      */
     public class TargetPane extends JLayeredPane {
 
-        int h = 100;
-        int w = 150;
+        private int h = 100;
+        private int w = 150;
 
         public TargetPane() {
             setLayout(null);
@@ -978,16 +1133,12 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * time. Deletion must be accomplished via the Delete this panel menu item.
      */
     protected void targetWindowClosing() {
-        String name = "Panel";
-        Container ancestor = _targetPanel.getTopLevelAncestor();
-        if (ancestor instanceof JFrame) {
-            name = ((JFrame) ancestor).getTitle();
-        }
+        String name = _targetFrame.getTitle();
         if (!InstanceManager.getDefault(ShutDownManager.class).isShuttingDown()) {
-            InstanceManager.getDefault(jmri.UserPreferencesManager.class).showInfoMessage(
+            InstanceManager.getDefault(UserPreferencesManager.class).showInfoMessage(
                     Bundle.getMessage("PanelHideTitle"), Bundle.getMessage("PanelHideNotice", name),  // NOI18N
                     "jmri.jmrit.display.EditorManager", "skipHideDialog"); // NOI18N
-            InstanceManager.getDefault(jmri.UserPreferencesManager.class).setPreferenceItemDetails(
+            InstanceManager.getDefault(UserPreferencesManager.class).setPreferenceItemDetails(
                     "jmri.jmrit.display.EditorManager", "skipHideDialog", Bundle.getMessage("PanelHideSkip"));  // NOI18N
         }
     }
@@ -1003,6 +1154,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 
             ed._contents = new ArrayList<>(_contents);
             ed._idContents = new HashMap<>(_idContents);
+            ed._classContents = new HashMap<>(_classContents);
 
             for (Positionable p : _contents) {
                 p.setEditor(ed);
@@ -1012,10 +1164,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }
             ed.setAllEditable(isEditable());
-            ed.setAllPositionable(allPositionable());
+            //ed.setAllPositionable(allPositionable());
             //ed.setShowCoordinates(showCoordinates());
             ed.setAllShowToolTip(showToolTip());
-            ed.setAllControlling(allControlling());
+            //ed.setAllControlling(allControlling());
             ed.setShowHidden(isVisible());
             ed.setPanelMenuVisible(frame.getJMenuBar().isVisible());
             ed.setScroll(getScrollable());
@@ -1027,6 +1179,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 //            ed.pack();
             ed.setVisible(true);
             dispose();
+            InstanceManager.getDefault(EditorManager.class).add(ed);
             return ed;
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException cnfe) {
             log.error("changeView exception {}", cnfe.toString());
@@ -1049,8 +1202,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         JCheckBoxMenuItem lockItem = new JCheckBoxMenuItem(Bundle.getMessage("LockPosition"));
         lockItem.setSelected(!p.isPositionable());
         lockItem.addActionListener(new ActionListener() {
-            Positionable comp;
-            JCheckBoxMenuItem checkBox;
+            private Positionable comp;
+            private JCheckBoxMenuItem checkBox;
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1076,10 +1229,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * @return always returns true
      */
     public boolean setShowCoordinatesMenu(Positionable p, JPopupMenu popup) {
-        //if (showCoordinates()) {
+
         JMenuItem edit;
-        if ((p instanceof MemoryIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
-            MemoryIcon pm = (MemoryIcon) p;
+        if ((p instanceof MemoryOrGVIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
+            MemoryOrGVIcon pm = (MemoryOrGVIcon) p;
 
             edit = new JMenuItem(Bundle.getMessage(
                 "EditLocationXY", pm.getOriginalX(), pm.getOriginalY()));
@@ -1092,8 +1245,6 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         }
         popup.add(edit);
         return true;
-        //}
-        //return false;
     }
 
     /**
@@ -1109,7 +1260,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         if (showAlignPopup(p)) {
             JMenu edit = new JMenu(Bundle.getMessage("EditAlignment"));
             edit.add(new AbstractAction(Bundle.getMessage("AlignX")) {
-                int _x;
+                private int _x;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1130,7 +1281,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }.init(p.getX()));
             edit.add(new AbstractAction(Bundle.getMessage("AlignMiddleX")) {
-                int _x;
+                private int _x;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1151,7 +1302,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }.init(p.getX() + p.getWidth() / 2));
             edit.add(new AbstractAction(Bundle.getMessage("AlignOtherX")) {
-                int _x;
+                private int _x;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1172,7 +1323,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }.init(p.getX() + p.getWidth()));
             edit.add(new AbstractAction(Bundle.getMessage("AlignY")) {
-                int _y;
+                private int _y;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1193,7 +1344,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }.init(p.getY()));
             edit.add(new AbstractAction(Bundle.getMessage("AlignMiddleY")) {
-                int _y;
+                private int _y;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1214,7 +1365,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }.init(p.getY() + p.getHeight() / 2));
             edit.add(new AbstractAction(Bundle.getMessage("AlignOtherY")) {
-                int _y;
+                private int _y;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -1300,8 +1451,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         JCheckBoxMenuItem hideItem = new JCheckBoxMenuItem(Bundle.getMessage("SetHidden"));
         hideItem.setSelected(p.isHidden());
         hideItem.addActionListener(new ActionListener() {
-            Positionable comp;
-            JCheckBoxMenuItem checkBox;
+            private Positionable comp;
+            private JCheckBoxMenuItem checkBox;
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1319,6 +1470,75 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     }
 
     /**
+     * Add a menu entry to set visibility of the Positionable item based on the presence of contents.
+     * If the value is null or empty, the icon is not visible.
+     * This is applicable to memory,  block content and LogixNG global variable labels.
+     *
+     * @param p     the item
+     * @param popup the menu to add the entry to
+     */
+    public void setEmptyHiddenMenu(Positionable p, JPopupMenu popup) {
+        if (p.getDisplayLevel() == BKG) {
+            return;
+        }
+        if (p instanceof BlockContentsIcon || p instanceof MemoryIcon
+                || p instanceof GlobalVariableIcon || p instanceof LogixNGTableIcon) {
+            JCheckBoxMenuItem hideEmptyItem = new JCheckBoxMenuItem(Bundle.getMessage("SetEmptyHidden"));
+            hideEmptyItem.setSelected(p.isEmptyHidden());
+            hideEmptyItem.addActionListener(new ActionListener() {
+                private Positionable comp;
+                private JCheckBoxMenuItem checkBox;
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    comp.setEmptyHidden(checkBox.isSelected());
+                }
+
+                ActionListener init(Positionable pos, JCheckBoxMenuItem cb) {
+                    comp = pos;
+                    checkBox = cb;
+                    return this;
+                }
+            }.init(p, hideEmptyItem));
+            popup.add(hideEmptyItem);
+        }
+    }
+
+    /**
+     * Add a menu entry to disable double click value edits.  This applies when not in panel edit mode.
+     * This is applicable to memory,  block content and LogixNG global variable labels.
+     *
+     * @param p     the item
+     * @param popup the menu to add the entry to
+     */
+    public void setValueEditDisabledMenu(Positionable p, JPopupMenu popup) {
+        if (p.getDisplayLevel() == BKG) {
+            return;
+        }
+        if (p instanceof BlockContentsIcon || p instanceof MemoryIcon
+                || p instanceof GlobalVariableIcon || p instanceof LogixNGTableIcon) {
+            JCheckBoxMenuItem valueEditDisableItem = new JCheckBoxMenuItem(Bundle.getMessage("SetValueEditDisabled"));
+            valueEditDisableItem.setSelected(p.isValueEditDisabled());
+            valueEditDisableItem.addActionListener(new ActionListener() {
+                private Positionable comp;
+                private JCheckBoxMenuItem checkBox;
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    comp.setValueEditDisabled(checkBox.isSelected());
+                }
+
+                ActionListener init(Positionable pos, JCheckBoxMenuItem cb) {
+                    comp = pos;
+                    checkBox = cb;
+                    return this;
+                }
+            }.init(p, valueEditDisableItem));
+            popup.add(valueEditDisableItem);
+        }
+    }
+
+    /**
      * Add a menu entry to edit Id of the Positionable item
      *
      * @param p     the item
@@ -1333,6 +1553,115 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     }
 
     /**
+     * Add a menu entry to edit Classes of the Positionable item
+     *
+     * @param p     the item
+     * @param popup the menu to add the entry to
+     */
+    public void setEditClassesMenu(Positionable p, JPopupMenu popup) {
+        if (p.getDisplayLevel() == BKG) {
+            return;
+        }
+
+        popup.add(CoordinateEdit.getClassesEditAction(p, "EditClasses", this));
+    }
+
+    /**
+     * Check if edit of a conditional is in progress.
+     *
+     * @return true if this is the case, after showing dialog to user
+     */
+    private boolean checkEditConditionalNG() {
+        if (_inEditInlineLogixNGMode) {
+            // Already editing a LogixNG, ask for completion of that edit
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("Error_InlineLogixNGInEditMode"), // NOI18N
+                    Bundle.getMessage("ErrorTitle"), // NOI18N
+                    JmriJOptionPane.ERROR_MESSAGE);
+            _inlineLogixNGEdit.bringToFront();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Add a menu entry to edit Id of the Positionable item
+     *
+     * @param p     the item
+     * @param popup the menu to add the entry to
+     */
+    public void setLogixNGPositionableMenu(Positionable p, JPopupMenu popup) {
+        if (p.getDisplayLevel() == BKG) {
+            return;
+        }
+
+        JMenu logixNG_Menu = new JMenu("LogixNG");
+        popup.add(logixNG_Menu);
+
+        logixNG_Menu.add(new AbstractAction(Bundle.getMessage("LogixNG_Inline")) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (checkEditConditionalNG()) {
+                    return;
+                }
+
+                if (p.getLogixNG() == null) {
+                    LogixNG logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
+                            .createLogixNG(null, true);
+                    logixNG.setInlineLogixNG(p);
+                    logixNG.activate();
+                    logixNG.setEnabled(true);
+                    logixNG.clearStartup();
+                    p.setLogixNG(logixNG);
+                }
+                LogixNGEditor logixNGEditor = new LogixNGEditor(null, p.getLogixNG().getSystemName());
+                logixNGEditor.addEditorEventListener((HashMap<String, String> data) -> {
+                    _inEditInlineLogixNGMode = false;
+                    data.forEach((key, value) -> {
+                        if (key.equals("Finish")) {                  // NOI18N
+                            _inlineLogixNGEdit = null;
+                            _inEditInlineLogixNGMode = false;
+                        } else if (key.equals("Delete")) {           // NOI18N
+                            _inEditInlineLogixNGMode = false;
+                            deleteLogixNG(p.getLogixNG());
+                        } else if (key.equals("chgUname")) {         // NOI18N
+                            p.getLogixNG().setUserName(value);
+                        }
+                    });
+                    if (p.getLogixNG() != null && p.getLogixNG().getNumConditionalNGs() == 0) {
+                        deleteLogixNG_Internal(p.getLogixNG());
+                    }
+                });
+                logixNGEditor.bringToFront();
+                _inEditInlineLogixNGMode = true;
+                _inlineLogixNGEdit = logixNGEditor;
+            }
+        });
+    }
+
+    private void deleteLogixNG(LogixNG logixNG) {
+        DeleteBean<LogixNG> deleteBean = new DeleteBean<>(
+                InstanceManager.getDefault(LogixNG_Manager.class));
+
+        boolean hasChildren = logixNG.getNumConditionalNGs() > 0;
+
+        deleteBean.delete(logixNG, hasChildren, t -> deleteLogixNG_Internal(t),
+                (t,list) -> logixNG.getListenerRefsIncludingChildren(list),
+                jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName());
+    }
+
+    private void deleteLogixNG_Internal(LogixNG logixNG) {
+        logixNG.setEnabled(false);
+        try {
+            InstanceManager.getDefault(LogixNG_Manager.class).deleteBean(logixNG, "DoDelete");
+            logixNG.getInlineLogixNG().setLogixNG(null);
+        } catch (PropertyVetoException e) {
+            //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+            log.error("{} : Could not Delete.", e.getMessage());
+        }
+    }
+
+    /**
      * Check if it's possible to change the id of the Positionable to the
      * desired string.
      * @param p the Positionable
@@ -1343,14 +1672,58 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     public void positionalIdChange(Positionable p, String newId)
             throws Positionable.DuplicateIdException {
 
-        if (Objects.equals(newId, p.getId())) return;
+        if (Objects.equals(newId, p.getId())) {
+            return;
+        }
 
         if ((newId != null) && (_idContents.containsKey(newId))) {
             throw new Positionable.DuplicateIdException();
         }
 
-        if (p.getId() != null) _idContents.remove(p.getId());
-        if (newId != null) _idContents.put(newId, p);
+        if (p.getId() != null) {
+            _idContents.remove(p.getId());
+        }
+        if (newId != null) {
+            _idContents.put(newId, p);
+        }
+    }
+
+    /**
+     * Add a class name to the Positionable
+     * @param p the Positionable
+     * @param className the class name
+     * @throws IllegalArgumentException if the name contains a comma
+     */
+    public void positionalAddClass(Positionable p, String className) {
+
+        if (className == null) {
+            throw new IllegalArgumentException("Class name must not be null");
+        }
+        if (className.isBlank()) {
+            throw new IllegalArgumentException("Class name must not be blank");
+        }
+        if (className.contains(",")) {
+            throw new IllegalArgumentException("Class name must not contain a comma");
+        }
+
+        if (p.getClasses().contains(className)) {
+            return;
+        }
+
+        _classContents.computeIfAbsent(className, o -> new HashSet<>()).add(p);
+    }
+
+    /**
+     * Removes a class name from the Positionable
+     * @param p the Positionable
+     * @param className the class name
+     */
+    public void positionalRemoveClass(Positionable p, String className) {
+
+        if (p.getClasses().contains(className)) {
+            return;
+        }
+        _classContents.get(className).remove(p);
     }
 
     /**
@@ -1364,12 +1737,14 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         if (p.getDisplayLevel() == BKG) {
             return;
         }
+
         JMenu edit = new JMenu(Bundle.getMessage("EditTooltip"));
+
         JCheckBoxMenuItem showToolTipItem = new JCheckBoxMenuItem(Bundle.getMessage("ShowTooltip"));
         showToolTipItem.setSelected(p.showToolTip());
         showToolTipItem.addActionListener(new ActionListener() {
-            Positionable comp;
-            JCheckBoxMenuItem checkBox;
+            private Positionable comp;
+            private JCheckBoxMenuItem checkBox;
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1383,33 +1758,29 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             }
         }.init(p, showToolTipItem));
         edit.add(showToolTipItem);
+
         edit.add(CoordinateEdit.getToolTipEditAction(p));
-        NamedBean bean = p.getNamedBean();
-        if (bean != null) {
-            edit.add(new AbstractAction(Bundle.getMessage("SetSysNameTooltip")) {
-                Positionable comp;
-                NamedBean bean;
 
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    ToolTip tip = comp.getToolTip();
-                    if (tip != null) {
-                        String uName = bean.getUserName();
-                        String sName = bean.getSystemName();
-                        if (uName != null && uName.length() > 0) {
-                            sName = uName + "(" + sName + ")";
-                        }
-                        tip.setText(sName);
-                    }
-                }
+        JCheckBoxMenuItem prependToolTipWithDisplayNameItem =
+            new JCheckBoxMenuItem(Bundle.getMessage("PrependTooltipWithDisplayName"));
+        prependToolTipWithDisplayNameItem.setSelected(p.getToolTip().getPrependToolTipWithDisplayName());
+        prependToolTipWithDisplayNameItem.addActionListener(new ActionListener() {
+            private Positionable comp;
+            private JCheckBoxMenuItem checkBox;
 
-                AbstractAction init(Positionable pos, NamedBean b) {
-                    comp = pos;
-                    bean = b;
-                    return this;
-                }
-            }.init(p, bean));
-        }
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                comp.getToolTip().setPrependToolTipWithDisplayName(checkBox.isSelected());
+            }
+
+            ActionListener init(Positionable pos, JCheckBoxMenuItem cb) {
+                comp = pos;
+                checkBox = cb;
+                return this;
+            }
+        }.init(p, prependToolTipWithDisplayNameItem));
+        edit.add(prependToolTipWithDisplayNameItem);
+
         popup.add(edit);
     }
 
@@ -1421,7 +1792,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      */
     public void setRemoveMenu(Positionable p, JPopupMenu popup) {
         popup.add(new AbstractAction(Bundle.getMessage("Remove")) {
-            Positionable comp;
+            private Positionable comp;
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1510,8 +1881,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             if ((nameID != null) && !(nameID.trim().equals(""))) {
                 addLocoIcon(nameID.trim());
             } else {
-                JOptionPane.showMessageDialog(locoFrame, Bundle.getMessage("ErrorEnterLocoID"),
-                        Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.showMessageDialog(locoFrame, Bundle.getMessage("ErrorEnterLocoID"),
+                        Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
             }
         });
         locoFrame.getContentPane().add(okay);
@@ -1537,7 +1908,12 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             Positionable il = _contents.get(i);
             if (il instanceof LocoIcon) {
                 il.remove();
-                if (il.getId() != null) _idContents.remove(il.getId());
+                if (il.getId() != null) {
+                    _idContents.remove(il.getId());
+                }
+                for (String className : il.getClasses()) {
+                    _classContents.get(className).remove(il);
+                }
             }
         }
     }
@@ -1600,11 +1976,16 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         return left;
     }
 
-    /* Positionable has set a new level.  Editor must change it in the target panel.
+    /**
+     * Positionable has set a new level.
+     * Editor must change it in the target panel.
+     * @param l the positionable to display.
      */
     public void displayLevelChange(Positionable l) {
-        removeFromTarget(l);
-        addToTarget(l);
+        ThreadingUtil.runOnGUI( () -> {
+            removeFromTarget(l);
+            addToTarget(l);
+        });
     }
 
     public TrainIcon addTrainIcon(String name) {
@@ -1624,6 +2005,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         l.setHorizontalTextPosition(SwingConstants.CENTER);
         l.setSize(l.getPreferredSize().width, l.getPreferredSize().height);
         l.setEditable(isEditable());    // match popup mode to editor mode
+        l.setLocation(75, 75);  // fixed location
         try {
             putItem(l);
         } catch (Positionable.DuplicateIdException e) {
@@ -1632,14 +2014,22 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         }
     }
 
-    public void putItem(Positionable l) throws Positionable.DuplicateIdException {
-        l.invalidate();
-        l.setPositionable(true);
-        l.setVisible(true);
-        if (l.getToolTip() == null) {
-            l.setToolTip(new ToolTip(_defaultToolTip, l));
-        }
-        addToTarget(l);
+    public void putItem(@Nonnull Positionable l) throws Positionable.DuplicateIdException {
+        putItem(l, false);
+    }
+
+    public void putItem(@Nonnull Positionable l, boolean factoryPositionable)
+            throws Positionable.DuplicateIdException {
+
+        ThreadingUtil.runOnGUI( () -> {
+            l.invalidate();
+            l.setPositionable(true);
+            l.setVisible(true);
+            if (l.getToolTip() == null) {
+                l.setToolTip(new ToolTip(_defaultToolTip, l));
+            }
+            addToTarget(l);
+        });
         if (!_contents.add(l)) {
             log.error("Unable to add {} to _contents", l.getNameString());
         }
@@ -1648,6 +2038,9 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 throw new Positionable.DuplicateIdException();
             }
             _idContents.put(l.getId(), l);
+        }
+        for (String className : l.getClasses()) {
+            _classContents.get(className).add(l);
         }
         if (log.isDebugEnabled()) {
             log.debug("putItem {} to _contents. level= {}", l.getNameString(), l.getDisplayLevel());
@@ -1667,9 +2060,9 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     /*
      * ************ Icon editors for adding content ***********
      */
-    static final public String[] ICON_EDITORS = {"Sensor", "RightTurnout", "LeftTurnout",
+    static final String[] ICON_EDITORS = {"Sensor", "RightTurnout", "LeftTurnout",
         "SlipTOEditor", "SignalHead", "SignalMast", "Memory", "Light",
-        "Reporter", "Background", "MultiSensor", "Icon", "Text", "Block Contents"};
+        "Reporter", "Background", "MultiSensor", "Icon", "Text", "BlockLabel"};
 
     /**
      * Create editor for a given item type.
@@ -1696,6 +2089,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 addSignalMastEditor();
             } else if ("Memory".equals(name)) {
                 addMemoryEditor();
+            } else if ("GlobalVariable".equals(name)) {
+                addGlobalVariableEditor();
+            } else if ("LogixNGTable".equals(name)) {
+                addLogixNGTableEditor();
             } else if ("Reporter".equals(name)) {
                 addReporterEditor();
             } else if ("Light".equals(name)) {
@@ -1710,6 +2107,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 addTextEditor();
             } else if ("BlockLabel".equals(name)) {
                 addBlockContentsEditor();
+            } else if ("Audio".equals(name)) {
+                addAudioEditor();
+            } else if ("LogixNG".equals(name)) {
+                addLogixNGEditor();
             } else {
                 // log.error("No such Icon Editor \"{}\"", name);
                 return null;
@@ -1736,11 +2137,15 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         return _iconEditorFrame.get(name).getEditor();
     }
 
+    public void putIconEditor(String name, Editor.JFrameItem frame) {
+        _iconEditorFrame.put(name, frame);
+    }
+
     /**
      * Add a label to the target.
      */
     protected void addTextEditor() {
-        String newLabel = JOptionPane.showInputDialog(this, Bundle.getMessage("PromptNewLabel"));
+        String newLabel = JmriJOptionPane.showInputDialog(this, Bundle.getMessage("PromptNewLabel"),"");
         if (newLabel == null) {
             return;  // canceled
         }
@@ -1931,8 +2336,86 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
     }
 
+    protected void addGlobalVariableEditor() {
+        IconAdder editor = new IconAdder("GlobalVariable") {
+            final JButton bSpin = new JButton(Bundle.getMessage("AddSpinner"));
+            final JButton bBox = new JButton(Bundle.getMessage("AddInputBox"));
+            final JSpinner spinner = new JSpinner(_spinCols);
+
+            @Override
+            protected void addAdditionalButtons(JPanel p) {
+                bSpin.addActionListener(a -> addGlobalVariableSpinner());
+                JPanel p1 = new JPanel();
+                //p1.setLayout(new BoxLayout(p1, BoxLayout.X_AXIS));
+                bBox.addActionListener(a -> addGlobalVariableInputBox());
+                ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setColumns(2);
+                spinner.setMaximumSize(spinner.getPreferredSize());
+                JPanel p2 = new JPanel();
+                p2.add(new JLabel(Bundle.getMessage("NumColsLabel")));
+                p2.add(spinner);
+                p1.add(p2);
+                p1.add(bBox);
+                p.add(p1);
+                p1 = new JPanel();
+                p1.add(bSpin);
+                p.add(p1);
+            }
+
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                super.valueChanged(e);
+                bSpin.setEnabled(addIconIsEnabled());
+                bBox.setEnabled(addIconIsEnabled());
+            }
+        };
+        ActionListener addIconAction = a -> putGlobalVariable();
+        JFrameItem frame = makeAddIconFrame("GlobalVariable", true, true, editor);
+        _iconEditorFrame.put("GlobalVariable", frame);
+        editor.setPickList(PickListModel.globalVariablePickModelInstance());
+        editor.makeIconPanel(true);
+        editor.complete(addIconAction, false, false, false);
+        frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
+    }
+
+    protected void addLogixNGTableEditor() {
+        IconAdder editor = new IconAdder("LogixNGTable");
+        ActionListener addIconAction = a -> addLogixNGTable();
+        JFrameItem frame = makeAddIconFrame("LogixNGTable", true, true, editor);
+        _iconEditorFrame.put("LogixNGTable", frame);
+        editor.setPickList(PickListModel.namedTablePickModelInstance());
+        editor.makeIconPanel(true);
+        editor.complete(addIconAction, false, false, false);
+        frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
+    }
+
     protected void addBlockContentsEditor() {
-        IconAdder editor = new IconAdder("Block Contents");
+        IconAdder editor = new IconAdder("BlockLabel") {
+            final JButton bBox = new JButton(Bundle.getMessage("AddInputBox"));
+            final JSpinner spinner = new JSpinner(_spinCols);
+
+            @Override
+            protected void addAdditionalButtons(JPanel p) {
+                JPanel p1 = new JPanel();
+                //p1.setLayout(new BoxLayout(p1, BoxLayout.X_AXIS));
+                bBox.addActionListener(a -> addBlockContentsInputBox());
+                ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setColumns(2);
+                spinner.setMaximumSize(spinner.getPreferredSize());
+                JPanel p2 = new JPanel();
+                p2.add(new JLabel(Bundle.getMessage("NumColsLabel")));
+                p2.add(spinner);
+                p1.add(p2);
+                p1.add(bBox);
+                p.add(p1);
+                p.add(p1);
+            }
+
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                super.valueChanged(e);
+                bBox.setEnabled(addIconIsEnabled());
+            }
+        };
+
         ActionListener addIconAction = a -> putBlockContents();
         JFrameItem frame = makeAddIconFrame("BlockLabel", true, true, editor);
         _iconEditorFrame.put("BlockLabel", frame);
@@ -2021,6 +2504,31 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         _iconEditorFrame.put("Icon", frame);
 
         ActionListener addIconAction = a -> putIcon();
+        editor.makeIconPanel(true);
+        editor.complete(addIconAction, true, false, false);
+        frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
+    }
+
+    protected void addAudioEditor() {
+        IconAdder editor = new IconAdder("Audio");
+        editor.setIcon(0, "plainIcon", "resources/icons/audio_icon.gif");
+        JFrameItem frame = makeAddIconFrame("Audio", true, false, editor);
+        _iconEditorFrame.put("Audio", frame);
+        editor.setPickList(PickListModel.audioPickModelInstance());
+
+        ActionListener addIconAction = a -> putAudio();
+        editor.makeIconPanel(true);
+        editor.complete(addIconAction, true, false, false);
+        frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
+    }
+
+    protected void addLogixNGEditor() {
+        IconAdder editor = new IconAdder("LogixNG");
+        editor.setIcon(0, "plainIcon", "resources/icons/logixng/logixng_icon.gif");
+        JFrameItem frame = makeAddIconFrame("LogixNG", true, false, editor);
+        _iconEditorFrame.put("LogixNG", frame);
+
+        ActionListener addIconAction = a -> putLogixNG();
         editor.makeIconPanel(true);
         editor.complete(addIconAction, true, false, false);
         frame.addHelpMenu("package.jmri.jmrit.display.IconAdder", true);
@@ -2247,6 +2755,70 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         return result;
     }
 
+    protected GlobalVariableIcon putGlobalVariable() {
+        GlobalVariableIcon result = new GlobalVariableIcon(new NamedIcon("resources/icons/misc/X-red.gif",
+                "resources/icons/misc/X-red.gif"), this);
+        IconAdder globalVariableIconEditor = getIconEditor("GlobalVariable");
+        result.setGlobalVariable(globalVariableIconEditor.getTableSelection().getDisplayName());
+        result.setSize(result.getPreferredSize().width, result.getPreferredSize().height);
+        result.setDisplayLevel(MEMORIES);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
+        }
+        return result;
+    }
+
+    protected GlobalVariableSpinnerIcon addGlobalVariableSpinner() {
+        GlobalVariableSpinnerIcon result = new GlobalVariableSpinnerIcon(this);
+        IconAdder globalVariableIconEditor = getIconEditor("GlobalVariable");
+        result.setGlobalVariable(globalVariableIconEditor.getTableSelection().getDisplayName());
+        result.setSize(result.getPreferredSize().width, result.getPreferredSize().height);
+        result.setDisplayLevel(MEMORIES);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
+        }
+        return result;
+    }
+
+    protected GlobalVariableInputIcon addGlobalVariableInputBox() {
+        GlobalVariableInputIcon result = new GlobalVariableInputIcon(_spinCols.getNumber().intValue(), this);
+        IconAdder globalVariableIconEditor = getIconEditor("GlobalVariable");
+        result.setGlobalVariable(globalVariableIconEditor.getTableSelection().getDisplayName());
+        result.setSize(result.getPreferredSize().width, result.getPreferredSize().height);
+        result.setDisplayLevel(MEMORIES);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
+        }
+        return result;
+    }
+
+    protected LogixNGTableIcon addLogixNGTable() {
+        IconAdder logixNGTableIconEditor = getIconEditor("LogixNGTable");
+        LogixNGTableIcon result = new LogixNGTableIcon(logixNGTableIconEditor.getTableSelection().getDisplayName(), this);
+        result.setSize(result.getPreferredSize().width, result.getPreferredSize().height);
+        result.setDisplayLevel(MEMORIES);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
+        }
+        return result;
+    }
+
     protected BlockContentsIcon putBlockContents() {
         BlockContentsIcon result = new BlockContentsIcon(new NamedIcon("resources/icons/misc/X-red.gif",
                 "resources/icons/misc/X-red.gif"), this);
@@ -2263,6 +2835,23 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         }
         return result;
     }
+
+    protected BlockContentsInputIcon addBlockContentsInputBox() {
+        BlockContentsInputIcon result = new BlockContentsInputIcon(_spinCols.getNumber().intValue(), this);
+        IconAdder blockContentsIconEditor = getIconEditor("BlockLabel");
+        result.setBlock(blockContentsIconEditor.getTableSelection().getDisplayName());
+        result.setSize(result.getPreferredSize().width, result.getPreferredSize().height);
+        result.setDisplayLevel(MEMORIES);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
+        }
+        return result;
+    }
+
 
     /**
      * Add a Light indicator to the target
@@ -2341,6 +2930,62 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         return result;
     }
 
+    /**
+     * Add a LogixNG icon to the target.
+     *
+     * @return The LogixNG icon that was added to the target.
+     */
+    protected Positionable putAudio() {
+        IconAdder iconEditor = getIconEditor("Audio");
+        String url = iconEditor.getIcon("plainIcon").getURL();
+        NamedIcon icon = NamedIcon.getIconByName(url);
+        if (log.isDebugEnabled()) {
+            log.debug("putAudio: {} url= {}", (icon == null ? "null" : "icon"), url);
+        }
+        AudioIcon result = new AudioIcon(icon, this);
+        NamedBean b = iconEditor.getTableSelection();
+        if (b != null) {
+            result.setAudio(b.getDisplayName());
+        }
+//        l.setPopupUtility(null);        // no text
+        result.setDisplayLevel(ICONS);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putAudio() with null id has thrown DuplicateIdException", e);
+        }
+        result.updateSize();
+        return result;
+    }
+
+    /**
+     * Add a LogixNG icon to the target.
+     *
+     * @return The LogixNG icon that was added to the target.
+     */
+    protected Positionable putLogixNG() {
+        IconAdder iconEditor = getIconEditor("LogixNG");
+        String url = iconEditor.getIcon("plainIcon").getURL();
+        NamedIcon icon = NamedIcon.getIconByName(url);
+        if (log.isDebugEnabled()) {
+            log.debug("putLogixNG: {} url= {}", (icon == null ? "null" : "icon"), url);
+        }
+        LogixNGIcon result = new LogixNGIcon(icon, this);
+//        l.setPopupUtility(null);        // no text
+        result.setDisplayLevel(ICONS);
+        setNextLocation(result);
+        try {
+            putItem(result);
+        } catch (Positionable.DuplicateIdException e) {
+            // This should never happen
+            log.error("Editor.putLogixNG() with null id has thrown DuplicateIdException", e);
+        }
+        result.updateSize();
+        return result;
+    }
+
     @SuppressFBWarnings(value="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE", justification="iconEditor requested as exact type")
     public MultiSensorIcon addMultiSensor() {
         MultiSensorIcon result = new MultiSensorIcon(this);
@@ -2403,7 +3048,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      */
     public static class JFrameItem extends JmriJFrame {
 
-        IconAdder _editor;
+        private final IconAdder _editor;
 
         JFrameItem(String name, IconAdder editor) {
             super(name);
@@ -2422,11 +3067,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     }
 
     public void setTitle() {
-        String name = "";
-        Container ancestor = _targetPanel.getTopLevelAncestor();
-        if (ancestor instanceof JFrame) {
-            name = ((JFrame) ancestor).getTitle();
-        }
+        String name = _targetFrame.getTitle();
         if (name == null || name.equals("")) {
             super.setTitle(Bundle.getMessage("LabelEditor"));
         } else {
@@ -2449,49 +3090,55 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * @param editor parent frame of the image frame
      * @return JFrame connected to the editor,  to be filled with icons
      */
-    protected JFrameItem makeAddIconFrame(String name, boolean add, boolean table, IconAdder editor) {
+    public JFrameItem makeAddIconFrame(String name, boolean add, boolean table, IconAdder editor) {
         log.debug("makeAddIconFrame for {}, add= {}, table= {}", name, add, table);
         String txt;
-        String BundleName;
+        String bundleName;
         JFrameItem frame = new JFrameItem(name, editor);
         // use NamedBeanBundle property for basic beans like "Turnout" I18N
         if ("Sensor".equals(name)) {
-            BundleName = "BeanNameSensor";
+            bundleName = "BeanNameSensor";
         } else if ("SignalHead".equals(name)) {
-            BundleName = "BeanNameSignalHead";
+            bundleName = "BeanNameSignalHead";
         } else if ("SignalMast".equals(name)) {
-            BundleName = "BeanNameSignalMast";
+            bundleName = "BeanNameSignalMast";
         } else if ("Memory".equals(name)) {
-            BundleName = "BeanNameMemory";
+            bundleName = "BeanNameMemory";
         } else if ("Reporter".equals(name)) {
-            BundleName = "BeanNameReporter";
+            bundleName = "BeanNameReporter";
         } else if ("Light".equals(name)) {
-            BundleName = "BeanNameLight";
+            bundleName = "BeanNameLight";
         } else if ("Turnout".equals(name)) {
-            BundleName = "BeanNameTurnout"; // called by RightTurnout and LeftTurnout objects in TurnoutIcon.java edit() method
+            bundleName = "BeanNameTurnout"; // called by RightTurnout and LeftTurnout objects in TurnoutIcon.java edit() method
         } else if ("Block".equals(name)) {
-            BundleName = "BeanNameBlock";
+            bundleName = "BeanNameBlock";
+        } else if ("GlobalVariable".equals(name)) {
+            bundleName = "BeanNameGlobalVariable";
+        } else if ("LogixNGTable".equals(name)) {
+            bundleName = "BeanNameLogixNGTable";
+        } else if ("Audio".equals(name)) {
+            bundleName = "BeanNameAudio";
         } else {
-            BundleName = name;
+            bundleName = name;
         }
         if (editor != null) {
             JPanel p = new JPanel();
             p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
             if (add) {
-                txt = MessageFormat.format(Bundle.getMessage("addItemToPanel"), Bundle.getMessage(BundleName));
+                txt = MessageFormat.format(Bundle.getMessage("addItemToPanel"), Bundle.getMessage(bundleName));
             } else {
-                txt = MessageFormat.format(Bundle.getMessage("editItemInPanel"), Bundle.getMessage(BundleName));
+                txt = MessageFormat.format(Bundle.getMessage("editItemInPanel"), Bundle.getMessage(bundleName));
             }
             p.add(new JLabel(txt));
             if (table) {
-                txt = MessageFormat.format(Bundle.getMessage("TableSelect"), Bundle.getMessage(BundleName),
+                txt = MessageFormat.format(Bundle.getMessage("TableSelect"), Bundle.getMessage(bundleName),
                         (add ? Bundle.getMessage("ButtonAddIcon") : Bundle.getMessage("ButtonUpdateIcon")));
             } else {
                 if ("MultiSensor".equals(name)) {
                     txt = MessageFormat.format(Bundle.getMessage("SelectMultiSensor", Bundle.getMessage("ButtonAddIcon")),
                             (add ? Bundle.getMessage("ButtonAddIcon") : Bundle.getMessage("ButtonUpdateIcon")));
                 } else {
-                    txt = MessageFormat.format(Bundle.getMessage("IconSelect"), Bundle.getMessage(BundleName),
+                    txt = MessageFormat.format(Bundle.getMessage("IconSelect"), Bundle.getMessage(bundleName),
                             (add ? Bundle.getMessage("ButtonAddIcon") : Bundle.getMessage("ButtonUpdateIcon")));
                 }
             }
@@ -2515,7 +3162,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
 
             JMenuItem searchItem = new JMenuItem(Bundle.getMessage("searchFSMenu"));
             searchItem.addActionListener(new ActionListener() {
-                IconAdder ea;
+                private IconAdder ea;
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -2548,10 +3195,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             log.error("No icon editor specified for {}", name); // NOI18N
         }
         if (add) {
-            txt = MessageFormat.format(Bundle.getMessage("AddItem"), Bundle.getMessage(BundleName));
+            txt = MessageFormat.format(Bundle.getMessage("AddItem"), Bundle.getMessage(bundleName));
             _iconEditorFrame.put(name, frame);
         } else {
-            txt = MessageFormat.format(Bundle.getMessage("EditItem"), Bundle.getMessage(BundleName));
+            txt = MessageFormat.format(Bundle.getMessage("EditItem"), Bundle.getMessage(bundleName));
         }
         frame.setTitle(txt + " (" + getTitle() + ")");
         frame.pack();
@@ -2561,23 +3208,55 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     /*
      * ******************* cleanup ************************
      */
-    protected void removeFromTarget(Positionable l) {
+    protected void removeFromTarget(@Nonnull Positionable l) {
+        Point p = l.getLocation();
         _targetPanel.remove((Component) l);
         _highlightcomponent = null;
-        Point p = l.getLocation();
-        int w = l.getWidth();
-        int h = l.getHeight();
+        int w = Math.max( l.maxWidth(), l.getWidth());
+        int h = Math.max( l.maxHeight(), l.getHeight());
         _targetPanel.revalidate();
         _targetPanel.repaint(p.x, p.y, w, h);
     }
 
-    public boolean removeFromContents(Positionable l) {
+    public boolean removeFromContents(@Nonnull Positionable l) {
         removeFromTarget(l);
         //todo check that parent == _targetPanel
         //Container parent = this.getParent();
         // force redisplay
-        if (l.getId() != null) _idContents.remove(l.getId());
+        if (l.getId() != null) {
+            _idContents.remove(l.getId());
+        }
+        for (String className : l.getClasses()) {
+            _classContents.get(className).remove(l);
+        }
         return _contents.remove(l);
+    }
+
+    /**
+     * Ask user the user to decide what to do with LogixNGs, whether to delete them
+     * or convert them to normal LogixNGs.  Then respond to user's choice.
+     */
+    private void dispositionLogixNGs() {
+        ArrayList<LogixNG> logixNGArrayList = new ArrayList<>();
+        for (Positionable _content : _contents) {
+            if (_content.getLogixNG() != null) {
+                LogixNG logixNG = _content.getLogixNG();
+                logixNGArrayList.add(logixNG);
+            }
+        }
+        if (!logixNGArrayList.isEmpty()) {
+            LogixNGDeleteDialog logixNGDeleteDialog = new LogixNGDeleteDialog(this, getTitle(), logixNGArrayList);
+            logixNGDeleteDialog.setVisible(true);
+            List<LogixNG> selectedItems = logixNGDeleteDialog.getSelectedItems();
+            for (LogixNG logixNG : selectedItems) {
+                deleteLogixNG_Internal(logixNG);
+                logixNGArrayList.remove(logixNG);
+            }
+            for (LogixNG logixNG : logixNGArrayList) {
+                logixNG.setInline(false);
+                logixNG.setEnabled(!logixNGDeleteDialog.isDisableLogixNG());
+            }
+        }
     }
 
     /**
@@ -2589,14 +3268,18 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     public boolean deletePanel() {
         log.debug("deletePanel");
         // verify deletion
-        int selectedValue = JOptionPane.showOptionDialog(_targetPanel,
-                Bundle.getMessage("QuestionA") + "\n" + Bundle.getMessage("QuestionA2", Bundle.getMessage("FileMenuItemStore")),
-                Bundle.getMessage("DeleteVerifyTitle"), JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE, null,
+        int selectedValue = JmriJOptionPane.showOptionDialog(_targetPanel,
+                Bundle.getMessage("QuestionA") + "\n" + Bundle.getMessage("QuestionA2",
+                    Bundle.getMessage("FileMenuItemStore")),
+                Bundle.getMessage("DeleteVerifyTitle"), JmriJOptionPane.DEFAULT_OPTION,
+                JmriJOptionPane.QUESTION_MESSAGE, null,
                 new Object[]{Bundle.getMessage("ButtonYesDelete"), Bundle.getMessage("ButtonCancel")},
                 Bundle.getMessage("ButtonCancel"));
-        // return without deleting if "No" response
-        return (selectedValue == JOptionPane.YES_OPTION);
+        // return without deleting if "Cancel" or Cancel Dialog response
+        if (selectedValue == 0) {
+            dispositionLogixNGs();
+        }
+        return (selectedValue == 0 ); // array position 0 = Yes, Delete.
     }
 
     /**
@@ -2617,6 +3300,10 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         setVisible(false);
         _contents.clear();
         _idContents.clear();
+        for (var list : _classContents.values()) {
+            list.clear();
+        }
+        _classContents.clear();
         removeAll();
         super.dispose();
     }
@@ -2624,19 +3311,15 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     /*
      * **************** Mouse Methods **********************
      */
-    public void showToolTip(Positionable selection, MouseEvent event) {
+    public void showToolTip(Positionable selection, JmriMouseEvent event) {
         ToolTip tip = selection.getToolTip();
-        String txt = tip.getText();
-        if (txt == null || txt.isEmpty()) {
-            return;
-        }
         tip.setLocation(selection.getX() + selection.getWidth() / 2, selection.getY() + selection.getHeight());
         setToolTip(tip);
     }
 
     protected int getItemX(Positionable p, int deltaX) {
-        if ((p instanceof MemoryIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
-            MemoryIcon pm = (MemoryIcon) p;
+        if ((p instanceof MemoryOrGVIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
+            MemoryOrGVIcon pm = (MemoryOrGVIcon) p;
             return pm.getOriginalX() + (int) Math.round(deltaX / getPaintScale());
         } else {
             return p.getX() + (int) Math.round(deltaX / getPaintScale());
@@ -2644,8 +3327,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     }
 
     protected int getItemY(Positionable p, int deltaY) {
-        if ((p instanceof MemoryIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
-            MemoryIcon pm = (MemoryIcon) p;
+        if ((p instanceof MemoryOrGVIcon) && (p.getPopupUtility().getFixedWidth() == 0)) {
+            MemoryOrGVIcon pm = (MemoryOrGVIcon) p;
             return pm.getOriginalY() + (int) Math.round(deltaY / getPaintScale());
         } else {
             return p.getY() + (int) Math.round(deltaY / getPaintScale());
@@ -2665,62 +3348,24 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         }
         for (Positionable pos : _contents) {
             if (pos.getNamedBean() == nb && pos.getPopupUtility() != null) {
-                switch (menu) {
-                    case VIEWPOPUPONLY:
-                        pos.getPopupUtility().addViewPopUpMenu(item);
-                        break;
-                    case EDITPOPUPONLY:
-                        pos.getPopupUtility().addEditPopUpMenu(item);
-                        break;
-                    default:
-                        pos.getPopupUtility().addEditPopUpMenu(item);
-                        pos.getPopupUtility().addViewPopUpMenu(item);
-                }
+                addToPopUpMenu( pos, item, menu);
                 return;
             } else if (pos instanceof SlipTurnoutIcon) {
                 if (pos.getPopupUtility() != null) {
                     SlipTurnoutIcon sti = (SlipTurnoutIcon) pos;
-                    if (sti.getTurnout(SlipTurnoutIcon.EAST) == nb || sti.getTurnout(SlipTurnoutIcon.WEST) == nb
-                            || sti.getTurnout(SlipTurnoutIcon.LOWEREAST) == nb || sti.getTurnout(SlipTurnoutIcon.LOWERWEST) == nb) {
-                        switch (menu) {
-                            case VIEWPOPUPONLY:
-                                pos.getPopupUtility().addViewPopUpMenu(item);
-                                break;
-                            case EDITPOPUPONLY:
-                                pos.getPopupUtility().addEditPopUpMenu(item);
-                                break;
-                            default:
-                                pos.getPopupUtility().addEditPopUpMenu(item);
-                                pos.getPopupUtility().addViewPopUpMenu(item);
-                        }
+                    if ( sti.getTurnout(SlipTurnoutIcon.EAST) == nb || sti.getTurnout(SlipTurnoutIcon.WEST) == nb
+                        || sti.getTurnout(SlipTurnoutIcon.LOWEREAST) == nb
+                        || sti.getTurnout(SlipTurnoutIcon.LOWERWEST) == nb) {
+                        addToPopUpMenu( pos, item, menu);
                         return;
                     }
                 }
-            } else if (pos instanceof MultiSensorIcon) {
-                if (pos.getPopupUtility() != null) {
-                    MultiSensorIcon msi = (MultiSensorIcon) pos;
-                    boolean match = false;
-                    for (int i = 0; i < msi.getNumEntries(); i++) {
-                        if (msi.getSensorName(i).equals(nb.getUserName())) {
-                            match = true;
-                            break;
-                        } else if (msi.getSensorName(i).equals(nb.getSystemName())) {
-                            match = true;
-                            break;
-                        }
-                    }
-                    if (match) {
-                        switch (menu) {
-                            case VIEWPOPUPONLY:
-                                pos.getPopupUtility().addViewPopUpMenu(item);
-                                break;
-                            case EDITPOPUPONLY:
-                                pos.getPopupUtility().addEditPopUpMenu(item);
-                                break;
-                            default:
-                                pos.getPopupUtility().addEditPopUpMenu(item);
-                                pos.getPopupUtility().addViewPopUpMenu(item);
-                        }
+            } else if ( pos instanceof MultiSensorIcon && pos.getPopupUtility() != null) {
+                MultiSensorIcon msi = (MultiSensorIcon) pos;
+                for (int i = 0; i < msi.getNumEntries(); i++) {
+                    if ( msi.getSensorName(i).equals(nb.getUserName())
+                        || msi.getSensorName(i).equals(nb.getSystemName())) {
+                        addToPopUpMenu( pos, item, menu);
                         return;
                     }
                 }
@@ -2728,9 +3373,23 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
         }
     }
 
-    public final static int VIEWPOPUPONLY = 0x00;
-    public final static int EDITPOPUPONLY = 0x01;
-    public final static int BOTHPOPUPS = 0x02;
+    private void addToPopUpMenu( Positionable pos, JMenuItem item, int menu ) {
+        switch (menu) {
+            case VIEWPOPUPONLY:
+                pos.getPopupUtility().addViewPopUpMenu(item);
+                break;
+            case EDITPOPUPONLY:
+                pos.getPopupUtility().addEditPopUpMenu(item);
+                break;
+            default:
+                pos.getPopupUtility().addEditPopUpMenu(item);
+                pos.getPopupUtility().addViewPopUpMenu(item);
+        }
+    }
+
+    public static final int VIEWPOPUPONLY = 0x00;
+    public static final int EDITPOPUPONLY = 0x01;
+    public static final int BOTHPOPUPS = 0x02;
 
     /**
      * Relocate item.
@@ -2766,7 +3425,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * @param event contains the mouse position.
      * @return a list of positionable items or an empty list.
      */
-    protected List<Positionable> getSelectedItems(MouseEvent event) {
+    protected List<Positionable> getSelectedItems(JmriMouseEvent event) {
         Rectangle rect = new Rectangle();
         ArrayList<Positionable> selections = new ArrayList<>();
         for (Positionable p : _contents) {
@@ -2812,7 +3471,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * Gather all items inside _selectRect
      * Keep old group if Control key is down
      */
-    protected void makeSelectionGroup(MouseEvent event) {
+    protected void makeSelectionGroup(JmriMouseEvent event) {
         if (!event.isControlDown() || _selectionGroup == null) {
             _selectionGroup = new ArrayList<>();
         }
@@ -2835,9 +3494,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }
         }
-        if (log.isDebugEnabled()) {
-            log.debug("makeSelectionGroup: {} selected.", _selectionGroup.size());
-        }
+        log.debug("makeSelectionGroup: {} selected.", _selectionGroup.size());
         if (_selectionGroup.size() < 1) {
             _selectRect = null;
             deselectSelectionGroup();
@@ -2850,7 +3507,7 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * If there, delete.
      * make new group if Cntl key is not held down
      */
-    protected void modifySelectionGroup(Positionable selection, MouseEvent event) {
+    protected void modifySelectionGroup(Positionable selection, JmriMouseEvent event) {
         if (!event.isControlDown() || _selectionGroup == null) {
             _selectionGroup = new ArrayList<>();
         }
@@ -2870,9 +3527,8 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 }
             }
         }
-        if (log.isDebugEnabled()) {
-            log.debug("modifySelectionGroup: size= {}, selection {}", _selectionGroup.size(), (removed ? "removed" : "added"));
-        }
+        log.debug("modifySelectionGroup: size= {}, selection {}",
+            _selectionGroup.size(), (removed ? "removed" : "added"));
     }
 
     /**
@@ -2883,6 +3539,9 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      *
      */
     public void setAttributes(PositionablePopupUtil newUtil, Positionable p) {
+        // the redisplay will happen once the attributes are loaded
+        PositionablePopupUtil.suppressWebPanelDisplayOptionNotifications();
+        try {
         p.setPopupUtility(newUtil.clone(p, p.getTextComponent()));
         int mar = newUtil.getMargin();
         int bor = newUtil.getBorderSize();
@@ -2922,6 +3581,9 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
             if (bean != null) {
                 ((PositionableIcon) p).displayState(bean.getState());
             }
+        }
+        } finally {
+            PositionablePopupUtil.restoreWebPanelDisplayOptionNotifications();
         }
     }
 
@@ -3083,13 +3745,13 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                 x = 1;
                 break;
             default:
-                log.warn("Unexpected e.getKeyCode() of {}", e.getKeyCode());
+                log.debug("Unexpected e.getKeyCode() of {}", e.getKeyCode());
                 break;
         }
         //A cheat if the shift key isn't pressed then we move 5 pixels at a time.
         if (!e.isShiftDown()) {
-            y = y * 5;
-            x = x * 5;
+            y *= 5;
+            x *= 5;
         }
         for (Positionable comp : _selectionGroup) {
             moveItem(comp, x, y);
@@ -3141,35 +3803,35 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      * ********************* Abstract Methods ***********************
      */
     @Override
-    abstract public void mousePressed(MouseEvent event);
+    public abstract void mousePressed(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseReleased(MouseEvent event);
+    public abstract void mouseReleased(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseClicked(MouseEvent event);
+    public abstract void mouseClicked(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseDragged(MouseEvent event);
+    public abstract void mouseDragged(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseMoved(MouseEvent event);
+    public abstract void mouseMoved(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseEntered(MouseEvent event);
+    public abstract void mouseEntered(JmriMouseEvent event);
 
     @Override
-    abstract public void mouseExited(MouseEvent event);
+    public abstract void mouseExited(JmriMouseEvent event);
 
     /*
      * set up target panel, frame etc.
      */
-    abstract protected void init(String name);
+    protected abstract void init(String name);
 
     /*
      * Closing of Target frame window.
      */
-    abstract protected void targetWindowClosingEvent(WindowEvent e);
+    protected abstract void targetWindowClosingEvent(WindowEvent e);
 
     /**
      * Called from TargetPanel's paint method for additional drawing by editor
@@ -3177,88 +3839,42 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
      *
      * @param g the context to paint within
      */
-    abstract protected void paintTargetPanel(Graphics g);
+    protected abstract void paintTargetPanel(Graphics g);
 
     /**
      * Set an object's location when it is created.
      *
      * @param obj the object to locate
      */
-    abstract protected void setNextLocation(Positionable obj);
-
-    /**
-     * Editor Views should make calls to this class (Editor) to set popup menu
-     * items. See 'Popup Item Methods' above for the calls.
-     *
-     * @param p     the item containing or requiring the context menu
-     * @param event the event triggering the menu
-     */
-    abstract protected void showPopUp(Positionable p, MouseEvent event);
+    public abstract void setNextLocation(Positionable obj);
 
     /**
      * After construction, initialize all the widgets to their saved config
      * settings.
      */
-    abstract public void initView();
+    protected abstract void initView();
 
     /**
      * Set up item(s) to be copied by paste.
      *
      * @param p the item to copy
      */
-    abstract protected void copyItem(Positionable p);
+    protected abstract void copyItem(Positionable p);
 
-    /**
-     * Get a List of the currently-existing Editor objects. The returned list is
-     * a copy made at the time of the call, so it can be manipulated as needed
-     * by the caller.
-     *
-     * @return a List of Editors
-     * @deprecated since 4.19.6; use {@link EditorManager#getAll()} instead
-     */
-    @Deprecated
-    synchronized public static List<Editor> getEditors() {
-        return new ArrayList<>(InstanceManager.getDefault(EditorManager.class).getAll());
-    }
-
-    /**
-     * Get a list of currently-existing Editor objects that are specific
-     * sub-classes of Editor.
-     * <p>
-     * The returned list is a copy made at the time of the call, so it can be
-     * manipulated as needed by the caller.
-     *
-     * @param <T>  the Class the list should be limited to.
-     * @param type the Class the list should be limited to.
-     * @return a List of Editors.
-     * @deprecated since 4.19.6; use {@link EditorManager#getAll(Class)} instead
-     */
-    @Deprecated
-    synchronized public static <T extends Editor> List<T> getEditors(@Nonnull Class<T> type) {
-        return new ArrayList<>(InstanceManager.getDefault(EditorManager.class).getAll(type));
-    }
-
-    /**
-     * Get an Editor of a particular name. If more than one exists, there's no
-     * guarantee as to which is returned.
-     *
-     * @param name the editor to get
-     * @return an Editor or null if no matching Editor could be found
-     * @deprecated since 4.19.6; use {@link EditorManager#get(String)} instead
-     */
-    @Deprecated
-    public static Editor getEditor(String name) {
-        return InstanceManager.getDefault(EditorManager.class).get(name);
+    @CheckForNull
+    public Rectangle2D resizePanelBounds(boolean forceFlag) {
+        // Do nothing. This method is overridden by LayoutEditor.
+        return null;
     }
 
     public List<NamedBeanUsageReport> getUsageReport(NamedBean bean) {
         List<NamedBeanUsageReport> report = new ArrayList<>();
         if (bean != null) {
-            getContents().forEach((pos) -> {
+            getContents().forEach( pos -> {
                 String data = getUsageData(pos);
                 if (pos instanceof MultiSensorIcon) {
                     MultiSensorIcon multi = (MultiSensorIcon) pos;
-                    multi.getSensors().forEach((sensor) -> {
+                    multi.getSensors().forEach( sensor -> {
                         if (bean.equals(sensor)) {
                             report.add(new NamedBeanUsageReport("PositionalIcon", data));
                         }
@@ -3272,15 +3888,13 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                     if (bean.equals(slip3Scissor.getTurnout(SlipTurnoutIcon.WEST))) {
                         report.add(new NamedBeanUsageReport("PositionalIcon", data));
                     }
-                    if (slip3Scissor.getNamedTurnout(SlipTurnoutIcon.LOWEREAST) != null) {
-                        if (bean.equals(slip3Scissor.getTurnout(SlipTurnoutIcon.LOWEREAST))) {
-                            report.add(new NamedBeanUsageReport("PositionalIcon", data));
-                        }
+                    if ( slip3Scissor.getNamedTurnout(SlipTurnoutIcon.LOWEREAST) != null
+                        && bean.equals(slip3Scissor.getTurnout(SlipTurnoutIcon.LOWEREAST))) {
+                        report.add(new NamedBeanUsageReport("PositionalIcon", data));
                     }
-                    if (slip3Scissor.getNamedTurnout(SlipTurnoutIcon.LOWERWEST) != null) {
-                        if (bean.equals(slip3Scissor.getTurnout(SlipTurnoutIcon.LOWERWEST))) {
-                            report.add(new NamedBeanUsageReport("PositionalIcon", data));
-                        }
+                    if ( slip3Scissor.getNamedTurnout(SlipTurnoutIcon.LOWERWEST) != null
+                        && bean.equals(slip3Scissor.getTurnout(SlipTurnoutIcon.LOWERWEST))) {
+                        report.add(new NamedBeanUsageReport("PositionalIcon", data));
                     }
 
                 } else if (pos instanceof LightIcon) {
@@ -3289,8 +3903,20 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
                         report.add(new NamedBeanUsageReport("PositionalIcon", data));
                     }
 
+                } else if (pos instanceof ReporterIcon) {
+                    ReporterIcon icon = (ReporterIcon) pos;
+                    if (bean.equals(icon.getReporter())) {
+                        report.add(new NamedBeanUsageReport("PositionalIcon", data));
+                    }
+
+                } else if (pos instanceof AudioIcon) {
+                    AudioIcon icon = (AudioIcon) pos;
+                    if (bean.equals(icon.getAudio())) {
+                        report.add(new NamedBeanUsageReport("PositionalIcon", data));
+                    }
+
                 } else {
-                    if (bean.equals(pos.getNamedBean())) {
+                    if ( bean.equals(pos.getNamedBean())) {
                         report.add(new NamedBeanUsageReport("PositionalIcon", data));
                     }
                }
@@ -3308,5 +3934,6 @@ abstract public class Editor extends JmriJFrame implements MouseListener, MouseM
     }
 
     // initialize logging
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Editor.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Editor.class);
+
 }

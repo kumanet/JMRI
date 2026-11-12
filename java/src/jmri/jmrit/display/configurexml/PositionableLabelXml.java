@@ -14,6 +14,7 @@ import jmri.jmrit.display.Positionable;
 import jmri.jmrit.display.PositionableLabel;
 import jmri.jmrit.display.PositionablePopupUtil;
 import jmri.jmrit.display.ToolTip;
+import jmri.jmrit.logixng.LogixNG_Manager;
 
 import org.jdom2.Attribute;
 import org.jdom2.DataConversionException;
@@ -59,6 +60,8 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
             element.addContent(storeIcon("icon", (NamedIcon) p.getIcon()));
         }
 
+        storeLogixNG_Data(p, element);
+
         element.setAttribute("class", "jmri.jmrit.display.configurexml.PositionableLabelXml");
         return element;
     }
@@ -82,7 +85,9 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
 
         String fontName = util.getFont().getFontName();
         if (!fontName.equals(defaultFontName)) {
-            element.setAttribute("fontname", "" + util.getFont().getFontName());
+            element.setAttribute("fontFamily", "" + util.getFont().getFamily());
+            String storedfontname = simplifyFontname(fontName, util.getFontStyle());
+            element.setAttribute("fontname", "" + storedfontname);
         }
 
         element.setAttribute("size", "" + util.getFontSize());
@@ -157,16 +162,41 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
     public void storeCommonAttributes(Positionable p, Element element) {
 
         if (p.getId() != null) element.setAttribute("id", p.getId());
+
+        var classes = p.getClasses();
+        if (!classes.isEmpty()) {
+            StringBuilder classNames = new StringBuilder();
+            for (String className : classes) {
+                if (className.contains(",")) {
+                    throw new UnsupportedOperationException("Comma is not allowed in class names");
+                }
+                if (classNames.length() > 0) classNames.append(",");
+                classNames.append(className);
+            }
+            element.setAttribute("classes", classNames.toString());
+        }
+
         element.setAttribute("x", "" + p.getX());
         element.setAttribute("y", "" + p.getY());
         element.setAttribute("level", String.valueOf(p.getDisplayLevel()));
         element.setAttribute("forcecontroloff", !p.isControlling() ? "true" : "false");
         element.setAttribute("hidden", p.isHidden() ? "yes" : "no");
+        if (p.isEmptyHidden()) {
+            element.setAttribute("emptyHidden", "yes");
+        }
+        if (p.isValueEditDisabled()) {
+            element.setAttribute("valueEditDisabled", "yes");
+        }
         element.setAttribute("positionable", p.isPositionable() ? "true" : "false");
         element.setAttribute("showtooltip", p.showToolTip() ? "true" : "false");
         element.setAttribute("editable", p.isEditable() ? "true" : "false");
         ToolTip tip = p.getToolTip();
         if (tip != null) {
+            if (tip.getPrependToolTipWithDisplayName()) {
+                element.addContent(
+                        new Element("tooltip_prependWithDisplayName")
+                                .addContent("yes"));
+            }
             String txt = tip.getText();
             if (txt != null) {
                 Element elem = new Element("tooltip").addContent(txt); // was written as "toolTip" 3.5.1 and before
@@ -191,6 +221,16 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
         element.addContent(new Element("rotation").addContent(String.valueOf(icon.getRotation())));
 
         return element;
+    }
+
+    public void storeLogixNG_Data(Positionable p, Element element) {
+        if (p.getLogixNG() == null) return;
+
+        // Don't save LogixNG data if we don't have any ConditionalNGs
+        if (p.getLogixNG().getNumConditionalNGs() == 0) return;
+        Element logixNG_Element = new Element("LogixNG");
+        logixNG_Element.addContent(new Element("InlineLogixNG_SystemName").addContent(p.getLogixNG().getSystemName()));
+        element.addContent(logixNG_Element);
     }
 
     @Override
@@ -270,12 +310,12 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
                 java.util.List<Attribute> attrs = element.getAttributes();
                 log.debug("\tElement Has {} Attributes:", attrs.size());
                 for (Attribute a : attrs) {
-                    log.debug("\t\t{} = {}", a.getName(), a.getValue());
+                    log.debug("  attribute:  {} = {}", a.getName(), a.getValue());
                 }
                 java.util.List<Element> kids = element.getChildren();
                 log.debug("\tElementHas {} children:", kids.size());
                 for (Element e : kids) {
-                    log.debug("\t\t{} = \"{}\"", e.getName(), e.getValue());
+                    log.debug("  child:  {} = \"{}\"", e.getName(), e.getValue());
                 }
             }
             editor.loadFailed();
@@ -287,6 +327,9 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
             // This should never happen
             log.error("Editor.putItem() with null id has thrown DuplicateIdException", e);
         }
+
+        loadLogixNG_Data(l, element);
+
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, Editor.LABELS, element);
     }
@@ -437,7 +480,7 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
 
     public void loadCommonAttributes(Positionable l, int defaultLevel, Element element)
             throws JmriConfigureXmlException {
-        
+
         if (element.getAttribute("id") != null) {
             try {
                 l.setId(element.getAttribute("id").getValue());
@@ -445,6 +488,16 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
                 throw new JmriConfigureXmlException("Positionable id is not unique", e);
             }
         }
+
+        if (element.getAttribute("classes") != null) {
+            String classes = element.getAttribute("classes").getValue();
+            for (String className : classes.split(",")) {
+                if (!className.isBlank()) {
+                    l.addClass(className);
+                }
+            }
+        }
+
         try {
             l.setControlling(!element.getAttribute("forcecontroloff").getBooleanValue());
         } catch (DataConversionException e1) {
@@ -483,6 +536,25 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
         } catch (NullPointerException e) {
             // considered normal if the attribute not present
         }
+
+        try {
+            boolean value = element.getAttribute("emptyHidden").getBooleanValue();
+            l.setEmptyHidden(value);
+        } catch (DataConversionException e) {
+            log.warn("unable to convert positionable label emptyHidden attribute");
+        } catch (NullPointerException e) {
+            // considered normal if the attribute not present
+        }
+
+        try {
+            boolean value = element.getAttribute("valueEditDisabled").getBooleanValue();
+            l.setValueEditDisabled(value);
+        } catch (DataConversionException e) {
+            log.warn("unable to convert positionable label valueEditDisabled attribute");
+        } catch (NullPointerException e) {
+            // considered normal if the attribute not present
+        }
+
         try {
             l.setPositionable(element.getAttribute("positionable").getBooleanValue());
         } catch (DataConversionException e) {
@@ -514,7 +586,15 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
             }
         }
 
-        Element elem = element.getChild("tooltip");
+        Element elem = element.getChild("tooltip_prependWithDisplayName");
+        if (elem != null) {
+            ToolTip tip = l.getToolTip();
+            if (tip != null) {
+                tip.setPrependToolTipWithDisplayName("yes".equals(elem.getText()));
+            }
+        }
+
+        elem = element.getChild("tooltip");
         if (elem == null) {
             elem = element.getChild("toolTip"); // pre JMRI 3.5.2
         }
@@ -526,6 +606,54 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
         }
     }
 
+    /**
+     * Remove verbose and redundant information from fontname field
+     * unless that's been disabled in preferences
+     *
+     * @param fontname The system-specific font name with a possible trailing .plain, etc
+     * @param style  From the Font class static style values
+     * @return A font name without trailing modifiers
+     */
+    String simplifyFontname(String fontname, int style) {
+        var loadAndStorePreferences = InstanceManager.getDefault(jmri.configurexml.LoadAndStorePreferences.class);
+        if (! loadAndStorePreferences.isExcludeFontExtensions() ) { 
+            log.trace("Returning early from simplifyFontname with {}", fontname);
+            return fontname;
+        }
+
+        if (fontname.endsWith(".plain")) {
+            if (style == Font.PLAIN) {
+                return fontname.substring(0, fontname.length()-(".plain".length()));
+            } else {
+                log.warn("fontname {} is not consistent with style {}", fontname, style);
+                return fontname;
+            }
+        } else if (fontname.endsWith(".bold")) {
+            if (style == Font.BOLD) {
+                return fontname.substring(0, fontname.length()-(".bold".length()));
+            } else {
+                log.warn("fontname {} is not consistent with style {}", fontname, style);
+                return fontname;
+            }
+        } else if (fontname.endsWith(".italic")) {
+            if (style == Font.ITALIC) {
+                return fontname.substring(0, fontname.length()-(".italic".length()));
+            } else {
+                log.warn("fontname {} is not consistent with style {}", fontname, style);
+                return fontname;
+            }
+        } else if (fontname.endsWith(".bolditalic")) {
+            if (style == Font.BOLD+Font.ITALIC) {
+                return fontname.substring(0, fontname.length()-(".bolditalic".length()));
+            } else {
+                log.warn("fontname {} is not consistent with style {}", fontname, style);
+                return fontname;
+            }
+        } else {
+            return fontname;
+        }
+    }
+    
     public NamedIcon loadIcon(PositionableLabel l, String attrName, Element element,
             String name, Editor ed) {
         NamedIcon icon = getNamedIcon(attrName, element, name, ed);
@@ -588,5 +716,18 @@ public class PositionableLabelXml extends AbstractXmlAdapter {
         return icon;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PositionableLabelXml.class);
+    public void loadLogixNG_Data(Positionable p, Element element) {
+        Element logixNG_Element = element.getChild("LogixNG");
+        if (logixNG_Element == null) return;
+        Element inlineLogixNG = logixNG_Element.getChild("InlineLogixNG_SystemName");
+        if (inlineLogixNG != null) {
+            String systemName = inlineLogixNG.getTextTrim();
+            p.setLogixNG_SystemName(systemName);
+            InstanceManager.getDefault(LogixNG_Manager.class).registerSetupTask(() -> {
+                p.setupLogixNG();
+            });
+        }
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(PositionableLabelXml.class);
 }

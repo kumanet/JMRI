@@ -2,11 +2,10 @@ package jmri.jmrix.marklin;
 
 import java.util.Hashtable;
 import javax.annotation.Nonnull;
-import javax.swing.JOptionPane;
 import jmri.JmriException;
 import jmri.Sensor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.jmrix.marklin.mcan.cs2.Cs2Frame;
+import jmri.jmrix.marklin.mcan.cs2.Cs2FeedbackCommands;
 
 /**
  * Implement sensor manager for Marklin systems. The Manager handles all the
@@ -25,12 +24,12 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
         super(memo);
         tc = memo.getTrafficController();
         // connect to the TrafficManager
-        tc.addMarklinListener(this);
+        tc.addMarklinListener(MarklinSensorManager.this);
     }
 
-    MarklinTrafficController tc;
+    private final MarklinTrafficController tc;
     //The hash table simply holds the object number against the MarklinSensor ref.
-    private Hashtable<Integer, Hashtable<Integer, MarklinSensor>> _tmarklin = new Hashtable<Integer, Hashtable<Integer, MarklinSensor>>();   // stores known Marklin Obj
+    private final Hashtable<Integer, Hashtable<Integer, MarklinSensor>> _tmarklin = new Hashtable<>();   // stores known Marklin Obj
 
     /**
      * {@inheritDoc}
@@ -53,7 +52,6 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
         MarklinSensor s = new MarklinSensor(systemName, userName);
         if (systemName.contains(":")) {
             int board = 0;
-            int channel = 0;
 
             String curAddress = systemName.substring(getSystemPrefix().length() + 1, systemName.length());
             int seperator = curAddress.indexOf(":");
@@ -71,7 +69,7 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
             }
             Hashtable<Integer, MarklinSensor> sensorList = _tmarklin.get(board);
             try {
-                channel = Integer.parseInt(curAddress.substring(seperator + 1));
+                int channel = Integer.parseInt(curAddress.substring(seperator + 1));
                 if (!sensorList.containsKey(channel)) {
                     sensorList.put(channel, s);
                 }
@@ -90,6 +88,9 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
         if (!curAddress.contains(":")) {
             throw new JmriException("Hardware Address "+curAddress+"should be passed in the form 'Module:port'");
         }
+
+        int board = 0;
+        int port = 0;
 
         //Address format passed is in the form of board:channel or T:turnout address
         int seperator = curAddress.indexOf(":");
@@ -117,46 +118,9 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
         return sb.toString();
     }
 
-    private int board = 0;
-    private int port = 0;
-
     @Override
     public boolean allowMultipleAdditions(@Nonnull String systemName) {
         return true;
-    }
-    
-    @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix, boolean ignoreInitialExisting) throws JmriException {
-
-        String tmpSName = createSystemName(curAddress, prefix);
-
-        // Check to determine if the System Name is in use, return null if it is,
-        // otherwise return the next valid address.
-        Sensor s = getBySystemName(tmpSName);
-        if (s != null || ignoreInitialExisting) {
-            port++;
-            while (port < 17) {
-                tmpSName = createSystemName(board + ":" + port, prefix);
-                s = getBySystemName(tmpSName);
-                if (s == null) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(board);
-                    sb.append(":");
-                    //Little work around to pad single digit address out.
-                    padPortNumber(port, sb);
-                    return sb.toString();
-                }
-                port++;
-            }
-            throw new JmriException(Bundle.getMessage("InvalidNextValidTenInUse",getBeanTypeHandled(true),curAddress,tmpSName));
-        } else {
-            StringBuilder sb = new StringBuilder();
-            sb.append(board);
-            sb.append(":");
-            //Little workaround to pad single digit address out.
-            padPortNumber(port, sb);
-            return sb.toString();
-        }
     }
 
     void padPortNumber(int portNo, StringBuilder sb) {
@@ -169,56 +133,45 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
     // to listen for status changes from Marklin system
     @Override
     public void reply(MarklinReply r) {
-        if (r.getPriority() == MarklinConstants.PRIO_1 && r.getCommand() >= MarklinConstants.FEECOMMANDSTART && r.getCommand() <= MarklinConstants.FEECOMMANDEND) {
-            if (r.getCommand() == MarklinConstants.S88EVENT) {
-                int module = (r.getElement(MarklinConstants.CANADDRESSBYTE1));
-                module = (module << 8) + (r.getElement(MarklinConstants.CANADDRESSBYTE2));
-                int contact = (r.getElement(MarklinConstants.CANADDRESSBYTE3));
-                contact = (contact << 8) + (r.getElement(MarklinConstants.CANADDRESSBYTE4));
-                String sensorprefix = getSystemPrefix() + "S" + module + ":";
-                Hashtable<Integer, MarklinSensor> sensorList = _tmarklin.get(module);
-                if (sensorList == null) {
-                    //Module does not exist, so add it
-                    sensorList = new Hashtable<Integer, MarklinSensor>();
-                    _tmarklin.put(module, sensorList);
-                    MarklinMessage m = MarklinMessage.sensorPollMessage(module);
-                    tc.sendMarklinMessage(m, this);
-                    if (log.isDebugEnabled()) {
-                        log.debug("New module added {}", module);
-                    }
-                }
-                MarklinSensor ms = sensorList.get(contact);
-                if (ms == null) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(sensorprefix);
-                    //Little work around to pad single digit address out.
-                    padPortNumber(contact, sb);
-                    if (log.isDebugEnabled()) {
-                        log.debug("New sensor added {} : {}", contact, sb.toString());
-                    }
-                    ms = (MarklinSensor) provideSensor(sb.toString());
-                }
-                if (r.getElement(9) == 0x01) {
-                    ms.setOwnState(Sensor.INACTIVE);
-                    return;
-                }
-                if (r.getElement(10) == 0x01) {
-                    ms.setOwnState(Sensor.ACTIVE);
-                    return;
-                }
-                log.error("state not found {} {} {}", ms.getDisplayName(), r.getElement(9), r.getElement(10));
-                log.error(r.toString());
+        Cs2Frame frame = MarklinCanBridge.parse(r);
+        if (frame == null) {
+            return;
+        }
+
+        if (frame instanceof Cs2FeedbackCommands.S88EventFrame) {
+            Cs2FeedbackCommands.S88EventFrame event = (Cs2FeedbackCommands.S88EventFrame) frame;
+            // contactId upper byte = module, lower byte = contact port
+            int module  = (event.contactId() >> 8) & 0xFF;
+            int contact = event.contactId() & 0xFF;
+            String sensorprefix = getSystemPrefix() + "S" + module + ":";
+            Hashtable<Integer, MarklinSensor> sensorList = _tmarklin.get(module);
+            if (sensorList == null) {
+                sensorList = new Hashtable<>();
+                _tmarklin.put(module, sensorList);
+                MarklinMessage m = MarklinMessage.sensorPollMessage(module);
+                tc.sendMarklinMessage(m, this);
+                log.debug("New module added {}", module);
+            }
+            MarklinSensor ms = sensorList.get(contact);
+            if (ms == null) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(sensorprefix);
+                padPortNumber(contact, sb);
+                log.debug("New sensor added {} : {}", contact, sb);
+                ms = (MarklinSensor) provideSensor(sb.toString());
+            }
+            if (event.newState() == 0x01) {
+                ms.setOwnState(Sensor.ACTIVE, r.getReceivedTime());
             } else {
-                int s88Module = r.getElement(9);
-                if (_tmarklin.containsKey(s88Module)) {
-                    int status = r.getElement(10);
-                    status = (status << 8) + (r.getElement(11));
-                    decodeSensorState(s88Module, status);
-                    return;
-                }
-                if (log.isDebugEnabled()) {
-                    log.debug("State s88Module not registered {}", s88Module);
-                }
+                ms.setOwnState(Sensor.INACTIVE, r.getReceivedTime());
+            }
+        } else if (frame instanceof Cs2FeedbackCommands.S88PollReplyFrame) {
+            Cs2FeedbackCommands.S88PollReplyFrame pollReply = (Cs2FeedbackCommands.S88PollReplyFrame) frame;
+            int s88Module = pollReply.module();
+            if (_tmarklin.containsKey(s88Module)) {
+                decodeSensorState(s88Module, pollReply.state(), r.getReceivedTime());
+            } else {
+                log.debug("State s88Module not registered {}", s88Module);
             }
         }
     }
@@ -228,7 +181,7 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
         // messages are ignored
     }
 
-    private void decodeSensorState(int board, int intState) {
+    private void decodeSensorState(int board, int intState, long timeNanos) {
         MarklinSensor ms;
         int k = 1;
         int result;
@@ -246,14 +199,14 @@ public class MarklinSensorManager extends jmri.managers.AbstractSensorManager
                 ms = (MarklinSensor) provideSensor(sb.toString());
             }
             if (result == 0) {
-                ms.setOwnState(Sensor.INACTIVE);
+                ms.setOwnState(Sensor.INACTIVE, timeNanos);
             } else {
-                ms.setOwnState(Sensor.ACTIVE);
+                ms.setOwnState(Sensor.ACTIVE, timeNanos);
             }
-            k = k * 2;
+            k *= 2;
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MarklinSensorManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MarklinSensorManager.class);
 
 }

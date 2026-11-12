@@ -19,7 +19,7 @@ public class NodeIOListActionTest {
     }
 
     @Test
-    public void testMemoCTor() {
+    public void testNodeIOListActionMemoCtor() {
         NodeIOListAction t = new NodeIOListAction(new CMRISystemConnectionMemo()); 
         Assert.assertNotNull("exists",t);
     }
@@ -34,6 +34,6 @@ public class NodeIOListActionTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(NodeIOListActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(NodeIOListActionTest.class);
 
 }

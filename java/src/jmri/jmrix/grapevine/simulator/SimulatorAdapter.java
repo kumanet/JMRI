@@ -1,20 +1,13 @@
 package jmri.jmrix.grapevine.simulator;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
+
 import javax.annotation.Nonnull;
-import javax.swing.JOptionPane;
-import jmri.jmrix.grapevine.SerialMessage;
-import jmri.jmrix.grapevine.SerialPortController; // no special xSimulatorController
-import jmri.jmrix.grapevine.SerialReply;
-import jmri.jmrix.grapevine.GrapevineSystemConnectionMemo;
-import jmri.jmrix.grapevine.SerialTrafficController;
+
+// no special xSimulatorController
+import jmri.jmrix.grapevine.*;
 import jmri.util.ImmediatePipedOutputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Provide access to a simulated Grapevine system.
@@ -37,10 +30,10 @@ import org.slf4j.LoggerFactory;
  * @author Mark Underwood, Copyright (C) 2015
  * @author Egbert Broerse, Copyright (C) 2018
  */
+@SuppressWarnings("javadoc")
 public class SimulatorAdapter extends SerialPortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
 
     private boolean outputBufferEmpty = true;
@@ -232,15 +225,14 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
             SerialReply r;
             if (log.isDebugEnabled()) {
                 StringBuffer buf = new StringBuffer();
-                buf.append("Grapevine Simulator Thread received message: ");
                 if (m != null) {
                     for (int i = 0; i < m.getNumDataElements(); i++) {
-                        buf.append(Integer.toHexString(0xFF & m.getElement(i)) + " ");
+                        buf.append(Integer.toHexString(0xFF & m.getElement(i))).append(" ");
                     }
                 } else {
                     buf.append("null message buffer");
                 }
-                log.trace(buf.toString()); // generates a lot of traffic
+                log.trace("Grapevine Simulator Thread received message: {}", buf); // generates a lot of traffic
             }
             if (m != null) {
                 r = generateReply(m);
@@ -248,11 +240,10 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
                     writeReply(r);
                     if (log.isDebugEnabled()) {
                         StringBuilder buf = new StringBuilder();
-                        buf.append("Grapevine Simulator Thread sent reply: ");
                         for (int i = 0; i < r.getNumDataElements(); i++) {
                             buf.append(Integer.toHexString(0xFF & r.getElement(i))).append(" ");
                         }
-                        log.debug(buf.toString());
+                        log.debug("Grapevine Simulator Thread sent reply: {}", buf );
                     }
                 }
             }
@@ -338,10 +329,10 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
 
             default:
                 if (bank == 0x6) { // this is the rename command, with element 2 = new node number
-                    JOptionPane.showMessageDialog(null,
+                    JmriJOptionPane.showMessageDialog(null,
                             Bundle.getMessage("RenumberSupport"),
                             Bundle.getMessage("MessageTitle"),
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     log.debug("rename command not supported, old address: {}, new address: {}, bank: {}",
                             nodeaddr, b2, bank);
                 } else {
@@ -355,7 +346,7 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
                     // reply = setParity(reply, 0);
                 }
         }
-        log.debug(reply == null ? "Message ignored" : "Reply generated " + reply.toString());
+        log.debug("Reply {}", reply == null ? "empty, Message ignored" : " generated " + reply.toString());
         return reply;
     }
 
@@ -515,6 +506,6 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
     private DataOutputStream outpipe = null; // feed pin
     private DataInputStream inpipe = null; // feed pout
 
-    private final static Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SimulatorAdapter.class);
 
 }

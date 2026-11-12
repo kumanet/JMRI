@@ -1,115 +1,117 @@
 package jmri.jmrix.can.cbus.swing;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.awt.GraphicsEnvironment;
+import java.io.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 import java.util.ArrayList;
+
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanReply;
+import jmri.jmrix.can.CanSystemConnectionMemo;
+import jmri.jmrix.can.TrafficControllerScaffold;
 import jmri.jmrix.can.cbus.CbusConstants;
+import jmri.jmrix.can.cbus.CbusFilterType;
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.junit.jupiter.api.Test;
+// import jmri.util.ThreadingUtil;
+
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+
 import org.netbeans.jemmy.operators.*;
 
 /**
  * @author Paul Bender Copyright (C) 2017
  * @author Steve Young Copyright (C) 2020
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class CbusFilterFrameTest extends jmri.util.JmriJFrameTestBase {
 
-    private class FtTestConsole extends jmri.jmrix.can.cbus.swing.console.CbusConsolePane {
-        
-        public FtTestConsole() {
+    protected static class FtTestConsole extends jmri.jmrix.can.cbus.swing.console.CbusConsolePane {
+
+        private final ArrayList<String> stringOutputList;
+
+        protected FtTestConsole() {
             super();
+            stringOutputList = new ArrayList<>();
         }
-        
+
         @Override
         public void nextLine(String lineOne, String lineTwo, int filterId){ 
             stringOutputList.add(lineOne);
         }
-        
+
+        protected ArrayList<String> getStringOutputList() {
+            return stringOutputList;
+        }
     }
-    
+
     private FtTestConsole _testConsole;
-    private ArrayList<String> stringOutputList;
-    
+
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     public void testCanFrames(){
         frame.initComponents();
-        assertThat(frame).isNotNull();
-        
+        assertNotNull(frame);
+
         frame.setVisible(true);
+        // ThreadingUtil.runOnGUI( () -> frame.setVisible(true));
+
+
+
         JFrameOperator jfo = new JFrameOperator( frame.getTitle() );
-        
+        JTreeOperator jto = new JTreeOperator(jfo);
+        Assertions.assertNotNull(jto);
+
         CbusFilterFrame cff = (CbusFilterFrame) frame;
         
         CanMessage m = new CanMessage(0x12);
         m.setNumDataElements(1);
         m.setElement(0, CbusConstants.CBUS_RTON);
-        assertThat(cff.filter(m)).isFalse();
-        
+        assertFalse(cff.filter(m));
+
         CanReply r = new CanReply(0x12);
         r.setNumDataElements(1);
         r.setElement(0, CbusConstants.CBUS_TON);
-        assertThat(cff.filter(r)).isFalse();
+        assertFalse(cff.filter(r));
         
-        new JToggleButtonOperator(jfo,0).clickMouse(); // Filter Incoming
-        JUnitUtil.waitFor(()->{ return(stringOutputList.size()>1); }, "Not all increments passed" + stringOutputList.size());
-        assertEquals("Filter Window Active \n",stringOutputList.get(0),"Filter Active sent to console");
-        assertEquals("Incoming: Filter \n",stringOutputList.get(1),"Filter Change sent to console");
-        
-        assertThat(cff.filter(r)).isTrue();
-        assertThat(cff.filter(m)).isFalse();
-        
-        new JToggleButtonOperator(jfo,0).clickMouse(); // Pass Incoming
-        new JToggleButtonOperator(jfo,1).clickMouse(); // Filter Outgoing
-        
-        JUnitUtil.waitFor(()->{ return(stringOutputList.size()>3); }, "Not all increments passed" + stringOutputList.size());
-        assertEquals("Incoming: Pass \n",stringOutputList.get(2),"Filter Active sent to console");
-        assertEquals("Outgoing: Filter \n",stringOutputList.get(3),"Filter Change sent to console");
-               
-        assertThat(cff.filter(m)).isTrue();
-        assertThat(cff.filter(r)).isFalse();
-        
-        new JToggleButtonOperator(jfo,2).clickMouse(); // event children
-        
-        new JToggleButtonOperator(jfo,3).clickMouse(); // All Events Filtered
-        
-        JUnitUtil.waitFor(()->{ return(stringOutputList.size()>4); }, "Not all increments passed " + stringOutputList.size());
-        
-        assertEquals("Filter ( 0 / 0 ) ",
-            new JToggleButtonOperator(jfo,4).getText(),"text says filter");
-        
-        new JToggleButtonOperator(jfo,3).clickMouse(); // All Events Passed
-        
-        JUnitUtil.waitFor(()->{ return(stringOutputList.size()>5); }, "Not all increments passed " + stringOutputList.size());
-        
-        
-        assertEquals("Pass ( 0 / 0 ) ",
-            new JToggleButtonOperator(jfo,4).getText(),"text says pass");
-        
-        
+         // Filter Incoming
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(1), true);
+
+        assertTrue(cff.filter(r));
+        assertFalse(cff.filter(m));
+
+        // Pass Incoming, Filter Outgoing
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(1), true);
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(2), true);
+
+        assertTrue(cff.filter(m));
+        assertFalse(cff.filter(r));
+
+        assertFalse(cff.ftp.filter.isFilterActive(CbusFilterType.CFEVENT.ordinal()));
+
+        // All Events Filtered
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(3), true);
+        assertTrue(cff.ftp.filter.isFilterActive(CbusFilterType.CFEVENT.ordinal()));
+
+        // All Events Passed
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(3), true);
+
+        assertFalse(cff.ftp.filter.isFilterActive(CbusFilterType.CFEVENT.ordinal()));
+
+        jto.expandRow(3);
+        jto.getQueueTool().waitEmpty();
+
+        // Minimum event number filter
+        ((jmri.util.swing.JCheckBoxTree)cff.ftp.cbt).treePathClicked(jto.getPathForRow(4), true);
+
         JSpinnerOperator spinner = new JSpinnerOperator(jfo, 0);
-            
         JTextFieldOperator jtfo = new JTextFieldOperator(spinner);
         assertEquals( "0", jtfo.getText(),"original Min Event 0");
-        
-        jtfo.setText("123");
-        new JToggleButtonOperator(jfo,4).clickMouse(); // Min Event Filter
-        JUnitUtil.waitFor(()->{ return(stringOutputList.size()>6); }, "Not all increments passed " + stringOutputList.size());
 
-        
-        assertEquals("Mixed ( 0 / 0 ) ",
-            new JToggleButtonOperator(jfo,3).getText(),"text says mixed");
-        
-        
+        jtfo.setText("123");
+
         // Outgoing event
-        
         CanReply mEvent = new CanReply(0x12);
         mEvent.setNumDataElements(5);
         mEvent.setElement(0, CbusConstants.CBUS_ACON);
@@ -118,43 +120,73 @@ public class CbusFilterFrameTest extends jmri.util.JmriJFrameTestBase {
         mEvent.setElement(3, 0x00); // Event > 123
         mEvent.setElement(4, 0xff); // Event > 123
 
-        assertThat(cff.filter(mEvent)).isFalse();
-        
-        assertEquals("Filter ( 1 / 0 ) ",
-            new JToggleButtonOperator(jfo,4).getText(),"text says pass");
-        
+        assertFalse(cff.filter(mEvent));
+
         mEvent.setElement(4, 0x01); // Event < 123
+        assertTrue(cff.filter(mEvent));
+
+        // JUnitUtil.dispose(jfo.getWindow());
+
+      //  assertEquals("Filter ( 1 / 1 ) ",
+       //     new JToggleButtonOperator(jfo,4).getText(),"text says pass");
+
+        // JUnitUtil.dispose(jfo.getWindow());
+        // jfo.waitClosed();
+
+        // frame.dispose();
         
-        assertThat(cff.filter(mEvent)).isTrue();
-        assertEquals("Filter ( 1 / 1 ) ",
-            new JToggleButtonOperator(jfo,4).getText(),"text says pass");
-        
-        frame.dispose();
-        
-        // JemmyUtil.pressButton(jfo,("Pause Test"));
         
     }
-    
+
+    private TrafficControllerScaffold tc;
+    private CanSystemConnectionMemo memo;
+
+    @TempDir
+    protected File tempDir;
+
     @BeforeEach
     @Override
     public void setUp() {
         JUnitUtil.setUp();
-        if(!GraphicsEnvironment.isHeadless()){
-            stringOutputList = new ArrayList<>();
-            _testConsole = new FtTestConsole();
-            frame = new CbusFilterFrame(_testConsole,null);
+        try {
+            JUnitUtil.resetProfileManager( new jmri.profile.NullProfile( tempDir));
+        } catch ( IOException ex ) {
+            Assertions.fail("Could not init new Null Profile", ex);
         }
+        memo = new CanSystemConnectionMemo();
+        tc = new TrafficControllerScaffold();
+        memo.setTrafficController(tc);
+        _testConsole = new FtTestConsole();
+        _testConsole.initComponents(memo, false);
+        frame = new CbusFilterFrame(_testConsole,null);
     }
 
     @AfterEach
     @Override
     public void tearDown() {
-        if(!GraphicsEnvironment.isHeadless() &&_testConsole !=null){
+
+        // JFrameOperator jfo = new JFrameOperator(frame);
+        // jfo.waitClosed();
+        
+
+        if( _testConsole !=null ){
             _testConsole.dispose();
         }
-        super.tearDown();
+
+        if(frame!=null) {
+           JUnitUtil.dispose(frame);
+        }
+        frame = null;
+        // JUnitUtil.resetWindows(true,true);
+
+        tc.terminateThreads();
+        memo.dispose();
+
+        JUnitUtil.tearDown();
+
+        // super.tearDown(); // disposes frame, calls JUnitUtil.shutDown
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusEventFilterTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusEventFilterTest.class);
 
 }

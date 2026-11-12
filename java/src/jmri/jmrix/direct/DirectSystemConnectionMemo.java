@@ -80,7 +80,7 @@ public class DirectSystemConnectionMemo extends DefaultSystemConnectionMemo impl
      */
     public ThrottleManager getThrottleManager(){
         return (ThrottleManager) classObjectMap.computeIfAbsent(ThrottleManager.class,
-                (Class c) -> {
+                (Class<?> c) -> {
                     setThrottleManager(new ThrottleManager(this));
                     log.debug("Auto create of ThrottleManager for initial configuration");
                     return get(ThrottleManager.class);
@@ -97,11 +97,12 @@ public class DirectSystemConnectionMemo extends DefaultSystemConnectionMemo impl
         return new NamedBeanComparator<>();
     }
 
+    @Override
     public void configureManagers(){
         setThrottleManager(new ThrottleManager(this));
         register();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DirectSystemConnectionMemo.class);
+    private static final Logger log = LoggerFactory.getLogger(DirectSystemConnectionMemo.class);
 
 }

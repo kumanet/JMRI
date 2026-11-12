@@ -1,12 +1,10 @@
 package jmri;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import jmri.implementation.SignalSpeedMap;
 import jmri.jmrix.internal.InternalSensorManager;
@@ -14,7 +12,6 @@ import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
 
 /**
  * Tests for the Block class
@@ -30,11 +27,11 @@ public class BlockTest {
     @Test
     public void testDirectCreate() {
         Block b = new Block("SystemName");
-        Assert.assertNotNull("Block Created",b);
+        assertNotNull( b, "Block Created");
     }
 
     @Test
-    @SuppressWarnings("unlikely-arg-type") // String / StringBuffer seems to be unrelated to Block
+    @SuppressWarnings({"unlikely-arg-type", "ObjectEqualsNull", "IncompatibleEquals"}) // String / StringBuffer seems to be unrelated to Block
     public void testEquals() {
         Block b1 = new Block("SystemName1");
         Block b2 = new Block("SystemName2");
@@ -42,32 +39,32 @@ public class BlockTest {
         //multiple Block objects with same SystemName are really the same
         Block b1a = new Block("SystemName1");
         
-        Assert.assertTrue(b1.equals(b1)); // identity
-        Assert.assertFalse(b1.equals(b2)); // blocks are named objects
+        assertTrue(b1.equals(b1)); // identity
+        assertFalse(b1.equals(b2)); // blocks are named objects
 
-        Assert.assertTrue(b1a.equals(b1));
-        Assert.assertTrue(b1.equals(b1a)); // commutes
+        assertTrue(b1a.equals(b1));
+        assertTrue(b1.equals(b1a)); // commutes
         
         // check null
-        Assert.assertFalse(b1.equals(null));
+        assertFalse(b1.equals(null));
 
         // check another type
-        Assert.assertFalse(b1.equals(new StringBuffer("foo")));
-        Assert.assertFalse(b1.equals("foo"));
+        assertFalse(b1.equals(new StringBuffer("foo")));
+        assertFalse(b1.equals("foo"));
     }
 
     @Test
-    public void testHashCode() {
+    public void testBlockHashCode() {
         Block b1 = new Block("SystemName1");
         
         //multiple Block objects with same SystemName are really the same
         Block b1a = new Block("SystemName1");
         
-        Assert.assertTrue(b1.hashCode() == b1a.hashCode());
+        assertTrue(b1.hashCode() == b1a.hashCode());
 
         b1a.setLength(120);
         b1a.setCurvature(21);
-        Assert.assertTrue(b1.hashCode() == b1a.hashCode());
+        assertTrue(b1.hashCode() == b1a.hashCode());
     }
     
     @Test
@@ -76,7 +73,7 @@ public class BlockTest {
         b.setSensor("IS12");
     }
 
-    static int count;
+    private int count;
 
     @Test
     public void testSensorInvoke() throws JmriException {
@@ -91,14 +88,14 @@ public class BlockTest {
         Sensor s = sm.provideSensor("IS12");
         b.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS12", s));
         sm.provideSensor("IS12").setState(jmri.Sensor.ACTIVE);
-        Assert.assertEquals("count of detected changes", 1, count);
+        assertEquals( 1, count, "count of detected changes");
     }
 
     @Test
     public void testValueField() {
         Block b = new Block("SystemName");
         b.setValue("string");
-        Assert.assertEquals("Returned Object matches", "string", b.getValue());
+        assertEquals( "string", b.getValue(), "Returned Object matches");
     }
 
     @Test
@@ -107,29 +104,29 @@ public class BlockTest {
         count = 0;
         Block b = new Block("SystemName");
         Sensor s = sm.provideSensor("IS12");
-        s.setState(jmri.Sensor.UNKNOWN);
-        
-        Assert.assertEquals("Initial state", Block.UNDETECTED, b.getState()); // state until sensor is set
-        
+        s.setState(Sensor.UNKNOWN);
+
+        assertEquals( Block.UNDETECTED, b.getState(), "Initial state"); // state until sensor is set
+
         b.setSensor("IS12");
-        s.setState(jmri.Sensor.ACTIVE);
-        Assert.assertEquals("State with sensor active", Block.OCCUPIED, s.getState());
-        s.setState(jmri.Sensor.INACTIVE);
-        Assert.assertEquals("State with sensor inactive", Block.UNOCCUPIED, s.getState());
+        s.setState(Sensor.ACTIVE);
+        assertEquals( Block.OCCUPIED, s.getState(), "State with sensor active");
+        s.setState(Sensor.INACTIVE);
+        assertEquals( Block.UNOCCUPIED, s.getState(), "State with sensor inactive");
     }
 
     @Test
     public void testCoding() {
-        Assert.assertTrue("Block.OCCUPIED != Block.UNOCCUPIED", Block.OCCUPIED != Block.UNOCCUPIED);
-        Assert.assertTrue("Block.OCCUPIED != Block.UNDETECTED", Block.OCCUPIED != Block.UNDETECTED);
-        Assert.assertTrue("Block.OCCUPIED != Block.UNKNOWN", Block.OCCUPIED != Block.UNKNOWN);
-        Assert.assertTrue("Block.OCCUPIED != Block.INCONSISTENT", Block.OCCUPIED != Block.INCONSISTENT);
-        Assert.assertTrue("Block.UNOCCUPIED != Block.UNDETECTED", Block.UNOCCUPIED != Block.UNDETECTED);
-        Assert.assertTrue("Block.UNOCCUPIED != Block.UNKNOWN", Block.UNOCCUPIED != Block.UNKNOWN);
-        Assert.assertTrue("Block.UNOCCUPIED != Block.INCONSISTENT", Block.UNOCCUPIED != Block.INCONSISTENT);
-        Assert.assertTrue("Block.UNDETECTED != Block.UNKNOWN", Block.UNDETECTED != Block.UNKNOWN);
-        Assert.assertTrue("Block.UNDETECTED != Block.INCONSISTENT", Block.UNDETECTED != Block.INCONSISTENT);
-        Assert.assertTrue("Block.UNKNOWN != Block.INCONSISTENT", Block.UNKNOWN != Block.INCONSISTENT);
+        assertTrue( Block.OCCUPIED != Block.UNOCCUPIED, "Block.OCCUPIED != Block.UNOCCUPIED");
+        assertTrue( Block.OCCUPIED != Block.UNDETECTED, "Block.OCCUPIED != Block.UNDETECTED");
+        assertTrue( Block.OCCUPIED != Block.UNKNOWN, "Block.OCCUPIED != Block.UNKNOWN");
+        assertTrue( Block.OCCUPIED != Block.INCONSISTENT, "Block.OCCUPIED != Block.INCONSISTENT");
+        assertTrue( Block.UNOCCUPIED != Block.UNDETECTED, "Block.UNOCCUPIED != Block.UNDETECTED");
+        assertTrue( Block.UNOCCUPIED != Block.UNKNOWN, "Block.UNOCCUPIED != Block.UNKNOWN");
+        assertTrue( Block.UNOCCUPIED != Block.INCONSISTENT, "Block.UNOCCUPIED != Block.INCONSISTENT");
+        assertTrue( Block.UNDETECTED != Block.UNKNOWN, "Block.UNDETECTED != Block.UNKNOWN");
+        assertTrue( Block.UNDETECTED != Block.INCONSISTENT, "Block.UNDETECTED != Block.INCONSISTENT");
+        assertTrue( Block.UNKNOWN != Block.INCONSISTENT, "Block.UNKNOWN != Block.INCONSISTENT");
     }
 
     // test going active with only one neighbor
@@ -141,7 +138,7 @@ public class BlockTest {
 
         Block b2 = new Block("SystemName2");
         Sensor s2 = sm.provideSensor("IS2");
-        b2.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
+        b2.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
         s2.setState(Sensor.ACTIVE);
         b2.setValue("b2 contents");
 
@@ -152,7 +149,7 @@ public class BlockTest {
 
         // actual test
         b1.goingActive();
-        Assert.assertEquals("Value transferred", "b2 contents", b1.getValue());
+        assertEquals( "b2 contents", b1.getValue(), "Value transferred");
     }
 
     // Test going active with two neighbors, one active.
@@ -166,16 +163,16 @@ public class BlockTest {
         Block b3 = new Block("SystemName3");
 
         Sensor s1 = sm.provideSensor("IS1");
-        b1.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
+        b1.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
         s1.setState(Sensor.ACTIVE);
         b1.setValue("b1 contents");
 
         Sensor s2 = sm.provideSensor("IS2");
-        b2.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
+        b2.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
         s2.setState(Sensor.INACTIVE);
 
         Sensor s3 = sm.provideSensor("IS3");
-        b3.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
+        b3.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
         s3.setState(Sensor.INACTIVE);
 
         Path p21 = new Path();
@@ -192,9 +189,9 @@ public class BlockTest {
 
         // actual test
         b2.goingActive();
-        Assert.assertEquals("State", Block.OCCUPIED, b2.getState());
-        Assert.assertEquals("Value transferred", "b1 contents", b2.getValue());
-        Assert.assertEquals("Direction", Path.RIGHT, b2.getDirection());
+        assertEquals( Block.OCCUPIED, b2.getState(), "State");
+        assertEquals( "b1 contents", b2.getValue(), "Value transferred");
+        assertEquals( Path.RIGHT, b2.getDirection(), "Direction");
 
     }
 
@@ -209,17 +206,17 @@ public class BlockTest {
         Block b3 = new Block("SystemName3");
 
         Sensor s1 = sm.provideSensor("IS1");
-        b1.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
+        b1.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
         s1.setState(Sensor.ACTIVE);
         b1.setValue("b1 contents");
         b1.setDirection(Path.RIGHT);
 
         Sensor s2 = sm.provideSensor("IS2");
-        b2.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
+        b2.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
         s2.setState(Sensor.INACTIVE);
 
         Sensor s3 = sm.provideSensor("IS3");
-        b3.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
+        b3.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
         s3.setState(Sensor.ACTIVE);
         b3.setValue("b3 contents");
         b3.setDirection(Path.RIGHT);
@@ -238,9 +235,9 @@ public class BlockTest {
         
         // actual test
         b2.goingActive();
-        Assert.assertEquals("State", Block.OCCUPIED, b2.getState());
-        Assert.assertEquals("Value transferred", "b1 contents", b2.getValue());
-        Assert.assertEquals("Direction", Path.RIGHT, b2.getDirection());
+        assertEquals( Block.OCCUPIED, b2.getState(), "State");
+        assertEquals( "b1 contents", b2.getValue(), "Value transferred");
+        assertEquals( Path.RIGHT, b2.getDirection(), "Direction");
 
     }
 
@@ -255,17 +252,17 @@ public class BlockTest {
         Block b3 = new Block("SystemName3");
 
         Sensor s1 = sm.provideSensor("IS1");
-        b1.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
+        b1.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS1", s1));
         s1.setState(Sensor.ACTIVE);
         b1.setValue("b1 contents");
         b1.setDirection(Path.NORTH_WEST); //combination direction
 
         Sensor s2 = sm.provideSensor("IS2");
-        b2.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
+        b2.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS2", s2));
         s2.setState(Sensor.INACTIVE);
 
         Sensor s3 = sm.provideSensor("IS3");
-        b3.setNamedSensor(jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
+        b3.setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle("IS3", s3));
         s3.setState(Sensor.ACTIVE);
         b3.setValue("b3 contents");
         b3.setDirection(Path.NORTH);
@@ -284,9 +281,9 @@ public class BlockTest {
         
         // actual test
         b2.goingActive();
-        Assert.assertEquals("State", Block.OCCUPIED, b2.getState());
-        Assert.assertEquals("Value transferred", "b1 contents", b2.getValue());
-        Assert.assertEquals("Direction", Path.NORTH, b2.getDirection());
+        assertEquals( Block.OCCUPIED, b2.getState(), "State");
+        assertEquals( "b1 contents", b2.getValue(), "Value transferred");
+        assertEquals( Path.NORTH, b2.getDirection(), "Direction");
 
     }
 
@@ -311,12 +308,12 @@ public class BlockTest {
         rm.provideReporter("IR22").setReport("report");
         // For each report, there are two PropertyChangeEvents -
         // "currentReport" and "lastReport"
-        Assert.assertEquals("count of detected changes", 2, count);
+        assertEquals( 2, count, "count of detected changes");
     }
 
     @Test
     public void testReporterInvokeCurrent() {
-        ReporterManager rm = jmri.InstanceManager.getDefault(ReporterManager.class);
+        ReporterManager rm = InstanceManager.getDefault(ReporterManager.class);
         count = 0;
         Block b = new Block("SystemName") {
             @Override
@@ -329,16 +326,16 @@ public class BlockTest {
         b.setReporter(rm.provideReporter("IR22"));
         rm.provideReporter("IR22").setReport("report");
         // Only detecting "currentReport" PropertyChangeEvent
-        Assert.assertEquals("count of detected changes", 1, count);
+        assertEquals( 1, count, "count of detected changes");
 
         rm.provideReporter("IR22").setReport(null);
         // Current report should change
-        Assert.assertEquals("count of detected changes", 2, count);
+        assertEquals( 2, count, "count of detected changes");
     }
 
     @Test
     public void testReporterInvokeLast() {
-        ReporterManager rm = jmri.InstanceManager.getDefault(ReporterManager.class);
+        ReporterManager rm = InstanceManager.getDefault(ReporterManager.class);
         count = 0;
         Block b = new Block("SystemName") {
             @Override
@@ -351,23 +348,25 @@ public class BlockTest {
         b.setReporter(rm.provideReporter("IR22"));
         rm.provideReporter("IR22").setReport("report");
         // Only detecting "lastReport" PropertyChangeEvent
-        Assert.assertEquals("count of detected changes", 1, count);
+        assertEquals( 1, count, "count of detected changes");
 
         rm.provideReporter("IR22").setReport(null);
         // Last report should not change
-        Assert.assertEquals("count of detected changes", 1, count);
+        assertEquals( 1, count, "count of detected changes");
     }
 
     @Test
     public void testGetLocoAddress(){
         Block b = new Block("SystemName");
-        Assert.assertEquals("address", new DccLocoAddress(1234,LocoAddress.Protocol.DCC), b.getLocoAddress("1234 enter"));
+        assertEquals( new DccLocoAddress(1234,LocoAddress.Protocol.DCC), b.getLocoAddress("1234 enter"),
+            "address");
     }
 
     @Test
     public void testGetLocoDirection(){
         Block b = new Block("SystemName");
-        Assert.assertEquals("direction", jmri.PhysicalLocationReporter.Direction.ENTER, b.getDirection("1234 enter"));
+        assertEquals( jmri.PhysicalLocationReporter.Direction.ENTER, b.getDirection("1234 enter"),
+            "direction");
     }
 
     @Test
@@ -376,21 +375,21 @@ public class BlockTest {
         Block b = new Block("BlockSystemName");
         b.setUserName("Start user id");
         Listen listen = new Listen();
-        Assert.assertEquals("no listener at start of test",0, b.getNumPropertyChangeListeners());
+        assertEquals( 0, b.getNumPropertyChangeListeners(), "no listener at start of test");
         
         b.addPropertyChangeListener(listen);
-        Assert.assertEquals("1 listener added",1, b.getNumPropertyChangeListeners());
+        assertEquals( 1, b.getNumPropertyChangeListeners(), "1 listener added");
         
         b.setUserName("user id");
-        Assert.assertEquals("prop ev name","UserName", listen.getPropertyName(0));
-        Assert.assertEquals("old value","Start user id", listen.getOldValue(0));
-        Assert.assertEquals("new value","user id", listen.getNewValue(0));
-                
+        assertEquals( "UserName", listen.getPropertyName(0), "prop ev name");
+        assertEquals( "Start user id", listen.getOldValue(0), "old value");
+        assertEquals( "user id", listen.getNewValue(0), "new value");
+
         b.removePropertyChangeListener(listen);
-        Assert.assertEquals("listener removed",0, b.getNumPropertyChangeListeners());
-        
+        assertEquals( 0, b.getNumPropertyChangeListeners(), "listener removed");
+
         b.setUserName("Changed user id");       
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
     }
     
     
@@ -422,56 +421,56 @@ public class BlockTest {
         sensorInactiveState.setKnownState(Sensor.INACTIVE);
         
         Block b = new Block("BlockSystemName");
-        Assert.assertEquals("Block starts state undetected", Block.UNDETECTED, b.getState());
-        Assert.assertEquals("Block starts no sensor", null, b.getSensor());
+        assertEquals( Block.UNDETECTED, b.getState(), "Block starts state undetected");
+        assertNull( b.getSensor(), "Block starts no sensor");
         Listen listen = new Listen();
         b.addPropertyChangeListener(listen);
         
         b.setSensor(null);
-        Assert.assertEquals("no prop change null to null",0, listen.getNumPropChanges());
-        
+        assertEquals( 0, listen.getNumPropChanges(), "no prop change null to null");
+
         b.setSensor("");
-        Assert.assertEquals("no prop change null to empty",0, listen.getNumPropChanges());
-        
+        assertEquals( 0, listen.getNumPropChanges(), "no prop change null to empty");
+
         b.setSensor("ISunknownState");
-        Assert.assertEquals("list size +2, state change, occ sense change",2, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name","state", listen.getPropertyName(0));
-        Assert.assertEquals("old value",Block.UNDETECTED, (int)listen.getOldValue(0));
-        Assert.assertEquals("new value", Block.UNKNOWN, (int)listen.getNewValue(0));
-        
-        Assert.assertEquals("prop ev name",Block.OCC_SENSOR_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value",null, listen.getOldValue(1));
-        Assert.assertEquals("new value",sensorUnknownState, listen.getNewValue(1));
-        
+        assertEquals( 2, listen.getNumPropChanges(), "list size +2, state change, occ sense change");
+        assertEquals( "state", listen.getPropertyName(0), "prop ev name");
+        assertEquals(Block.UNDETECTED, (int)listen.getOldValue(0), "old value");
+        assertEquals( Block.UNKNOWN, (int)listen.getNewValue(0), "new value");
+
+        assertEquals( Block.OCC_SENSOR_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertNull( listen.getOldValue(1), "old value");
+        assertEquals( sensorUnknownState, listen.getNewValue(1), "new value");
+
         b.setSensor("ISunknownState");
-        Assert.assertEquals("same sensor, no prop change",2, listen.getNumPropChanges());
-        
+        assertEquals( 2, listen.getNumPropChanges(), "same sensor, no prop change");
+
         b.setSensor("ISInactiveState");
-        Assert.assertEquals("list size +2, state change, occ sense change",4, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", "state", listen.getPropertyName(2));
-        Assert.assertEquals("old value", Block.UNKNOWN, (int)listen.getOldValue(2));
-        Assert.assertEquals("new value", Block.UNOCCUPIED, (int)listen.getNewValue(2));
-        
-        Assert.assertEquals("prop ev name", Block.OCC_SENSOR_CHANGE, listen.getPropertyName(3));
-        Assert.assertEquals("old value",sensorUnknownState, listen.getOldValue(3));
-        Assert.assertEquals("new value", sensorInactiveState, listen.getNewValue(3));
-        
+        assertEquals( 4, listen.getNumPropChanges(), "list size +2, state change, occ sense change");
+        assertEquals( "state", listen.getPropertyName(2), "prop ev name");
+        assertEquals( Block.UNKNOWN, (int)listen.getOldValue(2), "old value");
+        assertEquals( Block.UNOCCUPIED, (int)listen.getNewValue(2), "new value");
+
+        assertEquals( Block.OCC_SENSOR_CHANGE, listen.getPropertyName(3), "prop ev name");
+        assertEquals( sensorUnknownState, listen.getOldValue(3), "old value");
+        assertEquals( sensorInactiveState, listen.getNewValue(3), "new value");
+
         b.setSensor(null);
-        Assert.assertEquals("list size +2, state change, occ sense change",6, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name","state", listen.getPropertyName(4));
-        Assert.assertEquals("old value",Block.UNOCCUPIED, (int)listen.getOldValue(4));
-        Assert.assertEquals("setSensor sets status unoccupied to undetected", Block.UNDETECTED, (int)listen.getNewValue(4));
-        
-        Assert.assertEquals("prop ev name",Block.OCC_SENSOR_CHANGE, listen.getPropertyName(5));
-        Assert.assertEquals("old value", sensorInactiveState, listen.getOldValue(5));
-        Assert.assertEquals("new value", null, listen.getNewValue(5));
+        assertEquals( 6, listen.getNumPropChanges(), "list size +2, state change, occ sense change");
+        assertEquals( "state", listen.getPropertyName(4), "prop ev name");
+        assertEquals( Block.UNOCCUPIED, (int)listen.getOldValue(4), "old value");
+        assertEquals( Block.UNDETECTED, (int)listen.getNewValue(4), "setSensor sets status unoccupied to undetected");
+
+        assertEquals( Block.OCC_SENSOR_CHANGE, listen.getPropertyName(5), "prop ev name");
+        assertEquals( sensorInactiveState, listen.getOldValue(5), "old value");
+        assertNull( listen.getNewValue(5), "new value");
         
     }
     
     @Test
     public void testAddReporterPropertyChange() throws JmriException {
         
-        ReporterManager rm = jmri.InstanceManager.getDefault(ReporterManager.class);
+        ReporterManager rm = InstanceManager.getDefault(ReporterManager.class);
         Reporter rep = rm.provide("IR123");
         
         Block b = new Block("BlockSystemName");
@@ -479,19 +478,19 @@ public class BlockTest {
         b.addPropertyChangeListener(listen);
         
         b.setReporter(rep);
-        Assert.assertEquals("list size 1, reporter change",1, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", Block.BLOCK_REPORTER_CHANGE, listen.getPropertyName(0));
-        Assert.assertEquals("old value", null, listen.getOldValue(0));
-        Assert.assertEquals("new value", rep, listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size 1, reporter change");
+        assertEquals( Block.BLOCK_REPORTER_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertNull( listen.getOldValue(0), "old value");
+        assertEquals( rep, listen.getNewValue(0), "new value");
+
         b.setReporter(rep);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
         
         b.setReporter(null);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name",Block.BLOCK_REPORTER_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value", rep, listen.getOldValue(1));
-        Assert.assertEquals("new value", null, listen.getNewValue(1));
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( Block.BLOCK_REPORTER_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( rep, listen.getOldValue(1), "old value");
+        assertNull( listen.getNewValue(1), "new value");
     }
     
     /**
@@ -508,19 +507,19 @@ public class BlockTest {
         b.addPropertyChangeListener(listen);
         
         b.setReportingCurrent(true);
-        Assert.assertEquals("list size 1, property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", Block.BLOCK_REPORTING_CURRENT, listen.getPropertyName(0));
-        Assert.assertEquals("old value", Boolean.FALSE, listen.getOldValue(0));
-        Assert.assertEquals("new value", Boolean.TRUE, listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size 1, property change");
+        assertEquals( Block.BLOCK_REPORTING_CURRENT, listen.getPropertyName(0), "prop ev name");
+        assertEquals( Boolean.FALSE, listen.getOldValue(0), "old value");
+        assertEquals( Boolean.TRUE, listen.getNewValue(0), "new value");
+
         b.setReportingCurrent(true);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
         b.setReportingCurrent(false);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", Block.BLOCK_REPORTING_CURRENT, listen.getPropertyName(1));
-        Assert.assertEquals("old value", Boolean.TRUE, listen.getOldValue(1));
-        Assert.assertEquals("new value", Boolean.FALSE, listen.getNewValue(1));
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( Block.BLOCK_REPORTING_CURRENT, listen.getPropertyName(1), "prop ev name");
+        assertEquals( Boolean.TRUE, listen.getOldValue(1), "old value");
+        assertEquals( Boolean.FALSE, listen.getNewValue(1), "new value");
         
     }
     
@@ -532,12 +531,12 @@ public class BlockTest {
         
         b.setState(Block.UNDETECTED); // set initial test state
         b.addPropertyChangeListener(listen);
-        
+
         b.setState(Block.UNOCCUPIED);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", "state", listen.getPropertyName(0));
-        Assert.assertEquals("new value", Block.UNOCCUPIED, (int)listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( "state", listen.getPropertyName(0), "prop ev name");
+        assertEquals( Block.UNOCCUPIED, (int)listen.getNewValue(0), "new value");
+
     }
     
     @Test
@@ -550,28 +549,28 @@ public class BlockTest {
         b.addPropertyChangeListener(listen);
         
         b.setValue("String Block Value");
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", "value", listen.getPropertyName(0));
-        Assert.assertEquals("old value", null, listen.getOldValue(0));
-        Assert.assertEquals("new value", "String Block Value", listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( "value", listen.getPropertyName(0), "prop ev name");
+        assertNull( listen.getOldValue(0), "old value");
+        assertEquals( "String Block Value", listen.getNewValue(0), "new value");
+
         b.setValue("String Block Value");
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
         b.setValue("New Block Value");
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", "value", listen.getPropertyName(1));
-        Assert.assertEquals("old value", "String Block Value", listen.getOldValue(1));
-        Assert.assertEquals("new value", "New Block Value", listen.getNewValue(1));
-        
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( "value", listen.getPropertyName(1), "prop ev name");
+        assertEquals( "String Block Value", listen.getOldValue(1), "old value");
+        assertEquals( "New Block Value", listen.getNewValue(1), "new value");
+
         b.setValue(null);
-        Assert.assertEquals("+1 property change",3, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", "value", listen.getPropertyName(2));
-        Assert.assertEquals("old value", "New Block Value", listen.getOldValue(2));
-        Assert.assertEquals("new value", null, listen.getNewValue(2));
-        
+        assertEquals( 3, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( "value", listen.getPropertyName(2), "prop ev name");
+        assertEquals( "New Block Value", listen.getOldValue(2), "old value");
+        assertNull( listen.getNewValue(2), "new value");
+
     }
-    
+
     @Test
     public void testSetDirectionPropertyChange() throws JmriException {
         
@@ -582,21 +581,21 @@ public class BlockTest {
         b.addPropertyChangeListener(listen);
         
         b.setDirection(Path.EAST);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("Direction set",Path.EAST, b.getDirection());
-        Assert.assertEquals("prop ev name", "direction", listen.getPropertyName(0));
-        Assert.assertEquals("old value", Path.NORTH, (int)listen.getOldValue(0));
-        Assert.assertEquals("new value", Path.EAST, (int)listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( Path.EAST, b.getDirection(), "Direction set");
+        assertEquals( "direction", listen.getPropertyName(0), "prop ev name");
+        assertEquals( Path.NORTH, (int)listen.getOldValue(0), "old value");
+        assertEquals( Path.EAST, (int)listen.getNewValue(0), "new value");
+
         b.setDirection(Path.EAST);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
         b.setDirection(Path.WEST);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("Direction set",Path.WEST, b.getDirection());
-        Assert.assertEquals("prop ev name", "direction", listen.getPropertyName(1));
-        Assert.assertEquals("old value", Path.EAST, (int)listen.getOldValue(1));
-        Assert.assertEquals("new value", Path.WEST, (int)listen.getNewValue(1));
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( Path.WEST, b.getDirection(), "Direction set");
+        assertEquals( "direction", listen.getPropertyName(1), "prop ev name");
+        assertEquals( Path.EAST, (int)listen.getOldValue(1), "old value");
+        assertEquals( Path.WEST, (int)listen.getNewValue(1), "new value");
         
     }
     
@@ -606,28 +605,56 @@ public class BlockTest {
         Block b = new Block("BlockSystemName");
         Listen listen = new Listen();
         
-        Assert.assertFalse("block not permissive to start", b.getPermissiveWorking());
+        assertFalse( b.getPermissiveWorking(), "block not permissive to start");
         b.addPropertyChangeListener(listen);
         
         b.setPermissiveWorking(true);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertTrue("block permissive set", b.getPermissiveWorking());
-        Assert.assertEquals("prop ev name",Block.BLOCK_PERMISSIVE_CHANGE, listen.getPropertyName(0));
-        Assert.assertEquals("old value", Boolean.FALSE, listen.getOldValue(0));
-        Assert.assertEquals("new value", Boolean.TRUE, listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertTrue( b.getPermissiveWorking(), "block permissive set");
+        assertEquals( Block.BLOCK_PERMISSIVE_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertEquals( Boolean.FALSE, listen.getOldValue(0), "old value");
+        assertEquals( Boolean.TRUE, listen.getNewValue(0), "new value");
+
         b.setPermissiveWorking(true);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
         b.setPermissiveWorking(false);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertFalse("block not permissive when set", b.getPermissiveWorking());
-        Assert.assertEquals("prop ev name", Block.BLOCK_PERMISSIVE_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value", Boolean.TRUE, listen.getOldValue(1));
-        Assert.assertEquals("new value", Boolean.FALSE, listen.getNewValue(1));
-        
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertFalse( b.getPermissiveWorking(), "block not permissive when set");
+        assertEquals( Block.BLOCK_PERMISSIVE_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( Boolean.TRUE, listen.getOldValue(1), "old value");
+        assertEquals( Boolean.FALSE, listen.getNewValue(1), "new value");
+
     }
-    
+
+    @Test
+    public void testSetIsGhostPropertyChange() throws JmriException {
+
+        Block b = new Block("BlockSystemName");
+        Listen listen = new Listen();
+
+        assertFalse( b.getIsGhost(), "block not a ghost to start");
+        b.addPropertyChangeListener(listen);
+
+        b.setIsGhost(true);
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertTrue( b.getIsGhost(), "block permissive set");
+        assertEquals( Block.GHOST_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertEquals( Boolean.FALSE, listen.getOldValue(0), "old value");
+        assertEquals( Boolean.TRUE, listen.getNewValue(0), "new value");
+
+        b.setIsGhost(true);
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
+        b.setIsGhost(false);
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertFalse( b.getIsGhost(), "block not permissive when set");
+        assertEquals( Block.GHOST_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( Boolean.TRUE, listen.getOldValue(1), "old value");
+        assertEquals( Boolean.FALSE, listen.getNewValue(1), "new value");
+
+    }
+
     @Test
     public void testSetSpeedPropertyChange() throws JmriException {
         
@@ -636,90 +663,102 @@ public class BlockTest {
         
         String speedA = InstanceManager.getDefault(SignalSpeedMap.class).getValidSpeedNames().firstElement();
         String speedB = InstanceManager.getDefault(SignalSpeedMap.class).getValidSpeedNames().lastElement();
-        Assert.assertFalse("Sample speed text needs changing",speedA.equals(speedB));
-        
+        assertFalse( speedA.equals(speedB), "Sample speed text needs changing");
+
         b.setBlockSpeed(speedA); // set initial test state
-        Assert.assertEquals("block speedA set",speedA, b.getBlockSpeed());
+        assertEquals( speedA, b.getBlockSpeed(), "block speedA set");
         b.addPropertyChangeListener(listen);
-        
+
         b.setBlockSpeed(speedB);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("block speedB set",speedB, b.getBlockSpeed());
-        Assert.assertEquals("prop ev name",Block.BLOCK_SPEED_CHANGE, listen.getPropertyName(0));
-        Assert.assertEquals("old value", speedA, listen.getOldValue(0));
-        Assert.assertEquals("new value", speedB, listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( speedB, b.getBlockSpeed(), "block speedB set");
+        assertEquals( Block.BLOCK_SPEED_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertEquals( speedA, listen.getOldValue(0), "old value");
+        assertEquals( speedB, listen.getNewValue(0), "new value");
+
         b.setBlockSpeed(speedB);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
         
         b.setBlockSpeed(speedA);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("block speedA set",speedA, b.getBlockSpeed());
-        Assert.assertEquals("prop ev name",Block.BLOCK_SPEED_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value", speedB, listen.getOldValue(1));
-        Assert.assertEquals("new value", speedA, listen.getNewValue(1));
-        
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( speedA, b.getBlockSpeed(), "block speedA set");
+        assertEquals( Block.BLOCK_SPEED_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( speedB, listen.getOldValue(1), "old value");
+        assertEquals( speedA, listen.getNewValue(1), "new value");
+
     }
-    
+
     @Test
     public void testSetCurvaturePropertyChange() throws JmriException {
         
         Block b = new Block("BlockSystemName");
         Listen listen = new Listen();
         
-        Assert.assertEquals("no initial curvature",Block.NONE, b.getCurvature());
+        assertEquals( Block.NONE, b.getCurvature(), "no initial curvature");
         b.addPropertyChangeListener(listen);
-        
+
         b.setCurvature(Block.TIGHT);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name", Block.BLOCK_CURVATURE_CHANGE, listen.getPropertyName(0));
-        Assert.assertEquals("old value", Block.NONE, (int)listen.getOldValue(0));
-        Assert.assertEquals("new value", Block.TIGHT, (int)listen.getNewValue(0));
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( Block.BLOCK_CURVATURE_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertEquals( Block.NONE, (int)listen.getOldValue(0), "old value");
+        assertEquals( Block.TIGHT, (int)listen.getNewValue(0), "new value");
+
         b.setCurvature(Block.TIGHT);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
-        
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
+
         b.setCurvature(Block.GRADUAL);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("prop ev name",Block.BLOCK_CURVATURE_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value", Block.TIGHT, (int)listen.getOldValue(1));
-        Assert.assertEquals("new value", Block.GRADUAL, (int)listen.getNewValue(1));
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( Block.BLOCK_CURVATURE_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( Block.TIGHT, (int)listen.getOldValue(1), "old value");
+        assertEquals( Block.GRADUAL, (int)listen.getNewValue(1), "new value");
     }
-    
+
     @Test
     public void testSetGetLengthPropertyChange() throws JmriException {
         
         Block b = new Block("BlockSystemName");
         Listen listen = new Listen();
         
-        Assert.assertEquals("no initial length mm",0.0f, b.getLengthMm(), 0);
-        Assert.assertEquals("no initial length cm",0.0f, b.getLengthCm(), 0);
-        Assert.assertEquals("no initial length in",0.0f, b.getLengthIn(), 0);
+        assertEquals( 0.0f, b.getLengthMm(), 0, "no initial length mm");
+        assertEquals( 0.0f, b.getLengthCm(), 0, "no initial length cm");
+        assertEquals( 0.0f, b.getLengthIn(), 0, "no initial length in");
         b.addPropertyChangeListener(listen);
-        
+
         b.setLength(47f);
-        Assert.assertEquals("1 property change",1, listen.getNumPropChanges());
-        Assert.assertEquals("mm set to 47",47.0f, b.getLengthMm(), 0.01);
-        Assert.assertEquals("cm set to 4.7",4.7f, b.getLengthCm(), 0.01);
-        Assert.assertEquals("Inches set to ",1.850f, b.getLengthIn(), 0.01);
-        Assert.assertEquals("prop ev name", Block.BLOCK_LENGTH_CHANGE, listen.getPropertyName(0));
-        Assert.assertEquals("old value", 0.0f, (float)listen.getOldValue(0),0.01);
-        Assert.assertEquals("new value", 47.0f, (float)listen.getNewValue(0),0.01);
-        
+        assertEquals( 1, listen.getNumPropChanges(), "1 property change");
+        assertEquals( 47.0f, b.getLengthMm(), 0.01, "mm set to 47");
+        assertEquals( 4.7f, b.getLengthCm(), 0.01, "cm set to 4.7");
+        assertEquals( 1.850f, b.getLengthIn(), 0.01, "Inches set to ");
+        assertEquals( Block.BLOCK_LENGTH_CHANGE, listen.getPropertyName(0), "prop ev name");
+        assertEquals( 0.0f, (float)listen.getOldValue(0),0.01, "old value");
+        assertEquals( 47.0f, (float)listen.getNewValue(0),0.01, "new value");
+
         b.setLength(47f);
-        Assert.assertEquals("list size still 1",1, listen.getNumPropChanges());
+        assertEquals( 1, listen.getNumPropChanges(), "list size still 1");
         
         b.setLength(20f);
-        Assert.assertEquals("+1 property change",2, listen.getNumPropChanges());
-        Assert.assertEquals("mm set to 20",20.0f, b.getLengthMm(), 0.001);
-        Assert.assertEquals("cm set to 2.0",2.0f, b.getLengthCm(), 0.001);
-        Assert.assertEquals("Inches set to ",0.787f, b.getLengthIn(), 0.001);
-        Assert.assertEquals("prop ev name",Block.BLOCK_LENGTH_CHANGE, listen.getPropertyName(1));
-        Assert.assertEquals("old value", 47.0f, (float)listen.getOldValue(1),0.01);
-        Assert.assertEquals("new value", 20.0f, (float)listen.getNewValue(1),0.01);
-        
+        assertEquals( 2, listen.getNumPropChanges(), "+1 property change");
+        assertEquals( 20.0f, b.getLengthMm(), 0.001, "mm set to 20");
+        assertEquals( 2.0f, b.getLengthCm(), 0.001, "cm set to 2.0");
+        assertEquals( 0.787f, b.getLengthIn(), 0.001, "Inches set to ");
+        assertEquals( Block.BLOCK_LENGTH_CHANGE, listen.getPropertyName(1), "prop ev name");
+        assertEquals( 47.0f, (float)listen.getOldValue(1),0.01, "old value");
+        assertEquals( 20.0f, (float)listen.getNewValue(1),0.01, "new value");
+
     }
-    
+
+    @Test
+    public void testDescribeState() {
+        Block t = new Block("testDescribeState");
+        assertEquals("Unknown", t.describeState(Block.UNKNOWN));
+        assertEquals("Inconsistent", t.describeState(Block.INCONSISTENT));
+        assertEquals("Occupied", t.describeState(Block.OCCUPIED));
+        assertEquals("UnOccupied", t.describeState(Block.UNOCCUPIED));
+        assertEquals("Undetected", t.describeState(Block.UNDETECTED));
+        assertEquals("Unexpected value: 777", t.describeState(777));
+        t.dispose();
+    }
+
     /**
      * Class to log Property Changes.
      */
@@ -748,6 +787,152 @@ public class BlockTest {
             return propChangeNames.get(index).getNewValue();
         }
         
+    }
+
+    @Test
+    public void testWaysThrough() {
+        Block a = new Block("IB1");
+        Block b = new Block("IB2");
+        Block c = new Block("IB3");
+        Block d = new Block("IB4");
+        Turnout t = InstanceManager.turnoutManagerInstance().provideTurnout("IT1");
+        b.addPath(new Path(a, Path.NONE, Path.NONE));
+        b.addPath(new Path(c, Path.NONE, Path.NONE, new BeanSetting(t, Turnout.CLOSED)));
+        b.addPath(new Path(d, Path.NONE, Path.NONE, new BeanSetting(t, Turnout.THROWN)));
+        b.addPath(new Path(c, Path.EAST, Path.WEST, new BeanSetting(t, Turnout.CLOSED))); // a second path to C: still one way
+        assertEquals(List.of(new Block.WayThrough(a, c), new Block.WayThrough(a, d)), b.getWaysThrough(),
+                "A to either leg, but not between the turnout's two legs");
+        assertTrue(a.getWaysThrough().isEmpty(), "no paths: no way through");
+
+        // a ladder: each road set by its own turnout, so any two can be set at once
+        Block e = new Block("IB5");
+        Block f = new Block("IB6");
+        Block g = new Block("IB7");
+        Turnout t2 = InstanceManager.turnoutManagerInstance().provideTurnout("IT2");
+        e.addPath(new Path(f, Path.NONE, Path.NONE, new BeanSetting(t, Turnout.THROWN)));
+        e.addPath(new Path(g, Path.NONE, Path.NONE, new BeanSetting(t2, Turnout.THROWN)));
+        assertEquals(List.of(new Block.WayThrough(f, g)), e.getWaysThrough(), "different turnouts don't conflict");
+        assertEquals(new Block.WayThrough(c, a), new Block.WayThrough(a, c), "the same either way");
+        assertEquals(new Block.WayThrough(c, a).hashCode(), new Block.WayThrough(a, c).hashCode());
+        assertSame(a, new Block.WayThrough(c, a).getOneEnd(), "in system name order");
+        assertSame(c, new Block.WayThrough(c, a).getOtherEnd());
+        assertNotEquals(new Block.WayThrough(a, c), new Block.WayThrough(a, d));
+        assertNotEquals(new Block.WayThrough(a, c), "IB1 - IB3");
+        assertEquals("IB1 - IB3", new Block.WayThrough(c, a).toString());
+        assertThrows(IllegalArgumentException.class, () -> new Block.WayThrough(a, a));
+    }
+
+    @Test
+    public void testRouteLengths() {
+        Block a = new Block("IB1");
+        Block b = new Block("IB2");
+        Block c = new Block("IB3");
+        b.setLength(500f);
+        List<PropertyChangeEvent> events = new ArrayList<>();
+        b.addPropertyChangeListener(Block.PROPERTY_ROUTE_LENGTHS, events::add);
+
+        assertEquals(500f, b.getRouteLengthMm(a, c), "the Block's length until one is set");
+        assertFalse(b.hasRouteLength(a, c));
+        b.setRouteLengthMm(a, c, 620f);
+        assertEquals(620f, b.getRouteLengthMm(c, a), "the same either way");
+        assertTrue(b.hasRouteLength(c, a));
+        assertEquals(1, events.size());
+        assertEquals(new Block.WayThrough(a, c), events.get(0).getOldValue());
+        assertEquals(620f, events.get(0).getNewValue());
+
+        b.setRouteLengthMm(c, a, 620f);
+        assertEquals(1, events.size(), "no change, no event");
+        b.setLength(800f);
+        assertEquals(620f, b.getRouteLengthMm(a, c), "kept when the Block's length changes");
+
+        assertThrows(IllegalArgumentException.class, () -> b.setRouteLengthMm(a, c, 0f), "not a length");
+        assertThrows(IllegalArgumentException.class, () -> b.setRouteLengthMm(a, c, -5f), "not a length");
+        assertThrows(IllegalArgumentException.class, () -> b.setRouteLengthMm(a, c, Float.NaN), "not a length");
+        assertThrows(IllegalArgumentException.class, () -> b.setRouteLengthMm(a, c, Float.POSITIVE_INFINITY));
+        assertEquals(620f, b.getRouteLengthMm(a, c), "a refused length changes nothing");
+        assertEquals(1, events.size());
+
+        b.clearRouteLength(a, c);
+        assertEquals(800f, b.getRouteLengthMm(a, c), "cleared: the Block's length again");
+        assertFalse(b.hasRouteLength(a, c));
+        assertEquals(2, events.size());
+        assertNull(events.get(1).getNewValue());
+        assertTrue(b.getPropertyKeys().isEmpty(), "nothing left stored");
+        b.clearRouteLength(c, a);
+        assertEquals(2, events.size(), "clearing what isn't set changes nothing");
+    }
+
+    @Test
+    public void testRouteLengthsKeptApartWhateverTheNames() {
+        // without encoding, both ways would be stored under the same key
+        Block x = new Block("IBx|IBy");
+        Block z = new Block("IBz");
+        Block x2 = new Block("IBx");
+        Block y2 = new Block("IBy|IBz");
+        Block b = new Block("IB%41 :b");
+        b.setRouteLengthMm(x, z, 100f);
+        b.setRouteLengthMm(x2, y2, 200f);
+        assertEquals(100f, b.getRouteLengthMm(x, z));
+        assertEquals(200f, b.getRouteLengthMm(x2, y2));
+        assertEquals(2, b.getPropertyKeys().size());
+
+        // a % is encoded too, so a name holding an encoded | is still its own
+        Block p = new Block("IBp|q");
+        Block p2 = new Block("IBp%7Cq");
+        b.setRouteLengthMm(p, z, 300f);
+        b.setRouteLengthMm(p2, z, 400f);
+        assertEquals(300f, b.getRouteLengthMm(p, z));
+        assertEquals(400f, b.getRouteLengthMm(p2, z));
+        b.setBrakingTowards(p, true);
+        assertTrue(b.isBrakingTowards(p));
+        assertFalse(b.isBrakingTowards(p2), "only the Block it was set for");
+        assertEquals(5, b.getPropertyKeys().size());
+    }
+
+    @Test
+    public void testRouteLengthNotANumberReadsAsUnset() {
+        Block a = new Block("IB1");
+        Block b = new Block("IB2");
+        Block c = new Block("IB3");
+        b.setLength(500f);
+        b.setProperty(Block.ROUTE_LENGTH_KEY + "IB1|IB3", "long");
+        assertFalse(b.hasRouteLength(a, c), "not a length: as if none were set");
+        assertEquals(500f, b.getRouteLengthMm(a, c));
+        b.setProperty(Block.ROUTE_LENGTH_KEY + "IB1|IB3", "-3");
+        assertFalse(b.hasRouteLength(a, c), "not a length either");
+    }
+
+    @Test
+    public void testBrakingSections() {
+        Block a = new Block("IB1");
+        Block b = new Block("IB2");
+        Block c = new Block("IB3");
+        Block far = new Block("IB9");
+        b.addPath(new Path(a, Path.NONE, Path.NONE));
+        b.addPath(new Path(c, Path.NONE, Path.NONE));
+        List<PropertyChangeEvent> events = new ArrayList<>();
+        b.addPropertyChangeListener(Block.PROPERTY_BRAKING, events::add);
+
+        assertFalse(b.isBrakingTowards(c));
+        assertTrue(b.getBrakingTowards().isEmpty());
+        b.setBrakingTowards(c, true);
+        assertTrue(b.isBrakingTowards(c));
+        assertFalse(b.isBrakingTowards(a), "only for trains leaving towards C");
+        assertEquals(List.of(c), b.getBrakingTowards());
+        assertEquals(1, events.size());
+        assertSame(c, events.get(0).getOldValue());
+        assertEquals(Boolean.TRUE, events.get(0).getNewValue());
+
+        b.setBrakingTowards(c, true);
+        assertEquals(1, events.size(), "no change, no event");
+        b.setBrakingTowards(far, true);
+        assertEquals(List.of(c), b.getBrakingTowards(), "only neighbours, by the Block's paths");
+
+        b.setBrakingTowards(c, false);
+        b.setBrakingTowards(far, false);
+        assertFalse(b.isBrakingTowards(c));
+        assertTrue(b.getPropertyKeys().isEmpty(), "nothing left stored");
+        assertEquals(Boolean.FALSE, events.get(events.size() - 1).getNewValue());
     }
 
     @BeforeEach

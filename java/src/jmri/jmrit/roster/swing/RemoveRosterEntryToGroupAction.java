@@ -4,17 +4,17 @@ import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
 import javax.swing.AbstractAction;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+
 import jmri.jmrit.roster.Roster;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.util.JmriJFrame;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Remove a locomotive from a roster grouping.
@@ -59,6 +59,7 @@ public class RemoveRosterEntryToGroupAction extends AbstractAction {
     public void actionPerformed(ActionEvent event) {
         frame = new JmriJFrame(Bundle.getMessage("DeleteFromGroup"));
         rosterBox = new RosterEntrySelectorPanel();
+        boolean allEntriesEnabled = rosterBox.getRosterGroupComboBox().isAllEntriesEnabled();
         rosterBox.getRosterGroupComboBox().setAllEntriesEnabled(false);
         frame.getContentPane().setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
         JPanel p;
@@ -84,6 +85,9 @@ public class RemoveRosterEntryToGroupAction extends AbstractAction {
                 dispose();
             }
         });
+        
+        rosterBox.getRosterGroupComboBox().setAllEntriesEnabled(allEntriesEnabled);
+        
         frame.getContentPane().add(p);
         frame.pack();
         frame.setVisible(true);
@@ -97,11 +101,11 @@ public class RemoveRosterEntryToGroupAction extends AbstractAction {
      * @return true if user says to continue
      */
     boolean userOK(String entry, String group) {
-        return (JOptionPane.YES_OPTION
-                == JOptionPane.showConfirmDialog(_who,
+        return (JmriJOptionPane.YES_OPTION
+                == JmriJOptionPane.showConfirmDialog(_who,
                         Bundle.getMessage("DeleteEntryFromGroupDialog", entry, group),
                         Bundle.getMessage("DeleteEntryFromGroupTitle", entry, group),
-                        JOptionPane.YES_NO_OPTION));
+                        JmriJOptionPane.YES_NO_OPTION));
     }
 
     public void okPressed() {
@@ -127,7 +131,6 @@ public class RemoveRosterEntryToGroupAction extends AbstractAction {
 
     }
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(RemoveRosterEntryToGroupAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RemoveRosterEntryToGroupAction.class);
 
 }

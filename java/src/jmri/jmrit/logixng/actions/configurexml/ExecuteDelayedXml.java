@@ -3,9 +3,8 @@ package jmri.jmrit.logixng.actions.configurexml;
 import jmri.InstanceManager;
 import jmri.configurexml.JmriConfigureXmlException;
 import jmri.jmrit.logixng.*;
-import jmri.jmrit.logixng.actions.ActionSensor;
 import jmri.jmrit.logixng.actions.ExecuteDelayed;
-import jmri.jmrit.logixng.util.TimerUnit;
+import jmri.util.TimerUnit;
 import jmri.jmrit.logixng.util.parser.ParserException;
 
 import org.jdom2.Element;
@@ -60,6 +59,10 @@ public class ExecuteDelayedXml extends jmri.managers.configurexml.AbstractNamedB
         element.addContent(new Element("unit").addContent(p.getUnit().name()));
         element.addContent(new Element("resetIfAlreadyStarted").addContent(p.getResetIfAlreadyStarted() ? "yes" : "no"));  // NOI18N
         
+        if (p.getUseIndividualTimers()) {   // Only set this element if true, to keep backward compability if not used
+            element.addContent(new Element("useIndividualTimers").addContent(p.getUseIndividualTimers() ? "yes" : "no"));  // NOI18N
+        }
+        
         return element;
     }
     
@@ -101,6 +104,12 @@ public class ExecuteDelayedXml extends jmri.managers.configurexml.AbstractNamedB
         }
         h.setResetIfAlreadyStarted("yes".equals(resetIfAlreadyStarted));
         
+        String useIndividualTimers = "no";
+        if (shared.getChild("useIndividualTimers") != null) {  // NOI18N
+            useIndividualTimers = shared.getChild("useIndividualTimers").getTextTrim();  // NOI18N
+        }
+        h.setUseIndividualTimers("yes".equals(useIndividualTimers));
+        
         try {
             Element elem = shared.getChild("delayAddressing");
             if (elem != null) {
@@ -124,5 +133,5 @@ public class ExecuteDelayedXml extends jmri.managers.configurexml.AbstractNamedB
         return true;
     }
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExecuteDelayedXml.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExecuteDelayedXml.class);
 }

@@ -20,7 +20,7 @@ public class UsbLightManagerTest extends AbstractLightMgrTestBase {
     private AnymaDMX_SystemConnectionMemo _memo = null;
 
     @Test
-    public void ConstructorTest() {
+    public void testCtor() {
         Assert.assertNotNull("ConnectionConfig constructor", l);
     }
 
@@ -67,6 +67,6 @@ public class UsbLightManagerTest extends AbstractLightMgrTestBase {
         JUnitUtil.tearDown();
     }
     
-    private final static Logger log
+    private static final Logger log
             = LoggerFactory.getLogger(UsbLightManagerTest.class);
 }

@@ -1,10 +1,14 @@
 package jmri.jmrit.beantable.routetable;
 
-import jmri.Route;
+import java.awt.*;
+import java.util.*;
 
 import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
+
+import jmri.InstanceManager;
+import jmri.Route;
+import jmri.RouteManager;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Add frame for the Route Table.
@@ -31,47 +35,54 @@ public class RouteAddFrame extends AbstractRouteAddEditFrame {
 
     public RouteAddFrame(String name, boolean saveSize, boolean savePosition) {
         super(name, saveSize, savePosition);
-        initComponents();
+        super.initComponents();
     }
 
     @Override
     protected JPanel getButtonPanel() {
+        final JButton copyButton = new JButton(Bundle.getMessage("ButtonCopyRoute"));
         final JButton createButton = new JButton(Bundle.getMessage("ButtonCreate"));
         final JButton editButton = new JButton(Bundle.getMessage("ButtonEdit"));
         final JButton cancelButton = new JButton(Bundle.getMessage("ButtonCancel"));
         final JButton updateButton = new JButton(Bundle.getMessage("ButtonUpdate"));
+
         // add Buttons panel
         JPanel pb = new JPanel();
-        pb.setLayout(new FlowLayout(FlowLayout.TRAILING));
+        pb.setLayout(new BorderLayout());
+
+        // Copy button
+        JPanel left = new JPanel();
+        left.add(copyButton);
+        copyButton.addActionListener( e -> copyPressed());
+
+        JPanel right = new JPanel();
+        right.setLayout(new FlowLayout(FlowLayout.TRAILING));
+
         // Cancel (Add) button
-        pb.add(cancelButton);
-        cancelButton.addActionListener(this::cancelAddPressed);
+        right.add(cancelButton);
+        cancelButton.addActionListener( e -> cancelAddPressed());
+
         // Create button
-        pb.add(createButton);
-        createButton.addActionListener(this::createPressed);
+        right.add(createButton);
+        createButton.addActionListener( e -> createPressed());
         createButton.setToolTipText(Bundle.getMessage("TooltipCreateRoute"));
 
+        pb.add(left, BorderLayout.WEST);
+        pb.add(right, BorderLayout.EAST);
+
         // Show the initial buttons, and hide the others
-        cancelButton.setVisible(true); // show CancelAdd button
-        updateButton.setVisible(true);
-        editButton.setVisible(true);
+        copyButton.setVisible(true);
+        cancelButton.setVisible(true);
+        updateButton.setVisible(false);
+        editButton.setVisible(false);
         createButton.setVisible(true);
         return pb;
     }
 
     /**
      * Respond to the CancelAdd button.
-     *
-     * @param e the action event
      */
-    private void cancelAddPressed(ActionEvent e) {
-        cancelAdd();
-    }
-
-    /**
-     * Cancel Add mode.
-     */
-    private void cancelAdd() {
+    private void cancelAddPressed() {
         if (routeDirty) {
             showReminderMessage();
         }
@@ -82,21 +93,15 @@ public class RouteAddFrame extends AbstractRouteAddEditFrame {
         routeDirty = false;
         // hide addFrame
         setVisible(false);
-        _routeSensorModel.dispose();
-        _routeTurnoutModel.dispose();
         closeFrame();
     }
 
     /**
      * Respond to the Create button.
-     *
-     * @param e the action event
      */
-    private void createPressed(ActionEvent e) {
-        if (!_autoSystemName.isSelected()) {
-            if (!checkNewNamesOK()) {
-                return;
-            }
+    private void createPressed() {
+        if ( !_autoSystemName.isSelected() && !checkNewNamesOK() ) {
+            return;
         }
         updatePressed(true); // close pane after creating
         //status2.setText(Bundle.getMessage("RouteAddStatusInitial2", Bundle.getMessage("ButtonEdit")));
@@ -106,6 +111,50 @@ public class RouteAddFrame extends AbstractRouteAddEditFrame {
             curRoute.activateRoute();
         }
         closeFrame();
+    }
+
+    /**
+     * Respond to the Copy button.
+     * Request a source route for the copy and load the page if possible.
+     */
+    private void copyPressed() {
+        var selectedRoute = selectSourceRoute();
+        if (selectedRoute != null) {
+            var route = InstanceManager.getDefault(RouteManager.class).getRoute(selectedRoute);
+            if (route != null) {
+                setPageContent(route);
+            }
+        }
+    }
+
+    /**
+     * Display an input dialog with a combo box of existing routes.
+     *
+     * @return the selected route name or null if none.
+     */
+    private String selectSourceRoute() {
+        var routes = InstanceManager.getDefault(RouteManager.class).getNamedBeanSet();
+        var routeList = new ArrayList<String>();
+        routes.forEach( r -> routeList.add(r.getDisplayName()));
+        Collections.sort(routeList);
+
+        var routeArray = new String[routeList.size()];
+        routeList.toArray(routeArray);
+
+        try {
+            var icon = new ImageIcon(jmri.util.FileUtil.getProgramPath() + jmri.Application.getLogo());
+            var choice = JmriJOptionPane.showInputDialog(
+                    this,
+                    Bundle.getMessage("LabelCopyRoute"),
+                    Bundle.getMessage("TitleCopyRoute"),
+                    JmriJOptionPane.QUESTION_MESSAGE,
+                    icon,
+                    routeArray,
+                    null);
+            return (String) choice;
+        } catch (HeadlessException ex) {
+            return null;
+        }
     }
 
     /**
@@ -124,7 +173,7 @@ public class RouteAddFrame extends AbstractRouteAddEditFrame {
         }
         Route g;
         // check if a Route with the same user name exists
-        if (!uName.equals("")) {
+        if (!uName.isEmpty()) {
             g = routeManager.getByUserName(uName);
             if (g != null) {
                 // Route already exists

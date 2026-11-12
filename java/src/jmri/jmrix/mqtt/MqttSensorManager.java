@@ -34,10 +34,10 @@ public class MqttSensorManager extends jmri.managers.AbstractSensorManager {
     }
 
     @Nonnull
-    public String sendTopicPrefix = "track/turnout/"; // for constructing topic; public for script access
+    public String sendTopicPrefix = "track/sensor/"; // for constructing topic; public for script access
     @Nonnull
-    public String rcvTopicPrefix = "track/turnout/"; // for constructing topic; public for script access
-    
+    public String rcvTopicPrefix = "track/sensor/"; // for constructing topic; public for script access
+
     /** {@inheritDoc} */
     @Override
     public boolean allowMultipleAdditions(String systemName) {
@@ -54,7 +54,7 @@ public class MqttSensorManager extends jmri.managers.AbstractSensorManager {
     public String createSystemName(@Nonnull String topicSuffix, @Nonnull String prefix) throws JmriException {
         return prefix + typeLetter() + topicSuffix;
     }
-    
+
     /**
      * Create an new sensor object.
      * {@inheritDoc}
@@ -112,6 +112,6 @@ public class MqttSensorManager extends jmri.managers.AbstractSensorManager {
     }
     MqttContentParser<Sensor> parser = null;
 
-    private final static Logger log = LoggerFactory.getLogger(MqttSensorManager.class);
+    private static final Logger log = LoggerFactory.getLogger(MqttSensorManager.class);
 
 }

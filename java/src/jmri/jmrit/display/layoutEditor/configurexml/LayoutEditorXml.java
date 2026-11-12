@@ -1,10 +1,12 @@
 package jmri.jmrit.display.layoutEditor.configurexml;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.Color;
 import java.util.List;
-import java.util.stream.Collectors;
+
 import javax.swing.JFrame;
-import javax.swing.JOptionPane;
+
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
 import jmri.configurexml.AbstractXmlAdapter;
@@ -14,9 +16,9 @@ import jmri.jmrit.display.EditorManager;
 import jmri.jmrit.display.Positionable;
 import jmri.jmrit.display.layoutEditor.*;
 import jmri.util.ColorUtil;
+import jmri.util.swing.JmriJOptionPane;
+
 import org.jdom2.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handle configuration for LayoutEditor panes.
@@ -115,6 +117,9 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
         p.resetDirty();
         panel.setAttribute("openDispatcher", p.getOpenDispatcherOnLoad() ? "yes" : "no");
         panel.setAttribute("useDirectTurnoutControl", p.getDirectTurnoutControl() ? "yes" : "no");
+        if (p.isHighlightCursor()) {
+            panel.setAttribute("highlightCursor", "yes");
+        }
 
         // store layout track drawing options
         try {
@@ -175,6 +180,7 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
         for (LayoutTrackView lv : p.getLevelXingViews())            {storeOne(panel, lv); }
         for (LayoutTrackView lv : p.getLayoutSlipViews())           {storeOne(panel, lv); }
         for (LayoutTrackView lv : p.getLayoutTurntableViews())      {storeOne(panel, lv); }
+        for (LayoutTrackView lv : p.getLayoutTraverserViews())      {storeOne(panel, lv); }
 
         // include Layout Shapes
         for (LayoutShape ls : p.getLayoutShapes()) {storeOne(panel, ls); }
@@ -206,7 +212,13 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
      * @param shared Top level Element to unpack.
      */
     @Override
+    @SuppressFBWarnings(value = {"THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"},
+            justification = "We rethrow exception if it's a runtime exception")
     public boolean load(Element shared, Element perNode) {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return true;
+        }
+
         boolean result = true;
         Attribute a;
         // find coordinates
@@ -288,11 +300,11 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
             JFrame frame = new JFrame("DialogDemo");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             log.warn("File contains a panel with the same name ({}) as an existing panel", name);
-            int n = JOptionPane.showConfirmDialog(frame,
+            int n = JmriJOptionPane.showConfirmDialog(frame,
                     Bundle.getMessage("DuplicatePanel", name),
                     Bundle.getMessage("DuplicatePanelTitle"),
-                    JOptionPane.YES_NO_OPTION);
-            if (n == JOptionPane.NO_OPTION) {
+                    JmriJOptionPane.YES_NO_OPTION);
+            if (n != JmriJOptionPane.YES_OPTION ) {
                 return false;
             }
         }
@@ -586,7 +598,7 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
         } catch (DataConversionException e) {
             log.warn("Could not parse color attributes!");
         } catch (NullPointerException e) {  // considered normal if the attributes are not present
-            log.debug("missing backbround color attributes");
+            log.debug("missing background color attributes");
         }
 
         try {
@@ -597,9 +609,19 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
             log.debug("missing useDirectTurnoutControl attribute");
         }
 
+        try {
+            panel.setHighlightCursor(shared.getAttribute("highlightCursor").getBooleanValue());
+        } catch (DataConversionException e) {
+            log.warn("unable to convert highlightCursor attribute");
+        } catch (NullPointerException e) {  // considered normal if the attribute is not present
+            log.debug("missing highlightCursor attribute");
+        }
+
+
         // Set editor's option flags, load content after
         // this so that individual item flags are set as saved
         panel.initView();
+
 
         // load the contents
         for (Element item : shared.getChildren()) {
@@ -608,7 +630,7 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
             adapterName = jmri.configurexml.ConfigXmlManager.currentClassName(adapterName);
 
             if (log.isDebugEnabled()) {
-                String id = "<null>";
+                String id;
                 try {
                     id = item.getAttribute("name").getValue();
                     log.debug("Load {} for [{}] via {}", id, panel.getName(), adapterName);
@@ -686,6 +708,17 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
         panel.pack();
         panel.setLayoutDimensions(windowWidth, windowHeight, x, y, panelWidth, panelHeight);
         panel.setVisible(true);    // always show the panel
+
+        // make a pass over positionables, setting (re)setting their font style.
+        // This is to bypass a problem on Windows, where bold labels need to have
+        // this done after pack() to avoid sizing issues.
+        for (jmri.jmrit.display.Positionable label : panel.getContents()) {
+            var popup = label.getPopupUtility();
+            if (popup != null) { // encountered in some testing
+                popup.setFontStyle(popup.getFontStyle());
+            }
+        }
+
         panel.resetDirty();
 
         // register the resulting panel for later configuration
@@ -699,13 +732,14 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
                 boolean value = shared.getAttribute("openDispatcher").getBooleanValue();
                 panel.setOpenDispatcherOnLoad(value);
                 if (value) {
-                    DispatcherFrame df = InstanceManager.getDefault(DispatcherFrame.class);
-                    df.loadAtStartup();
+                    // Create the DispatcherFrame instance.
+                    // This is a trigger for LoadXmlConfigAction to call loadAtStartup.
+                    InstanceManager.getDefault(DispatcherFrame.class);
                 }
             } catch (DataConversionException e) {
                 log.warn("unable to convert openDispatcher attribute");
             } catch (NullPointerException e) {  // considered normal if the attribute is not present
-                log.debug("missing openDispatcher attribute");
+                log.debug("No openDispatcher attribute");
             }
         }
         return result;
@@ -715,5 +749,7 @@ public class LayoutEditorXml extends AbstractXmlAdapter {
     public int loadOrder() {
         return jmri.Manager.PANELFILES;
     }
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorXml.class);
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorXml.class);
+
 }

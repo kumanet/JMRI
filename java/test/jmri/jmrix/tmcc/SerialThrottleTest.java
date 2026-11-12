@@ -1,6 +1,7 @@
 package jmri.jmrix.tmcc;
 
 import jmri.SpeedStepMode;
+import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
@@ -10,7 +11,10 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender Copyright (C) 2017
  * @author Egbert Broerse 2021
+ * with edits/additions by
+ * @author Timothy Jump Copyright (C) 2025
  */
+@SuppressWarnings("deprecation")
 public class SerialThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     @Test
@@ -35,18 +39,18 @@ public class SerialThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Test
     @Override
     public void testGetSpeedStepMode() {
-        SpeedStepMode expResult = SpeedStepMode.TMCC_32;
+        SpeedStepMode expResult = SpeedStepMode.TMCC1_32;
         SpeedStepMode result = instance.getSpeedStepMode();
         Assert.assertEquals(expResult, result);
     }
-    
+
     /**
      * Test of getSpeedIncrement method, of class AbstractThrottle.
      */
     @Test
     @Override
     public void testGetSpeedIncrement() {
-        float expResult = SpeedStepMode.TMCC_32.increment;
+        float expResult = SpeedStepMode.TMCC1_32.increment;
         float result = instance.getSpeedIncrement();
         Assert.assertEquals(expResult, result, 0.0);
     }
@@ -270,21 +274,92 @@ public class SerialThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         boolean f21 = false;
         instance.setF21(f21);
     }
-    
+
+    /**
+     * Test of setF22 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF22() {
+        boolean f22 = false;
+        instance.setF22(f22);
+    }
+
+    /**
+     * Test of setF23 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF23() {
+        boolean f23 = false;
+        instance.setF23(f23);
+    }
+
+    /**
+     * Test of setF21 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF24() {
+        boolean f24 = false;
+        instance.setF24(f24);
+    }
+
+    /**
+     * Test of setF21 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF25() {
+        boolean f25 = false;
+        instance.setF25(f25);
+    }
+
+    /**
+     * Test of setF21 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF26() {
+        boolean f26 = false;
+        instance.setF26(f26);
+    }
+
+    /**
+     * Test of setF21 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF27() {
+        boolean f27 = false;
+        instance.setF27(f27);
+    }
+
+    /**
+     * Test of setF28 method, of class AbstractThrottle.
+     */
+    @Test
+    @Override
+    public void testSetF28() {
+        boolean f28 = false;
+        instance.setF28(f28);
+    }
+
     @Test
     @Override
     public void testOutOfRangeSetFunction(){
         instance.setFunction(-1, true);
-        jmri.util.JUnitAppender.assertWarnMessageStartingWith("Unhandled update function number: -1");
-        
-        instance.setFunction(29, true);
-        jmri.util.JUnitAppender.assertWarnMessageStartingWith("Unhandled update function number: 29");
-        jmri.util.JUnitAppender.assertWarnMessageStartingWith("Unhandled set function number: 29");
+        JUnitAppender.assertWarnMessageStartingWith("Unhandled update function number: -1");
+        JUnitAppender.assertWarnMessageStartingWith("Unhandled set function number: -1");
+
+        instance.setFunction(85, true);
+        jmri.util.JUnitAppender.assertWarnMessageStartingWith("Unhandled update function number: 85");
+        jmri.util.JUnitAppender.assertWarnMessageStartingWith("Unhandled set function number: 85");
     }
 
-    SerialTrafficController tcis;
-    TmccSystemConnectionMemo memo;
-    SerialThrottleManager tm;
+    private SerialTrafficController tcis;
+    private TmccSystemConnectionMemo memo;
+    private SerialThrottleManager tm;
 
     @BeforeEach
     @Override
@@ -295,7 +370,9 @@ public class SerialThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         memo = new TmccSystemConnectionMemo(tcis);
         tm = new SerialThrottleManager(memo);
         jmri.InstanceManager.setDefault(jmri.ThrottleManager.class, tm);
+        memo.store(tm, jmri.ThrottleManager.class);
         instance = new SerialThrottle(memo, new jmri.DccLocoAddress(1024, true));
+        setMaxFns(85);
     }
 
     @AfterEach
@@ -312,6 +389,6 @@ public class SerialThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SerialThrottleTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SerialThrottleTest.class);
 
 }

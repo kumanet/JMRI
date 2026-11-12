@@ -5,10 +5,11 @@ import java.util.Map;
 
 import jmri.InstanceManager;
 import jmri.JmriException;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.logixng.AnalogActionManager;
 import jmri.jmrit.logixng.AnalogExpressionManager;
 import jmri.jmrit.logixng.Base;
-import jmri.jmrit.logixng.Category;
+import jmri.jmrit.logixng.LogixNG_Category;
 import jmri.jmrit.logixng.DigitalActionManager;
 import jmri.jmrit.logixng.FemaleAnalogActionSocket;
 import jmri.jmrit.logixng.FemaleAnalogExpressionSocket;
@@ -19,7 +20,7 @@ import jmri.jmrit.logixng.SocketAlreadyConnectedException;
 
 /**
  * Executes an analog action with the result of an analog expression.
- * 
+ *
  * @author Daniel Bergqvist Copyright 2018
  */
 public class DoAnalogAction
@@ -30,7 +31,7 @@ public class DoAnalogAction
     private String _analogActionSocketSystemName;
     private final FemaleAnalogExpressionSocket _analogExpressionSocket;
     private final FemaleAnalogActionSocket _analogActionSocket;
-    
+
     public DoAnalogAction(String sys, String user) {
         super(sys, user);
         _analogExpressionSocket = InstanceManager.getDefault(AnalogExpressionManager.class)
@@ -38,7 +39,7 @@ public class DoAnalogAction
         _analogActionSocket = InstanceManager.getDefault(AnalogActionManager.class)
                 .createFemaleSocket(this, this, "A");
     }
-    
+
     @Override
     public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws JmriException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
@@ -49,24 +50,18 @@ public class DoAnalogAction
         copy.setComment(getComment());
         return manager.registerAction(copy).deepCopyChildren(this, systemNames, userNames);
     }
-    
+
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.COMMON;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.COMMON;
     }
 
     /** {@inheritDoc} */
     @Override
-    public boolean isExternal() {
-        return false;
-    }
-    
-    /** {@inheritDoc} */
-    @Override
     public void execute() throws JmriException {
         double result = _analogExpressionSocket.evaluate();
-        
+
         _analogActionSocket.setValue(result);
     }
 
@@ -75,10 +70,10 @@ public class DoAnalogAction
         switch (index) {
             case 0:
                 return _analogExpressionSocket;
-                
+
             case 1:
                 return _analogActionSocket;
-                
+
             default:
                 throw new IllegalArgumentException(
                         String.format("index has invalid value: %d", index));
@@ -153,11 +148,11 @@ public class DoAnalogAction
             if (!_analogExpressionSocket.isConnected()
                     || !_analogExpressionSocket.getConnectedSocket().getSystemName()
                             .equals(_analogExpressionSocketSystemName)) {
-                
+
                 String socketSystemName = _analogExpressionSocketSystemName;
-                
+
                 _analogExpressionSocket.disconnect();
-                
+
                 if (socketSystemName != null) {
                     MaleSocket maleSocket =
                             InstanceManager.getDefault(AnalogExpressionManager.class)
@@ -166,21 +161,21 @@ public class DoAnalogAction
                         _analogExpressionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load analog expression " + socketSystemName);
+                        log.error("cannot load analog expression {}", socketSystemName);
                     }
                 }
             } else {
                 _analogExpressionSocket.getConnectedSocket().setup();
             }
-            
+
             if (!_analogActionSocket.isConnected()
                     || !_analogActionSocket.getConnectedSocket().getSystemName()
                             .equals(_analogActionSocketSystemName)) {
-                
+
                 String socketSystemName = _analogActionSocketSystemName;
-                
+
                 _analogActionSocket.disconnect();
-                
+
                 if (socketSystemName != null) {
                     MaleSocket maleSocket =
                             InstanceManager.getDefault(AnalogActionManager.class)
@@ -189,7 +184,7 @@ public class DoAnalogAction
                         _analogActionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load analog action " + socketSystemName);
+                        log.error("cannot load analog action {}", socketSystemName);
                     }
                 }
             } else {
@@ -197,25 +192,25 @@ public class DoAnalogAction
             }
         } catch (SocketAlreadyConnectedException ex) {
             // This shouldn't happen and is a runtime error if it does.
-            throw new RuntimeException("socket is already connected");
+            throw new JmriUncheckedException("socket is already connected");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void registerListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void unregisterListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disposeMe() {
     }
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DoAnalogAction.class);
-    
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DoAnalogAction.class);
+
 }

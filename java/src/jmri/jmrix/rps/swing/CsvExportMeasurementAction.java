@@ -79,7 +79,7 @@ public class CsvExportMeasurementAction extends AbstractAction implements Measur
 
         // initialize chooser
         if (fileChooser == null) {
-            fileChooser = new JFileChooser();
+            fileChooser = new jmri.util.swing.JmriJFileChooser();
         } else {
             fileChooser.rescanCurrentDirectory();
         }
@@ -122,6 +122,6 @@ public class CsvExportMeasurementAction extends AbstractAction implements Measur
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CsvExportMeasurementAction.class);
+    private static final Logger log = LoggerFactory.getLogger(CsvExportMeasurementAction.class);
 
 }

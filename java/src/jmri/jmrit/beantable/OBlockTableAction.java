@@ -15,8 +15,7 @@ import jmri.jmrit.logix.OBlockManager;
 import jmri.jmrit.logix.PortalManager;
 import jmri.util.JmriJFrame;
 import jmri.util.gui.GuiLafPreferencesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * GUI to define OBlocks, OPaths and Portals. Overrides some of the AbstractTableAction methods as this is a hybrid pane.
@@ -35,7 +34,7 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
 
     // basic table models
     OBlockTableModel oblocks;
-    PortalTableModel portals;
+    private PortalTableModel portals;
     SignalTableModel signals;
     BlockPortalTableModel blockportals;
     // tables created on demand inside TableFrames:
@@ -43,9 +42,9 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
     // - PathTurnoutTable(block)
 
     @Nonnull
-    protected OBlockManager oblockManager = InstanceManager.getDefault(jmri.jmrit.logix.OBlockManager.class);
+    protected OBlockManager oblockManager = InstanceManager.getDefault(OBlockManager.class);
     @Nonnull
-    protected PortalManager portalManager = InstanceManager.getDefault(jmri.jmrit.logix.PortalManager.class);
+    protected PortalManager portalManager = InstanceManager.getDefault(PortalManager.class);
 
     TableFrames tf;
     OBlockTableFrame otf;
@@ -304,7 +303,7 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
     String systemNameAuto = this.getClass().getName() + ".AutoSystemName";
 
     // Three [Addx...] buttons on tabbed bottom box handlers
-    
+
     @Override
     protected void addPressed(ActionEvent e) {
         log.warn("This should not have happened");
@@ -356,13 +355,12 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
             numberOfOblocks = (Integer) numberToAddSpinner.getValue();
         }
 
-        if (numberOfOblocks >= 65) { // limited by JSpinnerModel to 100
-            if (JOptionPane.showConfirmDialog(addOBlockFrame,
-                    Bundle.getMessage("WarnExcessBeans", Bundle.getMessage("OBlocks"), numberOfOblocks),
-                    Bundle.getMessage("WarningTitle"),
-                    JOptionPane.YES_NO_OPTION) == 1) {
+        if (numberOfOblocks >= 65 // limited by JSpinnerModel to 100
+            && JmriJOptionPane.showConfirmDialog(addOBlockFrame,
+                Bundle.getMessage("WarnExcessBeans", Bundle.getMessage("OBlocks"), numberOfOblocks),
+                Bundle.getMessage("WarningTitle"),
+                JmriJOptionPane.YES_NO_OPTION) != JmriJOptionPane.YES_OPTION ) {
                 return;
-            }
         }
 
         String uName = NamedBean.normalizeUserName(userName.getText());
@@ -469,6 +467,7 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
             signals.setEditMode(true);
             if (signalFrame == null) {
                 signalFrame = new SignalEditFrame(Bundle.getMessage("TitleAddSignal"), null, null, signals);
+                signalFrame.initComponents();
             }
             //signalFrame.updateSignalList();
             signalFrame.resetFrame();
@@ -478,10 +477,10 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
     }
 
     void handleCreateException(String sysName) {
-        JOptionPane.showMessageDialog(addOBlockFrame,
+        JmriJOptionPane.showMessageDialog(addOBlockFrame,
                 Bundle.getMessage("ErrorOBlockAddFailed", sysName) + "\n" + Bundle.getMessage("ErrorAddFailedCheck"),
                 Bundle.getMessage("ErrorTitle"),
-                JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.ERROR_MESSAGE);
     }
 
     /**
@@ -508,6 +507,15 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
     @Override
     public String getClassDescription() {
         return Bundle.getMessage("TitleOBlockTable");
+    }
+
+    @Override
+    public void setMessagePreferencesDetails() {
+        InstanceManager.getDefault(jmri.UserPreferencesManager.class).
+                setPreferenceItemDetails(getClassName(), "duplicateUserName", Bundle.getMessage("HideDupUserError"));  // NOI18N
+        InstanceManager.getDefault(jmri.UserPreferencesManager.class).
+                setPreferenceItemDetails(getClassName(), "duplicateSystemName", Bundle.getMessage("HideDupSysError"));  // NOI18N
+        super.setMessagePreferencesDetails();
     }
 
 //    @Override
@@ -545,6 +553,6 @@ public class OBlockTableAction extends AbstractTableAction<OBlock> implements Pr
         return "package.jmri.jmrit.beantable.OBlockTable";
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OBlockTableAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OBlockTableAction.class);
 
 }

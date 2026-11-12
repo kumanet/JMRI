@@ -42,6 +42,9 @@ public class SignalMastIconXml extends PositionableLabelXml {
         element.setAttribute("imageset", p.useIconSet());
         element.setAttribute("class", "jmri.jmrit.display.configurexml.SignalMastIconXml");
         //storeIconInfo(p, element);
+
+        storeLogixNG_Data(p, element);
+
         return element;
     }
 
@@ -129,7 +132,7 @@ public class SignalMastIconXml extends PositionableLabelXml {
                 l.setClickMode(attr.getIntValue());
             }
         } catch (org.jdom2.DataConversionException e) {
-            log.error("Failed on clickmode attribute: {}", e);
+            log.error("Failed on clickmode attribute", e);
         }
 
         try {
@@ -138,7 +141,7 @@ public class SignalMastIconXml extends PositionableLabelXml {
                 l.setLitMode(attr.getBooleanValue());
             }
         } catch (org.jdom2.DataConversionException e) {
-            log.error("Failed on litmode attribute: {}", e);
+            log.error("Failed on litmode attribute", e);
         }
 
         try {
@@ -147,10 +150,12 @@ public class SignalMastIconXml extends PositionableLabelXml {
             throw new JmriConfigureXmlException("Positionable id is not unique", e);
         }
 
+        loadLogixNG_Data(l, element);
+
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, Editor.SIGNALS, element);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SignalMastIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(SignalMastIconXml.class);
 
 }

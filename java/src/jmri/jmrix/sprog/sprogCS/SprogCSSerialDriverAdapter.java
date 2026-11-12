@@ -43,13 +43,13 @@ public class SprogCSSerialDriverAdapter
             numSlots = Integer.parseInt(slots);
         }
         catch (NumberFormatException e) {
-            log.warn("Could not parse number of slots " + e);
+            log.warn("Could not parse number of slots {}", e.getMessage());
             numSlots = 16;
         }
         
         super.configure();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SprogCSSerialDriverAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SprogCSSerialDriverAdapter.class);
 
 }

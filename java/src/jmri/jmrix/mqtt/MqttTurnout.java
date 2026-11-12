@@ -40,10 +40,10 @@ public class MqttTurnout extends AbstractTurnout implements MqttEventListener {
         
     MqttContentParser<Turnout> parser = new MqttContentParser<Turnout>() {
         // public for scripting
-        public final static String closedText = "CLOSED";
-        public final static String thrownText = "THROWN";
-        public final static String unknownText = "UNKNOWN";
-        public final static String inconsistentText = "INCONSISTENT";
+        public static final String closedText = "CLOSED";
+        public static final String thrownText = "THROWN";
+        public static final String unknownText = "UNKNOWN";
+        public static final String inconsistentText = "INCONSISTENT";
 
         int stateFromString(String payload) {
             switch (payload) {
@@ -56,7 +56,7 @@ public class MqttTurnout extends AbstractTurnout implements MqttEventListener {
                 case inconsistentText:
                     return INCONSISTENT;
                 default:
-                    log.warn("Unknown state : {}, substitute UNKNOWN", payload);
+                    log.warn("{} saw unknown state : {}", getDisplayName(), payload);
                     return UNKNOWN;
             }
         }
@@ -130,7 +130,7 @@ public class MqttTurnout extends AbstractTurnout implements MqttEventListener {
     @Override
     public void notifyMqttMessage(String receivedTopic, String message) {
         if (! ( receivedTopic.endsWith(rcvTopic) || receivedTopic.endsWith(sendTopic) ) ) {
-            log.error("Got a message whose topic ({}) wasn't for me ({})", receivedTopic, rcvTopic);
+            log.error("{} got a message whose topic ({}) wasn't for me ({})", getDisplayName(), receivedTopic, rcvTopic);
             return;
         }
         
@@ -142,6 +142,13 @@ public class MqttTurnout extends AbstractTurnout implements MqttEventListener {
         log.warn("Send command to {} Pushbutton in {} not yet coded", (_pushButtonLockout ? "Lock" : "Unlock"), getSystemName());
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MqttTurnout.class);
+    @Override
+    public void dispose() {
+        mqttAdapter.unsubscribe(rcvTopic, this);
+        super.dispose();
+    }
+
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MqttTurnout.class);
 
 }

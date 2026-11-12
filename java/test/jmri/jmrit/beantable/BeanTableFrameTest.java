@@ -4,7 +4,8 @@ import java.awt.GraphicsEnvironment;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
 /**
  *
@@ -17,7 +18,7 @@ public class BeanTableFrameTest extends jmri.util.JmriJFrameTestBase {
     public void setUp() {
         JUnitUtil.setUp();
         if (!GraphicsEnvironment.isHeadless()) {
-            frame = new BeanTableFrame();
+            frame = new BeanTableFrame<>();
         }
     }
 
@@ -27,6 +28,6 @@ public class BeanTableFrameTest extends jmri.util.JmriJFrameTestBase {
         super.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(BeanTableFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(BeanTableFrameTest.class);
 
 }

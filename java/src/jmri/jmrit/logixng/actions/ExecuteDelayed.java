@@ -2,13 +2,15 @@ package jmri.jmrit.logixng.actions;
 
 import java.util.*;
 
-import jmri.jmrit.logixng.util.TimerUnit;
+import jmri.util.TimerUnit;
 
 import javax.annotation.Nonnull;
 
 import jmri.InstanceManager;
 import jmri.JmriException;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.implementation.DefaultSymbolTable;
 import jmri.jmrit.logixng.util.*;
 import jmri.jmrit.logixng.util.parser.*;
 import jmri.util.TimerUtil;
@@ -16,7 +18,7 @@ import jmri.util.TypeConversionUtil;
 
 /**
  * Executes a digital action delayed.
- * 
+ *
  * @author Daniel Bergqvist Copyright 2021
  */
 public class ExecuteDelayed
@@ -25,7 +27,7 @@ public class ExecuteDelayed
 
     private String _socketSystemName;
     private final FemaleDigitalActionSocket _socket;
-    private ProtectedTimerTask _timerTask;
+    private ProtectedTimerTask _defaultTimerTask;
     private NamedBeanAddressing _stateAddressing = NamedBeanAddressing.Direct;
     private int _delay;
     private String _stateReference = "";
@@ -34,17 +36,17 @@ public class ExecuteDelayed
     private ExpressionNode _stateExpressionNode;
     private TimerUnit _unit = TimerUnit.MilliSeconds;
     private boolean _resetIfAlreadyStarted;
-    
-    // These variables are used internally in this action
-    private long _timerDelay = 0;   // Timer delay in milliseconds
-    private long _timerStart = 0;   // Timer start in milliseconds
-    
+    private boolean _useIndividualTimers;
+
+    private final InternalFemaleSocket _defaultInternalSocket = new InternalFemaleSocket();
+
+
     public ExecuteDelayed(String sys, String user) {
         super(sys, user);
         _socket = InstanceManager.getDefault(DigitalActionManager.class)
                 .createFemaleSocket(this, this, "A");
     }
-    
+
     @Override
     public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws JmriException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
@@ -60,101 +62,128 @@ public class ExecuteDelayed
         copy.setDelayReference(_stateReference);
         copy.setUnit(_unit);
         copy.setResetIfAlreadyStarted(_resetIfAlreadyStarted);
+        copy.setUseIndividualTimers(_useIndividualTimers);
         return manager.registerAction(copy).deepCopyChildren(this, systemNames, userNames);
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public Category getCategory() {
-        return Category.COMMON;
     }
 
     /** {@inheritDoc} */
     @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.COMMON;
     }
-    
+/*
+    private String getVariables(SymbolTable symbolTable) {
+        java.io.StringWriter stringWriter = new java.io.StringWriter();
+        java.io.PrintWriter writer = new java.io.PrintWriter(stringWriter);
+        symbolTable.printSymbolTable(writer);
+        return stringWriter.toString();
+    }
+*/
     /**
      * Get a new timer task.
+     * @param conditionalNG  the ConditionalNG
+     * @param symbolTable    the symbol table
+     * @param timerDelay     the time the timer should wait
+     * @param timerStart     the time when the timer was started
      */
-    private ProtectedTimerTask getNewTimerTask(ConditionalNG conditionalNG) {
+    private ProtectedTimerTask getNewTimerTask(ConditionalNG conditionalNG, SymbolTable symbolTable, long timerDelay, long timerStart) throws JmriException {
+
+        DefaultSymbolTable newSymbolTable = new DefaultSymbolTable(symbolTable);
+
         return new ProtectedTimerTask() {
             @Override
             public void execute() {
                 try {
                     synchronized(ExecuteDelayed.this) {
-                        _timerTask = null;
-                        long currentTimerTime = System.currentTimeMillis() - _timerStart;
-                        if (currentTimerTime < _timerDelay) {
-                            scheduleTimer(conditionalNG, _timerDelay - currentTimerTime);
+                        if (!_useIndividualTimers) _defaultTimerTask = null;
+                        long currentTime = System.currentTimeMillis();
+                        long currentTimerTime = currentTime - timerStart;
+                        if (currentTimerTime < timerDelay) {
+                            scheduleTimer(conditionalNG, symbolTable, timerDelay - currentTimerTime, currentTime);
                         } else {
-                            conditionalNG.execute(_socket);
+                            InternalFemaleSocket internalSocket;
+                            if (_useIndividualTimers) {
+                                internalSocket = new InternalFemaleSocket();
+                            } else {
+                                internalSocket = _defaultInternalSocket;
+                            }
+                            internalSocket.conditionalNG = conditionalNG;
+                            internalSocket.newSymbolTable = newSymbolTable;
+                            conditionalNG.execute(internalSocket);
                         }
                     }
-                } catch (Exception e) {
+                } catch (RuntimeException | JmriException e) {
                     log.error("Exception thrown", e);
                 }
             }
         };
     }
-    
-    private void scheduleTimer(ConditionalNG conditionalNG, long delay) {
-        if (_timerTask != null) _timerTask.stopTimer();
-        _timerTask = getNewTimerTask(conditionalNG);
-        TimerUtil.schedule(_timerTask, delay);
+
+    private void scheduleTimer(ConditionalNG conditionalNG, SymbolTable symbolTable, long timerDelay, long timerStart) throws JmriException {
+        synchronized(ExecuteDelayed.this) {
+            if (!_useIndividualTimers && (_defaultTimerTask != null)) {
+                _defaultTimerTask.stopTimer();
+            }
+            ProtectedTimerTask timerTask =
+                    getNewTimerTask(conditionalNG, symbolTable, timerDelay, timerStart);
+            if (!_useIndividualTimers) {
+                _defaultTimerTask = timerTask;
+            }
+            TimerUtil.schedule(timerTask, timerDelay);
+        }
     }
-    
+
     private long getNewDelay() throws JmriException {
-        
+
         switch (_stateAddressing) {
             case Direct:
                 return _delay;
-                
+
             case Reference:
                 return TypeConversionUtil.convertToLong(ReferenceUtil.getReference(
                         getConditionalNG().getSymbolTable(), _stateReference));
-                
+
             case LocalVariable:
                 SymbolTable symbolTable = getConditionalNG().getSymbolTable();
                 return TypeConversionUtil
                         .convertToLong(symbolTable.getValue(_stateLocalVariable));
-                
+
             case Formula:
                 return _stateExpressionNode != null
                         ? TypeConversionUtil.convertToLong(
                                 _stateExpressionNode.calculate(
                                         getConditionalNG().getSymbolTable()))
                         : 0;
-                
+
             default:
                 throw new IllegalArgumentException("invalid _addressing state: " + _stateAddressing.name());
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void execute() throws JmriException {
         synchronized(this) {
-            if (_timerTask != null) {
-                if (_resetIfAlreadyStarted) _timerTask.stopTimer();
+            if (!_useIndividualTimers && (_defaultTimerTask != null)) {
+                if (_resetIfAlreadyStarted) _defaultTimerTask.stopTimer();
                 else return;
             }
-            _timerDelay = getNewDelay() * _unit.getMultiply();
-            _timerStart = System.currentTimeMillis();
-            scheduleTimer(getConditionalNG(), _delay * _unit.getMultiply());
+            long timerDelay = getNewDelay() * _unit.getMultiply();
+            long timerStart = System.currentTimeMillis();
+            ConditionalNG conditonalNG = getConditionalNG();
+            scheduleTimer(conditonalNG, conditonalNG.getSymbolTable(), timerDelay, timerStart);
         }
     }
-    
+
     public void setDelayAddressing(NamedBeanAddressing addressing) throws ParserException {
         _stateAddressing = addressing;
         parseDelayFormula();
     }
-    
+
     public NamedBeanAddressing getDelayAddressing() {
         return _stateAddressing;
     }
-    
+
     /**
      * Get the delay.
      * @return the delay
@@ -162,7 +191,7 @@ public class ExecuteDelayed
     public int getDelay() {
         return _delay;
     }
-    
+
     /**
      * Set the delay.
      * @param delay the delay
@@ -170,46 +199,46 @@ public class ExecuteDelayed
     public void setDelay(int delay) {
         _delay = delay;
     }
-    
+
     public void setDelayReference(@Nonnull String reference) {
         if ((! reference.isEmpty()) && (! ReferenceUtil.isReference(reference))) {
             throw new IllegalArgumentException("The reference \"" + reference + "\" is not a valid reference");
         }
         _stateReference = reference;
     }
-    
+
     public String getDelayReference() {
         return _stateReference;
     }
-    
+
     public void setDelayLocalVariable(@Nonnull String localVariable) {
         _stateLocalVariable = localVariable;
     }
-    
+
     public String getDelayLocalVariable() {
         return _stateLocalVariable;
     }
-    
+
     public void setDelayFormula(@Nonnull String formula) throws ParserException {
         _stateFormula = formula;
         parseDelayFormula();
     }
-    
+
     public String getDelayFormula() {
         return _stateFormula;
     }
-    
+
     private void parseDelayFormula() throws ParserException {
         if (_stateAddressing == NamedBeanAddressing.Formula) {
             Map<String, Variable> variables = new HashMap<>();
-            
+
             RecursiveDescentParser parser = new RecursiveDescentParser(variables);
             _stateExpressionNode = parser.parseExpression(_stateFormula);
         } else {
             _stateExpressionNode = null;
         }
     }
-    
+
     /**
      * Get the unit
      * @return the unit
@@ -217,7 +246,7 @@ public class ExecuteDelayed
     public TimerUnit getUnit() {
         return _unit;
     }
-    
+
     /**
      * Set the unit
      * @param unit the unit
@@ -225,7 +254,7 @@ public class ExecuteDelayed
     public void setUnit(TimerUnit unit) {
         _unit = unit;
     }
-    
+
     /**
      * Get reset if timer is already started.
      * @return true if the timer should be reset if this action is executed
@@ -234,7 +263,7 @@ public class ExecuteDelayed
     public boolean getResetIfAlreadyStarted() {
         return _resetIfAlreadyStarted;
     }
-    
+
     /**
      * Set reset if timer is already started.
      * @param resetIfAlreadyStarted true if the timer should be reset if this
@@ -244,13 +273,30 @@ public class ExecuteDelayed
     public void setResetIfAlreadyStarted(boolean resetIfAlreadyStarted) {
         _resetIfAlreadyStarted = resetIfAlreadyStarted;
     }
-    
+
+    /**
+     * Get use individual timers.
+     * @return true if the timer should use individual timers, false othervise
+     */
+    public boolean getUseIndividualTimers() {
+        return _useIndividualTimers;
+    }
+
+    /**
+     * Set reset if timer is already started.
+     * @param useIndividualTimers true if the timer should use individual timers,
+     *                              false othervise
+     */
+    public void setUseIndividualTimers(boolean useIndividualTimers) {
+        _useIndividualTimers = useIndividualTimers;
+    }
+
     @Override
     public FemaleSocket getChild(int index) throws IllegalArgumentException, UnsupportedOperationException {
         switch (index) {
             case 0:
                 return _socket;
-                
+
             default:
                 throw new IllegalArgumentException(
                         String.format("index has invalid value: %d", index));
@@ -288,35 +334,38 @@ public class ExecuteDelayed
     @Override
     public String getLongDescription(Locale locale) {
         String delay;
-        
+
         switch (_stateAddressing) {
             case Direct:
                 delay = Bundle.getMessage(locale, "ExecuteDelayed_DelayByDirect", _unit.getTimeWithUnit(_delay));
                 break;
-                
+
             case Reference:
                 delay = Bundle.getMessage(locale, "ExecuteDelayed_DelayByReference", _stateReference, _unit.toString());
                 break;
-                
+
             case LocalVariable:
                 delay = Bundle.getMessage(locale, "ExecuteDelayed_DelayByLocalVariable", _stateLocalVariable, _unit.toString());
                 break;
-                
+
             case Formula:
                 delay = Bundle.getMessage(locale, "ExecuteDelayed_DelayByFormula", _stateFormula, _unit.toString());
                 break;
-                
+
             default:
                 throw new IllegalArgumentException("invalid _stateAddressing state: " + _stateAddressing.name());
         }
-        
+
         return Bundle.getMessage(locale,
                 "ExecuteDelayed_Long",
                 _socket.getName(),
                 delay,
                 _resetIfAlreadyStarted
-                        ? Bundle.getMessage("ExecuteDelayed_ResetRepeat")
-                        : Bundle.getMessage("ExecuteDelayed_IgnoreRepeat"));
+                        ? Bundle.getMessage("ExecuteDelayed_Options", Bundle.getMessage("ExecuteDelayed_ResetRepeat"))
+                        : Bundle.getMessage("ExecuteDelayed_Options", Bundle.getMessage("ExecuteDelayed_IgnoreRepeat")),
+                _useIndividualTimers
+                        ? Bundle.getMessage("ExecuteDelayed_Options", Bundle.getMessage("ExecuteDelayed_UseIndividualTimers"))
+                        : "");
     }
 
     public FemaleDigitalActionSocket getSocket() {
@@ -338,11 +387,11 @@ public class ExecuteDelayed
             if (!_socket.isConnected()
                     || !_socket.getConnectedSocket().getSystemName()
                             .equals(_socketSystemName)) {
-                
+
                 String socketSystemName = _socketSystemName;
-                
+
                 _socket.disconnect();
-                
+
                 if (socketSystemName != null) {
                     MaleSocket maleSocket =
                             InstanceManager.getDefault(DigitalActionManager.class)
@@ -351,7 +400,7 @@ public class ExecuteDelayed
                         _socket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load analog action " + socketSystemName);
+                        log.error("cannot load analog action {}", socketSystemName);
                     }
                 }
             } else {
@@ -359,30 +408,66 @@ public class ExecuteDelayed
             }
         } catch (SocketAlreadyConnectedException ex) {
             // This shouldn't happen and is a runtime error if it does.
-            throw new RuntimeException("socket is already connected");
+            throw new JmriUncheckedException("socket is already connected");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void registerListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void unregisterListenersForThisClass() {
-        if (_timerTask != null) {
-            _timerTask.stopTimer();
-            _timerTask = null;
+        synchronized(ExecuteDelayed.this) {
+            if (!_useIndividualTimers && (_defaultTimerTask != null)) {
+                _defaultTimerTask.stopTimer();
+                _defaultTimerTask = null;
+            }
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disposeMe() {
     }
-    
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExecuteDelayed.class);
-    
+
+
+
+    private class InternalFemaleSocket extends jmri.jmrit.logixng.implementation.DefaultFemaleDigitalActionSocket {
+
+        private ConditionalNG conditionalNG;
+        private SymbolTable newSymbolTable;
+
+        public InternalFemaleSocket() {
+            super(null, new FemaleSocketListener(){
+                @Override
+                public void connected(FemaleSocket socket) {
+                    // Do nothing
+                }
+
+                @Override
+                public void disconnected(FemaleSocket socket) {
+                    // Do nothing
+                }
+            }, "A");
+        }
+
+        @Override
+        public void execute() throws JmriException {
+            if (conditionalNG == null) { throw new NullPointerException("conditionalNG is null"); }
+            if (_socket != null) {
+                SymbolTable oldSymbolTable = conditionalNG.getSymbolTable();
+                conditionalNG.setSymbolTable(newSymbolTable);
+                _socket.execute();
+                conditionalNG.setSymbolTable(oldSymbolTable);
+            }
+        }
+
+    }
+
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExecuteDelayed.class);
+
 }

@@ -1,33 +1,31 @@
 package jmri.jmrix;
 
-import java.awt.GraphicsEnvironment;
-
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 /**
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true" )
 public class AbstractMonFrameTest extends jmri.util.JmriJFrameTestBase {
 
     @BeforeEach
     @Override
     public void setUp() {
         JUnitUtil.setUp();
-        jmri.util.JUnitUtil.initDefaultUserMessagePreferences();
-        if(!GraphicsEnvironment.isHeadless()){
-           frame = new AbstractMonFrame(){
-              @Override
-              public String title(){
-                 return "test";
-              }
-              @Override
-              public void init(){
-              }
-           };
-        }
+        JUnitUtil.initDefaultUserMessagePreferences();
+        frame = new AbstractMonFrame(){
+            @Override
+            public String title(){
+                return "test";
+            }
+            @Override
+            public void init(){
+            }
+       };
     }
 
     @AfterEach
@@ -37,6 +35,6 @@ public class AbstractMonFrameTest extends jmri.util.JmriJFrameTestBase {
         super.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(AbstractMonFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(AbstractMonFrameTest.class);
 
 }

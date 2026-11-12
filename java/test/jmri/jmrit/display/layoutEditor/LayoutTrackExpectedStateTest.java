@@ -4,8 +4,6 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.jupiter.api.*;
 import java.awt.GraphicsEnvironment;
-import java.awt.geom.Point2D;
-
 import jmri.util.JUnitUtil;
 
 /**
@@ -37,7 +35,6 @@ public class LayoutTrackExpectedStateTest {
     @AfterEach
     public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 

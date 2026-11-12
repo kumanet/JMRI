@@ -7,30 +7,32 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
+
 import javax.annotation.Nonnull;
 import javax.jmdns.JmDNS;
 import javax.jmdns.JmmDNS;
 import javax.jmdns.NetworkTopologyEvent;
 import javax.jmdns.NetworkTopologyListener;
 import javax.jmdns.ServiceInfo;
+
 import jmri.Disposable;
 import jmri.InstanceManager;
 import jmri.InstanceManagerAutoDefault;
 import jmri.ShutDownManager;
 import jmri.profile.ProfileManager;
 import jmri.util.SystemType;
+import jmri.util.ThreadingUtil;
 import jmri.util.node.NodeIdentity;
 import jmri.web.server.WebServerPreferences;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A ZeroConfServiceManager object manages zeroConf network service
@@ -70,7 +72,6 @@ import org.slf4j.LoggerFactory;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <p>
  *
  * @author Randall Wood Copyright (C) 2011, 2013, 2018
  * @see javax.jmdns.JmDNS
@@ -88,12 +89,20 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
      * objects is static. All access <strong>must</strong> be through
      * {@link #getDNSes() } to ensure this is populated correctly.
      */
-    protected static final HashMap<InetAddress, JmDNS> JMDNS_SERVICES = new HashMap<>();
-    private static final Logger log = LoggerFactory.getLogger(ZeroConfServiceManager.class);
+    static final HashMap<InetAddress, JmDNS> JMDNS_SERVICES = new HashMap<>();
+
     // class data objects
     protected final HashMap<String, ZeroConfService> services = new HashMap<>();
     protected final NetworkListener networkListener = new NetworkListener(this);
     protected final Runnable shutDownTask = () -> dispose(this);
+
+    public static final String DNS_CLOSE_THREAD_NAME = "dns.close in ZerConfServiceManager#stopAll";
+
+    /**
+     * The start of the name of each thread that unregisters services from one
+     * JmDNS instance.
+     */
+    private static final String UNREGISTER_THREAD_NAME = "ZeroConfServiceManager unregister";
 
     protected final ZeroConfPreferences preferences = new ZeroConfPreferences(ProfileManager.getDefault().getActiveProfile());
 
@@ -263,22 +272,35 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
     public void stop(ZeroConfService service) {
         log.debug("Stopping ZeroConfService {}", service.getKey());
         if (services.containsKey(service.getKey())) {
-            getDNSes().values().parallelStream().forEach((dns) -> {
+            HashMap<JmDNS, InetAddress> registered = new HashMap<>();
+            getDNSes().values().forEach(dns -> {
                 try {
                     final InetAddress address = dns.getInetAddress();
-                    try {
-                        log.debug("Unregistering {} from {}", service.getKey(), address);
-                        dns.unregisterService(service.getServiceInfo(address));
-                        service.removeServiceInfo(address);
-                        service.getListeners().stream().forEach((listener) -> {
-                            listener.serviceUnpublished(new ZeroConfServiceEvent(service, dns));
-                        });
-                    } catch (NullPointerException ex) {
+                    if (service.getServiceInfo(address) != null) {
+                        registered.put(dns, address);
+                    } else {
                         log.debug("{} already unregistered from {}", service.getKey(), address);
                     }
                 } catch (IOException ex) {
                     log.error("Unable to stop ZeroConfService {}. {}", service.getKey(), ex.getLocalizedMessage());
                 }
+            });
+            // JmDNS blocks in unregisterService while it announces that the
+            // service has gone, so unregister from every address at once
+            ArrayList<Runnable> unregisters = new ArrayList<>();
+            registered.forEach((dns, address) -> {
+                ServiceInfo info = service.getServiceInfo(address);
+                unregisters.add(() -> {
+                    log.debug("Unregistering {} from {}", service.getKey(), address);
+                    dns.unregisterService(info);
+                });
+            });
+            runConcurrently(unregisters, UNREGISTER_THREAD_NAME + " " + service.getKey());
+            registered.forEach((dns, address) -> {
+                service.removeServiceInfo(address);
+                service.getListeners().stream().forEach(listener -> {
+                    listener.serviceUnpublished(new ZeroConfServiceEvent(service, dns));
+                });
             });
             services.remove(service.getKey());
         }
@@ -291,40 +313,79 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
         stopAll(false);
     }
 
+    /**
+     * Stop advertising all services, and optionally close every JmDNS
+     * instance.
+     * <p>
+     * Each JmDNS instance unregisters all of its services together, and the
+     * instances do so at the same time, so this waits for one round of
+     * announcements whatever the number of services and addresses. Closing an
+     * instance makes a further announcement; that is left to run on its own
+     * thread, named from {@link #DNS_CLOSE_THREAD_NAME}, and is not waited
+     * for.
+     *
+     * @param close true to close every JmDNS instance once its services are
+     *              unregistered
+     */
     private void stopAll(final boolean close) {
         log.debug("Stopping all ZeroConfServices");
-        CountDownLatch zcLatch = new CountDownLatch(services.size());
-        new HashMap<>(services).values().parallelStream().forEach(service -> {
-            stop(service);
-            zcLatch.countDown();
+        HashMap<InetAddress, JmDNS> dnses = getDNSes();
+        ArrayList<Runnable> unregisters = new ArrayList<>();
+        dnses.values().forEach(dns -> unregisters.add(dns::unregisterAllServices));
+        runConcurrently(unregisters, UNREGISTER_THREAD_NAME + " all");
+        new HashMap<>(services).values().forEach(service -> {
+            dnses.forEach((address, dns) -> {
+                if (service.containsServiceInfo(address)) {
+                    service.removeServiceInfo(address);
+                    service.getListeners().stream().forEach(listener -> {
+                        listener.serviceUnpublished(new ZeroConfServiceEvent(service, dns));
+                    });
+                }
+            });
         });
-        try {
-            zcLatch.await();
-        } catch (InterruptedException ex) {
-            log.warn("ZeroConfService stop threads interrupted.", ex);
-        }
-        CountDownLatch nsLatch = new CountDownLatch(getDNSes().size());
-        new HashMap<>(getDNSes()).values().parallelStream().forEach(dns -> {
-            Thread t = new Thread(() -> {
-                dns.unregisterAllServices();
-                if (close) {
+        services.clear();
+        if (close) {
+            dnses.values().forEach(dns -> {
+                ThreadingUtil.newThread(() -> {
                     try {
                         dns.close();
                     } catch (IOException ex) {
                         log.debug("jmdns.close() returned IOException: {}", ex.getMessage());
                     }
-                }
-                nsLatch.countDown();
+                }, DNS_CLOSE_THREAD_NAME + ":" + dns.toString()).start();
             });
-            t.setName("dns.close in ZerConfServiceManager#stopAll");
-            t.start();
-        });
-        try {
-            zcLatch.await();
-        } catch (InterruptedException ex) {
-            log.warn("JmDNS unregister threads interrupted.", ex);
         }
-        services.clear();
+    }
+
+    /**
+     * Run each task on its own thread, all at the same time, and wait until
+     * every one has finished.
+     * <p>
+     * The tasks here block on JmDNS while it announces a change, for about two
+     * seconds, and JmDNS limits each wait. Running them one after another made
+     * the wait grow with the number of addresses. A parallel stream is not
+     * used: it may run every element on the calling thread, for example when
+     * the common pool has a single worker or the source does not split.
+     *
+     * @param tasks      the tasks to run
+     * @param threadName the name for each task's thread
+     */
+    private static void runConcurrently(List<Runnable> tasks, String threadName) {
+        ArrayList<Thread> threads = new ArrayList<>();
+        tasks.forEach(task -> {
+            Thread thread = ThreadingUtil.newThread(task, threadName);
+            thread.start();
+            threads.add(thread);
+        });
+        for (Thread thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException ex) {
+                log.warn("Interrupted while waiting for {}", threadName);
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     /**
@@ -470,7 +531,7 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
      * <li>Repeat process with NodeIdentity#networkIdentity() as input if above never
      * yields a usable host name</li>
      * </ol>
-     * 
+     *
      * @param string String to convert to host name
      * @return An RFC 1123 compliant host name
      */
@@ -479,7 +540,7 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
         String puny = null;
         String name = string.toLowerCase(Locale.ROOT);
         name = name.replaceFirst("^[_\\.\\s]+", "");
-        if (string.isEmpty()) {
+        if (string.isBlank()) {
             name = NodeIdentity.networkIdentity();
         }
         if (name.length() > 63) {
@@ -593,7 +654,7 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
                             });
                         }
                     } catch (IOException ex) {
-                        log.error(ex.getLocalizedMessage(), ex);
+                        log.error("IOException adding address {}",address, ex);
                     }
                 });
             } else {
@@ -617,4 +678,7 @@ public class ZeroConfServiceManager implements InstanceManagerAutoDefault, Dispo
         }
 
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ZeroConfServiceManager.class);
+
 }

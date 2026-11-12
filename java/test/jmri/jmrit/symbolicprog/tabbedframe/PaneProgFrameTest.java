@@ -1,6 +1,5 @@
 package jmri.jmrit.symbolicprog.tabbedframe;
 
-import java.awt.GraphicsEnvironment;
 import java.awt.event.WindowEvent;
 
 import javax.swing.JFrame;
@@ -11,13 +10,12 @@ import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.symbolicprog.CvTableModel;
 import jmri.jmrit.symbolicprog.VariableTableModel;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
 import org.jdom2.DocType;
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import org.junit.Assume;
 
 /**
  * Tests for PaneProgFrame.
@@ -28,8 +26,8 @@ public class PaneProgFrameTest {
 
     // test creating a pane in config file
     @Test
+    @DisabledIfHeadless
     public void testPane() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         setupDoc();
 
         // create test object
@@ -48,18 +46,19 @@ public class PaneProgFrameTest {
         // invoke
         result = null;
         p.readConfig(root, new RosterEntry());
-        Assert.assertEquals("paneList length ", 4, p.paneList.size());
+        
+        JUnitUtil.waitFor(()->{return p.paneList.size() == 4;}, "frame list 4");
         // three panes in root, plus roster entry pane
 
-        JFrame f = jmri.util.JmriJFrame.getFrame("test frame");
-        Assert.assertTrue("found frame", f != null);
+        JFrame f = jmri.util.JmriJFrame.getFrame("Programming: test frame");
+        Assertions.assertNotNull(f, "found frame");
         p.dispatchEvent(new WindowEvent(p, WindowEvent.WINDOW_CLOSING));
     }
 
     // show me the specially-created frame
     @Test
+    @DisabledIfHeadless
     public void testFrame() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         setupDoc();
         PaneProgFrame p = new PaneProgFrame(null, new RosterEntry(),
                 "test frame", "programmers/Basic.xml",
@@ -70,7 +69,7 @@ public class PaneProgFrameTest {
                 return null;
             }
         };
-
+        
         // ugly, temporary way to load the decoder info
         jmri.jmrit.decoderdefn.DecoderFileTest t = new jmri.jmrit.decoderdefn.DecoderFileTest();
         t.setupDecoder();
@@ -81,14 +80,16 @@ public class PaneProgFrameTest {
         p.pack();
         p.setVisible(true);
 
-        JFrame f = jmri.util.JmriJFrame.getFrame("test frame");
-        Assert.assertTrue("found frame", f != null);
+        JUnitUtil.waitFor(()->{return p.threadCount.get() == 0;}, "PaneProgFrame threads done");
+
+        JFrame f = jmri.util.JmriJFrame.getFrame("Editing: test frame"); // frame title starts with Editing
+        Assertions.assertNotNull(f, "found frame");
         p.dispatchEvent(new WindowEvent(p, WindowEvent.WINDOW_CLOSING));
     }
 
     @Test
+    @DisabledIfHeadless
     public void testLoadDecoderFileUpdateMaxFnNum() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         // create test Element
         org.jdom2.Element e = new org.jdom2.Element("locomotive")
                 .setAttribute("id", "our id 4")
@@ -128,11 +129,11 @@ public class PaneProgFrameTest {
         org.jdom2.Element o = r.store();
 
         // check test attributes are loaded
-        Assert.assertEquals("XML Element ", e.toString(), o.toString());
-        Assert.assertEquals("family ", "91", o.getChild("decoder").getAttribute("family").getValue());
-        Assert.assertEquals("model ", "33", o.getChild("decoder").getAttribute("model").getValue());
-        Assert.assertEquals("comment", "decoder comment", o.getChild("decoder").getAttribute("comment").getValue());
-        Assert.assertEquals("default maxFnNum is loaded", "28", o.getChild("decoder").getAttribute("maxFnNum").getValue());
+        Assertions.assertEquals(e.toString(), o.toString(), "XML Element ");
+        Assertions.assertEquals("91", o.getChild("decoder").getAttribute("family").getValue(), "family ");
+        Assertions.assertEquals("33", o.getChild("decoder").getAttribute("model").getValue(), "model ");
+        Assertions.assertEquals("decoder comment", o.getChild("decoder").getAttribute("comment").getValue(), "comment");
+        Assertions.assertEquals("28", o.getChild("decoder").getAttribute("maxFnNum").getValue(), "default maxFnNum is loaded");
 
         // ugly, temporary way to load the decoder info
         jmri.jmrit.decoderdefn.DecoderFileTest t = new jmri.jmrit.decoderdefn.DecoderFileTest();
@@ -179,23 +180,29 @@ public class PaneProgFrameTest {
         p.loadDecoderFile(df, r);
         o = r.store();
 
-        Assert.assertEquals("model maxFnNum ", "31", t.model.getAttribute("maxFnNum").getValue());
-        Assert.assertEquals("roster entry maxFnNum ", "31", o.getChild("decoder").getAttribute("maxFnNum").getValue());
+        Assertions.assertEquals("31", t.model.getAttribute("maxFnNum").getValue(), "model maxFnNum ");
+        Assertions.assertEquals("31", o.getChild("decoder").getAttribute("maxFnNum").getValue(), "roster entry maxFnNum ");
+
+        JUnitUtil.waitFor(()->{return p.threadCount.get() == 0;}, "PaneProgFrame threads done");
 
         p.dispatchEvent(new WindowEvent(p, WindowEvent.WINDOW_CLOSING));
     }
 
-    // static variables for internal classes to report their interpretations
-    static String result = null;
-    static int colCount = -1;
-    static int varCount = -1;
+    // variables for internal classes to report their interpretations
+    private String result = "";
+    private int colCount = -1;
+    private int varCount = -1;
 
-    // static variables for the test XML structures
-    Element root = null;
-    Document doc = null;
+    // variables for the test XML structures
+    private Element root = null;
+    private Document doc = null;
 
-    // provide a test document in the above static variables
+    // provide a test document in the above variables
     void setupDoc() {
+        Assertions.assertNull( result);
+        Assertions.assertEquals(-1, colCount);
+        Assertions.assertEquals(-1, varCount);
+
         // create a JDOM tree with just some elements
         root = new Element("programmer-config");
         doc = new Document(root);
@@ -260,10 +267,15 @@ public class PaneProgFrameTest {
         JUnitUtil.setUp();
         JUnitUtil.resetProfileManager();
         JUnitUtil.initRosterConfigManager();
+        result = null;
+        colCount = -1;
+        varCount = -1;
     }
 
     @AfterEach
     public void tearDown() {
+        JUnitUtil.clearShutDownManager();
+        JUnitUtil.resetWindows(false, false); // Detachable frame : "Basic : test frame"
         JUnitUtil.tearDown();
     }
 

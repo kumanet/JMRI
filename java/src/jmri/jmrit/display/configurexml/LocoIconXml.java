@@ -50,6 +50,9 @@ public class LocoIconXml extends PositionableLabelXml {
         if (entry != null) {
             element.setAttribute("rosterentry", entry.getId());
         }
+
+        storeLogixNG_Data(p, element);
+
         element.setAttribute("class", "jmri.jmrit.display.configurexml.LocoIconXml");
 
         return element;
@@ -73,14 +76,14 @@ public class LocoIconXml extends PositionableLabelXml {
         try {
             textName = element.getAttribute("text").getValue();
         } catch (Exception e) {
-            log.error("failed to get loco text attribute ex= {}", e);
+            log.error("failed to get loco text attribute", e);
         }
         String name = "error";
         NamedIcon icon;
         try {
             name = element.getAttribute("icon").getValue();
         } catch (Exception e) {
-            log.error("failed to get icon attribute ex= {}", e);
+            log.error("failed to get icon attribute", e);
         }
         if (name.equals("yes")) {
             icon = loadIcon(l, "icon", element, "LocoIcon", ed);
@@ -102,7 +105,7 @@ public class LocoIconXml extends PositionableLabelXml {
             l.setDockingLocation(x, y);
             //           l.dock();
         } catch (Exception e) {
-            log.warn("failed to get docking location= {}", e);
+            log.warn("failed to get docking location", e);
         }
 
         String rosterId = null;
@@ -111,15 +114,17 @@ public class LocoIconXml extends PositionableLabelXml {
             RosterEntry entry = Roster.getDefault().entryFromTitle(rosterId);
             l.setRosterEntry(entry);
         } catch (Exception e) {
-            log.debug("no roster entry for {}, ex= {}", rosterId, e);
+            log.debug("no roster entry for {}", rosterId, e);
         }
         ed.putLocoIcon(l, textName);
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, Editor.MARKERS, element);
         loadTextInfo(l, element);
 
-        l.init();  // to detect "background" color for use in Tracker, examine icon file 
+        loadLogixNG_Data(l, element);
+
+        l.init();  // to detect "background" color for use in Tracker, examine icon file
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LocoIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(LocoIconXml.class);
 }

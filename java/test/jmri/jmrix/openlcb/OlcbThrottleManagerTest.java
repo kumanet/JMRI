@@ -15,7 +15,7 @@ import org.openlcb.*;
  */
 public class OlcbThrottleManagerTest extends jmri.managers.AbstractThrottleManagerTestBase {
 
-    private static OlcbSystemConnectionMemo memo;
+    private static OlcbSystemConnectionMemoScaffold memo;
     static Connection connection;
     static NodeID nodeID = new NodeID(new byte[]{1, 0, 0, 0, 0, 0});
     static java.util.ArrayList<Message> messages;
@@ -32,6 +32,7 @@ public class OlcbThrottleManagerTest extends jmri.managers.AbstractThrottleManag
     }
 
     @BeforeAll
+    @SuppressWarnings("deprecation") // OlcbInterface(NodeID, Connection)
     public static void preClassInit() {
         JUnitUtil.setUp();
         // we need to set up the memo because as a throttle is created in test, a message will be generated
@@ -43,7 +44,7 @@ public class OlcbThrottleManagerTest extends jmri.managers.AbstractThrottleManag
             }
         };
 
-        memo = new jmri.jmrix.openlcb.OlcbSystemConnectionMemo();
+        memo = new jmri.jmrix.openlcb.OlcbSystemConnectionMemoScaffold();
         TestTrafficController tc = new TestTrafficController();
         memo.setTrafficController(tc);
         memo.setInterface(new OlcbInterface(nodeID, connection) {
@@ -64,7 +65,6 @@ public class OlcbThrottleManagerTest extends jmri.managers.AbstractThrottleManag
         connection = null;
         nodeID = null;
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 

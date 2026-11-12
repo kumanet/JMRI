@@ -69,7 +69,7 @@ public class ExpressionClockXml extends jmri.managers.configurexml.AbstractNamed
             try {
                 beginTime = Integer.parseInt(beginTimeElement.getTextTrim());
             } catch (NumberFormatException e) {
-                log.error("cannot parse beginTime: " + beginTimeElement.getTextTrim(), e);
+                log.error("cannot parse beginTime: {}", beginTimeElement.getTextTrim(), e);
             }
         }
         if (endTimeElement != null) {
@@ -77,7 +77,7 @@ public class ExpressionClockXml extends jmri.managers.configurexml.AbstractNamed
                 endTime =  Integer.parseInt(endTimeElement.getTextTrim());
                 h.setRange(beginTime, endTime);
             } catch (NumberFormatException e) {
-                log.error("cannot parse endTime: " + endTimeElement.getTextTrim(), e);
+                log.error("cannot parse endTime: {}", endTimeElement.getTextTrim(), e);
             }
         }
         h.setRange(beginTime, endTime);
@@ -86,5 +86,5 @@ public class ExpressionClockXml extends jmri.managers.configurexml.AbstractNamed
         return true;
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionClockXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionClockXml.class);
 }

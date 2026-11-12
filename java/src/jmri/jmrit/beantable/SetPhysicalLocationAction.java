@@ -4,26 +4,17 @@ import java.awt.Frame;
 import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ResourceBundle;
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
+import java.util.*;
+
+import javax.swing.*;
 import javax.swing.event.ChangeEvent;
-import jmri.InstanceManager;
-import jmri.Reporter;
-import jmri.ReporterManager;
+
+import jmri.*;
 import jmri.jmrit.operations.OperationsFrame;
 import jmri.jmrit.operations.OperationsPanel;
 import jmri.util.PhysicalLocation;
 import jmri.util.PhysicalLocationPanel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Swing action to create a SetPhysicalLocation dialog.
@@ -78,6 +69,7 @@ public class SetPhysicalLocationAction extends AbstractAction {
 
         /**
          * Frame Constructor.
+         * @param reporter reporter
          */
         public SetPhysicalLocationFrame(Reporter reporter) {
             super(rb.getString("MenuSetPhysicalLocation"), new SetPhysicalLocationPanel(reporter));
@@ -85,7 +77,7 @@ public class SetPhysicalLocationAction extends AbstractAction {
             // add help menu to window
             addHelpMenu("package.jmri.jmrit.operations.Operations_SetTrainIconCoordinates", true); // fix this later
 
-            pack();
+            super.pack();
         }
     }
 
@@ -175,7 +167,7 @@ public class SetPhysicalLocationAction extends AbstractAction {
             }
             String[] sa = new String[displayList.size()];
             displayList.toArray(sa);
-            JComboBox<String> retv = new JComboBox<String>(sa);
+            JComboBox<String> retv = new JComboBox<>(sa);
             return (retv);
 
         }
@@ -183,34 +175,34 @@ public class SetPhysicalLocationAction extends AbstractAction {
         /**
          * Close button action.
          */
-        public void closeButtonActionPerformed(ActionEvent ae) {
-            JOptionPane.showMessageDialog(null,
+        public void closeButtonActionPerformed(@SuppressWarnings("javadoc") ActionEvent ae) {
+            JmriJOptionPane.showMessageDialog(this,
                     rb.getString("CloseButtonSaveWarning"),
                     rb.getString("CloseButtonSaveWarningTitle"),
-                    JOptionPane.WARNING_MESSAGE);
+                    JmriJOptionPane.WARNING_MESSAGE);
             dispose();
         }
 
         /**
          * Save button action -> save this Reporter's location.
          */
-        public void saveButtonActionPerformed(ActionEvent ae) {
+        public void saveButtonActionPerformed(@SuppressWarnings("javadoc") ActionEvent ae) {
             // check to see if a location has been selected
             if (reporterBox.getSelectedItem() == null
                     || reporterBox.getSelectedItem().equals("")) {
-                JOptionPane.showMessageDialog(null,
+                JmriJOptionPane.showMessageDialog(this,
                         rb.getString("SelectLocationToEdit"),
                         rb.getString("NoLocationSelected"),
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             }
             Reporter l = getReporterFromList();
             if (l == null) {
                 return;
             }
-            int value = JOptionPane.showConfirmDialog(null, MessageFormat.format(rb.getString("UpdatePhysicalLocation"),
-                    new Object[]{l.getDisplayName()}), rb.getString("SaveLocation?"), JOptionPane.YES_NO_OPTION);
-            if (value == JOptionPane.YES_OPTION) {
+            int value = JmriJOptionPane.showConfirmDialog(null, MessageFormat.format(rb.getString("UpdatePhysicalLocation"),
+                    new Object[]{l.getDisplayName()}), rb.getString("SaveLocation?"), JmriJOptionPane.YES_NO_OPTION);
+            if (value == JmriJOptionPane.YES_OPTION) {
                 saveSpinnerValues(l);
             }
         }
@@ -285,6 +277,6 @@ public class SetPhysicalLocationAction extends AbstractAction {
 
     }
 
-    private static final Logger log = LoggerFactory.getLogger(SetPhysicalLocationAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SetPhysicalLocationAction.class);
 
 }

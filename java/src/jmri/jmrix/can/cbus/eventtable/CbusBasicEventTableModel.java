@@ -3,10 +3,7 @@ package jmri.jmrix.can.cbus.eventtable;
 import java.util.ArrayList;
 import javax.annotation.Nonnull;
 import jmri.jmrix.can.CanSystemConnectionMemo;
-import jmri.jmrix.can.cbus.CbusEvent;
 import jmri.jmrix.can.cbus.CbusNameService;
-import jmri.util.ThreadingUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,60 +13,65 @@ import org.slf4j.LoggerFactory;
  */
 public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableModel {
 
-    static public final int NODE_COLUMN = 0; 
-    static public final int EVENT_COLUMN = 1; 
-    static public final int NAME_COLUMN = 2; 
-    static public final int NODENAME_COLUMN = 3;
-    static public final int COMMENT_COLUMN = 4;
-    static public final int STATE_COLUMN = 5;
-    
-    static public final int TOGGLE_BUTTON_COLUMN = 6;
-    static public final int ON_BUTTON_COLUMN = 7; 
-    static public final int OFF_BUTTON_COLUMN = 8; 
-    static public final int CANID_COLUMN = 9;
-    static public final int LATEST_TIMESTAMP_COLUMN = 10;
-    static public final int STATUS_REQUEST_BUTTON_COLUMN = 11;
-    
-    static public final int SESSION_TOTAL_COLUMN = 12;
-    static public final int SESSION_ON_COLUMN = 13;
-    static public final int SESSION_OFF_COLUMN = 14;
-    static public final int SESSION_IN_COLUMN = 15;
-    static public final int SESSION_OUT_COLUMN = 16;
-    
-    static public final int ALL_TOTAL_COLUMN = 17;
-    static public final int ALL_ON_COLUMN = 18;
-    static public final int ALL_OFF_COLUMN = 19;
-    static public final int ALL_IN_COLUMN = 20;
-    static public final int ALL_OUT_COLUMN = 21;
-    
-    static public final int DELETE_BUTTON_COLUMN = 22;
-    static public final int STLR_ON_COLUMN = 23;
-    static public final int STLR_OFF_COLUMN = 24;
-    
-    public final static int EVENT_DAT_1 = 25;
-    public final static int EVENT_DAT_2 = 26;
-    public final static int EVENT_DAT_3 = 27;
-    
-    static public final int MAX_COLUMN = 28;
-    
+    public static final int NODE_COLUMN = 0;
+    public static final int EVENT_COLUMN = 1;
+    public static final int NAME_COLUMN = 2;
+    public static final int NODENAME_COLUMN = 3;
+    public static final int COMMENT_COLUMN = 4;
+    public static final int STATE_COLUMN = 5;
+
+    public static final int TOGGLE_BUTTON_COLUMN = 6;
+    public static final int ON_BUTTON_COLUMN = 7;
+    public static final int OFF_BUTTON_COLUMN = 8;
+    public static final int CANID_COLUMN = 9;
+    public static final int LATEST_TIMESTAMP_COLUMN = 10;
+    public static final int STATUS_REQUEST_BUTTON_COLUMN = 11;
+
+    public static final int SESSION_TOTAL_COLUMN = 12;
+    public static final int SESSION_ON_COLUMN = 13;
+    public static final int SESSION_OFF_COLUMN = 14;
+    public static final int SESSION_IN_COLUMN = 15;
+    public static final int SESSION_OUT_COLUMN = 16;
+
+    public static final int ALL_TOTAL_COLUMN = 17;
+    public static final int ALL_ON_COLUMN = 18;
+    public static final int ALL_OFF_COLUMN = 19;
+    public static final int ALL_IN_COLUMN = 20;
+    public static final int ALL_OUT_COLUMN = 21;
+
+    public static final int DELETE_BUTTON_COLUMN = 22;
+    public static final int STLR_ON_COLUMN = 23;
+    public static final int STLR_OFF_COLUMN = 24;
+
+    public static final int EVENT_DAT_1 = 25;
+    public static final int EVENT_DAT_2 = 26;
+    public static final int EVENT_DAT_3 = 27;
+
+    public static final int MAX_COLUMN = 28;
+
     protected final CanSystemConnectionMemo _memo;
     protected ArrayList<CbusTableEvent> _mainArray;
     public final CbusEventTableAction ta;
-    public final static int[] INITIAL_COLS = new int[]{ 0,1,2,4,5,6,23,24 };
-    
+    public static final int[] INITIAL_COLS = new int[]{ 0,1,2,4,5,6,23,24 };
+
     // list of Columns which may update on receipt of CanFrame.
-    protected static final int[] canFrameCols = new int[]{
+    static final int[] canFrameCols = new int[]{
         CANID_COLUMN, LATEST_TIMESTAMP_COLUMN, STATE_COLUMN, TOGGLE_BUTTON_COLUMN,
         SESSION_TOTAL_COLUMN, SESSION_IN_COLUMN, SESSION_OUT_COLUMN, SESSION_OFF_COLUMN, SESSION_ON_COLUMN,
         ALL_TOTAL_COLUMN, ALL_ON_COLUMN, ALL_OFF_COLUMN, ALL_IN_COLUMN, ALL_OUT_COLUMN,
         EVENT_DAT_1, EVENT_DAT_2, EVENT_DAT_3 };
-    
+
     public CbusBasicEventTableModel(CanSystemConnectionMemo memo) {
+        this(memo, 1);
+    }
+
+    public CbusBasicEventTableModel(CanSystemConnectionMemo memo, int initialRowSize) {
+        super();
         _memo = memo;
-        _mainArray = new ArrayList<>();
+        _mainArray = new ArrayList<>(initialRowSize);
         ta = new CbusEventTableAction( this);
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -108,11 +110,11 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return getValueAtPt2(row,col);
         }
     }
-    
+
     private Object getValueAtPt2(int row, int col) {
         switch (col) {
             case TOGGLE_BUTTON_COLUMN:  // on or off event  1 is on, 0 is off, null unknown
-                if ( _mainArray.get(row).getState()==CbusTableEvent.EvState.OFF ) { 
+                if ( _mainArray.get(row).getState()==CbusTableEvent.EvState.OFF ) {
                     return Bundle.getMessage("CbusSendOn"); // NOI18N
                 } else {
                     return Bundle.getMessage("CbusSendOff"); // NOI18N
@@ -129,7 +131,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return getValueAtPt3(row,col);
         }
     }
-    
+
     private Object getValueAtPt3(int row, int col) {
         switch (col) {
             case SESSION_TOTAL_COLUMN:
@@ -146,7 +148,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return getValueAtPt4(row,col);
         }
     }
-    
+
     private Object getValueAtPt4(int row, int col) {
         switch (col) {
             case ALL_TOTAL_COLUMN:
@@ -163,7 +165,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return getValueAtPt5(row,col);
         }
     }
-    
+
     private Object getValueAtPt5(int row, int col) {
         switch (col) {
             case STATE_COLUMN:
@@ -180,7 +182,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return getValueAtPt6(row,col);
         }
     }
-    
+
     private Object getValueAtPt6(int row, int col) {
         switch (col) {
             case EVENT_DAT_1:
@@ -193,7 +195,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 return null;
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -216,7 +218,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 setValueAt2( value,  row,  col);
         }
     }
-    
+
     public void setValueAt2(Object value, int row, int col) {
         switch (col) {
             case TOGGLE_BUTTON_COLUMN:
@@ -231,9 +233,9 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
                 break;
         }
     }
-    
-    
-    
+
+
+
     /**
      * Provide a new Event and add to Table.
      * @param nn Node Number
@@ -242,16 +244,32 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
      */
     @Nonnull
     public CbusTableEvent provideEvent(int nn, int en){
-        if (getEventTableRow(nn,en)>-1){
-            return _mainArray.get(getEventTableRow(nn,en));
+        int row = getEventTableRow(nn,en);
+        if (row>-1){
+            return _mainArray.get(row);
         }
         // not existing so creating new
         CbusTableEvent newtabev = new CbusTableEvent(_memo,nn,en );
         _mainArray.add(newtabev);
-        ThreadingUtil.runOnGUIEventually(() -> fireTableDataChanged()); 
+        int newRow = _mainArray.size() - 1;
+        _rowIndex.put(eventKey(nn, en), newRow);
+        fireTableRowsInserted(newRow, newRow);
         return newtabev;
     }
-    
+
+    /**
+     * Cache of Node + Event to table row, so that every incoming event frame
+     * does not need a linear search of the table.
+     * <p>
+     * An entry is only used after checking that the row still holds that event,
+     * so the cache self-corrects after rows are removed or the table cleared.
+     */
+    private final java.util.Map<Integer, Integer> _rowIndex = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static int eventKey(int node, int event) {
+        return (node << 16) | (event & 0xFFFF);
+    }
+
     /**
      * Do Node + Event check, returns -1 if not on table, otherwise the row id
      * @since 4.13.3
@@ -260,9 +278,24 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
      * @return int of row, otherwise -1
      */
     public int getEventTableRow( int node, int event) {
-        return _mainArray.indexOf(new CbusEvent(node,event));
+        int key = eventKey(node, event);
+        Integer cached = _rowIndex.get(key);
+        if (cached != null) {
+            int row = cached;
+            if (row < _mainArray.size() && _mainArray.get(row).matches(node, event)) {
+                return row;
+            }
+            _rowIndex.remove(key); // stale, eg. after a row removal
+        }
+        for (int row = 0; row < _mainArray.size(); row++) {
+            if (_mainArray.get(row).matches(node, event)) {
+                _rowIndex.put(key, row);
+                return row;
+            }
+        }
+        return -1;
     }
-    
+
     /**
      * Get event name for an event in the table
      * @param event int
@@ -277,7 +310,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
         }
         return "";
     }
-    
+
     /**
      * Get event String for an event in the table
      * @param event int
@@ -292,7 +325,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
         }
         return("");
     }
-    
+
     /**
      * Get the core list containing all table events
      * @return actual array of events
@@ -301,7 +334,7 @@ public class CbusBasicEventTableModel extends javax.swing.table.AbstractTableMod
     public ArrayList<CbusTableEvent> getEvents() {
         return new ArrayList<>(_mainArray);
     }
-    
-    private final static Logger log = LoggerFactory.getLogger(CbusBasicEventTableModel.class);
-    
+
+    private static final Logger log = LoggerFactory.getLogger(CbusBasicEventTableModel.class);
+
 }

@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 abstract public class AbstractSignalMastServer {
 
     private final HashMap<String, SignalMastListener> signalMasts;
-    static private final Logger log = LoggerFactory.getLogger(AbstractSignalMastServer.class);
+    private static final Logger log = LoggerFactory.getLogger(AbstractSignalMastServer.class);
 
     public AbstractSignalMastServer(){
         signalMasts = new HashMap<>();
@@ -67,7 +67,8 @@ abstract public class AbstractSignalMastServer {
             if (signalMast == null) {
                 log.error("SignalMast {} is not available.", signalMastName);
             } else {
-                if (signalMast.getAspect() == null || !signalMast.getAspect().equals(signalMastState) || signalMast.getHeld()) {
+                String aspect = signalMast.getAspect();
+                if ( aspect == null || !aspect.equals(signalMastState) || signalMast.getHeld()) {
                     if (signalMastState.equals("Held")) {
                         signalMast.setHeld(true);
                     } else {

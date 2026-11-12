@@ -1,8 +1,8 @@
 package jmri.server.json;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+
+import jmri.Audio;
 
 /**
  * Common and utility constants used in the JMRI JSON protocol.
@@ -10,7 +10,7 @@ import java.util.List;
  * <strong>Note</strong> any documented use of a constant is not the exclusive
  * or sole use of the constant. Review the JSON schemas for all uses of any
  * given constant.
- * 
+ *
  * @author Randall Wood (C) 2013, 2014, 2016, 2018, 2019
  */
 public final class JSON {
@@ -34,7 +34,7 @@ public final class JSON {
      * this is a semantic version string; prior to that, it is just an X.Y
      * version string.
      */
-    public static final String V5_PROTOCOL_VERSION = "5.4.0"; // NOI18N
+    public static final String V5_PROTOCOL_VERSION = "5.5.0"; // NOI18N
 
     /**
      * JMRI JSON protocol version. See {@link jmri.server.json} for the version
@@ -167,29 +167,25 @@ public final class JSON {
     public static final String RAILROAD = "railroad"; // NOI18N
     /**
      * {@value #NODE}
-     * <p>
-     * 
+     *
      * @since 1.1
      */
     public static final String NODE = "node"; // NOI18N
     /**
      * {@value #ACTIVE_PROFILE}
-     * <p>
-     * 
+     *
      * @since 3.0
      */
     public static final String ACTIVE_PROFILE = "activeProfile"; // NOI18N
     /**
      * {@value #FORMER_NODES}
-     * <p>
-     * 
+     *
      * @since 1.1
      */
     public static final String FORMER_NODES = "formerNodes"; // NOI18N
     /**
      * {@value #LOCALE}
-     * <p>
-     * 
+     *
      * @since 1.1
      */
     public static final String LOCALE = "locale"; // NOI18N
@@ -273,6 +269,10 @@ public final class JSON {
      * {@value #LENGTH}
      */
     public static final String LENGTH = "length"; // NOI18N
+    /**
+     * {@value #WEIGHT}
+     */
+    public static final String WEIGHT = "weight"; // NOI18N
 
     /* JSON panel tokens */
     /**
@@ -329,16 +329,6 @@ public final class JSON {
      * {@value #WRITE}
      */
     public static final String WRITE = "write"; // NOI18N
-
-    /* JSON roster and car/engine (operations) tokens */
-    /**
-     * {@value #COLOR}
-     */
-    public static final String COLOR = "color"; // NOI18N
-    /**
-     * {@value #LOAD}
-     */
-    public static final String LOAD = "load"; // NOI18N
     /**
      * {@value #MODEL}
      */
@@ -462,41 +452,29 @@ public final class JSON {
      */
     public static final String ROUTE_ID = "routeId"; // NOI18N
     /**
-     * {@value #HAZARDOUS}
-     *
-     * @since 1.1
-     */
-    public static final String HAZARDOUS = "hazardous"; // NOI18N
-    /**
      * {@value #KERNEL}
      *
      * @since 1.1
      */
     public static final String KERNEL = "kernel"; // NOI18N
     /**
-     * {@value #FINAL_DESTINATION}
-     *
-     * @since 1.1
+     * {@value #LOCATIONS}
      */
-    public static final String FINAL_DESTINATION = "finalDestination"; // NOI18N
+    public static final String LOCATIONS = "locations"; // NOI18N
     /**
-     * {@value #REMOVE_COMMENT}
-     *
-     * @since 1.1
+     * {@value #LOCATION}
      */
-    public static final String REMOVE_COMMENT = "removeComment"; // NOI18N
+    public static final String LOCATION = "location"; // NOI18N
     /**
-     * {@value #ADD_COMMENT}
+     * {@value #TRACK}
      *
      * @since 1.1
      */
-    public static final String ADD_COMMENT = "addComment"; // NOI18N
+    public static final String TRACK = "track";
     /**
-     * {@value #IS_LOCAL}
-     *
-     * @since 1.1
+     * {@value #DESTINATION}
      */
-    public static final String IS_LOCAL = "isLocal";
+    public static final String DESTINATION = "destination"; // NOI18N
     /**
      * {@value #ADD_HELPERS}
      *
@@ -572,18 +550,12 @@ public final class JSON {
      * @since 1.1
      */
     public static final String EMPTIES = "empties";
+    
     /**
-     * {@value #RETURN_WHEN_EMPTY}
+     * {@value #COMMENT_TERMINATION}
      *
-     * @since 1.1
      */
-    public static final String RETURN_WHEN_EMPTY = "returnWhenEmpty";
-    /**
-     * {@value #UTILITY}
-     *
-     * @since 1.1
-     */
-    public static final String UTILITY = "utility";
+    public static final String COMMENT_TERMINATION = "commentTermination";
 
     /* JSON signalling tokens */
     /**
@@ -669,9 +641,50 @@ public final class JSON {
      */
     public static final String RATE = "rate"; // NOI18N
 
+    /* Permission System JSON API */
+    /**
+     * {@value #SESSION_LOGIN}
+     *
+     * @since 5.11
+     */
+    public static final String SESSION_LOGIN = "sessionLogin";
+    /**
+     * {@value #SESSION_LOGOUT}
+     *
+     * @since 5.11
+     */
+    public static final String SESSION_LOGOUT = "sessionLogout";
+
+
     /*
      * JSON State (an unsigned integer)
      */
+
+    /* Audio commands */
+    /**
+     * {@value #AUDIO_ICON_IDENTITY}
+     */
+    public static final String AUDIO_ICON_IDENTITY = "identity";
+    /**
+     * {@value #AUDIO_COMMAND}
+     */
+    public static final String AUDIO_COMMAND = "command";
+    /**
+     * {@value #AUDIO_COMMAND_NONE}
+     */
+    public static final String AUDIO_COMMAND_NONE = "None";
+    /**
+     * {@value #AUDIO_COMMAND_PLAY}
+     */
+    public static final String AUDIO_COMMAND_PLAY = "Play";
+    /**
+     * {@value #AUDIO_COMMAND_PLAY_NUM_LOOPS}
+     */
+    public static final String AUDIO_COMMAND_PLAY_NUM_LOOPS = "playNumLoops";
+    /**
+     * {@value #AUDIO_COMMAND_STOP}
+     */
+    public static final String AUDIO_COMMAND_STOP = "Stop";
 
     /* Common state */
     /**
@@ -692,12 +705,26 @@ public final class JSON {
      * {@value #OFF}
      */
     public static final int OFF = 0x04;
+    /**
+     * {@value #IDLE}
+     */
+    public static final int IDLE = 0x08;
 
     /* NamedBean state */
     /**
      * {@value #INCONSISTENT}
      */
     public static final int INCONSISTENT = 0x08;
+
+    /* Audio state */
+    /**
+     * {@value #AUDIO_PLAYING}
+     */
+    public static final int AUDIO_PLAYING = Audio.STATE_PLAYING;
+    /**
+     * {@value #AUDIO_STOPPED}
+     */
+    public static final int AUDIO_STOPPED = Audio.STATE_STOPPED;
 
     /* Route state */
     /**
@@ -833,13 +860,13 @@ public final class JSON {
     public static final String CLIENT = "client"; // NOI18N
     /**
      * {@value #FORCE_DELETE}
-     * 
+     *
      * @since 5.0.0
      */
     public static final String FORCE_DELETE = "forceDelete"; // NOI18N
     /**
      * {@value #CONFLICT}
-     * 
+     *
      * @since 5.0.0
      */
     public static final String CONFLICT = "conflict"; // NOI18N
@@ -851,19 +878,31 @@ public final class JSON {
      * while other services will change the name based on other values. In a
      * message from the server, carries the old name for a recently renamed
      * object in the message.
-     * 
+     *
      * @since 5.0.0
      */
     public static final String RENAME = "rename"; // NOI18N
     /**
      * {@value #RFID}
-     * 
+     *
      * @since 5.0.0
      */
     public static final String RFID = "rfid"; // NOI18N
     /**
+     * {@value #WHERELASTSEEN}
+     *
+     * @since 5.7.6
+     */
+    public static final String WHERELASTSEEN = "whereLastSeen"; // NOI18N
+    /**
+     * {@value #WHENLASTSEEN}
+     *
+     * @since 5.7.6
+     */
+    public static final String WHENLASTSEEN = "whenLastSeen"; // NOI18N
+    /**
      * {@value #TIME}
-     * 
+     *
      * @since 5.0.0
      */
     public static final String TIME = "time"; // NOI18N

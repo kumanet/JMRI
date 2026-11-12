@@ -64,7 +64,7 @@ public class ShortAddrVariableValue extends DecVariableValue {
                 log.error("CV numbers don't match: {} {}", cvNumbers[i], cv.number());
             }
             cv.setToWrite(true);
-            cv.setState(EDITED);
+            cv.setState(ValueState.EDITED);
             if (log.isDebugEnabled()) {
                 log.debug("Mark to write {}", cv.number());
             }
@@ -107,6 +107,6 @@ public class ShortAddrVariableValue extends DecVariableValue {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(ShortAddrVariableValue.class);
+    private static final Logger log = LoggerFactory.getLogger(ShortAddrVariableValue.class);
 
 }

@@ -31,7 +31,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
     protected int numTestNodes = 0;
     protected SerialNode[] testNodes = new SerialNode[128];  // Node control blocks
     protected int[] testNodeAddresses = new int[128];        // ua's of loaded nodes
-    
+
     protected SerialNode testNode = null;                    // current node under test
     public int testNodeAddr = 0;                             // Address (ua) of selected Node
     protected String testNodeID = "x";                       // text address of selected Node
@@ -45,13 +45,14 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                             testType_Wraparound = 1,       // Write bit pattern to port, read and compare bit pattern. Needs loopback cable
                             testType_SendCommand= 2,       // Poll node to check for presence, read inputs
                             testType_WriteBytes = 3;       // Transmit output byte pattern
-    
+
     protected int selTestType = testType_Outputs;    // Current test suite
     protected boolean outTest = true;
     protected boolean wrapTest = false;
     protected boolean isSMINI = false;
     protected boolean isUSIC_SUSIC = true;
     protected boolean isCPNODE = false;
+    protected boolean isESP32NODE = false;
     // Here add other node types
     protected int numOutputCards = 2;
     protected int numInputCards = 1;
@@ -92,14 +93,11 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
     protected javax.swing.Timer wrapTimer;
     protected javax.swing.Timer pollTimer;
 
-    @SuppressFBWarnings(value = "IS2_INCONSISTENT_SYNC", justification = "unsync access only during initialization")
     protected boolean waitingOnInput = false;
     protected boolean waitingResponse = false;
 
     protected boolean needInputTest = false;
     protected int count = 20;
-    int debugCount = 0;
-    javax.swing.ButtonGroup testGroup = new javax.swing.ButtonGroup();
     javax.swing.JCheckBox invertOutButton = new javax.swing.JCheckBox(Bundle.getMessage("ButtonInvert"), false);
     javax.swing.JCheckBox invertWrapButton = new javax.swing.JCheckBox(Bundle.getMessage("ButtonInvert"), false);
     javax.swing.JCheckBox invertWriteButton = new javax.swing.JCheckBox(Bundle.getMessage("ButtonInvert"), false);
@@ -109,7 +107,6 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
     javax.swing.JButton writeButton = new javax.swing.JButton(Bundle.getMessage("ButtonWriteBytes"));
     javax.swing.JButton haltPollButton = new javax.swing.JButton("Halt Polling" );
 
-    javax.swing.JTextField uaAddrField = new javax.swing.JTextField(3);
     javax.swing.JTextField outCardField = new javax.swing.JTextField(3);
     javax.swing.JTextField inCardField = new javax.swing.JTextField(3);
     javax.swing.JTextField obsDelayField = new javax.swing.JTextField(5);
@@ -129,7 +126,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
     javax.swing.JLabel nodeReplyText = new javax.swing.JLabel();
     javax.swing.JLabel writeCardLabel = new javax.swing.JLabel("Out Card:");
     javax.swing.JLabel writeBytesLabel = new javax.swing.JLabel("Output Bytes (Hex):");
-   
+
     javax.swing.JLabel statusText1 = new javax.swing.JLabel();
     javax.swing.JLabel statusText2 = new javax.swing.JLabel();
     javax.swing.JLabel compareErr = new javax.swing.JLabel();
@@ -444,32 +441,23 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         continueButton.setText(Bundle.getMessage("ButtonContinue"));
         continueButton.setVisible(false);
         continueButton.setToolTipText(Bundle.getMessage("ContinueTestToolTip"));
-        continueButton.addActionListener(new java.awt.event.ActionListener() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                continueButtonActionPerformed(e);
-            }
+        continueButton.addActionListener((java.awt.event.ActionEvent e) -> {
+            continueButtonActionPerformed(e);
         });
         panel4.add(continueButton);
         stopButton.setText(Bundle.getMessage("ButtonStop"));
         stopButton.setVisible(true);
         stopButton.setToolTipText(Bundle.getMessage("StopToolTip"));
         panel4.add(stopButton);
-        stopButton.addActionListener(new java.awt.event.ActionListener() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                stopButtonActionPerformed(e);
-            }
+        stopButton.addActionListener((java.awt.event.ActionEvent e) -> {
+            stopButtonActionPerformed(e);
         });
         runButton.setText(Bundle.getMessage("ButtonRun"));
         runButton.setVisible(true);
         runButton.setToolTipText(Bundle.getMessage("RunTestToolTip"));
         panel4.add(runButton);
-        runButton.addActionListener(new java.awt.event.ActionListener() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                runButtonActionPerformed(e);
-            }
+        runButton.addActionListener((java.awt.event.ActionEvent e) -> {
+            runButtonActionPerformed(e);
         });
         contentPane.add(panel4);
 
@@ -514,7 +502,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             index++;
         }
     }
-    
+
     /**
      * Method to handle selection of a Node for info display.
      * @param nodeID Node ID.
@@ -544,12 +532,12 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
 //            int numOutputCards = testNode.numOutputCards();
 //            int numIOXInputCards = 0;
 //            int numIOXOutputCards= 0;
-           
+
             testNodeType = testNode.getNodeType();
             String s1 = "",
                    s2 = "";
             switch (testNodeType)
-             {        
+             {
                 case SerialNode.SMINI:
                   bitsPerCard = testNode.getNumBitsPerCard();
                   numInputCards = testNode.numInputCards();
@@ -584,7 +572,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                   nodeText1.setText("  CPNODE - " + bitsPerCard + " " +Bundle.getMessage("BitsPerCard"));
                   nodeText2.setText(numInputCards + " " + Bundle.getMessage("InputCard") + s1 +
                                     ", " + numOutputCards + " " + Bundle.getMessage("OutputCard") + s2 +
-                                    "  IOX: " + numIOXInputCards + " " + Bundle.getMessage("InputsTitle") + 
+                                    "  IOX: " + numIOXInputCards + " " + Bundle.getMessage("InputsTitle") +
                                     ", " + numIOXOutputCards + " " + Bundle.getMessage("OutputsTitle"));
                   invertWrapButton.setSelected(testNodeType == SerialNode.CPNODE);
                 break;
@@ -593,9 +581,25 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
                   numIOXOutputCards= 0;
                   nodeText1.setText("CPMEGA - " + bitsPerCard + " " + Bundle.getMessage("BitsPerCard"));
                 break;
+                case SerialNode.ESP32NODE:
+                  // No onboard cards at all (unlike CPNODE's 2+2), so unlike CPNODE's
+                  // "numOutputCards - 2" here, IOX counts equal the raw counts directly.
+                  bitsPerCard = testNode.getNumBitsPerCard();
+                  numInputCards = testNode.numInputCards();
+                  numOutputCards = testNode.numOutputCards();
+                  numIOXInputCards = numInputCards;
+                  numIOXOutputCards= numOutputCards;
+                  if(numInputCards > 1) s1 = "s";
+                  if(numOutputCards > 1) s2 = "s";
+                  nodeText1.setText("  ESP32Node - " + bitsPerCard + " " +Bundle.getMessage("BitsPerCard"));
+                  nodeText2.setText(numInputCards + " " + Bundle.getMessage("InputCard") + s1 +
+                                    ", " + numOutputCards + " " + Bundle.getMessage("OutputCard") + s2 +
+                                    "  IOX: " + numIOXInputCards + " " + Bundle.getMessage("InputsTitle") +
+                                    ", " + numIOXOutputCards + " " + Bundle.getMessage("OutputsTitle"));
+                break;
                 default:
                   nodeText1.setText("Unknown Node Type "+testNodeType);
-                break;            
+                break;
             }
 // here insert code for new types of C/MRI nodes
         }
@@ -603,7 +607,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         statusText2.setVisible(true);
 
     }
-    
+
     /**
      * Handle run button in Diagnostic Frame.
      * @param e unused.
@@ -660,7 +664,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             default:
                 log.debug("default case in testSelectBox switch");
         }
-        
+
         // get the SerialNode corresponding to this node address
         testNode = (SerialNode) _memo.getTrafficController().getNodeFromAddress(testNodeAddr);
         if (testNode == null) {
@@ -673,6 +677,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         isSMINI = (type == SerialNode.SMINI);
         isUSIC_SUSIC = (type == SerialNode.USIC_SUSIC);
         isCPNODE = (type == SerialNode.CPNODE);
+        isESP32NODE = (type == SerialNode.ESP32NODE);
         // Here insert code for other type nodes
         // initialize numInputCards, numOutputCards, and numCards
         numOutputCards = testNode.numOutputCards();
@@ -682,7 +687,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         // read setup data - Out Card field
         try {
             outCardNum = Integer.parseInt(outCardField.getText());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             statusText1.setText(Bundle.getMessage("DiagnosticError4"));
             statusText1.setVisible(true);
             return (false);
@@ -710,12 +715,29 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             statusText1.setVisible(true);
             return (false);
         }
-        
+        // ESP32Node's typed Out Card field is 1-based (Card 1 = the first real
+        // card, 0x20/A) to match its on-screen "Card N" label -- unlike
+        // CPNODE's field above, which is 0-based internally even though its
+        // label shows +2. So the typed number converts to a raw
+        // cardTypeLocation index via -1, not +2 or +1. Card 1 typed -> raw
+        // index 0. Guard against 0 or negative input first (raw index -1
+        // would be an ArrayIndexOutOfBoundsException, not just "not a card").
+        if (isESP32NODE && (outCardNum < 1)) {
+            statusText1.setText(Bundle.getMessage("DiagnosticError6"));
+            statusText1.setVisible(true);
+            return (false);
+        }
+        if (isESP32NODE && (!testNode.isOutputCard(outCardNum-1))) {
+            statusText1.setText(Bundle.getMessage("DiagnosticError6"));
+            statusText1.setVisible(true);
+            return (false);
+        }
+
         if (outTest) {
             // read setup data - Observation Delay field
             try {
                 obsDelay = Integer.parseInt(obsDelayField.getText());
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 statusText1.setText(Bundle.getMessage("DiagnosticError8"));
                 statusText1.setVisible(true);
                 return (false);
@@ -726,7 +748,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             // read setup data - In Card field
             try {
                 inCardNum = Integer.parseInt(inCardField.getText());
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 statusText1.setText(Bundle.getMessage("DiagnosticError9"));
                 statusText1.setVisible(true);
                 return (false);
@@ -753,7 +775,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             // read setup data - Filtering Delay field
             try {
                 filterDelay = Integer.parseInt(filterDelayField.getText());
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 statusText1.setText(Bundle.getMessage("DiagnosticError13"));
                 statusText1.setVisible(true);
                 return (false);
@@ -763,10 +785,12 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         // complete initialization of output card
         portsPerCard = (testNode.getNumBitsPerCard()) / 8;
 
-        if (testNodeType != SerialNode.CPNODE)        
-         begOutByte = (testNode.getOutputCardIndex(outCardNum)) * portsPerCard;
+        if (testNodeType == SerialNode.CPNODE)
+         begOutByte = (testNode.getOutputCardIndex(outCardNum+2)) * portsPerCard;
+        else if (testNodeType == SerialNode.ESP32NODE)
+         begOutByte = (testNode.getOutputCardIndex(outCardNum-1)) * portsPerCard;
         else
-         begOutByte = (testNode.getOutputCardIndex(outCardNum+2)) * portsPerCard;        
+         begOutByte = (testNode.getOutputCardIndex(outCardNum)) * portsPerCard;
 
         endOutByte = begOutByte + portsPerCard - 1;
         nOutBytes = numOutputCards * portsPerCard;
@@ -813,7 +837,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
     /**
      * Halt Poll button handler
      * Polling should be halted when executing diagnostics so as not to
-     * interfere with the test sequences.  
+     * interfere with the test sequences.
      */
     public void haltpollButtonActionPerformed() {
          SerialTrafficController stc = _memo.getTrafficController();
@@ -864,51 +888,59 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
      */
     protected void runOutputTest() {
         // Set up timer to update output pattern periodically
-        outTimer = new Timer(obsDelay, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evnt) {
-                if (testRunning && outTest) {
-                    int[] outBitPattern = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
-                    String[] portID = {"A", "B", "C", "D"};
-                    
-                    // set new pattern
-                    // Invert bit polarity if selected (usefull for Common Anode LEDs)
-                    if (invertOutButton.isSelected())
-                     for (int i=0; i<8; i++) { outBitPattern[i] = (~outBitPattern[i]); }
-                    
-                    outBytes[curOutByte] = (byte) outBitPattern[curOutBit];
-                    // send new pattern
-                    SerialMessage m = createOutPacket();
-                    m.setTimeout(50);
-                    _memo.getTrafficController().sendSerialMessage(m, curFrame);
-                    // update status panel to show bit that is on
-                    statusText1.setText(Bundle.getMessage("StatusLine3", portID[curOutByte - begOutByte], Integer.toString(curOutBit)));
-                    statusText1.setVisible(true);
-                    StringBuilder st = new StringBuilder();
-                    for (int i = begOutByte; i <= endOutByte; i++) {
-                        st.append("  ");
-                      for (int j = 0; j < 8; j++) {
-                            if ((i == curOutByte) && (j == curOutBit)) {
-                                st.append("1 ");
-                            } else {
-                                st.append("0 ");
-                            }
+        outTimer = new Timer(obsDelay, (ActionEvent evnt) -> {
+            if (testRunning && outTest) {
+                int[] outBitPattern = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+                String[] portID = {"A", "B", "C", "D"};
+
+                // set new pattern
+                // Invert bit polarity if selected (usefull for Common Anode LEDs)
+                if (invertOutButton.isSelected())
+                    for (int i=0; i<8; i++) { outBitPattern[i] = (~outBitPattern[i]); }
+
+                outBytes[curOutByte] = (byte) outBitPattern[curOutBit];
+                // send new pattern
+                SerialMessage m = createOutPacket();
+                m.setTimeout(50);
+                _memo.getTrafficController().sendSerialMessage(m, curFrame);
+                // update status panel to show bit that is on
+                statusText1.setText(Bundle.getMessage("StatusLine3", portID[curOutByte - begOutByte], Integer.toString(curOutBit)));
+                statusText1.setVisible(true);
+                StringBuilder st = new StringBuilder();
+                for (int i = begOutByte; i <= endOutByte; i++) {
+                    st.append("  ");
+                    for (int j = 0; j < 8; j++) {
+                        if ((i == curOutByte) && (j == curOutBit)) {
+                            st.append("1 ");
+                        } else {
+                            st.append("0 ");
                         }
                     }
-                    statusText2.setText(st.reverse().toString()); //statusText2
-                    statusText2.setVisible(true);
-                    // update bit pattern for next entry
-                    curOutBit++;
-                    if (curOutBit > 7) {
-                        // Move to the next byte
-                        curOutBit = 0;
-                        outBytes[curOutByte] = 0;
-                        curOutByte++;
-                        if (curOutByte > endOutByte) {
-                            // Pattern complete, recycle to first byte
-                            curOutByte = begOutByte;
-                            numIterations++;
-                        }
+                }
+                // Was st.reverse().toString() -- that reversed the WHOLE
+                // string char-by-char, which flipped bit order within
+                // each byte to MSB-left/LSB-right AND (for multi-byte
+                // cards) reversed the order the byte-groups themselves
+                // appeared in. As curOutBit climbed 0->7, the "1" in the
+                // reversed string moved right-to-left, not left-to-right.
+                // Dropping the reversal displays the string exactly as
+                // built above: bit0 leftmost within each byte (ascending,
+                // matching the convention used elsewhere in this project),
+                // byte begOutByte's group leftmost for multi-byte cards --
+                // so the walking-bit test now visibly sweeps left to right.
+                statusText2.setText(st.toString()); //statusText2
+                statusText2.setVisible(true);
+                // update bit pattern for next entry
+                curOutBit++;
+                if (curOutBit > 7) {
+                    // Move to the next byte
+                    curOutBit = 0;
+                    outBytes[curOutByte] = 0;
+                    curOutByte++;
+                    if (curOutByte > endOutByte) {
+                        // Pattern complete, recycle to first byte
+                        curOutByte = begOutByte;
+                        numIterations++;
                     }
                 }
             }
@@ -932,10 +964,10 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             statusText2.setVisible(true);
         }
     }
-    
+
     /**
      * Transmit an Initialize message to the test node.
-     * 
+     *
      * @return 'true' if message sent successfully
      */
     synchronized protected boolean sendInitalizePacket() {
@@ -967,10 +999,10 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         // Set up beginning output values
         curOutByte = begOutByte;
         curOutValue = 0;
-        
+
         if (!sendInitalizePacket())
-         return false; 
-        
+         return false;
+
         // Clear error count
         numErrors = 0;
         numIterations = 0;
@@ -994,123 +1026,120 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         statusText1.setVisible(true);
 
         // Set up timer to update output pattern periodically
-        wrapTimer = new Timer(100, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evnt) {
-                if (testRunning && !testSuspended) {
-                    if (waitingOnInput) {
-                        count--;
-                        if (count == 0) {
-                            statusText2.setText(Bundle.getMessage("StatusLine5"));
-                            statusText2.setVisible(true);
-                        }
-                    } else {
-                        // compare input with previous output if needed
-                        if (needInputTest) {
-                            needInputTest = false;
-                            boolean comparisonError = false;
-                            // compare input and output bytes
-                            int j = 0;
-                            for (int i = begInByte; i <= endInByte; i++, j++) 
-                            {
-                                if (invertWrapButton.isSelected()) { inBytes[i] = (byte) ~inBytes[j];                               
-                                 }
-                                
-                                if (inBytes[i] != wrapBytes[j]) {
-                                    comparisonError = true;                                
-                                }
-                            }
-                            if (comparisonError) {
-                                // report error and suspend test
-                                statusText1.setText(Bundle.getMessage("StatusLine6",
-                                Bundle.getMessage("ButtonStop"), Bundle.getMessage("ButtonContinue")));
-                                statusText1.setVisible(true);
-                                StringBuilder st = new StringBuilder(Bundle.getMessage("StatusLine7pt1"));
-                                for (int i = begOutByte; i <= endOutByte; i++) {
-                                    st.append(" ");
-                                    st.append(Integer.toHexString((outBytes[i]) & 0x000000ff).toUpperCase());
-                                }
-                                st.append("    "); // spacer
-                                st.append(Bundle.getMessage("StatusLine7pt2"));
-                                for (int i = begInByte; i <= endInByte; i++) {
-                                    st.append(" ");
-                                    st.append(Integer.toHexString((inBytes[i]) & 0x000000ff).toUpperCase());
-                                }
-                                compareErr.setText(st.toString()); //statusText2
-                                compareErr.setVisible(true);
-                                numErrors++;
-                                testSuspended = true;
-                                return;
-                            }
-                        }                         
-
-                        // send next output pattern
-                        outBytes[curOutByte] = (byte) curOutValue;
-                        if (isSMINI) { 
-                            // If SMINI, send same pattern to both output cards
-                            if (curOutByte > 2) {
-                                outBytes[curOutByte - 3] = (byte) curOutValue;
-                            } else {
-                                outBytes[curOutByte + 3] = (byte) curOutValue;
-                            }
-                        }
-                        SerialMessage m = createOutPacket();
-                        // wait for signal to settle down if filter delay
-                        m.setTimeout(50 + filterDelay);
-                        _memo.getTrafficController().sendSerialMessage(m, curFrame);
-
-                        // update Status area
-                        short[] outBitPattern = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
-                        String[] portID = {"A", "B", "C", "D"};
-                        StringBuilder st = new StringBuilder(Bundle.getMessage("PortLabel"));
-                        StringBuilder bp = new StringBuilder("  ");
-                        st.append(portID[curOutByte - begOutByte]);
-                        st.append(",  ");
-                        st.append(Bundle.getMessage("PatternLabel"));
-                        for (int j = 0; j < 8; j++) {
-                            if ((curOutValue & outBitPattern[j]) != 0) {
-                                bp.append("1 ");
-                            } else {
-                                bp.append("0 ");
-                            }
-                        }
-                        // Reverse the displayed output string to put bit zero on the right
-                        //-----------------------------------------------------------------
-                        statusText2.setText(st.toString()+bp.reverse().toString()); //statusText2
+        wrapTimer = new Timer(100, (ActionEvent evnt) -> {
+            if (testRunning && !testSuspended) {
+                if (waitingOnInput) {
+                    count--;
+                    if (count == 0) {
+                        statusText2.setText(Bundle.getMessage("StatusLine5"));
                         statusText2.setVisible(true);
+                    }
+                } else {
+                    // compare input with previous output if needed
+                    if (needInputTest) {
+                        needInputTest = false;
+                        boolean comparisonError = false;
+                        // compare input and output bytes
+                        int j = 0;
+                        for (int i = begInByte; i <= endInByte; i++, j++)
+                        {
+                            if (invertWrapButton.isSelected()) { inBytes[i] = (byte) ~inBytes[j];
+                            }
 
-                        // set up for testing input returned
-                        int k = 0;
-                        for (int i = begOutByte; i <= endOutByte; i++, k++) {
-                            wrapBytes[k] = outBytes[i];
+                            if (inBytes[i] != wrapBytes[j]) {
+                                comparisonError = true;
+                            }
                         }
-                        waitingOnInput = true;
-                        needInputTest = true;
-                        count = 50;
-                        // send poll
-                        _memo.getTrafficController().sendSerialMessage(
-                                SerialMessage.getPoll(testNodeAddr), curFrame);
+                        if (comparisonError) {
+                            // report error and suspend test
+                            statusText1.setText(Bundle.getMessage("StatusLine6",
+                                    Bundle.getMessage("ButtonStop"), Bundle.getMessage("ButtonContinue")));
+                            statusText1.setVisible(true);
+                            StringBuilder st = new StringBuilder(Bundle.getMessage("StatusLine7pt1"));
+                            for (int i = begOutByte; i <= endOutByte; i++) {
+                                st.append(" ");
+                                st.append(Integer.toHexString((outBytes[i]) & 0x000000ff).toUpperCase());
+                            }
+                            st.append("    "); // spacer
+                            st.append(Bundle.getMessage("StatusLine7pt2"));
+                            for (int i = begInByte; i <= endInByte; i++) {
+                                st.append(" ");
+                                st.append(Integer.toHexString((inBytes[i]) & 0x000000ff).toUpperCase());
+                            }
+                            compareErr.setText(st.toString()); //statusText2
+                            compareErr.setVisible(true);
+                            numErrors++;
+                            testSuspended = true;
+                            return;
+                        }
+                    }
 
-                        // update output pattern for next entry
-                        curOutValue++;
-                        if (curOutValue > 255) {
-                            // Move to the next byte
-                            curOutValue = 0;
-                            outBytes[curOutByte] = 0;
-                            if (isSMINI) {
-                                // If SMINI, clear ports of both output cards
-                                if (curOutByte > 2) {
-                                    outBytes[curOutByte - 3] = 0;
-                                } else {
-                                    outBytes[curOutByte + 3] = 0;
-                                }
+                    // send next output pattern
+                    outBytes[curOutByte] = (byte) curOutValue;
+                    if (isSMINI) {
+                        // If SMINI, send same pattern to both output cards
+                        if (curOutByte > 2) {
+                            outBytes[curOutByte - 3] = (byte) curOutValue;
+                        } else {
+                            outBytes[curOutByte + 3] = (byte) curOutValue;
+                        }
+                    }
+                    SerialMessage m = createOutPacket();
+                    // wait for signal to settle down if filter delay
+                    m.setTimeout(50 + filterDelay);
+                    _memo.getTrafficController().sendSerialMessage(m, curFrame);
+
+                    // update Status area
+                    short[] outBitPattern = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+                    String[] portID = {"A", "B", "C", "D"};
+                    StringBuilder st = new StringBuilder(Bundle.getMessage("PortLabel"));
+                    StringBuilder bp = new StringBuilder("  ");
+                    st.append(portID[curOutByte - begOutByte]);
+                    st.append(",  ");
+                    st.append(Bundle.getMessage("PatternLabel"));
+                    for (int j = 0; j < 8; j++) {
+                        if ((curOutValue & outBitPattern[j]) != 0) {
+                            bp.append("1 ");
+                        } else {
+                            bp.append("0 ");
+                        }
+                    }
+                    // Reverse the displayed output string to put bit zero on the right
+                    //-----------------------------------------------------------------
+                    statusText2.setText(st.toString()+bp.reverse().toString()); //statusText2
+                    statusText2.setVisible(true);
+
+                    // set up for testing input returned
+                    int k = 0;
+                    for (int i = begOutByte; i <= endOutByte; i++, k++) {
+                        wrapBytes[k] = outBytes[i];
+                    }
+                    waitingOnInput = true;
+                    needInputTest = true;
+                    count = 50;
+                    // send poll
+                    _memo.getTrafficController().sendSerialMessage(
+                            SerialMessage.getPoll(testNodeAddr), curFrame);
+
+                    // update output pattern for next entry
+                    curOutValue++;
+                    if (curOutValue > 255) {
+                        // Move to the next byte
+                        curOutValue = 0;
+                        outBytes[curOutByte] = 0;
+                        if (isSMINI) {
+                            // If SMINI, clear ports of both output cards
+                            if (curOutByte > 2) {
+                                outBytes[curOutByte - 3] = 0;
+                            } else {
+                                outBytes[curOutByte + 3] = 0;
                             }
-                            curOutByte++;
-                            if (curOutByte > endOutByte) {
-                                // Pattern complete, recycle to first port (byte)
-                                curOutByte = begOutByte;
-                                numIterations++;
-                            }
+                        }
+                        curOutByte++;
+                        if (curOutByte > endOutByte) {
+                            // Pattern complete, recycle to first port (byte)
+                            curOutByte = begOutByte;
+                            numIterations++;
                         }
                     }
                 }
@@ -1166,7 +1195,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         }
         return m;
     }
-    
+
     /**
      * Handle poll node button in Diagnostic Frame.
      * @param e unused.
@@ -1176,65 +1205,62 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
             begInByte = (testNode.getInputCardIndex(inCardNum)) * portsPerCard;
             endInByte = begInByte + portsPerCard;
             nInBytes = numInputCards * portsPerCard;
-           
+
             needInputTest = true;
             waitingOnInput = true;
             waitingResponse = false;
             count = 30;
-                
+
             // send poll
             _memo.getTrafficController().sendSerialMessage(SerialMessage.getPoll(testNodeAddr), curFrame);
-            statusText2.setText(""); 
-            nodeReplyText.setText(""); 
-            
+            statusText2.setText("");
+            nodeReplyText.setText("");
+
             // display input data bytes or timeout
             pollNodeReadReply();
     }
 
-    
+
     /**
     * Run a Poll/Response Test.
     * Returns number of bytes read or a timeout
     */
     protected synchronized void pollNodeReadReply() {
     // Set up timer to poll the node and report data or a timeout
-        pollTimer = new Timer(100, new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent evnt) {
-                if (waitingOnInput) {
-                    count--;
-                    if (count == 0) {
-                        nodeReplyText.setText(Bundle.getMessage("PollTimeOut"));
+        pollTimer = new Timer(100, (ActionEvent evnt) -> {
+            if (waitingOnInput) {
+                count--;
+                if (count == 0) {
+                    nodeReplyText.setText(Bundle.getMessage("PollTimeOut"));
                     waitingOnInput = false;
                     pollTimer.stop();
                     return;
-                   }
-                } 
-                else 
+                }
+            }
+            else
+            {
+                if (waitingResponse)
                 {
-                 if (waitingResponse)
-                    {
-                     nodeReplyText.setText(Bundle.getMessage("InByteCount",replyCount));
-                     nodeReplyText.setVisible(true);
-                     waitingOnInput = false;
-                     pollTimer.stop();
-                     return;                        
-                    }
+                    nodeReplyText.setText(Bundle.getMessage("InByteCount",replyCount));
+                    nodeReplyText.setVisible(true);
+                    waitingOnInput = false;
+                    pollTimer.stop();
+                    return;
                 }
             }
         });
-    
+
     // start timer
         pollTimer.start();
         waitingResponse = true;
     }
-    
+
     /**
      * Transmit bytes to selected output card starting with out card number
      * for number of bytes entered.
      * If inverted checked, data is flipped.
      * @param e unused.
-     */    
+     */
     public synchronized void sendButtonActionPerformed(java.awt.event.ActionEvent e) {
 
        portsPerCard = (testNode.getNumBitsPerCard()) / 8;
@@ -1245,32 +1271,40 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
        // Validate number of bytes entered
         if (b.length == 0) {
             statusText1.setText(Bundle.getMessage("WriteBytesError1"));
-            return; 
+            return;
         }
         if (b.length > portsPerCard) {
             statusText1.setText(Bundle.getMessage("WriteBytesError2",portsPerCard));
-            return; 
+            return;
         }
-        outCardNum = Integer.parseInt(writeCardField.getText());        
-        
-        if (testNodeType != SerialNode.CPNODE)   
-        {
-            if (!testNode.isOutputCard(outCardNum)) {
-             statusText1.setText(Bundle.getMessage("DiagnosticError6"));
-             return;                          
-            }
-            begOutByte = (testNode.getOutputCardIndex(outCardNum)) * portsPerCard;
-        }
-        else
+        outCardNum = Integer.parseInt(writeCardField.getText());
+
+        if (testNodeType == SerialNode.CPNODE)
         {
             if (!testNode.isOutputCard(outCardNum+2)) {
              statusText1.setText(Bundle.getMessage("DiagnosticError6"));
-             return;   
+             return;
             }
-            begOutByte = (testNode.getOutputCardIndex(outCardNum+2)) * portsPerCard; 
+            begOutByte = (testNode.getOutputCardIndex(outCardNum+2)) * portsPerCard;
+        }
+        else if (testNodeType == SerialNode.ESP32NODE)
+        {
+            if ((outCardNum < 1) || (!testNode.isOutputCard(outCardNum-1))) {
+             statusText1.setText(Bundle.getMessage("DiagnosticError6"));
+             return;
+            }
+            begOutByte = (testNode.getOutputCardIndex(outCardNum-1)) * portsPerCard;
+        }
+        else
+        {
+            if (!testNode.isOutputCard(outCardNum)) {
+             statusText1.setText(Bundle.getMessage("DiagnosticError6"));
+             return;
+            }
+            begOutByte = (testNode.getOutputCardIndex(outCardNum)) * portsPerCard;
         }
         // Zero the output buffer
-        int zero = (invertWriteButton.isSelected()) ? -1:0; 
+        int zero = (invertWriteButton.isSelected()) ? -1:0;
 
         for (int i=0; i<totalOutBytes; i++)
         {
@@ -1279,12 +1313,12 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
 
         int j=begOutByte;
         for (int i=0; i<portsPerCard; i++)
-        {         
-         outBytes[j] = (invertWriteButton.isSelected()) ? (byte) ~b[i]: (byte) b[i]; 
+        {
+         outBytes[j] = (invertWriteButton.isSelected()) ? (byte) ~b[i]: (byte) b[i];
          j++;
-        }        
+        }
         nOutBytes = totalOutBytes;
-        
+
         SerialMessage m = createOutPacket();
         m.setTimeout(50);
         _memo.getTrafficController().sendSerialMessage(m, curFrame);
@@ -1317,6 +1351,7 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
 
     /**
      * Stop operation when window closing
+     * @param e the event
      */
     @Override
     public void windowClosing(java.awt.event.WindowEvent e) {
@@ -1330,5 +1365,5 @@ public class DiagnosticFrame extends jmri.util.JmriJFrame implements jmri.jmrix.
         super.windowClosing(e);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DiagnosticFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DiagnosticFrame.class);
 }

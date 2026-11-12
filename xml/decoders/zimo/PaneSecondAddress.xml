@@ -5,9 +5,13 @@
            - added Dim function output 10-12
 -->
 <!-- version 1.2 - Ronald Kuhn - add german translation -->
-<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder.xsd">
+<!-- version 1.3 - Pierre Billon - fixed table labels -->
+<!-- version 1.4 - Pierre Billon - Added French translations -->
+<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder-4-15-2.xsd">
     <name>Secondary Function Map</name>
+    <name xml:lang="fr">Deuxième adresse</name>
     <name xml:lang="de">Zweitadresse</name>
+    <name xml:lang="cs">Druhé přiřazení funkcí</name>
     <column>
       <label>
         <text> </text>
@@ -24,7 +28,9 @@
       </label>
       <label>
         <text>           See the manual chapter 3.5</text>
+        <text xml:lang="fr">           Voir le chapitre 3.5 du manuel</text>
         <text xml:lang="de">                           Bitte Kapitel 3.5 im Handbuch beachten.</text>
+        <text xml:lang="cs">                           Viz příručka kapitola 3.5</text>
       </label>
       <label>
         <text>   </text>
@@ -32,18 +38,22 @@
       <label>
         <text>   </text>
         <text xml:lang="de">    Zum Setzen der Zweitadresse zunächst den gewünschten Wert</text>
+        <text xml:lang="cs">    Chcete-li nastavit druhou adresu, nejprve nastavte požadovanou hodnotu</text>
       </label>
       <label>
         <text>   </text>
         <text xml:lang="de">    in der "Erweiterten Adresse" im  Reiter "Basis" setzen.</text>
+        <text xml:lang="cs">    v "Rozšířená adresa" v kartě "Základní".</text>
       </label>
       <label>
         <text>   </text>
         <text xml:lang="de">    Danach den Wert aus CV#17 im Feld "zweite Erweiterte Adresse, Teil 1"</text>
+        <text xml:lang="cs">    Potom hodnotu z CV17 v poli "dDruhá rozšířená adresa, část 1"</text>
       </label>
       <label>
         <text>   </text>
         <text xml:lang="de">    und den Wert aus CV#18 im Feld "zweite Erweiterte Adresse, Teil 2" eintragen.</text>
+        <text xml:lang="cs">    a do pole "druhá rozšířená adresa, část 2" zadejte hodnotu z CV18.</text>
       </label>
     <separator/>
       <label>
@@ -54,8 +64,10 @@
       </label>
       <label>
         <text>           Description                       Output wire or operation</text>
+        <text xml:lang="fr">           Description                       Fil de sortie ou fonction</text>
         <text xml:lang="it">           Descrizione                                      Filo Uscita o operazione</text>
         <text xml:lang="de">      Funktion                     Ausgang bzw. Funktion</text>
+        <text xml:lang="cs">           Popis                             Výstupní vodič nebo operace</text>
       </label>
       <label>
         <text> </text>
@@ -63,40 +75,46 @@
       <row>
         <column>
           <label>
-            <text>                                 1</text>
+            <text>          1</text>
           </label>
           <label>
-            <text>                              Front  </text>
-            <text xml:lang="it">                                          Frontale </text>
-            <text xml:lang="de">                              Lvor  </text>
+            <text>         Front  </text>
+            <text xml:lang="fr">         Avant  </text>
+            <text xml:lang="it">         Frontale </text>
+            <text xml:lang="de">         Lvor  </text>
+            <text xml:lang="cs">         Přední  </text>
           </label>
           <label>
-            <text>                                           Light  </text>
-            <text xml:lang="it">                                           Luci   </text>
-            <text xml:lang="de">                                      </text>
+            <text>         Light  </text>
+            <text xml:lang="fr">         Feu  </text>
+            <text xml:lang="it">         Luci   </text>
+            <text xml:lang="de">         Lrück </text>
+            <text xml:lang="cs">         světlo  </text>
           </label>
           <label>
-            <text>                                           White  </text>
-            <text xml:lang="it">                                           Bianco   </text>
-            <text xml:lang="de">                              Weiß   </text>
+            <text>         White  </text>
+            <text xml:lang="fr">         Blanc  </text>
+            <text xml:lang="it">         Bianco   </text>
+            <text xml:lang="de">         Weiß   </text>
+            <text xml:lang="cs">         Bílá  </text>
           </label>
           <label>
             <text> </text>
           </label>
-          <display item="AltFL(f) controls output 1" format="checkbox"/>
-          <display item="AltFL(r) controls output 1" format="checkbox"/>
-          <display item="AltF1 controls output 1" format="checkbox"/>
-          <display item="AltF2 controls output 1" format="checkbox"/>
-          <display item="AltF3 controls output 1" format="checkbox"/>
-          <display item="AltF4 controls output 1" format="checkbox"/>
-          <display item="AltF5 controls output 1" format="checkbox"/>
-          <display item="AltF6 controls output 1" format="checkbox"/>
-          <display item="AltF7 controls output 1" format="checkbox"/>
-          <display item="AltF8 controls output 1" format="checkbox"/>
-          <display item="AltF9 controls output 1" format="checkbox"/>
-          <display item="AltF10 controls output 1" format="checkbox"/>
-          <display item="AltF11 controls output 1" format="checkbox"/>
-          <display item="AltF12 controls output 1" format="checkbox"/>
+          <display item="AltFL(f) controls output 1" format="checkbox" label="AltFL(f)"/>
+          <display item="AltFL(r) controls output 1" format="checkbox" label="AltFL(r)"/>
+          <display item="AltF1 controls output 1" format="checkbox" label="AltF1"/>
+          <display item="AltF2 controls output 1" format="checkbox" label="AltF2"/>
+          <display item="AltF3 controls output 1" format="checkbox" label="AltF3"/>
+          <display item="AltF4 controls output 1" format="checkbox" label="AltF4"/>
+          <display item="AltF5 controls output 1" format="checkbox" label="AltF5"/>
+          <display item="AltF6 controls output 1" format="checkbox" label="AltF6"/>
+          <display item="AltF7 controls output 1" format="checkbox" label="AltF7"/>
+          <display item="AltF8 controls output 1" format="checkbox" label="AltF8"/>
+          <display item="AltF9 controls output 1" format="checkbox" label="AltF9"/>
+          <display item="AltF10 controls output 1" format="checkbox" label="AltF10"/>
+          <display item="AltF11 controls output 1" format="checkbox" label="AltF11"/>
+          <display item="AltF12 controls output 1" format="checkbox" label="AltF12"/>
         </column>
         <column>
           <label>
@@ -104,15 +122,21 @@
           </label>
           <label>
             <text> Rear </text>
+            <text xml:lang="fr"> Arrière </text>
             <text xml:lang="de"> Lrück </text>
+            <text xml:lang="cs"> Zadní </text>
           </label>
           <label>
             <text> Light </text>
+            <text xml:lang="fr"> Feu </text>
             <text xml:lang="de">       </text>
+            <text xml:lang="cs"> světlo </text>
           </label>
           <label>
             <text>Yellow </text>
+            <text xml:lang="fr">Jaune </text>
             <text xml:lang="de"> Gelb </text>
+            <text xml:lang="cs">Žlutá </text>
           </label>
           <label>
             <text> </text>
@@ -167,13 +191,16 @@
           <label>
             <text>  FO 1  </text>
             <text xml:lang="de"> FA1 </text>
+            <text xml:lang="cs">  FV 1  </text>
           </label>
           <label>
             <text>       </text>
           </label>
           <label>
             <text> Green </text>
+            <text xml:lang="fr"> Vert </text>
             <text xml:lang="de"> Grün </text>
+            <text xml:lang="cs"> Zelená </text>
           </label>
           <label>
             <text> </text>
@@ -228,13 +255,16 @@
           <label>
             <text> FO 2 </text>
             <text xml:lang="de"> FA2 </text>
+            <text xml:lang="cs"> FV 2 </text>
           </label>
           <label>
             <text>    </text>
           </label>
           <label>
             <text>Brown </text>
+            <text xml:lang="fr">Brun </text>
             <text xml:lang="de"> Braun </text>
+            <text xml:lang="cs">Hnědá </text>
           </label>
           <label>
             <text> </text>
@@ -289,13 +319,16 @@
           <label>
             <text> FO 3  </text>
             <text xml:lang="de"> FA3 </text>
+            <text xml:lang="cs"> FV 3  </text>
           </label>
           <label>
             <text>    </text>
           </label>
           <label>
             <text> Grey </text>
+            <text xml:lang="fr"> Gris </text>
             <text xml:lang="de">      </text>
+            <text xml:lang="cs"> Šedá </text>
           </label>
           <label>
             <text> </text>
@@ -350,13 +383,16 @@
           <label>
             <text> FO 4</text>
             <text xml:lang="de"> FA4 </text>
+            <text xml:lang="cs"> FV 4 </text>
           </label>
           <label>
             <text>    </text>
           </label>
           <label>
             <text>Orange</text>
+            <text xml:lang="fr">Orange</text>
             <text xml:lang="de">        </text>
+            <text xml:lang="cs">Oranžová</text>
           </label>
           <label>
             <text> </text>
@@ -416,13 +452,16 @@
           <label>
             <text> FO 5</text>
             <text xml:lang="de"> FA5 </text>
+            <text xml:lang="cs"> FV 5</text>
           </label>
           <label>
             <text>    </text>
           </label>
           <label>
             <text>Orange</text>
+            <text xml:lang="fr">Orange</text>
             <text xml:lang="de">        </text>
+            <text xml:lang="cs">Oranžová</text>
           </label>
           <label>
             <text> </text>
@@ -482,13 +521,16 @@
           <label>
             <text> FO 6</text>
             <text xml:lang="de"> FA6 </text>
+            <text xml:lang="cs"> FV 6</text>
           </label>
           <label>
             <text>    </text>
           </label>
           <label>
             <text>Orange</text>
+            <text xml:lang="fr">Orange</text>
             <text xml:lang="de">        </text>
+            <text xml:lang="cs">Oranžová</text>
           </label>
           <label>
             <text> </text>

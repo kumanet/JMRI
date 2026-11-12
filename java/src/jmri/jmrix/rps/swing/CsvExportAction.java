@@ -78,7 +78,7 @@ public class CsvExportAction extends AbstractAction implements ReadingListener {
 
         // initialize chooser
         if (fileChooser == null) {
-            fileChooser = new JFileChooser();
+            fileChooser = new jmri.util.swing.JmriJFileChooser();
         } else {
             fileChooser.rescanCurrentDirectory();
         }
@@ -118,6 +118,6 @@ public class CsvExportAction extends AbstractAction implements ReadingListener {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CsvExportAction.class);
+    private static final Logger log = LoggerFactory.getLogger(CsvExportAction.class);
 
 }

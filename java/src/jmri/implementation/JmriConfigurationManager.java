@@ -12,21 +12,18 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Action;
-import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JList;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 import javax.swing.TransferHandler;
 import javax.swing.event.ListSelectionEvent;
 
 import jmri.util.prefs.JmriPreferencesActionFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jmri.Application;
 import jmri.ConfigureManager;
@@ -35,6 +32,7 @@ import jmri.JmriException;
 import jmri.configurexml.ConfigXmlManager;
 import jmri.configurexml.swing.DialogErrorHandler;
 import jmri.jmrit.XmlFile;
+import jmri.jmrit.roster.RosterLocationUnavailableException;
 import jmri.profile.Profile;
 import jmri.profile.ProfileManager;
 import jmri.spi.PreferencesManager;
@@ -43,6 +41,7 @@ import jmri.util.SystemType;
 import jmri.util.com.sun.TransferActionListener;
 import jmri.util.prefs.HasConnectionButUnableToConnectException;
 import jmri.util.prefs.InitializationException;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  *
@@ -50,7 +49,6 @@ import jmri.util.prefs.InitializationException;
  */
 public class JmriConfigurationManager implements ConfigureManager {
 
-    private final static Logger log = LoggerFactory.getLogger(JmriConfigurationManager.class);
     private final ConfigXmlManager legacy = new ConfigXmlManager();
     private final HashMap<PreferencesManager, InitializationException> initializationExceptions = new HashMap<>();
     /*
@@ -64,14 +62,15 @@ public class JmriConfigurationManager implements ConfigureManager {
      */
     private final Set<PreferencesManager> initializing = new HashSet<>();
 
-    @SuppressWarnings("unchecked") // For types in InstanceManager.store()
     public JmriConfigurationManager() {
         ServiceLoader<PreferencesManager> sl = ServiceLoader.load(PreferencesManager.class);
         for (PreferencesManager pp : sl) {
             InstanceManager.store(pp, PreferencesManager.class);
-            for (Class provided : pp.getProvides()) { // use raw class so next line can compile
-                InstanceManager.store(provided.cast(pp), provided);
+
+            for (Class<?> provided : pp.getProvides()) {
+                InstanceManager.storeUnchecked(pp, provided);
             }
+
         }
         Profile profile = ProfileManager.getDefault().getActiveProfile();
         if (profile != null) {
@@ -133,11 +132,6 @@ public class JmriConfigurationManager implements ConfigureManager {
     @Override
     public List<Object> getInstanceList(Class<?> c) {
         return this.legacy.getInstanceList(c);
-    }
-
-    @Override
-    public boolean storeAll(File file) {
-        return this.legacy.storeAll(file);
     }
 
     /**
@@ -228,8 +222,17 @@ public class JmriConfigurationManager implements ConfigureManager {
             throw new JmriException(ex.getMessage(), ex);
         }
         // make this url the default "Store Panels..." file
-        JFileChooser ufc = jmri.configurexml.StoreXmlUserAction.getUserFileChooser();
-        ufc.setSelectedFile(new File(FileUtil.urlToURI(url)));
+        try {
+            JFileChooser ufc = jmri.configurexml.StoreXmlUserAction.getUserFileChooser();
+            ufc.setSelectedFile(new File(FileUtil.urlToURI(url)));
+        } catch (Exception e) {
+            // A user was seeing an IndexOutOfBoundsException in the setSelectedFile above
+            // when loading a file at startup.  
+            // We don't know why, but see https://stackoverflow.com/questions/37322892/jfilechooser-java-lang-indexoutofboundsexception-invalid-index
+            // and https://web.archive.org/web/20170924021323/http://bugs.java.com/view_bug.do?bug_id=6684952
+            // This lets operation proceed past that exception.
+            log.error("Exception caught while setting default load file in file chooser: {}", e.toString());
+        }
 
         return this.legacy.load(url, registerDeferred);
         // return true; // always return true once legacy support is dropped
@@ -239,6 +242,7 @@ public class JmriConfigurationManager implements ConfigureManager {
         if (!GraphicsEnvironment.isHeadless()) {
 
             AtomicBoolean isUnableToConnect = new AtomicBoolean(false);
+            AtomicReference<RosterLocationUnavailableException> rosterUnavailable = new AtomicReference<>();
 
             List<String> errors = new ArrayList<>();
             this.initialized.forEach((provider) -> {
@@ -251,9 +255,19 @@ public class JmriConfigurationManager implements ConfigureManager {
                         errors.add(exception.getLocalizedMessage());
                     });
                 } else if (this.initializationExceptions.get(provider) != null) {
-                    errors.add(this.initializationExceptions.get(provider).getLocalizedMessage());
+                    InitializationException stored = this.initializationExceptions.get(provider);
+                    if (stored instanceof RosterLocationUnavailableException) {
+                        rosterUnavailable.compareAndSet(null, (RosterLocationUnavailableException) stored);
+                    }
+                    errors.add(stored.getLocalizedMessage());
                 }
             });
+
+            RosterLocationUnavailableException rosterUnavailException = rosterUnavailable.get();
+            if (rosterUnavailException != null && handleRosterLocationUnavailable(rosterUnavailException)) {
+                return; // user chose Quit; ShutDownManager will end the JVM
+            }
+
             Object list = getErrorListObject(errors);
 
             if (isUnableToConnect.get()) {
@@ -262,6 +276,41 @@ public class JmriConfigurationManager implements ConfigureManager {
                 displayErrorListDialog(list);
             }
         }
+    }
+
+    /**
+     * Show a Continue/Quit dialog when the configured roster location is
+     * unavailable at startup. Returns true if the user chose Quit (in which
+     * case {@link #handleQuit()} has been invoked); returns false only if the
+     * user explicitly chose Continue. Dismissing the dialog (close button) is
+     * treated as Quit, matching the profile chooser dialog's behavior.
+     *
+     * @param ex the exception describing the unavailable roster location
+     * @return true if the user chose to quit
+     */
+    private boolean handleRosterLocationUnavailable(RosterLocationUnavailableException ex) {
+        Object[] options = {
+            Bundle.getMessage("ErrorDialogButtonContinue"),
+            Bundle.getMessage("ErrorDialogButtonQuitProgram", Application.getApplicationName())
+        };
+        Object[] message = {
+            Bundle.getMessage("RosterLocationUnavailableText", ex.getUnavailablePath()),
+            Bundle.getMessage("RosterLocationUnavailablePrompt")
+        };
+        int choice = JmriJOptionPane.showOptionDialog(
+                null,
+                message,
+                Bundle.getMessage("RosterLocationUnavailableTitle"),
+                JmriJOptionPane.DEFAULT_OPTION,
+                JmriJOptionPane.WARNING_MESSAGE,
+                null,
+                options,
+                options[0]);
+        if (choice == 0) {
+            return false; // explicit Continue
+        }
+        handleQuit();
+        return true;
     }
 
     private Object getErrorListObject(List<String> errors) {
@@ -275,7 +324,7 @@ public class JmriConfigurationManager implements ConfigureManager {
     }
 
     protected void displayErrorListDialog(Object list) {
-        JOptionPane.showMessageDialog(null,
+        JmriJOptionPane.showMessageDialog(null,
                 new Object[]{
                     (list instanceof JList) ? Bundle.getMessage("InitExMessageListHeader") : null,
                     list,
@@ -284,7 +333,7 @@ public class JmriConfigurationManager implements ConfigureManager {
                     Bundle.getMessage("InitExMessagePrefs"), // NOI18N
                 },
                 Bundle.getMessage("InitExMessageTitle", Application.getApplicationName()), // NOI18N
-                JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.ERROR_MESSAGE);
             InstanceManager.getDefault(JmriPreferencesActionFactory.class)
                     .getDefaultAction().actionPerformed(new ActionEvent(this,ActionEvent.ACTION_PERFORMED,""));
     }
@@ -304,35 +353,32 @@ public class JmriConfigurationManager implements ConfigureManager {
 
         if (list instanceof JList) {
             JPopupMenu popupMenu = new JPopupMenu();
-            JMenuItem copyMenuItem = buildCopyMenuItem((JList) list);
+            JMenuItem copyMenuItem = buildCopyMenuItem((JList<?>) list);
             popupMenu.add(copyMenuItem);
 
-            JMenuItem copyAllMenuItem = buildCopyAllMenuItem((JList) list);
+            JMenuItem copyAllMenuItem = buildCopyAllMenuItem((JList<?>) list);
             popupMenu.add(copyAllMenuItem);
 
-            ((JList) list).setComponentPopupMenu(popupMenu);
+            ((JList<?>) list).setComponentPopupMenu(popupMenu);
 
-            ((JList) list).addListSelectionListener((ListSelectionEvent e) -> copyMenuItem.setEnabled(((JList)e.getSource()).getSelectedIndex() != -1));
+            ((JList<?>) list).addListSelectionListener((ListSelectionEvent e) -> copyMenuItem.setEnabled(((JList<?>)e.getSource()).getSelectedIndex() != -1));
         }
 
-        JOptionPane pane = getjOptionPane(list, options);
+        handleRestartSelection(getjOptionPane(list, options));
 
-        JDialog dialog = pane.createDialog(null, Bundle.getMessage("InitExMessageTitle", Application.getApplicationName())); // NOI18N
-        dialog.setVisible(true);
-        Object selectedValue = pane.getValue();
-
-        handleRestartSelection(selectedValue);
     }
 
-    private void handleRestartSelection(Object selectedValue) {
-        if (Bundle.getMessage("ErrorDialogButtonQuitProgram", Application.getApplicationName()).equals(selectedValue)) {
+    // see order of generateErrorDialogButtonOptions()
+    // -1 - dialog closed, 0 - quit, 1 - continue, 2 - editconns
+    private void handleRestartSelection(int selectedValue) {
+        if (selectedValue == 0) {
             // Exit program
             handleQuit();
 
-        } else if (Bundle.getMessage("ErrorDialogButtonContinue").equals(selectedValue)) {
+        } else if (selectedValue == 1 || selectedValue == -1 ) {
             // Do nothing. Let the program continue
 
-        } else if (Bundle.getMessage("ErrorDialogButtonEditConnections").equals(selectedValue)) {
+        } else if (selectedValue == 2) {
            if (isEditDialogRestart()) {
                handleRestart();
            } else {
@@ -360,23 +406,24 @@ public class JmriConfigurationManager implements ConfigureManager {
     }
 
 
-    private JOptionPane getjOptionPane(Object list, Object[] options) {
-        return new JOptionPane(
-                    new Object[] {
-                        (list instanceof JList) ? Bundle.getMessage("InitExMessageListHeader") : null,
-                        list,
-                        "<html><br></html>", // Add a visual break between list of errors and notes // NOI18N
-                        Bundle.getMessage("InitExMessageLogs"), // NOI18N
-                        Bundle.getMessage("ErrorDialogConnectLayout"), // NOI18N
-                    },
-                    JOptionPane.ERROR_MESSAGE,
-                    JOptionPane.DEFAULT_OPTION,
-                    null,
-                    options
-            );
+    private int getjOptionPane(Object list, Object[] options) {
+        return JmriJOptionPane.showOptionDialog(
+            null, 
+            new Object[] {
+                (list instanceof JList) ? Bundle.getMessage("InitExMessageListHeader") : null,
+                list,
+                "<html><br></html>", // Add a visual break between list of errors and notes
+                Bundle.getMessage("InitExMessageLogs"),
+                Bundle.getMessage("ErrorDialogConnectLayout")}, 
+            Bundle.getMessage("InitExMessageTitle", Application.getApplicationName()), 
+            JmriJOptionPane.DEFAULT_OPTION, 
+            JmriJOptionPane.ERROR_MESSAGE, 
+            null, 
+            options, 
+            null);
     }
 
-    private JMenuItem buildCopyAllMenuItem(JList list) {
+    private JMenuItem buildCopyAllMenuItem(JList<?> list) {
         JMenuItem copyAllMenuItem = new JMenuItem(Bundle.getMessage("MenuItemCopyAll"));
         ActionListener copyAllActionListener = (ActionEvent e) -> {
             StringBuilder text = new StringBuilder();
@@ -392,7 +439,7 @@ public class JmriConfigurationManager implements ConfigureManager {
         return copyAllMenuItem;
     }
 
-    private JMenuItem buildCopyMenuItem(JList list) {
+    private JMenuItem buildCopyMenuItem(JList<?> list) {
         JMenuItem copyMenuItem = new JMenuItem(Bundle.getMessage("MenuItemCopy"));
         TransferActionListener copyActionListener = new TransferActionListener();
         copyMenuItem.setActionCommand((String) TransferHandler.getCopyAction().getValue(Action.NAME));
@@ -482,5 +529,7 @@ public class JmriConfigurationManager implements ConfigureManager {
     public XmlFile.Validate getValidate() {
         return legacy.getValidate();
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JmriConfigurationManager.class);
 
 }

@@ -2,19 +2,17 @@ package jmri.jmrit.operations.locations.tools;
 
 import java.awt.GraphicsEnvironment;
 
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.jupiter.api.Test;
-
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
-import jmri.jmrit.operations.locations.Location;
-import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.locations.Track;
-import jmri.jmrit.operations.locations.YardEditFrame;
+import jmri.jmrit.operations.locations.*;
+import jmri.jmrit.operations.locations.gui.YardEditFrame;
 import jmri.util.JUnitOperationsUtil;
 import jmri.util.JUnitUtil;
 import jmri.util.swing.JemmyUtil;
+
+import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.jupiter.api.Test;
 
 /**
  *
@@ -33,8 +31,7 @@ public class ChangeTrackFrameTest extends OperationsTestCase {
 
         Track track = loc.getTrackByName("NI Yard", null);
 
-        YardEditFrame tf = new YardEditFrame();
-        tf.initComponents(loc, track);
+        YardEditFrame tf = new YardEditFrame(track);
         Assert.assertNotNull("exists", tf);
 
         ChangeTrackFrame t = new ChangeTrackFrame(tf);
@@ -55,8 +52,7 @@ public class ChangeTrackFrameTest extends OperationsTestCase {
 
         Track track = loc.getTrackByName("NI Yard", null);
 
-        YardEditFrame tef = new YardEditFrame();
-        tef.initComponents(loc, track);
+        YardEditFrame tef = new YardEditFrame(track);
         Assert.assertNotNull("exists", tef);
         
         ChangeTrackFrame ctf = new ChangeTrackFrame(tef);
@@ -75,6 +71,24 @@ public class ChangeTrackFrameTest extends OperationsTestCase {
         JUnitUtil.dispose(tef);
 
     }
+    
+    @Test
+    public void testCloseWindowOnSave() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        JUnitOperationsUtil.initOperationsData();
+        LocationManager lmanager = InstanceManager.getDefault(LocationManager.class);
+        Location loc = lmanager.getLocationByName("North Industries");
+        Assert.assertNotNull("exists", loc);
 
-    // private final static Logger log = LoggerFactory.getLogger(ChangeTrackFrameTest.class);
+        Track track = loc.getTrackByName("NI Yard", null);
+
+        YardEditFrame tef = new YardEditFrame(track);
+        Assert.assertNotNull("exists", tef);
+        
+        ChangeTrackFrame f = new ChangeTrackFrame(tef);
+        JUnitOperationsUtil.testCloseWindowOnSave(f.getTitle());
+    }
+
+
+    // private static final Logger log = LoggerFactory.getLogger(ChangeTrackFrameTest.class);
 }

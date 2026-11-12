@@ -46,11 +46,13 @@ public class CarColors extends RollingStockAttribute implements InstanceManagerA
         super.deleteName(oldName);
     }
     
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+            justification="I18N of Info Message")
     @Override
     public int getMaxNameLength() {
         if (maxNameLength == 0) {
             super.getMaxNameLength();
-            log.info("Max color name ({}) length {}", maxName, maxNameLength);
+            log.info(Bundle.getMessage("InfoMaxColor", maxName, maxNameLength));
         }
         return maxNameLength;
     }
@@ -75,6 +77,6 @@ public class CarColors extends RollingStockAttribute implements InstanceManagerA
         super.firePropertyChange(p, old, n);
     }
         
-    private final static Logger log = LoggerFactory.getLogger(CarColors.class);
+    private static final Logger log = LoggerFactory.getLogger(CarColors.class);
 
 }

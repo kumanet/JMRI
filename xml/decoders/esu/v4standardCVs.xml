@@ -60,7 +60,7 @@
     <variable CV="7" item="Decoder Version" readOnly="yes">
         <decVal/>
         <label>Decoder Version</label>
-        <label xml:lang="cs">Verze dekodéru: </label>
+        <label xml:lang="cs">Verze dekodéru </label>
         <label xml:lang="it">Versione Decoder: </label>
         <label xml:lang="fr">Version décodeur: </label>
         <label xml:lang="de">Decoderversion: </label>
@@ -70,7 +70,7 @@
     <variable CV="8" readOnly="yes" default="151" item="Manufacturer">
         <decVal/>
         <label>Manufacturer ID</label>
-        <label xml:lang="cs">ID výrobce: </label>
+        <label xml:lang="cs">ID výrobce </label>
         <label xml:lang="it">ID Costruttore: </label>
         <label xml:lang="fr">ID constructeur: </label>
         <label xml:lang="de">Hersteller ID: </label>
@@ -684,21 +684,6 @@
     <!-- Indexed variables -->
     <constant item="PICV" default="31" comment="CV used for Primary Index"/>
     <constant item="SICV" default="32" comment="CV used for Secondary Index"/>
-    <!-- Firmware Version -->
-    <variable CV="0.255.285" readOnly="yes" item="Firmware Build Number">
-        <splitVal highCV="0.255.286"/>
-        <label>Firmware Build Number</label>
-        <label xml:lang="de">Firmware Build Nummer</label>
-        <label xml:lang="ca">Número de firmware</label>
-    </variable>
-    <variable CV="0.255.287" readOnly="yes" item="Firmware Minor Version">
-        <decVal/>
-        <label>Firmware Minor Version</label>
-    </variable>
-    <variable CV="0.255.288" readOnly="yes" item="Firmware Major Version">
-        <decVal/>
-        <label>Firmware Major Version</label>
-    </variable>
     <xi:include href="http://jmri.org/xml/decoders/esu/v4decoderInfoCVs.xml"/>
     <xi:include href="http://jmri.org/xml/decoders/esu/v4projectInfoCVs.xml"/>
     <variables exclude="ESU LokPilot V4.0">

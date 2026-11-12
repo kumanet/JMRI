@@ -11,15 +11,15 @@
 <!-- ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or  -->
 <!-- FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License  -->
 <!-- for more details.                                                      -->
-<!-- 																		-->
+<!--                                                                        -->
 <!-- version 1 - Created as a separate file from Uhlenbrock_73400.xml v2    -->
-<!-- 					Alain Le Marchand (2014-05-09)						-->
-<!-- 	Valid for 731x0, 734x0, 764x0 families (non exhaustive list)        -->
-<!-- 	-->
+<!--                     Alain Le Marchand (2014-05-09)                     -->
+<!--     Valid for 731x0, 734x0, 764x0 families (non exhaustive list)       -->
+<!--     -->
 <!-- version 2 - Created as a separate file from PaneUhlenbrock.xml v2    -->
-<!-- 					Konrad Malkowski (2021-01-31)						-->
-<!-- 	 -->
-<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder.xsd">
+<!--                     Konrad Malkowski (2021-01-31)                      -->
+<!--      -->
+<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder-4-15-2.xsd">
   <name>Piko</name>
   <column>
     <separator/>
@@ -27,21 +27,22 @@
       <text>Piko configuration</text>
       <text xml:lang="de">Piko Konfiguration</text>
       <text xml:lang="nl">Piko Configuratie</text>
+      <text xml:lang="cs">Konfigurace Piko</text>
     </label>
     <label>
       <text> </text>
     </label>
-      <display item="RailCom" format="checkbox"/>	  
+      <display item="RailCom" format="checkbox"/>
       <display item="RailCom broadcast"/>
-      <display item="RailCom data transmission"/>	  
+      <display item="RailCom data transmission"/>
     <label>
       <text> </text>
     </label>
       <display item="Selectrix Operation" format="checkbox"/>
       <display item="Mfx Operation" format="checkbox"/>
-      <display item="DCC Operation" format="checkbox"/>	 
-      <display item="DC Operation" format="checkbox"/>	 
-      <display item="AC Operation" format="checkbox"/>	 
+      <display item="DCC Operation" format="checkbox"/>
+      <display item="DC Operation" format="checkbox"/>
+      <display item="AC Operation" format="checkbox"/>
     <label>
       <text> </text>
     </label>
@@ -50,6 +51,7 @@
       <text>Braking</text>
       <text xml:lang="de">Bremsen</text>
       <text xml:lang="nl">Remmen</text>
+      <text xml:lang="cs">Brždění</text>
     </label>
     <label>
       <text> </text>
@@ -70,6 +72,7 @@
             <text>Constant Distance</text>
             <text xml:lang="de">Konstanter Bremsweg</text>
             <text xml:lang="nl">Vaste Remweg</text>
+            <text xml:lang="cs">Konstantní vzdálenost</text>
         </label>
       </group>
           <display item="Constant Brakedist Threshold"/>
@@ -84,6 +87,7 @@
         <text>Coupling</text>
         <text xml:lang="de">Kupplungen</text>
         <text xml:lang="nl">Elektr. koppeling</text>
+        <text xml:lang="cs">Spřahování</text>
       </label>
       <label>
         <text> </text>
@@ -99,6 +103,7 @@
         <text>Smoke Generator</text>
         <text xml:lang="de">Rauchgenerator</text>
         <text xml:lang="nl">Rookgenerator</text>
+        <text xml:lang="cs">Kouřový generátor</text>
       </label>
       <label>
         <text> </text>
@@ -126,24 +131,25 @@
       <label>
         <text> </text>
       </label>
-      <separator/>		  
+      <separator/>
       <label>
         <text>Errors or Information (Read-Only)</text>
         <text xml:lang="de">Fehler oder Information (Read-Only)</text>
         <text xml:lang="it">Informazioni o Errori (Solo-Lettura)</text>
         <text xml:lang="nl">Fouten en ov. informatie (Alleen Lezen)</text>
+        <text xml:lang="cs">Chyby nebo Informace (Pouze pro čtení)</text>
       </label>
     <label>
       <text> </text>
     </label>
-      <display item="Shutdown Temperature"/>	  
+      <display item="Shutdown Temperature"/>
       <display item="Short circuit supervision"/>
       <display item="Function Outputs Short Constant"/>
       <display item="Motor Output Short Constant"/>
       <display item="Lights Short circuit supervision"/>
       <display item="Short circuit supervision 1" format="checkbox"/>
       <display item="Short circuit supervision 2" format="checkbox"/>
-      <display item="Short circuit supervision 3" format="checkbox"/>	  
+      <display item="Short circuit supervision 3" format="checkbox"/>
       <display item="Error register"/>
     <label>
       <text> </text>
@@ -190,6 +196,7 @@
                       <label>Flip PWM Phase:</label>
                       <label xml:lang="de">PWM Phase 180:</label>
                       <label xml:lang="nl">PWM Fase omkeren:</label>
+                      <label xml:lang="cs">Otočit fázi PWM:</label>
                   </display>
               </griditem>
               <griditem gridx="1" gridy="1" gridwidth="1" anchor="CENTER">

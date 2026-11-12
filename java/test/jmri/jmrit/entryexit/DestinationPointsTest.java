@@ -1,20 +1,21 @@
 package jmri.jmrit.entryexit;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.HashMap;
 
-import jmri.InstanceManager;
-import jmri.MemoryManager;
-import jmri.SensorManager;
-import jmri.TurnoutManager;
+import jmri.*;
 import jmri.jmrit.display.layoutEditor.LayoutBlockManager;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
+import jmri.util.ThreadingUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
 import org.junit.jupiter.api.*;
-import org.junit.Assume;
-import org.junit.jupiter.api.BeforeAll;
+
 import org.netbeans.jemmy.operators.*;
 
 /**
@@ -22,78 +23,93 @@ import org.netbeans.jemmy.operators.*;
  * @author Paul Bender Copyright (C) 2017
  * @author Dave Sand Copyright (C) 2018
  */
+@DisabledIfHeadless
 public class DestinationPointsTest {
 
-    static EntryExitTestTools tools;
-    static HashMap<String, LayoutEditor> panels = new HashMap<>();
+    private EntryExitTestTools tools;
+    private HashMap<String, LayoutEditor> panels = new HashMap<>();
 
-    static EntryExitPairs eep;
-    static LayoutBlockManager lbm;
-    static SensorManager sm;
-    static TurnoutManager tm;
+    private EntryExitPairs eep;
+    private LayoutBlockManager lbm;
+    private SensorManager sm;
+    private TurnoutManager tm;
 
     @Test
     public void testCTor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        PointDetails pdSrc = tools.getPoint(sm.getSensor("NX-From-Beta"), panels.get("Alpha") ,eep);  // NOI18N
-        Assert.assertNotNull("testCTor - source point", pdSrc);  // NOI18N
+        PointDetails pdSrc = ThreadingUtil.runOnGUIwithReturn(() -> {
+            return tools.getPoint(sm.getSensor("NX-From-Beta"), panels.get("Alpha") ,eep);  // NOI18N
+        });
+        assertNotNull(pdSrc, "testCTor - source point");
         Source src = new Source(pdSrc);
-        Assert.assertNotNull("testCTor - source", src);  // NOI18N
+        assertNotNull(src, "testCTor - source");
 
-        PointDetails pdDest = tools.getPoint(sm.getSensor("NX-AE"), panels.get("Alpha") ,eep);  // NOI18N
-        Assert.assertNotNull("testCTor - destination point", pdDest);  // NOI18N
+        PointDetails pdDest = ThreadingUtil.runOnGUIwithReturn(() -> {
+            return tools.getPoint(sm.getSensor("NX-AE"), panels.get("Alpha") ,eep);  // NOI18N
+        });
+        assertNotNull(pdDest, "testCTor - destination point");
 
         DestinationPoints dp = new DestinationPoints(pdDest, null, src);
-        Assert.assertNotNull("testCTor", dp);  // NOI18N
+        assertNotNull(dp, "testCTor");
         String uuid = dp.getUniqueId();
-        Assert.assertTrue("check uuid", uuid.startsWith("IN:"));  // NOI18N
+        assertTrue(uuid.startsWith("IN:"), "check uuid");
+
+        assertNotNull(lbm);
+        assertNotNull(tm);
     }
 
     @Test
-    public void testSetRoute() throws Exception {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        // Create a route
-        DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AW-Side"),  // NOI18N
-                sm.getSensor("NX-Alpha-EB"), panels.get("Alpha"), eep);  // NOI18N
-        dp.activeBean(false, false);
-        dp.setRoute(true);
-        JUnitUtil.waitFor(()->{return dp.getState() == 2;}, "Route active");  // NOI18N
+    public void testSetRoute() {
+        DestinationPoints dp2 = ThreadingUtil.runOnGUIwithReturn(() -> {
+            // Create a route
+            DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AW-Side"),  // NOI18N
+                    sm.getSensor("NX-Alpha-EB"), panels.get("Alpha"), eep);  // NOI18N
+            dp.activeBean(false, false);
+            dp.setRoute(true);
+            return dp;
+        });
+        JUnitUtil.waitFor(()->{return dp2.getState() == 2;}, "Route active");  // NOI18N
 
         // Cancel the route
-        dp.cancelClearInterlock(EntryExitPairs.CANCELROUTE);
-        JUnitUtil.waitFor(()->{return dp.getState() == 4;}, "Route inactive");  // NOI18N
+        ThreadingUtil.runOnGUI(() -> dp2.cancelClearInterlock(EntryExitPairs.CANCELROUTE));
+        JUnitUtil.waitFor(()->{return dp2.getState() == 4;}, "Route inactive");  // NOI18N
     }
 
     @Test
     public void testEnabled() {
-        DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
-                sm.getSensor("NX-AW-Main"), panels.get("Alpha"), eep);  // NOI18N
-        Assert.assertNotNull("test enabled", dp);  // NOI18N
-        boolean chkEnabled = dp.isEnabled();
-        Assert.assertTrue("test enabled true", chkEnabled);  // NOI18N
-        dp.setEnabled(false);
-        chkEnabled = dp.isEnabled();
-        Assert.assertFalse("test enabled false", chkEnabled);  // NOI18N
+        DestinationPoints dp2 = ThreadingUtil.runOnGUIwithReturn(() -> {
+            DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
+                    sm.getSensor("NX-AW-Main"), panels.get("Alpha"), eep);  // NOI18N
+            return dp;
+        });
+        assertNotNull(dp2, "test enabled");
+        boolean chkEnabled = dp2.isEnabled();
+        assertTrue(chkEnabled, "test enabled true");
+        dp2.setEnabled(false);
+        chkEnabled = dp2.isEnabled();
+        assertFalse(chkEnabled, "test enabled false");
     }
 
     @Test
     public void testState() {
-        DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
-                sm.getSensor("NX-AW-Side"), panels.get("Alpha"), eep);  // NOI18N
-        Assert.assertNotNull("test state", dp);
+        DestinationPoints dp = ThreadingUtil.runOnGUIwithReturn(() -> {
+            return tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
+                    sm.getSensor("NX-AW-Side"), panels.get("Alpha"), eep);  // NOI18N
+        });
+        assertNotNull(dp, "test state");
         int state = dp.getState();
-        Assert.assertEquals("test state inactive", 4, state);  // NOI18N
+        assertEquals(4, state, "test state inactive");
         dp.setActiveEntryExit(true);
         state = dp.getState();
-        Assert.assertEquals("test state active", 2, state);  // NOI18N
+        assertEquals(2, state, "test state active");
     }
 
     @Test
     public void testNoCurrentRoute() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        DestinationPoints dp = tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
-                sm.getSensor("NX-AW-Side"), panels.get("Alpha"), eep);  // NOI18N
-        Assert.assertNotNull("test state", dp);
+        DestinationPoints dp = ThreadingUtil.runOnGUIwithReturn(() -> {
+            return tools.getDestinationPoint(sm.getSensor("NX-AE"),  // NOI18N
+                    sm.getSensor("NX-AW-Side"), panels.get("Alpha"), eep);  // NOI18N
+        });
+        assertNotNull(dp, "test state");
 
         // Setup memory variable
         InstanceManager.getDefault(MemoryManager.class).provideMemory("testMemory");
@@ -116,22 +132,24 @@ public class DestinationPointsTest {
         return t;
     }
 
-    @BeforeAll
-    public static void setUp() throws Exception {
+    @BeforeEach
+    public void setUp() throws JmriException {
         JUnitUtil.setUp();
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        jmri.util.JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
         tools = new EntryExitTestTools();
         panels = EntryExitTestTools.getPanels();
-        Assert.assertEquals("Get LE panels", 2, panels.size());  // NOI18N
+        assertEquals(2, panels.size(), "Get LE panels");
         eep = InstanceManager.getDefault(EntryExitPairs.class);
         lbm = InstanceManager.getDefault(LayoutBlockManager.class);
         sm = InstanceManager.getDefault(SensorManager.class);
         tm = InstanceManager.getDefault(TurnoutManager.class);
     }
 
-    @AfterAll
-    public static void tearDown() {
+    @AfterEach
+    public void tearDown() {
+        JUnitUtil.clearRouteThreads();
+        JUnitUtil.clearTurnoutThreads();
+        JUnitUtil.removeMatchingThreads("Routing stabilising timer");
         panels.forEach((name, panel) -> JUnitUtil.dispose(panel));
         tm = null;
         sm = null;
@@ -140,10 +158,9 @@ public class DestinationPointsTest {
         panels = null;
         tools = null;
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-//     private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DestinationPointsTest.class);
+//     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DestinationPointsTest.class);
 
 }

@@ -1,22 +1,23 @@
 package jmri.jmrix.nce.consist;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+
 import javax.swing.JFileChooser;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+
 import jmri.jmrix.nce.NceBinaryCommand;
 import jmri.jmrix.nce.NceMessage;
 import jmri.jmrix.nce.NceReply;
 import jmri.jmrix.nce.NceTrafficController;
 import jmri.util.FileUtil;
 import jmri.util.StringUtil;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.TextFilter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Restores NCE consists from a text file defined by NCE.
@@ -30,10 +31,10 @@ import org.slf4j.LoggerFactory;
  * appropriate consist address.
  *
  * @author Dan Boudreau Copyright (C) 2007
+ * @author Ken Cameron Copyright (C) 2023
  */
 public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListener {
 
-    private static final int CS_CONSIST_MEM = 0xF500; // start of NCE CS Consist memory
     private static final int CONSIST_LNTH = 16; // 16 bytes per consist line
     private static final int REPLY_1 = 1; // reply length of 1 byte expected
     private int replyLen = 0; // expected byte length
@@ -54,7 +55,7 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
     public void run() {
 
         // Get file to read from
-        JFileChooser fc = new JFileChooser(FileUtil.getUserFilesPath());
+        JFileChooser fc = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
         fc.addChoosableFileFilter(new TextFilter());
         int retVal = fc.showOpenDialog(null);
         if (retVal != JFileChooser.APPROVE_OPTION) {
@@ -83,9 +84,12 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
             waiting = 0;
             fileValid = false; // in case we break out early
             int consistNum = 0; // for user status messages
-            int curConsist = CS_CONSIST_MEM; // load the start address of the NCE consist memory
+            int curConsist = tc.csm.getConsistHeadAddr(); // load the start address of the NCE consist memory
             byte[] consistData = new byte[CONSIST_LNTH]; // NCE Consist data
             String line;
+            int consistMemMim = tc.csm.getConsistHeadAddr();
+            int consistMemMax = consistMemMim + 0x100 + 0x100 + tc.csm.getConsistMidSize();
+            int consistMemAddr;
 
             while (true) {
                 line = in.readLine();
@@ -93,7 +97,7 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
                 consistNumber.setText(Integer.toString(consistNum++));
 
                 if (line == null) { // while loop does not break out quick enough
-                    log.error("NCE consist file terminator :0000 not found");
+                    log.error("NCE consist file terminator :0000 not found"); // NOI18N
                     break;
                 }
                 
@@ -108,19 +112,41 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
                     fileValid = true; // success!
                     break;
                 }
+                
+                // check for consistLine our of range
+                consistMemAddr = Integer.parseUnsignedInt(consistLine[0].replace(":", ""), 16);
+                if (consistMemAddr < consistMemMim) {
+                    log.warn("consist mem file out of range, ending restore, got: {} mimimum: {} ",
+                            Integer.toHexString(consistMemAddr), Integer.toHexString(consistMemMim));
+                    fileValid = true;
+                    break;
+                }
+                if (consistMemAddr >= consistMemMax ) {
+                    log.warn("consist mem file out of range, ending restore, got: {} maximum: {} ",
+                            Integer.toHexString(consistMemAddr), Integer.toHexString(consistMemMax));
+                    fileValid = true;
+                    break;
+                }
+                if (consistMemAddr != curConsist) {
+                    log.warn("consist mem file out of range, ending restore, got: {} expected: {} ",
+                            Integer.toHexString(consistMemAddr), Integer.toHexString(curConsist));
+                    fileValid = true;
+                    break;
+                }
 
                 if (!consistAddr.equalsIgnoreCase(consistLine[0])) {
-                    log.error("Restore file selected is not a vaild backup file");
-                    log.error("Consist memory address in restore file should be {} read {}",
-                            consistAddr, consistLine[0]);
+                    log.error("Restore file selected is not a valid backup file"); // NOI18N
+                    log.error("Consist memory address in restore file should be {}, read {}",
+                            consistAddr, consistLine[0]); // NOI18N
                     break;
                 }
 
                 // consist file found, give the user the choice to continue
-                if (curConsist == CS_CONSIST_MEM) {
-                    if (JOptionPane.showConfirmDialog(null, Bundle.getMessage("RestoreTakesAwhile"),
+                if (curConsist == tc.csm.getConsistHeadAddr()) {
+                    if (JmriJOptionPane.showConfirmDialog(null,
+                            Bundle.getMessage("RestoreTakesAwhile"),
                             Bundle.getMessage("NceConsistRestore"),
-                            JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                            JmriJOptionPane.YES_NO_OPTION) != JmriJOptionPane.YES_OPTION) {
                         break;
                     }
                 }
@@ -154,7 +180,7 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
                 }
                 // failed
                 if (waiting > 0) {
-                    log.error("timeout waiting for reply");
+                    log.error("timeout waiting for reply"); // NOI18N
                     break;
                 }
             }
@@ -164,17 +190,62 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
             fstatus.dispose();
 
             if (fileValid) {
-                JOptionPane.showMessageDialog(null, Bundle.getMessage("SuccessfulRestore"),
-                        Bundle.getMessage("NceConsistRestore"), JOptionPane.INFORMATION_MESSAGE);
+                JmriJOptionPane.showMessageDialog(null,
+                        Bundle.getMessage("SuccessfulRestore"),
+                        Bundle.getMessage("NceConsistRestore"),
+                        JmriJOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(null, Bundle.getMessage("RestoreFailed"),
-                        Bundle.getMessage("NceConsistRestore"), JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.showMessageDialog(null,
+                        Bundle.getMessage("RestoreFailed"),
+                        Bundle.getMessage("NceConsistRestore"),
+                        JmriJOptionPane.ERROR_MESSAGE);
             }
         } catch (IOException e) {
             // this is the end of the try-with-resources that opens in.
-            return;
         }
     }
+//
+//    // USB set cab memory pointer
+//    private void setUsbCabMemoryPointer(int cab, int offset) {
+//        log.debug("Macro base address: {}, offset: {}", Integer.toHexString(cab), offset);
+//        replyLen = NceMessage.REPLY_1; // Expect 1 byte response
+//        waiting++;
+//        byte[] bl = NceBinaryCommand.usbMemoryPointer(cab, offset);
+//        NceMessage m = NceMessage.createBinaryMessage(tc, bl, NceMessage.REPLY_1);
+//        tc.sendNceMessage(m, this);
+//    }
+//
+//    // USB Read N bytes of NCE cab memory
+//    private void readUsbMemoryN(int num) {
+//        switch (num) {
+//            case 1:
+//                replyLen = NceMessage.REPLY_1; // Expect 1 byte response
+//                break;
+//            case 2:
+//                replyLen = NceMessage.REPLY_2; // Expect 2 byte response
+//                break;
+//            case 4:
+//                replyLen = NceMessage.REPLY_4; // Expect 4 byte response
+//                break;
+//            default:
+//                log.error("Invalid usb read byte count");
+//                return;
+//        }
+//        waiting++;
+//        byte[] bl = NceBinaryCommand.usbMemoryRead((byte) num);
+//        NceMessage m = NceMessage.createBinaryMessage(tc, bl, replyLen);
+//        tc.sendNceMessage(m, this);
+//    }
+//
+//    // USB Write 1 byte of NCE memory
+//    private void writeUsbMemory1(byte value) {
+//        log.debug("Write byte: {}", String.format("%2X", value));
+//        replyLen = NceMessage.REPLY_1; // Expect 1 byte response
+//        waiting++;
+//        byte[] bl = NceBinaryCommand.usbMemoryWrite1(value);
+//        NceMessage m = NceMessage.createBinaryMessage(tc, bl, NceMessage.REPLY_1);
+//        tc.sendNceMessage(m, this);
+//    }
 
     // writes 16 bytes of NCE consist memory
     private NceMessage writeNceConsistMemory(int curConsist, byte[] b) {
@@ -194,22 +265,21 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
     @SuppressFBWarnings(value = "NN_NAKED_NOTIFY")
     @Override
     public void reply(NceReply r) {
-        log.debug("waiting for {} responses", waiting);
+        log.debug("waiting for {} responses", waiting); // NOI18N
 
         if (waiting <= 0) {
-            log.error("unexpected response");
+            log.error("unexpected response"); // NOI18N
             return;
         }
         waiting--;
         if (r.getNumDataElements() != replyLen) {
-            log.error("reply length incorrect");
+            log.error("reply length incorrect"); // NOI18N
             return;
         }
         if (replyLen == REPLY_1) {
             // Looking for proper response
-            int recChar = r.getElement(0);
-            if (recChar != '!') {
-                log.error("reply incorrect");
+            if (r.getElement(0) != NceMessage.NCE_OKAY) {
+                log.error("reply incorrect"); // NOI18N
             }
         }
 
@@ -221,5 +291,6 @@ public class NceConsistRestore extends Thread implements jmri.jmrix.nce.NceListe
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NceConsistRestore.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceConsistRestore.class);
+
 }

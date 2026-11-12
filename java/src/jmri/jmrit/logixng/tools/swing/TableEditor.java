@@ -15,16 +15,16 @@ import java.util.List;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.JTableHeader;
 
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.beantable.BeanTableDataModel;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.*;
 import jmri.jmrit.logixng.util.ReferenceUtil;
-import jmri.util.FileUtil;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.JmriJFrame;
 
 /**
@@ -35,6 +35,7 @@ import jmri.util.JmriJFrame;
  * @author Matthew Harris copyright (c) 2009  (ConditionalListEdit)
  * @author Dave Sand copyright (c) 2017  (ConditionalListEdit)
  * @author Daniel Bergqvist (c) 2019
+ * @author J. Scott Walton (c) 2022 (Csv Types)
  */
     public final class TableEditor implements AbstractLogixNGEditor<NamedTable> {
 
@@ -44,18 +45,9 @@ import jmri.util.JmriJFrame;
     private boolean _inEditMode = false;
 
     private boolean _showReminder = false;
+    private boolean _checkEnabled = jmri.InstanceManager.getDefault(jmri.configurexml.ShutdownPreferences.class).isStoreCheckEnabled();
 
     private final SymbolTable symbolTable = new DefaultSymbolTable();
-
-//    private final JCheckBox _autoSystemName = new JCheckBox(Bundle.getMessage("LabelAutoSysName"));   // NOI18N
-//    private final JLabel _sysNameLabel = new JLabel(Bundle.getMessage("SystemName") + ":");  // NOI18N
-//    private final JLabel _userNameLabel = new JLabel(Bundle.getMessage("UserName") + ":");   // NOI18N
-//    private final String systemNameAuto = this.getClass().getName() + ".AutoSystemName";         // NOI18N
-//    private final JTextField _systemName = new JTextField(20);
-//    private final JTextField _addUserName = new JTextField(20);
-
-//    private NamedBeanComboBox<NamedTable> _nameComboBox = null;
-
 
     /**
      * Create a new ConditionalNG List View editor.
@@ -73,56 +65,9 @@ import jmri.util.JmriJFrame;
     private JmriJFrame _editLogixNGFrame = null;
     private final JTextField editUserName = new JTextField(20);
     private final JTextField editCsvTableName = new JTextField(40);
-//    private JLabel status = new JLabel(" ");
 
     // ------------ ConditionalNG Variables ------------
     private TableTableModel tableTableModel = null;
-//    private ConditionalNG _curConditionalNG = null;
-//    private int _conditionalRowNumber = 0;
-//    private boolean _inReorderMode = false;
-//    private boolean _inActReorder = false;
-//    private boolean _inVarReorder = false;
-//    private int _nextInOrder = 0;
-
-    // ------------ Select NamedTable/ConditionalNG Variables ------------
-//    private JPanel _selectLogixNGPanel = null;
-//    private JPanel _selectConditionalNGPanel = null;
-//    private JComboBox<String> _selectLogixNGComboBox = new JComboBox<>();
-//    private JComboBox<String> _selectConditionalNGComboBox = new JComboBox<>();
-//    private TreeMap<String, String> _selectLogixNGMap = new TreeMap<>();
-//    private ArrayList<String> _selectConditionalNGList = new ArrayList<>();
-
-    // ------------ Edit ConditionalNG Variables ------------
-//    private boolean _inEditConditionalNGMode = false;
-//    private JmriJFrame _editConditionalNGFrame = null;
-//    private JTextField _conditionalUserName = new JTextField(22);
-//    private JRadioButton _triggerOnChangeButton;
-
-    // ------------ Methods for Edit NamedTable Pane ------------
-
-    private JButton createFileChooser() {
-        JButton selectFileButton = new JButton("..."); // "File" replaced by ...
-        selectFileButton.setMaximumSize(selectFileButton.getPreferredSize());
-        selectFileButton.setToolTipText(Bundle.getMessage("TableEdit_FileButtonHint"));  // NOI18N
-        selectFileButton.addActionListener((ActionEvent e) -> {
-            JFileChooser csvFileChooser = new JFileChooser(FileUtil.getUserFilesPath());
-            csvFileChooser.setFileFilter(new FileNameExtensionFilter("CSV files", "csv", "txt")); // NOI18N
-            csvFileChooser.rescanCurrentDirectory();
-            int retVal = csvFileChooser.showOpenDialog(null);
-            // handle selection or cancel
-            if (retVal == JFileChooser.APPROVE_OPTION) {
-                // set selected file location
-                try {
-                    editCsvTableName.setText(FileUtil.getPortableFilename(csvFileChooser.getSelectedFile().getCanonicalPath()));
-                } catch (java.io.IOException ex) {
-                    log.error("exception setting file location: {}", ex);  // NOI18N
-                    editCsvTableName.setText("");
-                }
-            }
-        });
-        return selectFileButton;
-    }
-
 
     /**
      * Create and/or initialize the Edit NamedTable pane.
@@ -181,15 +126,30 @@ import jmri.util.JmriJFrame;
             contentPane.add(panel3);
 
             if (isCsvTable) {
+                JPanel csvTypePanel = new JPanel();
+                csvTypePanel.setLayout(new FlowLayout());
+                csvTypePanel.add(new JLabel(Bundle.getMessage("TableEditor_Csv_Type") + ":"));
+                JLabel csvTypeLabel = new JLabel();
+                Table.CsvType csvType = ((DefaultCsvNamedTable) _curTable).getCsvType();
+                if (csvType == null || csvType.equals(Table.CsvType.TABBED)) {
+                    csvTypeLabel.setText(Table.CsvType.TABBED.toString());
+                } else if (csvType.equals(Table.CsvType.COMMA)) {
+                    csvTypeLabel.setText(Table.CsvType.COMMA.toString());
+                } else if (csvType.equals(Table.CsvType.SEMICOLON)) {
+                    csvTypeLabel.setText(Table.CsvType.SEMICOLON.toString());
+                } else {
+                    throw new JmriUncheckedException("unrecognized csvType");
+                }
+
+                csvTypePanel.add(csvTypeLabel);
+                contentPane.add(csvTypePanel);
                 JPanel panel4 = new JPanel();
                 panel4.setLayout(new FlowLayout());
                 JLabel tableFileNameLabel = new JLabel(Bundle.getMessage("TableEditor_FileName") + ": ");  // NOI18N
                 panel4.add(tableFileNameLabel);
-//                panel4.add(new JLabel(((DefaultCsvNamedTable)_curTable).getFileName()));
                 editCsvTableName.setText(((DefaultCsvNamedTable)_curTable).getFileName());
+                editCsvTableName.setEditable(false);
                 panel4.add(editCsvTableName);
-//                editCsvTableName.setToolTipText(Bundle.getMessage("LogixNGUserNameHint2"));  // NOI18N
-                panel4.add(createFileChooser());
                 contentPane.add(panel4);
             }
 
@@ -201,7 +161,6 @@ import jmri.util.JmriJFrame;
             contentPane.add(pctSpace);
             JPanel pTitle = new JPanel();
             pTitle.setLayout(new FlowLayout());
-//            pTitle.add(new JLabel(Bundle.getMessage("ConditionalNGTableTitle")));  // NOI18N
             contentPane.add(pTitle);
             // initialize table of conditionals
             tableTableModel = new TableTableModel();
@@ -296,14 +255,12 @@ import jmri.util.JmriJFrame;
             cancelButton.addActionListener((e) -> {
                 finishDone();
             });
-//            done.setToolTipText(Bundle.getMessage("CancelButtonHint"));  // NOI18N
             // Bottom Buttons - Ok NamedTable
             JButton okButton = new JButton(Bundle.getMessage("ButtonOK"));  // NOI18N
             panel6.add(okButton);
             okButton.addActionListener((e) -> {
                 okPressed(e);
             });
-//            done.setToolTipText(Bundle.getMessage("OkButtonHint"));  // NOI18N
             // Delete NamedTable
             JButton delete = new JButton(Bundle.getMessage("ButtonDelete"));  // NOI18N
             panel6.add(delete);
@@ -339,7 +296,7 @@ import jmri.util.JmriJFrame;
      * Display reminder to save.
      */
     void showSaveReminder() {
-        if (_showReminder) {
+        if (_showReminder && !_checkEnabled) {
             if (InstanceManager.getNullableDefault(jmri.UserPreferencesManager.class) != null) {
                 InstanceManager.getDefault(jmri.UserPreferencesManager.class).
                         showInfoMessage(Bundle.getMessage("ReminderTitle"), // NOI18N
@@ -372,12 +329,11 @@ import jmri.util.JmriJFrame;
                 NamedTable p = _tableManager.getByUserName(uName);
                 if (p != null) {
                     // NamedTable with this user name already exists
-                    log.error("Failure to update NamedTable with Duplicate User Name: " // NOI18N
-                            + uName);
-                    JOptionPane.showMessageDialog(_editLogixNGFrame,
+                    log.error("Failure to update NamedTable with Duplicate User Name: {}", uName); // NOI18N
+                    JmriJOptionPane.showMessageDialog(_editLogixNGFrame,
                             Bundle.getMessage("Error6"),
                             Bundle.getMessage("ErrorTitle"), // NOI18N
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return;
                 }
             }
@@ -395,27 +351,27 @@ import jmri.util.JmriJFrame;
                 AbstractNamedTable.loadTableFromCSV_File(
                         "IQT1",     // Arbitrary LogixNG table name
 //                        InstanceManager.getDefault(NamedTableManager.class).getAutoSystemName(),
-                        null, csvFileName, false);
+                        null, csvFileName, false, ((DefaultCsvNamedTable) _curTable).getCsvType());
             } catch (java.nio.file.NoSuchFileException ex) {
                 log.error("Cannot load table due since the file is not found", ex);
-                JOptionPane.showMessageDialog(_editLogixNGFrame,
+                JmriJOptionPane.showMessageDialog(_editLogixNGFrame,
                         Bundle.getMessage("TableEditor_Error_FileNotFound", csvFileName),
                         Bundle.getMessage("ErrorTitle"), // NOI18N
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             } catch (IOException ex) {
                 log.error("Cannot load table due to I/O error", ex);
-                JOptionPane.showMessageDialog(_editLogixNGFrame,
+                JmriJOptionPane.showMessageDialog(_editLogixNGFrame,
                         ex.getLocalizedMessage(),
                         Bundle.getMessage("ErrorTitle"), // NOI18N
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             } catch (RuntimeException ex) {
                 log.error("Cannot load table due to an error", ex);
-                JOptionPane.showMessageDialog(_editLogixNGFrame,
+                JmriJOptionPane.showMessageDialog(_editLogixNGFrame,
                         ex.getLocalizedMessage(),
                         Bundle.getMessage("ErrorTitle"), // NOI18N
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             }
 
@@ -514,7 +470,7 @@ import jmri.util.JmriJFrame;
         }
 
         @Override
-        public Component getListCellRendererComponent(JList list, Object value,
+        public Component getListCellRendererComponent(JList<?> list, Object value,
                 int index, boolean isSelected, boolean cellHasFocus) {
             setText((value == null) ? "" : value.toString());
             return this;
@@ -522,7 +478,9 @@ import jmri.util.JmriJFrame;
     }
 
     protected String getClassName() {
-        return TableEditor.class.getName();
+        // The class that is returned must have a default constructor,
+        // a constructor with no parameters.
+        return jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName();
     }
 
 
@@ -584,6 +542,6 @@ import jmri.util.JmriJFrame;
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TableEditor.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TableEditor.class);
 
 }

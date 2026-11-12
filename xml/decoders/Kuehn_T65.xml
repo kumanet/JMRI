@@ -54,7 +54,7 @@
         <label xml:lang="it">Versione Decoder: </label>
         <label xml:lang="fr">Version décodeur: </label>
         <label xml:lang="de">Decoder Version: </label>
-        <label xml:lang="cs">Verze dekodéru: </label>
+        <label xml:lang="cs">Verze dekodéru </label>
         <label xml:lang="nl">Decoder versie: </label>
         <comment>at least version 35</comment>
         <tooltip xml:lang="de">mindestens Version 35</tooltip>
@@ -66,7 +66,7 @@
         <label xml:lang="it">ID Costruttore: </label>
         <label xml:lang="fr">ID constructeur: </label>
         <label xml:lang="de">Hersteller ID: </label>
-        <label xml:lang="cs">ID výrobce: </label>
+        <label xml:lang="cs">ID výrobce </label>
         <label xml:lang="nl">Fabrikanten ID: </label>
         <tooltip xml:lang="de">für Kühn Wert 157</tooltip>
         <tooltip xml:lang="nl">Voor Kühn Waarde 157</tooltip>
@@ -952,6 +952,7 @@
         <label xml:lang="de">Rangiergang mit F4</label>
         <label xml:lang="nl">Rangeergang met F4</label>
       </variable>
+      
       <variable CV="59" mask="XXXXXXXV" item="Global lighting option 3" default="0">
         <xi:include href="http://jmri.org/xml/decoders/parts/enum-NoYes.xml"/>
         <label>Dimming with F1</label>
@@ -964,6 +965,7 @@
         <tooltip xml:lang="nl">&lt;html&gt;Wil u dat F1 het dimmen activeert?
                                           Stel dan de dimwaarde in, in de ééner stelle van CV-55.&lt;/html&gt;</tooltip>
       </variable>
+
       <variable CV="59" mask="XXXXXXVX" item="Global lighting option 4" default="0">
         <xi:include href="http://jmri.org/xml/decoders/parts/enum-NoYes.xml"/>
         <label>Dimming with F2</label>
@@ -976,6 +978,7 @@
         <tooltip xml:lang="nl">&lt;html&gt;Wil u dat F2 het dimmen activeert?
                                           Stel dan de dimwaarde in, in de ééner stelle van CV-55.&lt;/html&gt;</tooltip>
       </variable>
+
       <variable CV="59" mask="XXXXXVXX" item="Global lighting option 5" default="0">
         <xi:include href="http://jmri.org/xml/decoders/parts/enum-NoYes.xml"/>
         <label>Dimming with F3</label>
@@ -988,6 +991,8 @@
         <tooltip xml:lang="nl">&lt;html&gt;Wil u dat F3 het dimmen activeert?
                                           Stel dan de dimwaarde in, in de ééner stelle van CV-55.&lt;/html&gt;</tooltip>
       </variable>
+      
+<!-- commented out because without a type specification element it doesn't do anything
       <variable CV="59" mask="XXXXVXXX" item="Global lighting option 6" default="0">
         <label>Dimming with F4</label>
         <label xml:lang="de">Abblenden mit F4</label>
@@ -999,6 +1004,7 @@
         <tooltip xml:lang="nl">&lt;html&gt;Wil u dat F4 het dimmen activeert?
                                           Stel dan de dimwaarde in, in de ééner stelle van CV-55.&lt;/html&gt;</tooltip>
       </variable>
+-->
       <variable CV="60" default="0" item="Output 1 effect generated">
         <decVal min="0" max="99"/>
         <label>Dimmvalue Output B / Output A</label>

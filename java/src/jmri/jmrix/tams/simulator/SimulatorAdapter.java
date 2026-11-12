@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 public class SimulatorAdapter extends TamsPortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
 
     // streams to share with user class
@@ -152,7 +151,6 @@ public class SimulatorAdapter extends TamsPortController implements Runnable {
             TamsReply r;
             if (log.isDebugEnabled()) {
                 StringBuilder buf = new StringBuilder();
-                buf.append("Tams Simulator Thread received message: ");
                 if (m != null) {
                     for (int i = 0; i < m.getNumDataElements(); i++) {
                         buf.append(Integer.toHexString(0xFF & m.getElement(i))).append(" ");
@@ -160,7 +158,7 @@ public class SimulatorAdapter extends TamsPortController implements Runnable {
                 } else {
                     buf.append("null message buffer");
                 }
-                log.debug(buf.toString());
+                log.debug("Tams Simulator Thread received message: {}", buf );
             }
             if (m != null) {
                 //if(m.isReplyExpected()){
@@ -169,11 +167,10 @@ public class SimulatorAdapter extends TamsPortController implements Runnable {
                 //}
                 if (log.isDebugEnabled()) {
                     StringBuilder buf = new StringBuilder();
-                    buf.append("Tams Simulator Thread sent reply: ");
                     for (int i = 0; i < r.getNumDataElements(); i++) {
                         buf.append(Integer.toHexString(0xFF & r.getElement(i))).append(" ");
                     }
-                    log.debug(buf.toString());
+                    log.debug("Tams Simulator Thread sent reply: {}", buf );
                 }
             }
         }
@@ -310,7 +307,7 @@ public class SimulatorAdapter extends TamsPortController implements Runnable {
         }
     }
 
-    private final static Logger log = LoggerFactory
+    private static final Logger log = LoggerFactory
             .getLogger(SimulatorAdapter.class);
 
 }

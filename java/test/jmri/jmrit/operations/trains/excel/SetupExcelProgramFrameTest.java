@@ -1,11 +1,13 @@
 package jmri.jmrit.operations.trains.excel;
 
 import java.awt.GraphicsEnvironment;
+
+import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.jupiter.api.Test;
+
 import jmri.jmrit.operations.OperationsTestCase;
 import jmri.util.JUnitUtil;
-import org.junit.Assert;
-import org.junit.jupiter.api.*;
-import org.junit.Assume;
 
 /**
  *
@@ -21,6 +23,6 @@ public class SetupExcelProgramFrameTest extends OperationsTestCase {
         JUnitUtil.dispose(t);
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SetupExcelProgramFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SetupExcelProgramFrameTest.class);
 
 }

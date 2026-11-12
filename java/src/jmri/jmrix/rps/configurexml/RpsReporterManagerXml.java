@@ -1,8 +1,6 @@
 package jmri.jmrix.rps.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring RpsReporterManagers.
@@ -30,6 +28,6 @@ public class RpsReporterManagerXml extends jmri.managers.configurexml.AbstractRe
         return loadReporters(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(RpsReporterManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(RpsReporterManagerXml.class);
 
 }

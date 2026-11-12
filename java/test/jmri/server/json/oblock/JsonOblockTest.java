@@ -1,10 +1,7 @@
 package jmri.server.json.oblock;
 
 import jmri.util.JUnitUtil;
-import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -26,23 +23,23 @@ public class JsonOblockTest {
     }
 
     @Test
-    public void testConstructor() throws Exception {
-        try {
+    public void testConstructor() {
+
+        // because the constructor throws UnsupportedOperationException, and
+        // that is thrown by newInstance() into an InvocationTargetException
+        // we pass an InvocationTargetException that is caused by an
+        // UnsupportedOperationException and fail everything else.
+
+        InvocationTargetException ex = Assertions.assertThrows( InvocationTargetException.class, () -> {
             Constructor<JsonOblock> constructor;
             constructor = JsonOblock.class.getDeclaredConstructor();
             constructor.setAccessible(true);
             constructor.newInstance();
-            Assert.fail("Instance of JsonOblock created");
-        } catch (InvocationTargetException ex) {
-            // because the constructor throws UnsupportedOperationException, and
-            // that is thrown by newInstance() into an InvocationTargetException
-            // we pass an InvocationTargetException that is caused by an
-            // UnsupportedOperationException and fail everything else by
-            // rethrowing the unexpected exception to get a stack trace
-            if (!ex.getCause().getClass().equals(UnsupportedOperationException.class)) {
-                throw ex;
-            }
-        }
+            Assertions.fail("Instance of JsonOblock created");
+        });
+        UnsupportedOperationException cause = Assertions.assertInstanceOf(
+            UnsupportedOperationException.class, ex.getCause());
+        Assertions.assertNotNull(cause);
     }
 
 }

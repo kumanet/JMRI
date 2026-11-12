@@ -12,51 +12,46 @@ import jmri.jmrix.loconet.*;
 
 /**
  * Sets all engine slots to status common
- * 
+ *
  * @author Daniel Bergqvist Copyright 2020
  */
 public class ActionClearSlots extends AbstractDigitalAction {
 
     private static final int NUM_LOCO_SLOTS_TO_CLEAR = 119;
-    
+
     private LocoNetSystemConnectionMemo _memo;
-    
+
     public ActionClearSlots(String sys, String user, LocoNetSystemConnectionMemo memo) {
         super(sys, user);
         _memo = memo;
     }
-    
+
     @Override
     public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws JmriException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
         String sysName = systemNames.get(getSystemName());
         String userName = userNames.get(getSystemName());
         if (sysName == null) sysName = manager.getAutoSystemName();
-        ActionUpdateSlots copy = new ActionUpdateSlots(sysName, userName, _memo);
+        ActionClearSlots copy = new ActionClearSlots(sysName, userName, _memo);
+        copy.setComment(getComment());
         return manager.registerAction(copy).deepCopyChildren(this, systemNames, userNames);
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public Category getCategory() {
-        return CategoryLocoNet.LOCONET;
     }
 
     /** {@inheritDoc} */
     @Override
-    public boolean isExternal() {
-        return true;
+    public LogixNG_Category getCategory() {
+        return CategoryLocoNet.LOCONET;
     }
-    
+
     public void setMemo(LocoNetSystemConnectionMemo memo) {
         assertListenersAreNotRegistered(log, "setMemo");
         _memo = memo;
     }
-    
+
     public LocoNetSystemConnectionMemo getMemo() {
         return _memo;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void execute() {
@@ -95,7 +90,7 @@ public class ActionClearSlots extends AbstractDigitalAction {
     public void setup() {
         // Do nothing
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void registerListenersForThisClass() {
@@ -103,19 +98,19 @@ public class ActionClearSlots extends AbstractDigitalAction {
             _listenersAreRegistered = true;
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void unregisterListenersForThisClass() {
         _listenersAreRegistered = false;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disposeMe() {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ActionClearSlots.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ActionClearSlots.class);
 
 }

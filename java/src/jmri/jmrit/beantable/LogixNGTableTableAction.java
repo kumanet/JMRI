@@ -5,19 +5,19 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
-
+import java.beans.PropertyVetoException;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.TableColumn;
 
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.Manager;
+import jmri.jmrit.logixng.Table;
 import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
 
-
+import jmri.jmrit.logixng.Base;
 import jmri.jmrit.logixng.NamedTable;
 import jmri.jmrit.logixng.NamedTableManager;
 import jmri.jmrit.logixng.tools.swing.AbstractLogixNGEditor;
@@ -30,7 +30,6 @@ import jmri.jmrit.logixng.tools.swing.TableEditor;
  <p>
  * Most of the text used in this GUI is in BeanTableBundle.properties, accessed
  * via Bundle.getMessage().
- * <p>
  *
  * @author Dave Duchamp Copyright (C) 2007 (LogixTableAction)
  * @author Pete Cressman Copyright (C) 2009, 2010, 2011 (LogixTableAction)
@@ -38,6 +37,7 @@ import jmri.jmrit.logixng.tools.swing.TableEditor;
  * @author Dave Sand copyright (c) 2017 (LogixTableAction)
  * @author Daniel Bergqvist copyright (c) 2019
  * @author Dave Sand copyright (c) 2021
+ * @author J. Scott Walton (c) 2022 (Csv types)
  */
 public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTable> {
 
@@ -46,6 +46,12 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
     ButtonGroup _buttonGroup = new ButtonGroup();
     JTextField _csvFileName = new JTextField(50);
 
+    ButtonGroup _csvGroup = new ButtonGroup();
+    JRadioButton _csvTabbed = new JRadioButton(Table.CsvType.TABBED.toString());
+    JRadioButton _csvComma = new JRadioButton(Table.CsvType.COMMA.toString());
+    JRadioButton _csvSemicolon = new JRadioButton(Table.CsvType.SEMICOLON.toString());
+
+    JLabel _csvLabel = new JLabel(Bundle.getMessage("LogixNG_CsvType") + ":");
     /**
      * Create a LogixNGTableAction instance.
      *
@@ -74,7 +80,7 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
     }
 
     @Override
-    protected AbstractLogixNGEditor<NamedTable> getEditor(BeanTableFrame<NamedTable> f, BeanTableDataModel<NamedTable> m, String sName) {
+    protected AbstractLogixNGEditor<NamedTable> getEditor(BeanTableDataModel<NamedTable> m, String sName) {
         return new TableEditor(m, sName);
     }
 
@@ -109,18 +115,26 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         if (_typeExternalTable.isSelected()) {
             String fileName = _csvFileName.getText();
             if (fileName == null || fileName.isEmpty()) {
-                JOptionPane.showMessageDialog(addLogixNGFrame,
+                jmri.util.swing.JmriJOptionPane.showMessageDialog(addLogixNGFrame,
                         Bundle.getMessage("LogixNGError2"), Bundle.getMessage("ErrorTitle"), // NOI18N
-                        JOptionPane.ERROR_MESSAGE);
+                        jmri.util.swing.JmriJOptionPane.ERROR_MESSAGE);
                 return null;
             }
-            return InstanceManager.getDefault(NamedTableManager.class)
-                    .newCSVTable(systemName, userName, fileName);
+            if (_csvTabbed.isSelected()) {
+                return InstanceManager.getDefault(NamedTableManager.class)
+                        .newCSVTable(systemName, userName, fileName, Table.CsvType.TABBED);
+            } else if (_csvComma.isSelected()) {
+                return InstanceManager.getDefault(NamedTableManager.class)
+                        .newCSVTable(systemName, userName, fileName, Table.CsvType.COMMA);
+            } else if (_csvSemicolon.isSelected()) {
+                return InstanceManager.getDefault(NamedTableManager.class)
+                        .newCSVTable(systemName, userName, fileName, Table.CsvType.SEMICOLON);
+            }
         } else if (_typeInternalTable.isSelected()) {
             // Open table editor
         } else {
             log.error("No table type selected");
-            throw new RuntimeException("No table type selected");
+            throw new JmriUncheckedException("No table type selected");
         }
 
 //        InstanceManager.getDefault(NamedTableManager.class).loadTableFromCSV(file, systemName, userName);
@@ -129,7 +143,12 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
 
     @Override
     protected void deleteBean(NamedTable bean) {
-        InstanceManager.getDefault(NamedTableManager.class).deleteNamedTable(bean);
+        try {
+            InstanceManager.getDefault(NamedTableManager.class).deleteBean(bean, "DoDelete");
+        } catch (PropertyVetoException e) {
+            //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+            log.error("{} : Could not Delete.", e.getMessage());
+        }
     }
 
     @Override
@@ -138,47 +157,49 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
     }
 
     @Override
-    protected String getBeanText(NamedTable bean) {
+    protected String getBeanText(NamedTable bean, Base.PrintTreeSettings printTreeSettings) {
         int maxColumnWidth = 0;
-        int columnWidth[] = new int[bean.numColumns()];
-        String[][] cells = new String[bean.numRows()][];
-        for (int row=0; row < bean.numRows(); row++) {
-            cells[row] = new String[bean.numColumns()];
-            for (int col=0; col < bean.numColumns(); col++) {
+        int columnWidth[] = new int[bean.numColumns()+1];
+        String[][] cells = new String[bean.numRows()+1][];
+        for (int row=0; row <= bean.numRows(); row++) {
+            cells[row] = new String[bean.numColumns()+1];
+            for (int col=0; col <= bean.numColumns(); col++) {
                 Object value = bean.getCell(row, col);
                 cells[row][col] = value != null ? value.toString() : "<null>";
                 columnWidth[col] = Math.max(columnWidth[col], cells[row][col].length());
                 maxColumnWidth = Math.max(maxColumnWidth, columnWidth[col]);
             }
         }
-        StringBuilder columnLine = new StringBuilder();
-        while (columnLine.length()+2 < maxColumnWidth) {
-            columnLine.append("----------------------");
-        }
-        String columnPadding = String.format("%"+Integer.toString(maxColumnWidth)+"s", "");
+        String columnLine = "-".repeat(maxColumnWidth+2);
+        String columnPadding = " ".repeat(maxColumnWidth);
         StringBuilder sb = new StringBuilder();
         sb.append("+");
-        for (int col=0; col < bean.numColumns(); col++) {
+        for (int col=0; col <= bean.numColumns(); col++) {
             sb.append(columnLine.substring(0,columnWidth[col]+2));
             sb.append("+");
-            if (col+1 == bean.numColumns()) sb.append(String.format("%n"));
+            if (col == bean.numColumns()) sb.append(String.format("%n"));
         }
-        for (int row=0; row < bean.numRows(); row++) {
+        for (int row=0; row <= bean.numRows(); row++) {
             sb.append("|");
-            for (int col=0; col < bean.numColumns(); col++) {
+            for (int col=0; col <= bean.numColumns(); col++) {
                 sb.append(" ");
                 sb.append((cells[row][col]+columnPadding).substring(0,columnWidth[col]));
                 sb.append(" |");
-                if (col+1 == bean.numColumns()) sb.append(String.format("%n"));
+                if (col == bean.numColumns()) sb.append(String.format("%n"));
             }
             sb.append("+");
-            for (int col=0; col < bean.numColumns(); col++) {
+            for (int col=0; col <= bean.numColumns(); col++) {
                 sb.append(columnLine.substring(0,columnWidth[col]+2));
                 sb.append("+");
-                if (col+1 == bean.numColumns()) sb.append(String.format("%n"));
+                if (col == bean.numColumns()) sb.append(String.format("%n"));
             }
         }
         return sb.toString();
+    }
+
+    @Override
+    protected String getBrowserTitle() {
+        return Bundle.getMessage("LogixNG_Table_Browse_Title");
     }
 
     @Override
@@ -201,8 +222,8 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         selectFileButton.setMaximumSize(selectFileButton.getPreferredSize());
         selectFileButton.setToolTipText(Bundle.getMessage("LogixNG_FileButtonHint"));  // NOI18N
         selectFileButton.addActionListener((ActionEvent e) -> {
-            JFileChooser csvFileChooser = new JFileChooser(FileUtil.getUserFilesPath());
-            csvFileChooser.setFileFilter(new FileNameExtensionFilter("CSV files", "csv", "txt")); // NOI18N
+            JFileChooser csvFileChooser = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
+            csvFileChooser.setFileFilter(new FileNameExtensionFilter("CSV files", "csv", "txt", "tsv")); // NOI18N
             csvFileChooser.rescanCurrentDirectory();
             int retVal = csvFileChooser.showOpenDialog(null);
             // handle selection or cancel
@@ -211,7 +232,7 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
                 try {
                     _csvFileName.setText(FileUtil.getPortableFilename(csvFileChooser.getSelectedFile().getCanonicalPath()));
                 } catch (java.io.IOException ex) {
-                    log.error("exception setting file location: {}", ex);  // NOI18N
+                    log.error("exception setting file location", ex);  // NOI18N
                     _csvFileName.setText("");
                 }
             }
@@ -254,6 +275,21 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         p.add(_userNameLabel, c);
         _userNameLabel.setLabelFor(_addUserName);
         c.gridy = 2;
+        _csvLabel.setLabelFor(null);
+        p.add(_csvLabel, c);
+        JPanel csvPanel = new JPanel();
+        csvPanel.setLayout(new FlowLayout());
+        _csvGroup.add(_csvTabbed);
+        _csvGroup.add(_csvComma);
+        _csvGroup.add(_csvSemicolon);
+        _csvTabbed.setSelected(true);
+        csvPanel.add(_csvTabbed);
+        csvPanel.add(_csvComma);
+        csvPanel.add(_csvSemicolon);
+        c.gridx = 1;
+        p.add(csvPanel,c);
+        c.gridx = 0;
+        c.gridy = 3;
         p.add(new JLabel(Bundle.getMessage("LogixNG_CsvFileName")), c);
 
         c.gridx = 1;
@@ -265,7 +301,7 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         c.gridy = 1;
         p.add(_addUserName, c);
 
-        c.gridy = 2;
+        c.gridy = 3;
         createFileChooser();
         p.add(createFileChooser(), c);
 
@@ -322,7 +358,7 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
         panel5.add(cancel);
         cancel.addActionListener(this::cancelAddPressed);
-        cancel.setToolTipText(Bundle.getMessage("CancelLogixNGButtonHint"));      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("CancelLogixNGTableButtonHint"));      // NOI18N
 
         addLogixNGFrame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -338,6 +374,17 @@ public class LogixNGTableTableAction extends AbstractLogixNGTableAction<NamedTab
         return panel5;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGTableTableAction.class);
+    @Override
+    protected void getListenerRefsIncludingChildren(NamedTable table, java.util.List<String> list) {
+        // Do nothing
+    }
+
+    @Override
+    protected boolean hasChildren(NamedTable table) {
+        // Tables doesn't have children
+        return false;
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGTableTableAction.class);
 
 }

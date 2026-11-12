@@ -7,8 +7,6 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import jmri.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of a TurnoutManager that can serve as a proxy for multiple
@@ -185,7 +183,7 @@ public class ProxyTurnoutManager extends AbstractProvidingProxyManager<Turnout> 
     public String[] getValidOperationTypes() {
         List<String> typeList = new LinkedList<>();
         getManagerList().forEach(m -> typeList.addAll(Arrays.asList(((TurnoutManager) m).getValidOperationTypes())));
-        return TurnoutOperationManager.concatenateTypeLists(typeList.toArray(new String[0]));
+        return TurnoutOperationManager.concatenateTypeLists(typeList.toArray(String[]::new));
     }
 
     /**
@@ -194,17 +192,6 @@ public class ProxyTurnoutManager extends AbstractProvidingProxyManager<Turnout> 
     @Override
     public boolean allowMultipleAdditions(@Nonnull String systemName) {
         return ((TurnoutManager) getManagerOrDefault(systemName)).allowMultipleAdditions(systemName);
-    }
-
-    @SuppressWarnings("deprecation") // user warned by actual manager class
-    @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix) throws jmri.JmriException {
-        return getNextValidAddress(curAddress, prefix, typeLetter());
-    }
-    
-    @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix, boolean ignoreInitialExisting) throws jmri.JmriException {
-        return getNextValidAddress(curAddress, prefix, ignoreInitialExisting, typeLetter());
     }
 
     /**
@@ -216,7 +203,7 @@ public class ProxyTurnoutManager extends AbstractProvidingProxyManager<Turnout> 
             try {
                 ((TurnoutManager) m).setDefaultClosedSpeed(speed);
             } catch (jmri.JmriException ex) {
-                log.error(ex.toString());
+                log.error("JmriException {}", ex.getMessage() );
                 throw ex;
             }
         }
@@ -231,7 +218,7 @@ public class ProxyTurnoutManager extends AbstractProvidingProxyManager<Turnout> 
             try {
                 ((TurnoutManager) m).setDefaultThrownSpeed(speed);
             } catch (jmri.JmriException ex) {
-                log.error(ex.toString());
+                log.error("JmriException {}", ex.getMessage() );
                 throw ex;
             }
         }
@@ -312,6 +299,6 @@ public class ProxyTurnoutManager extends AbstractProvidingProxyManager<Turnout> 
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(ProxyTurnoutManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProxyTurnoutManager.class);
 
 }

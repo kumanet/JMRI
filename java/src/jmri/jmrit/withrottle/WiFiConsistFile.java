@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * @author Brett Hoffman Copyright (C) 2011
- * 
+ *
  */
 public class WiFiConsistFile extends ConsistFile {
 
@@ -27,7 +27,7 @@ public class WiFiConsistFile extends ConsistFile {
             try {
                 readFile(getFileLocation() + fileName);
             } catch (Exception e) {
-                log.warn("error reading consist file: {}", e);
+                log.warn("error reading consist file", e);
             }
         } else {
             log.debug("No {} file, will check for default file.", fileName);
@@ -36,7 +36,7 @@ public class WiFiConsistFile extends ConsistFile {
                 try {
                     readFile();
                 } catch (Exception e) {
-                    log.warn("error reading consist file: {}", e);
+                    log.warn("error reading consist file", e);
                 }
             } else {
                 log.debug("No consist files found, will create if needed.");
@@ -44,6 +44,6 @@ public class WiFiConsistFile extends ConsistFile {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(WiFiConsistFile.class);
+    private static final Logger log = LoggerFactory.getLogger(WiFiConsistFile.class);
 
 }

@@ -224,14 +224,10 @@ public class SE8cSignalHead extends DefaultSignalHead {
     }
 
     @Override
-    public void dispose() {
-    }
-
-    @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         return (getLow() != null && t.equals(getLow().getBean()))
                 || (getHigh() != null && t.equals(getHigh().getBean()));
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SE8cSignalHead.class);
+    private static final Logger log = LoggerFactory.getLogger(SE8cSignalHead.class);
 }

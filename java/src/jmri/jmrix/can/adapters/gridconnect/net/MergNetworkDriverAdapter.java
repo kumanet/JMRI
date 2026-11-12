@@ -1,6 +1,5 @@
 package jmri.jmrix.can.adapters.gridconnect.net;
 
-
 /**
  * Implements NetworkDriverAdapter for the MERG system network connection.
  * <p>
@@ -13,8 +12,11 @@ public class MergNetworkDriverAdapter extends NetworkDriverAdapter {
 
     public MergNetworkDriverAdapter() {
         super();
-        options.put("CANID", new Option("CAN ID for CAN-USB", new String[]{"127", "126", "125", "124", "123", "122", "121", "120"}));
-        setManufacturer(jmri.jmrix.merg.MergConnectionTypeList.MERG);
+
+        options.put("CANID", new Option(Bundle.getMessage("JMRICANID"),
+            jmri.jmrix.can.cbus.CbusConstants.getValidFixedCanIds(),
+            jmri.jmrix.can.cbus.CbusConstants.DEFAULT_JMRI_CAN_ID_STRING ));
+        super.setManufacturer(jmri.jmrix.merg.MergConnectionTypeList.MERG);
     }
 
 }

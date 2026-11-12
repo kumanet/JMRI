@@ -1,21 +1,26 @@
 package jmri.jmrix.lenz;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+
+import jmri.util.JUnitUtil;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of XNetPortController that eases
  * checking whether data was forwarded or not.
- * 
+ *
  * @author Bob Jacobsen Copyright (C) 2006, 2015
  */
 public class XNetPortControllerScaffold extends XNetSimulatorPortController {
 
-    private final static Logger log = LoggerFactory.getLogger(XNetPortControllerScaffold.class);
+    private static final Logger log = LoggerFactory.getLogger(XNetPortControllerScaffold.class);
 
     /*@Override
     public java.util.Vector<String> getPortNames() {
@@ -48,37 +53,39 @@ public class XNetPortControllerScaffold extends XNetSimulatorPortController {
 
     PipedInputStream otempIPipe;
     PipedOutputStream otempOPipe;
-    
+
     PipedInputStream itempIPipe;
     PipedOutputStream itempOPipe;
-    
-    public XNetPortControllerScaffold() throws Exception {
-        otempIPipe = new PipedInputStream(200);
-        tostream = new DataInputStream(otempIPipe);
-        otempOPipe = new PipedOutputStream(otempIPipe);
-        ostream = new DataOutputStream(otempOPipe);
 
-        itempIPipe = new PipedInputStream(200);
-        istream = new DataInputStream(itempIPipe);
-        itempOPipe = new PipedOutputStream(itempIPipe);
-        tistream = new DataOutputStream(itempOPipe);
+    public XNetPortControllerScaffold() {
+        assertDoesNotThrow( () -> {
+            otempIPipe = new PipedInputStream(200);
+            tostream = new DataInputStream(otempIPipe);
+            otempOPipe = new PipedOutputStream(otempIPipe);
+            ostream = new DataOutputStream(otempOPipe);
+
+            itempIPipe = new PipedInputStream(200);
+            istream = new DataInputStream(itempIPipe);
+            itempOPipe = new PipedOutputStream(itempIPipe);
+            tistream = new DataOutputStream(itempOPipe);
+        });
     }
 
     public void flush() {
-        try { 
+        try {
             ostream.flush();
             otempOPipe.flush();
-        
+
             tistream.flush();
             itempOPipe.flush();
 
-            jmri.util.JUnitUtil.releaseThread(this);
+            JUnitUtil.waitFor(JUnitUtil.WAITFOR_DEFAULT_DELAY);
 
         } catch (Exception e) {
             log.error("Exception during flush", e);
         }
     }
-    
+
     /**
      * Returns the InputStream from the port.
      */
@@ -103,6 +110,8 @@ public class XNetPortControllerScaffold extends XNetSimulatorPortController {
         return true;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+        justification = "always ok to send in test class")
     @Override
     public boolean okToSend() {
         return true;

@@ -6,7 +6,10 @@ import java.beans.PropertyChangeSupport;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
+import javax.annotation.CheckForNull;
 import javax.swing.JMenuItem;
+
 import jmri.NamedBean;
 import jmri.SignalMast;
 import jmri.jmrit.display.layoutEditor.LayoutBlock;
@@ -21,6 +24,11 @@ public class Source implements PropertyChangeListener {
     JMenuItem editOneClick = null;
     JMenuItem oneClick = null;
 
+    /**
+     * String constant for the active property.
+     */
+    public static final String PROPERTY_ACTIVE = "active";
+
     NamedBean sourceObject = null;
     NamedBean sourceSignal = null;
     //String ref = "Empty";
@@ -32,6 +40,18 @@ public class Source implements PropertyChangeListener {
     //one day be possible to have a signal icon selectable on a panel and
     //generate a propertychange, so hence do not want to tie it down at this stage.
     transient HashMap<PointDetails, DestinationPoints> pointToDest = new HashMap<PointDetails, DestinationPoints>();
+
+    public Source(PointDetails point/*, ArrayList<LayoutBlock> protectingBlock*/) {
+        if (point.getSensor() != null) {
+            addSourceObject(point.getSensor());
+        } else {
+            addSourceObject(point.getSignal());
+        }
+        //protectingBlocks = protectingBlock;
+        point.setSource(Source.this);
+        sourceSignal = point.getSignal();
+        pd = point;
+    }
 
     public boolean isEnabled(Object dest, LayoutEditor panel) {
         PointDetails lookingFor = manager.getPointDetails(dest, panel);
@@ -48,22 +68,10 @@ public class Source implements PropertyChangeListener {
         }
     }
 
-    public Source(PointDetails point/*, ArrayList<LayoutBlock> protectingBlock*/) {
-        if (point.getSensor() != null) {
-            addSourceObject(point.getSensor());
-        } else {
-            addSourceObject(point.getSignal());
-        }
-        //protectingBlocks = protectingBlock;
-        point.setSource(this);
-        sourceSignal = point.getSignal();
-        pd = point;
-    }
-
     /**
      * Property change support for table in AddEntryExitPairPanel.
      * Catch when paths go active.
-     * @since 4.17.4 
+     * @since 4.17.4
      */
     private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
 
@@ -75,7 +83,7 @@ public class Source implements PropertyChangeListener {
     public void addPropertyChangeListener(PropertyChangeListener listener) {
         pcs.addPropertyChangeListener(listener);
     }
-    
+
     /**
      * Remove property change listener.
      * @since 4.17.4
@@ -84,15 +92,15 @@ public class Source implements PropertyChangeListener {
     public void removePropertyChangeListener(PropertyChangeListener listener) {
         pcs.removePropertyChangeListener(listener);
     }
-    
+
     /**
      * @since 4.17.4
      */
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        pcs.firePropertyChange("active", evt.getOldValue(), evt.getNewValue());
+        pcs.firePropertyChange(PROPERTY_ACTIVE, evt.getOldValue(), evt.getNewValue());
     }
-    
+
 
     void cancelClearInterlockFromSource(int cancelClear) {
         for (DestinationPoints dp : pointToDest.values()) {
@@ -173,12 +181,12 @@ public class Source implements PropertyChangeListener {
         pointToDest.get(dest).dispose();
         pointToDest.remove(dest);
         dest.removePropertyChangeListener(this);
-        if (pointToDest.size() == 0) {
+        if (pointToDest.isEmpty()) {
             getPoint().removeSource(this);
         }
     }
 
-    void addSourceObject(NamedBean source) {
+    private void addSourceObject(NamedBean source) {
         if (sourceObject == source) {
             return;
         }
@@ -190,8 +198,7 @@ public class Source implements PropertyChangeListener {
     }
 
     public ArrayList<PointDetails> getDestinationPoints() {
-        //ArrayList<PointDetails> rtn =
-        return new ArrayList<PointDetails>(pointToDest.keySet());
+        return new ArrayList<>(pointToDest.keySet());
     }
 
     public boolean isDestinationValid(PointDetails destPoint) {
@@ -229,7 +236,7 @@ public class Source implements PropertyChangeListener {
 
     public boolean isRouteActive(PointDetails endpoint) {
         if (pointToDest.containsKey(endpoint)) {
-            return pointToDest.get(endpoint).activeEntryExit;
+            return pointToDest.get(endpoint).isActive();
         }
         return false;
     }
@@ -255,7 +262,9 @@ public class Source implements PropertyChangeListener {
         }
         if (type == EntryExitPairs.FULLINTERLOCK) {
             if (sourceSignal instanceof SignalMast) {
-                ((SignalMast) sourceSignal).setHeld(true);
+                if (!manager.isAbsSignalMode()) {
+                    ((SignalMast) sourceSignal).setHeld(true);
+                }
             }
         }
     }
@@ -276,6 +285,7 @@ public class Source implements PropertyChangeListener {
         }
     }
 
+    @CheckForNull
     public String getUniqueId(Object dest, LayoutEditor panel) {
         PointDetails lookingFor = manager.getPointDetails(dest, panel);
         if (pointToDest.containsKey(lookingFor)) {
@@ -285,13 +295,14 @@ public class Source implements PropertyChangeListener {
     }
 
     public ArrayList<String> getDestinationUniqueId() {
-        ArrayList<String> rList = new ArrayList<String>();
+        ArrayList<String> rList = new ArrayList<>();
         for (DestinationPoints d : pointToDest.values()) {
             rList.add(d.getUniqueId());
         }
         return rList;
     }
 
+    @CheckForNull
     public DestinationPoints getByUniqueId(String id) {
         for (DestinationPoints d : pointToDest.values()) {
             if (d.getUniqueId().equals(id)) {
@@ -301,6 +312,7 @@ public class Source implements PropertyChangeListener {
         return null;
     }
 
+    @CheckForNull
     public DestinationPoints getByUserName(String id) {
         for (DestinationPoints d : pointToDest.values()) {
             String uname = d.getUserName();

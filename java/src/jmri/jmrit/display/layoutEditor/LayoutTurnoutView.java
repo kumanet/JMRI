@@ -1,11 +1,12 @@
 package jmri.jmrit.display.layoutEditor;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
 import java.awt.geom.*;
 import static java.lang.Float.POSITIVE_INFINITY;
+import java.text.ParseException;
 import java.util.*;
 
 import javax.annotation.CheckForNull;
@@ -17,7 +18,10 @@ import jmri.jmrit.display.layoutEditor.LayoutTurnout.Geometry;
 import jmri.jmrit.display.layoutEditor.LayoutTurnout.LinkType;
 import jmri.jmrit.display.layoutEditor.LayoutTurnout.TurnoutType;
 import jmri.jmrit.display.layoutEditor.blockRoutingTable.LayoutBlockRouteTableAction;
+import jmri.util.IntlUtilities;
 import jmri.util.MathUtil;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * MVC View component for the LayoutTurnout class.
@@ -228,17 +232,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
     public static final double xOverHWidDefault = 10.0;
     public static final double xOverShortDefault = 10.0;
 
-    // operational instance variables (not saved between sessions)
-    protected NamedBeanHandle<Turnout> namedTurnout = null;
-    // Second turnout is used to either throw a second turnout in a cross over or if one turnout address is used to throw two physical ones
-    protected NamedBeanHandle<Turnout> secondNamedTurnout = null;
-
     // default is package protected
-    protected NamedBeanHandle<LayoutBlock> namedLayoutBlockA = null;
-    protected NamedBeanHandle<LayoutBlock> namedLayoutBlockB = null;  // Xover - second block, if there is one
-    protected NamedBeanHandle<LayoutBlock> namedLayoutBlockC = null;  // Xover - third block, if there is one
-    protected NamedBeanHandle<LayoutBlock> namedLayoutBlockD = null;  // Xover - forth block, if there is one
-
     protected NamedBeanHandle<SignalHead> signalA1HeadNamed = null; // signal 1 (continuing) (throat for RH, LH, WYE)
     protected NamedBeanHandle<SignalHead> signalA2HeadNamed = null; // signal 2 (diverging) (throat for RH, LH, WYE)
     protected NamedBeanHandle<SignalHead> signalA3HeadNamed = null; // signal 3 (second diverging) (3-way turnouts only)
@@ -256,17 +250,16 @@ public class LayoutTurnoutView extends LayoutTrackView {
     public Point2D pointC = new Point2D.Double(60, 20);
     public Point2D pointD = new Point2D.Double(20, 20);
 
-    private int version = 1;
+    public boolean showUnknown = false; // if true, show "?" when state is UNKNOWN
 
-    public String linkedTurnoutName = ""; // name of the linked Turnout (as entered in tool)
-    public LinkType linkType = LinkType.NO_LINK;
+    private int version = 1;
 
     private final boolean useBlockSpeed = false;
 
     // temporary reference to the Editor that will eventually be part of View
     protected jmri.jmrit.display.layoutEditor.LayoutEditorDialogs.LayoutTurnoutEditor editor;
 
-    final private LayoutTurnout turnout;
+    private final LayoutTurnout turnout;
 
     public final LayoutTurnout getLayoutTurnout() {
         return turnout;
@@ -460,6 +453,14 @@ public class LayoutTurnoutView extends LayoutTrackView {
 
     public void removeBeanReference(@CheckForNull jmri.NamedBean nb) {
         turnout.removeBeanReference(nb);
+    }
+
+    public void setShowUnknown(boolean show) {
+        showUnknown = show;
+    }
+
+    public boolean getShowUnknown() {
+        return showUnknown;
     }
 
     /**
@@ -831,6 +832,18 @@ public class LayoutTurnoutView extends LayoutTrackView {
             result.add(getCoordsD());
         }
         return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * A turnout, crossover or slip is drawn in the colours of up to four
+     * blocks, one for each of its legs.
+     */
+    @Override
+    public boolean usesLayoutBlock(@Nonnull LayoutBlock layoutBlock) {
+        return (getLayoutBlock() == layoutBlock) || (getLayoutBlockB() == layoutBlock)
+                || (getLayoutBlockC() == layoutBlock) || (getLayoutBlockD() == layoutBlock);
     }
 
     // updates connectivity for blocks assigned to this turnout and connected track segments
@@ -1258,12 +1271,11 @@ public class LayoutTurnoutView extends LayoutTrackView {
                 || (getTurnoutType() == TurnoutType.LH_XOVER)) {
             dispA = new Point2D.Double(x, y);
             // adjust to maintain the parallelogram
-            double a = 0.0;
             double b = -y;
             double xi = 0.0;
             double yi = b;
             if ((dispB.getX() + x) != 0.0) {
-                a = (dispB.getY() + y) / (dispB.getX() + x);
+                double a = (dispB.getY() + y) / (dispB.getX() + x);
                 b = -y + (a * x);
                 xi = -b / (a + (1.0 / a));
                 yi = (a * xi) + b;
@@ -1309,7 +1321,6 @@ public class LayoutTurnoutView extends LayoutTrackView {
         } else if ((getTurnoutType() == TurnoutType.RH_XOVER)
                 || (getTurnoutType() == TurnoutType.LH_XOVER)) {
             // adjust to maintain the parallelogram
-            double a = 0.0;
             double b = y;
             double xi = 0.0;
             double yi = b;
@@ -1320,7 +1331,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
                     don't have a divide by zero issue */
                     x = x - 0.0000000001;
                 }
-                a = (dispA.getY() - y) / (dispA.getX() - x);
+                double a = (dispA.getY() - y) / (dispA.getX() - x);
                 b = y - (a * x);
                 xi = -b / (a + (1.0 / a));
                 yi = (a * xi) + b;
@@ -1352,7 +1363,6 @@ public class LayoutTurnoutView extends LayoutTrackView {
             dispB = MathUtil.multiply(dispB, newLength / oldLength);
         } else if ((getTurnoutType() == TurnoutType.RH_XOVER)
                 || (getTurnoutType() == TurnoutType.LH_XOVER)) {
-            double a = 0.0;
             double b = -y;
             double xi = 0.0;
             double yi = b;
@@ -1364,7 +1374,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
 
                     x = x - 0.0000000001;
                 }
-                a = (-dispB.getY() + y) / (-dispB.getX() + x);
+                double a = (-dispB.getY() + y) / (-dispB.getX() + x);
                 b = -y + (a * x);
                 xi = -b / (a + (1.0 / a));
                 yi = (a * xi) + b;
@@ -1395,12 +1405,11 @@ public class LayoutTurnoutView extends LayoutTrackView {
         } else if ((getTurnoutType() == TurnoutType.RH_XOVER)
                 || (getTurnoutType() == TurnoutType.LH_XOVER)) {
             // adjust to maintain the parallelogram
-            double a = 0.0;
             double b = y;
             double xi = 0.0;
             double yi = b;
             if ((dispA.getX() + x) != 0.0) {
-                a = (dispA.getY() + y) / (dispA.getX() + x);
+                double a = (dispA.getY() + y) / (dispA.getX() + x);
                 b = -y + (a * x);
                 xi = -b / (a + (1.0 / a));
                 yi = (a * xi) + b;
@@ -1529,17 +1538,6 @@ public class LayoutTurnoutView extends LayoutTrackView {
         return turnout.isOccupied();
     }
 
-    // initialization instance variables (used when loading a LayoutEditor)
-    public String connectAName = "";
-    public String connectBName = "";
-    public String connectCName = "";
-    public String connectDName = "";
-
-    public String tBlockAName = "";
-    public String tBlockBName = "";
-    public String tBlockCName = "";
-    public String tBlockDName = "";
-
     private JPopupMenu popup = null;
 
     /**
@@ -1547,7 +1545,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
      */
     @Override
     @Nonnull
-    protected JPopupMenu showPopup(@CheckForNull MouseEvent mouseEvent) {
+    protected JPopupMenu showPopup(@Nonnull JmriMouseEvent mouseEvent) {
         if (popup != null) {
             popup.removeAll();
         } else {
@@ -1694,15 +1692,23 @@ public class LayoutTurnoutView extends LayoutTrackView {
             JCheckBoxMenuItem hiddenCheckBoxMenuItem = new JCheckBoxMenuItem(Bundle.getMessage("Hidden"));
             hiddenCheckBoxMenuItem.setSelected(isHidden());
             popup.add(hiddenCheckBoxMenuItem);
-            hiddenCheckBoxMenuItem.addActionListener((java.awt.event.ActionEvent e1) -> {
+            hiddenCheckBoxMenuItem.addActionListener( e1 -> {
                 JCheckBoxMenuItem o = (JCheckBoxMenuItem) e1.getSource();
                 setHidden(o.isSelected());
+            });
+
+            JCheckBoxMenuItem showUnknownCheckBoxMenuItem = new JCheckBoxMenuItem(Bundle.getMessage("ShowUnknown"));
+            showUnknownCheckBoxMenuItem.setSelected(getShowUnknown());
+            popup.add(showUnknownCheckBoxMenuItem);
+            showUnknownCheckBoxMenuItem.addActionListener( e1 -> {
+                JCheckBoxMenuItem o = (JCheckBoxMenuItem) e1.getSource();
+                setShowUnknown(o.isSelected());
             });
 
             JCheckBoxMenuItem cbmi = new JCheckBoxMenuItem(Bundle.getMessage("Disabled"));
             cbmi.setSelected(isDisabled());
             popup.add(cbmi);
-            cbmi.addActionListener((java.awt.event.ActionEvent e2) -> {
+            cbmi.addActionListener( e2 -> {
                 JCheckBoxMenuItem o = (JCheckBoxMenuItem) e2.getSource();
                 setDisabled(o.isSelected());
             });
@@ -1713,7 +1719,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
             }
             cbmi.setSelected(isDisabledWhenOccupied());
             popup.add(cbmi);
-            cbmi.addActionListener((java.awt.event.ActionEvent e3) -> {
+            cbmi.addActionListener( e3 -> {
                 JCheckBoxMenuItem o = (JCheckBoxMenuItem) e3.getSource();
                 setDisableWhenOccupied(o.isSelected());
             });
@@ -1721,42 +1727,12 @@ public class LayoutTurnoutView extends LayoutTrackView {
             // Rotate if there are no track connections
 //            if ((getConnectA() == null) && (getConnectB() == null)
 //                    && (getConnectC() == null)
-//                    && (getConnectD() == null)) 
-            {
-                JMenuItem rotateItem = new JMenuItem(Bundle.getMessage("Rotate_",
-                        String.format("%.1f", getRotationDEG())) + "...");
-                popup.add(rotateItem);
-                rotateItem.addActionListener((ActionEvent event) -> {
-                    boolean entering = true;
-                    boolean error = false;
-                    String newAngle = "";
-                    while (entering) {
-                        // prompt for rotation angle
-                        error = false;
-                        newAngle = JOptionPane.showInputDialog(layoutEditor,
-                                Bundle.getMessage("MakeLabel", Bundle.getMessage("EnterRotation")));
-                        if (newAngle.isEmpty()) {
-                            return;  // cancelled
-                        }
-                        double rot = 0.0;
-                        try {
-                            rot = Double.parseDouble(newAngle);
-                        } catch (Exception e1) {
-                            JOptionPane.showMessageDialog(layoutEditor, Bundle.getMessage("Error3")
-                                    + " " + e1, Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
-                            error = true;
-                            newAngle = "";
-                        }
-                        if (!error) {
-                            entering = false;
-                            if (rot != 0.0) {
-                                rotateCoords(rot);
-                                layoutEditor.redrawPanel();
-                            }
-                        }
-                    }
-                });
-            }
+//                    && (getConnectD() == null))
+
+            JMenuItem rotateItem = new JMenuItem(Bundle.getMessage("Rotate_",
+                    String.format(Locale.getDefault(), "%.1f", getRotationDEG())) + "...");
+            popup.add(rotateItem);
+            rotateItem.addActionListener( event -> displayRotationDialog());
 
             popup.add(new AbstractAction(Bundle.getMessage("UseSizeAsDefault")) {
                 @Override
@@ -1774,7 +1750,8 @@ public class LayoutTurnoutView extends LayoutTrackView {
             popup.add(new AbstractAction(Bundle.getMessage("ButtonDelete")) {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (canRemove() && layoutEditor.removeLayoutTurnout(turnout)) {
+                    if (canRemove() && removeInlineLogixNG()
+                            && layoutEditor.removeLayoutTurnout(turnout)) {
                         // Returned true if user did not cancel
                         remove();
                         dispose();
@@ -1791,17 +1768,17 @@ public class LayoutTurnoutView extends LayoutTrackView {
                         if (isTurnoutTypeXover()) {
                             tools.setSignalsAtXoverTurnoutFromMenu(turnout,
                                     letbp.signalIconEditor, letbp.signalFrame);
-                        } else if (linkType == LinkType.NO_LINK) {
+                        } else if (getLinkType() == LinkType.NO_LINK) {
                             tools.setSignalsAtTurnoutFromMenu(turnout,
                                     letbp.signalIconEditor, letbp.signalFrame);
-                        } else if (linkType == LinkType.THROAT_TO_THROAT) {
-                            tools.setSignalsAtThroatToThroatTurnoutsFromMenu(turnout, linkedTurnoutName,
+                        } else if (getLinkType() == LinkType.THROAT_TO_THROAT) {
+                            tools.setSignalsAtThroatToThroatTurnoutsFromMenu(turnout, getLinkedTurnoutName(),
                                     letbp.signalIconEditor, letbp.signalFrame);
-                        } else if (linkType == LinkType.FIRST_3_WAY) {
-                            tools.setSignalsAt3WayTurnoutFromMenu(getTurnoutName(), linkedTurnoutName,
+                        } else if (getLinkType() == LinkType.FIRST_3_WAY) {
+                            tools.setSignalsAt3WayTurnoutFromMenu(getTurnoutName(), getLinkedTurnoutName(),
                                     letbp.signalIconEditor, letbp.signalFrame);
-                        } else if (linkType == LinkType.SECOND_3_WAY) {
-                            tools.setSignalsAt3WayTurnoutFromMenu(linkedTurnoutName, getTurnoutName(),
+                        } else if (getLinkType() == LinkType.SECOND_3_WAY) {
+                            tools.setSignalsAt3WayTurnoutFromMenu(getLinkedTurnoutName(), getTurnoutName(),
                                     letbp.signalIconEditor, letbp.signalFrame);
                         }
                     }
@@ -1809,7 +1786,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
 
                 JMenu jm = new JMenu(Bundle.getMessage("SignalHeads"));
                 if (layoutEditor.getLETools().addLayoutTurnoutSignalHeadInfoToMenu(
-                        getTurnoutName(), linkedTurnoutName, jm)) {
+                        getTurnoutName(), getLinkedTurnoutName(), jm)) {
                     jm.add(ssaa);
                     popup.add(jm);
                 } else {
@@ -1886,13 +1863,38 @@ public class LayoutTurnoutView extends LayoutTrackView {
             }   // getBlockName().isEmpty()
             setAdditionalEditPopUpMenu(popup);
             layoutEditor.setShowAlignmentMenu(popup);
+            addCommonPopupItems(mouseEvent, popup);
             popup.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
         } else if (!viewAdditionalMenu.isEmpty()) {
             setAdditionalViewPopUpMenu(popup);
+            addCommonPopupItems(mouseEvent, popup);
             popup.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
         }
         return popup;
     } // showPopup
+
+    private void displayRotationDialog(){
+        boolean entering = true;
+        while (entering) {
+            // prompt for rotation angle
+            String newAngle = JmriJOptionPane.showInputDialog(layoutEditor,
+                    Bundle.getMessage("MakeLabel", Bundle.getMessage("EnterRotation")),"");
+            if (newAngle==null || newAngle.isEmpty()) {
+                return; // cancelled
+            }
+            try {
+                double rot = IntlUtilities.doubleValue(newAngle);
+                entering = false;
+                if ( Double.compare(rot, 0.0d) != 0 ) { // i.e. rot != 0
+                    rotateCoords(rot);
+                    layoutEditor.redrawPanel();
+                }
+            } catch (ParseException e1) {
+                JmriJOptionPane.showMessageDialog(layoutEditor, Bundle.getMessage("Error3")
+                    + " " + e1, Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
 
     public String[] getBlockBoundaries() {
         return turnout.getBlockBoundaries();
@@ -2043,6 +2045,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
         }
 
         TurnoutType type = getTurnoutType();
+
         if (type == TurnoutType.DOUBLE_XOVER) {
             if (state != Turnout.THROWN && state != INCONSISTENT) { // unknown or continuing path - not crossed over
                 if (isMain == mainlineA) {
@@ -2280,6 +2283,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
         } else if (isTurnoutTypeSlip()) {
             log.error("{}.draw1(...); slips should be being drawn by LayoutSlip sub-class", getName());
         } else {    // LH, RH, or WYE Turnouts
+
             // draw A<===>center
             if (isMain == mainlineA) {
                 g2.setColor(colorA);
@@ -2314,7 +2318,61 @@ public class LayoutTurnoutView extends LayoutTrackView {
                 }
             }
         }
+
+        // Overwrite with "?" if UNKNOWN and showUnknown requesting
+        if (showUnknown && state == UNKNOWN) {
+            // Draw the circle over the track drawing
+            //Color previousColor = g2.getColor();
+            //g2.setColor(g2.getBackground());
+            g2.fill(trackControlCircleAt(getCoordsCenter()));
+            //g2.setColor(previousColor);
+
+            drawForShowUnknown(g2, pM, g2.getColor(), true);
+            return;
+        }
     }   // draw1
+
+    /**
+     * Draw a "?" for the UNKNOWN state.
+     *
+     * To be invoked if getShowUnknown() is true
+     *
+     * @param g2 the graphics context to draw in
+     * @param center where to center the "?"
+     * @param color the base color for drawing
+     * @param complement true means select black or white to complement the base color
+     */
+    private void drawForShowUnknown(Graphics2D g2, Point2D center, Color color, boolean complement) {
+        var originalFont = g2.getFont();
+        var originalColor = g2.getColor();
+
+        // convert color to HSV to get intensity
+        int v = Math.max(Math.max(color.getBlue(), color.getGreen()), color.getRed());
+
+        Color drawColor = color;
+
+        if (complement) {
+            drawColor = Color.BLACK;
+            if ( v < 255*0.5) {
+                drawColor = Color.WHITE;
+            }
+        }
+
+        g2.setColor(drawColor);
+
+        int size = (int) layoutEditor.circleDiameter;
+
+        g2.setFont(new Font("SansSerif", Font.BOLD, size));
+
+        var metrics = g2.getFontMetrics();
+        double x = center.getX() - ((double) metrics.charWidth('?'))/2; // - to move left
+        double y = center.getY() + (metrics.getAscent()*0.9)/2;    // + to move down
+
+        g2.drawString("?", (float) x, (float) y);
+
+        g2.setColor(originalColor);
+        g2.setFont(originalFont);
+    }
 
     /**
      * {@inheritDoc}
@@ -3028,21 +3086,29 @@ public class LayoutTurnoutView extends LayoutTrackView {
     protected void drawTurnoutControls(Graphics2D g2) {
         if (!isDisabled() && !(isDisabledWhenOccupied() && isOccupied())) {
             Color foregroundColor = g2.getColor();
-            // if turnout is not continuing state
-            if (getState() != getContinuingSense()) {
-                // then switch to background color
+
+            if (getState() != Turnout.CLOSED) {
+                // then switch to background (thrown) color
                 g2.setColor(g2.getBackground());
             }
+
             if (layoutEditor.isTurnoutFillControlCircles()) {
                 g2.fill(trackControlCircleAt(getCoordsCenter()));
+                // do we need to draw a ? for unknown over the circle?
+                if (showUnknown && getState() == UNKNOWN) {
+                    drawForShowUnknown(g2, getCoordsCenter(), g2.getBackground(), true);
+                    return;
+                }
             } else {
                 g2.draw(trackControlCircleAt(getCoordsCenter()));
             }
-            // if turnout is not continuing state
-            if (getState() != getContinuingSense()) {
+
+            if (getState() != Turnout.CLOSED) {
                 // then restore foreground color
                 g2.setColor(foregroundColor);
             }
+
+
         }
     }
 
@@ -3182,7 +3248,7 @@ public class LayoutTurnoutView extends LayoutTrackView {
         private final String blockName;
         private final LayoutBlock layoutBlock;
 
-        public AbstractActionImpl(String name, String blockName, LayoutBlock layoutBlock) {
+        AbstractActionImpl(String name, String blockName, LayoutBlock layoutBlock) {
             super(name);
             this.blockName = blockName;
             this.layoutBlock = layoutBlock;
@@ -3195,5 +3261,5 @@ public class LayoutTurnoutView extends LayoutTrackView {
         }
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurnoutView.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurnoutView.class);
 }

@@ -5,10 +5,11 @@ import java.awt.event.ActionListener;
 
 import javax.swing.*;
 
+import jmri.InstanceManager;
 import jmri.jmrix.can.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.jmrix.can.cbus.CbusConsistManager;
+import jmri.util.ThreadingUtil;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Mode Switcher to switch modes between programmer and command station for simple
@@ -77,22 +78,31 @@ public class SprogCbusSimpleModeSwitcherFrame extends SprogCbusModeSwitcherFrame
 
             // Handle Programmer mode button activity
             ActionListener listener = ae -> {
+                CbusConsistManager cm = (CbusConsistManager)InstanceManager.getNullableDefault(jmri.ConsistManager.class);
                 if (progModeButton.isSelected() && mode != PROG_MODE) {
                     // Switch to programmer mode
                     log.info("Setting Global Programmer Available");
                     pm.setGlobalProgrammerAvailable(true);
+                    log.info("Setting Addressed Programmer Unavailable");
                     pm.setAddressedModePossible(false);
                     _memo.setMultipleThrottles(false);
                     showServiceModeWarningDialogue();
                     closeProgrammerWarningDialogue();
+                    if (cm != null) {
+                        cm.setEnabled(false);
+                    }
                     mode = PROG_MODE;
                 } else if (cmdModeButton.isSelected() && mode != CMD_MODE) {
                     // Switch to command station mode
                     log.info("Setting Global Programmer Unavailable");
                     pm.setGlobalProgrammerAvailable(false);
+                    log.info("Setting Addressed Programmer Available");
                     pm.setAddressedModePossible(true);
                     _memo.setMultipleThrottles(true);
                     closeProgrammerWarningDialogue();
+                    if (cm != null) {
+                        cm.setEnabled(true);
+                    }
                     mode = CMD_MODE;
                 }
                 setHardwareMode(mode);
@@ -112,8 +122,10 @@ public class SprogCbusSimpleModeSwitcherFrame extends SprogCbusModeSwitcherFrame
         setHelp();
 
         this.add(panel);
-        pack();
-        setVisible(true);
+        ThreadingUtil.runOnGUI( () -> {
+            pack();
+            setVisible(true);
+        });
     }
 
     private boolean _hideProgWarning = false;
@@ -122,16 +134,12 @@ public class SprogCbusSimpleModeSwitcherFrame extends SprogCbusModeSwitcherFrame
         if ((!java.awt.GraphicsEnvironment.isHeadless()) && (!_hideProgWarning)){
             jmri.util.ThreadingUtil.runOnGUI(() -> {
                 javax.swing.JCheckBox checkbox = new javax.swing.JCheckBox(Bundle.getMessage("HideFurtherWarnings"));
-                Object[] params = {Bundle.getMessage("ProgWarning"), checkbox};
-                javax.swing.JOptionPane pane = new javax.swing.JOptionPane(params);
-                pane.setMessageType(javax.swing.JOptionPane.WARNING_MESSAGE);
-                JDialog dialog = pane.createDialog(null, Bundle.getMessage("switchMode"));
-                dialog.setModal(false);
-                dialog.setVisible(true);
-                dialog.requestFocus();
-                dialog.toFront();
                 java.awt.event.ActionListener progPopUpCheckBox = (java.awt.event.ActionEvent evt) -> hideProgWarning(checkbox.isSelected());
                 checkbox.addActionListener(progPopUpCheckBox);
+                Object[] params = {Bundle.getMessage("ProgWarning"), checkbox};
+                JmriJOptionPane.showMessageDialogNonModal(null, params,
+                    Bundle.getMessage("switchMode"),
+                    JmriJOptionPane.WARNING_MESSAGE, null);
             });
         }
     }
@@ -154,15 +162,11 @@ public class SprogCbusSimpleModeSwitcherFrame extends SprogCbusModeSwitcherFrame
             jmri.util.ThreadingUtil.runOnGUI(() -> {
                 javax.swing.JCheckBox checkbox = new javax.swing.JCheckBox(Bundle.getMessage("HideFurtherWarnings"));
                 Object[] params = {Bundle.getMessage("ProgModeWarning"), checkbox};
-                javax.swing.JOptionPane pane = new javax.swing.JOptionPane(params);
-                pane.setMessageType(javax.swing.JOptionPane.WARNING_MESSAGE);
-                JDialog dialog = pane.createDialog(null, Bundle.getMessage("switchToProgMode"));
-                dialog.setModal(false);
-                dialog.setVisible(true);
-                dialog.requestFocus();
-                dialog.toFront();
                 java.awt.event.ActionListener progPopUpCheckBox = (java.awt.event.ActionEvent evt) -> hideProgModeWarning(checkbox.isSelected());
                 checkbox.addActionListener(progPopUpCheckBox);
+                JmriJOptionPane.showMessageDialogNonModal(null,params,
+                    Bundle.getMessage("switchToProgMode"),
+                    JmriJOptionPane.WARNING_MESSAGE, null);
             });
         }
     }
@@ -195,6 +199,6 @@ public class SprogCbusSimpleModeSwitcherFrame extends SprogCbusModeSwitcherFrame
     }
 
     
-    private final static Logger log = LoggerFactory.getLogger(SprogCbusSimpleModeSwitcherFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SprogCbusSimpleModeSwitcherFrame.class);
     
 }

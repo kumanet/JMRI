@@ -1,16 +1,12 @@
 package jmri.jmrit.logixng.tools.swing;
 
-import jmri.jmrit.logixng.*;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.*;
 
 /**
  * Test EditCommentDialog
- * 
+ *
  * @author Daniel Bergqvist 2021
  */
 public class EditCommentDialogTest {
@@ -18,11 +14,10 @@ public class EditCommentDialogTest {
     @Test
     public void testCtor() {
         EditCommentDialog d = new EditCommentDialog();
-        Assert.assertNotNull(d);
+        Assertions.assertNotNull(d);
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -31,10 +26,11 @@ public class EditCommentDialogTest {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
+
 }

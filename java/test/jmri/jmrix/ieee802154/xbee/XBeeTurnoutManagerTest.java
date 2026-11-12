@@ -34,6 +34,7 @@ public class XBeeTurnoutManagerTest extends jmri.managers.AbstractTurnoutMgrTest
      * Number of turnout to test. Made a separate method so it can be overridden
      * in subclasses that do or don't support various numbers
      */
+    @Override
     protected int getNumToTest1() {
         return 0;
     }
@@ -145,5 +146,5 @@ public class XBeeTurnoutManagerTest extends jmri.managers.AbstractTurnoutMgrTest
 
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(XBeeTurnoutManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(XBeeTurnoutManagerTest.class);
 }

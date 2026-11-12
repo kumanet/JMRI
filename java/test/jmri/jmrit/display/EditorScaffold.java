@@ -1,10 +1,11 @@
 package jmri.jmrit.display;
 
 import java.awt.Graphics;
-import java.awt.event.MouseEvent;
+
+import jmri.util.swing.JmriMouseEvent;
 
 /**
- * This class provides a concrete implementation of the Abstract Editor 
+ * This class provides a concrete implementation of the Abstract Editor
  * class to be used in testing.
  *
  * @author Bob Jacobsen Copyright: Copyright (c) 2002, 2003, 2007
@@ -31,35 +32,47 @@ public class EditorScaffold extends Editor {
         this(name, true, true);
     }
 
+    /**
+     * The last rectangle passed to {@link #repaintTargetPanel(java.awt.Rectangle)},
+     * in unscaled target panel coordinates, for test verification.
+     */
+    public java.awt.Rectangle lastRepaintRect = null;
+
+    @Override
+    public void repaintTargetPanel(java.awt.Rectangle rect) {
+        lastRepaintRect = new java.awt.Rectangle(rect);
+        super.repaintTargetPanel(rect);
+    }
+
     /*
      * ********************* Abstract Methods ***********************
      */
     @Override
-    public void mousePressed(MouseEvent event){
+    public void mousePressed(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseReleased(MouseEvent event){
+    public void mouseReleased(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseClicked(MouseEvent event){
+    public void mouseClicked(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseDragged(MouseEvent event){
+    public void mouseDragged(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseMoved(MouseEvent event){
+    public void mouseMoved(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseEntered(MouseEvent event){
+    public void mouseEntered(JmriMouseEvent event){
     }
 
     @Override
-    public void mouseExited(MouseEvent event){
+    public void mouseExited(JmriMouseEvent event){
     }
 
     /*
@@ -90,16 +103,7 @@ public class EditorScaffold extends Editor {
      *
      */
     @Override
-    protected void setNextLocation(Positionable obj){
-    }
-
-    /**
-     * Editor Views should make calls to this class (Editor) to set popup menu
-     * items. See 'Popup Item Methods' above for the calls.
-     *
-     */
-    @Override
-    protected void showPopUp(Positionable p, MouseEvent event){
+    public void setNextLocation(Positionable obj){
     }
 
     /**
@@ -119,5 +123,5 @@ public class EditorScaffold extends Editor {
     }
 
     // initialize logging
-    // private final static Logger log = LoggerFactory.getLogger(EditorScaffold.class);
+    // private static final Logger log = LoggerFactory.getLogger(EditorScaffold.class);
 }

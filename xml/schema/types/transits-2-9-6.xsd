@@ -55,7 +55,8 @@
                         <xs:attribute name="whenstring" type="xs:string" />                      
                         <xs:attribute name="whatdata1" type="xs:integer" />                      
                         <xs:attribute name="whatdata2" type="xs:integer" />                      
-                        <xs:attribute name="whatstring" type="xs:string" />                      
+                        <xs:attribute name="whatstring" type="xs:string" />
+                        <xs:attribute name="whatstring2" type="xs:string" />
                       </xs:complexType>
                     </xs:element>
                   </xs:sequence>
@@ -65,6 +66,8 @@
                   <xs:attribute name="alternate" type="yesNoType" />
                   <xs:attribute name="safe" type="yesNoType" />
                   <xs:attribute name="stopallocatingsensor" type="xs:string" />
+                  <xs:attribute name="fwdstoppercent" type="xs:float" />
+                  <xs:attribute name="revstoppercent" type="xs:float" />
                 </xs:complexType>
               </xs:element>
             </xs:sequence>

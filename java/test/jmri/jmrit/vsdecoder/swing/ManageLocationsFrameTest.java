@@ -44,10 +44,9 @@ public class ManageLocationsFrameTest extends jmri.util.JmriJFrameTestBase {
     @Override
     public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         super.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ManageLocationsFrameTest.class.getName());
+    // private static final Logger log = LoggerFactory.getLogger(ManageLocationsFrameTest.class.getName());
 
 }

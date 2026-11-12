@@ -37,7 +37,11 @@ public class SimpleTimebaseXml extends jmri.configurexml.AbstractXmlAdapter {
         Element elem = new Element("timebase");
         elem.setAttribute("class", this.getClass().getName());
 
-        elem.setAttribute("time", clock.getStartTime().toString());
+        var loadAndStorePreferences = InstanceManager.getDefault(jmri.configurexml.LoadAndStorePreferences.class);
+        if (! loadAndStorePreferences.isExcludeTimebase() ) {
+            elem.setAttribute("time", clock.getStartTime().toString());
+        }
+
         elem.setAttribute("rate", "" + clock.userGetRate());
         elem.setAttribute("startrate", "" + clock.getStartRate());
         elem.setAttribute("run", (clock.getClockInitialRunState() == DO_START ? "yes" : "no"));
@@ -145,7 +149,7 @@ public class SimpleTimebaseXml extends jmri.configurexml.AbstractXmlAdapter {
                 clock.setStartRate(r);
                 hasRate = true;
             } catch (org.jdom2.DataConversionException e2) {
-                log.error("Cannot convert start rate: {}", e2);
+                log.error("Cannot convert start rate", e2);
                 result = false;
             }
         }
@@ -155,7 +159,7 @@ public class SimpleTimebaseXml extends jmri.configurexml.AbstractXmlAdapter {
                 clock.setStartRate(r);
                 hasRate = true;
             } catch (org.jdom2.DataConversionException e2) {
-                log.error("Cannot convert rate: {}", e2);
+                log.error("Cannot convert rate", e2);
                 result = false;
             }
         }
@@ -163,7 +167,7 @@ public class SimpleTimebaseXml extends jmri.configurexml.AbstractXmlAdapter {
             try {
                 clock.userSetRate(clock.getStartRate());
             } catch (jmri.TimebaseRateException e1) {
-                log.error("Cannot restore rate: {} {}", clock.getStartRate(), e1);
+                log.error("Cannot restore rate: {}", clock.getStartRate(), e1);
                 result = false;
             }
         }
@@ -224,6 +228,6 @@ public class SimpleTimebaseXml extends jmri.configurexml.AbstractXmlAdapter {
         return jmri.Manager.TIMEBASE;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SimpleTimebaseXml.class);
+    private static final Logger log = LoggerFactory.getLogger(SimpleTimebaseXml.class);
 
 }

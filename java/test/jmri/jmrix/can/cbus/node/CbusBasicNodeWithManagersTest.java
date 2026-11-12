@@ -17,9 +17,14 @@ public class CbusBasicNodeWithManagersTest {
     public void testCTor() {
         Assert.assertNotNull("exists",new CbusBasicNodeWithManagers(null,123));
     }
-    
-    private CanSystemConnectionMemo memo;
-    
+
+    @Test
+    public void testCbBnWMcTorWithMemo() {
+        Assert.assertNotNull("exists",new CbusBasicNodeWithManagers(memo,123));
+    }
+
+    private CanSystemConnectionMemo memo = null;
+
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
@@ -30,13 +35,13 @@ public class CbusBasicNodeWithManagersTest {
 
     @AfterEach
     public void tearDown() {
-        
+        Assertions.assertNotNull(memo);
         memo.dispose();
         memo = null;
-        
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusBasicNodeWithManagersTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusBasicNodeWithManagersTest.class);
 
 }

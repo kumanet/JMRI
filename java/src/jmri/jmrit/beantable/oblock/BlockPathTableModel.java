@@ -14,8 +14,7 @@ import jmri.jmrit.logix.Portal;
 import jmri.jmrit.logix.PortalManager;
 import jmri.util.IntlUtilities;
 import jmri.util.gui.GuiLafPreferencesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * GUI to define the OPaths within an OBlock. An OPath is the setting of turnouts
@@ -40,8 +39,8 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
     public static final int FROM_PORTAL_COLUMN = 0;
     public static final int NAME_COLUMN = 1;
     public static final int TO_PORTAL_COLUMN = 2;
-    static public final int LENGTHCOL = 3;
-    static public final int UNITSCOL = 4;
+    public static final int LENGTHCOL = 3;
+    public static final int UNITSCOL = 4;
     public static final int EDIT_COL = 5;
     public static final int DELETE_COL = 6;
     public static final int NUMCOLS = 7;
@@ -52,7 +51,6 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
     private TableFrames _parent;
     private final boolean _tabbed;     // read from prefs (restart required)
     private ArrayList<Boolean> _units; // list to toggle units of length col for each path
-    private float _tempLen;
     
     java.text.DecimalFormat twoDigit = new java.text.DecimalFormat("0.00");
 
@@ -176,13 +174,8 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
                     } else {
                         return (twoDigit.format(path.getLengthIn()));
                     }
-                } else {
-                    if (_units.get(rowIndex)) {
-                        return (twoDigit.format(_tempLen/10));
-                    } else {
-                        return (twoDigit.format(_tempLen/25.4f));
-                    }
                 }
+                break;
             case UNITSCOL:
                 return _units.get(rowIndex);
             case EDIT_COL:
@@ -248,18 +241,6 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
                         }
                     }
                     break;
-                case LENGTHCOL:
-                    try {
-                        _tempLen = IntlUtilities.floatValue(value.toString());
-                        if (tempRow[UNITSCOL].equals(Bundle.getMessage("cm"))) {
-                            _tempLen *= 10f;
-                        } else {
-                            _tempLen *= 25.4f;                            
-                        }
-                    } catch (ParseException e) {
-                        msg = Bundle.getMessage("BadNumber", tempRow[LENGTHCOL]);
-                    }
-                    break;
                 case UNITSCOL:
                     _units.set(row, (Boolean)value); // true = metric
                     fireTableRowsUpdated(row, row);
@@ -274,8 +255,8 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
             }
             tempRow[col] = (String)value;
             if (msg != null) {
-                JOptionPane.showMessageDialog(null, msg,
-                        Bundle.getMessage("WarningTitle"), JOptionPane.WARNING_MESSAGE);
+                JmriJOptionPane.showMessageDialog(null, msg,
+                        Bundle.getMessage("WarningTitle"), JmriJOptionPane.WARNING_MESSAGE);
             }
             return;
         }
@@ -371,8 +352,8 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
                     }
                     fireTableRowsUpdated(row, row);                    
                 } catch (ParseException e) {
-                    JOptionPane.showMessageDialog(null, Bundle.getMessage("BadNumber", value),
-                            Bundle.getMessage("ErrorTitle"), JOptionPane.WARNING_MESSAGE);                    
+                    JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("BadNumber", value),
+                            Bundle.getMessage("ErrorTitle"), JmriJOptionPane.WARNING_MESSAGE);                    
                 }
                 return;
             case UNITSCOL:
@@ -397,8 +378,8 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
                 break;
         }
         if (msg != null) {
-            JOptionPane.showMessageDialog(null, msg,
-                    Bundle.getMessage("WarningTitle"), JOptionPane.WARNING_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null, msg,
+                    Bundle.getMessage("WarningTitle"), JmriJOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -465,6 +446,6 @@ public class BlockPathTableModel extends AbstractTableModel implements PropertyC
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(BlockPathTableModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BlockPathTableModel.class);
 
 }

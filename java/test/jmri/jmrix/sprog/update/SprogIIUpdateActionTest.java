@@ -19,6 +19,7 @@ public class SprogIIUpdateActionTest {
         m.setSprogTrafficController(new SprogTrafficControlScaffold(m));
         SprogIIUpdateAction t = new SprogIIUpdateAction("test",m);
         Assert.assertNotNull("exists",t);
+        m.getSprogTrafficController().dispose();
     }
 
     @BeforeEach
@@ -31,6 +32,6 @@ public class SprogIIUpdateActionTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SprogIIUpdateActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SprogIIUpdateActionTest.class);
 
 }

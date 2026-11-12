@@ -1,9 +1,5 @@
 package jmri.jmrix.can.cbus.swing;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.awt.GraphicsEnvironment;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 
@@ -12,10 +8,10 @@ import javax.swing.TransferHandler;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.cbus.eventtable.CbusEventTableDataModel;
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.junit.jupiter.api.Test;
+
+import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test simple functioning of CbusSendEventPane
@@ -23,19 +19,18 @@ import org.junit.jupiter.api.Test;
  * @author Paul Bender Copyright (C) 2016
  * @author Steve Young Copyright (C) 2020
 */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class CbusTableRowEventDnDHandlerTest  {
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
-    public void testInitComponents() throws Exception{
+    public void testInitComponents() {
         // for now, just makes sure there isn't an exception.
         t = new CbusTableRowEventDnDHandler(null,null);
-        assertThat(t).isNotNull();
+        assertNotNull(t);
         t.dispose();
     }
     
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
     public void testTransferable() throws java.awt.datatransfer.UnsupportedFlavorException, java.io.IOException {
         
         dm = new CbusEventTableDataModel(memo,0,0);
@@ -46,9 +41,9 @@ public class CbusTableRowEventDnDHandlerTest  {
         table.setName("jmri.jmrix.can.cbus.eventtable.CbusEventTableDataModel");
         
         t = new CbusTableRowEventDnDHandler(memo,table);
-        assertThat(t.getSourceActions(null)).isEqualTo(TransferHandler.COPY);
-        assertThat(t.createTransferable(null)).isNull();
-        assertThat(t.createTransferable(table)).isNull();
+        assertEquals(TransferHandler.COPY, t.getSourceActions(null));
+        assertNull(t.createTransferable(null));
+        assertNull(t.createTransferable(table));
         t.mouseMoved(0,0);
         new org.netbeans.jemmy.QueueTool().waitEmpty();
         
@@ -78,7 +73,7 @@ public class CbusTableRowEventDnDHandlerTest  {
         assertEquals("+N222E333", trnfrd.getTransferData(DataFlavor.stringFlavor));
         
         table.setName("Incorrect Table");
-        assertThat(t.createTransferable(table)).isNull();
+        assertNull(t.createTransferable(table));
         
         dm.skipSaveOnDispose();
         dm.dispose();
@@ -92,23 +87,19 @@ public class CbusTableRowEventDnDHandlerTest  {
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
-        if(!GraphicsEnvironment.isHeadless()){
-            memo = new CanSystemConnectionMemo();
-        }
+        memo = new CanSystemConnectionMemo();
+        memo.setProtocol(jmri.jmrix.can.CanConfigurationManager.SPROGCBUS);
+        memo.configureManagers();
     }
 
     @AfterEach
     public void tearDown() {
-        if (dm != null) {
-            dm.skipSaveOnDispose();
-            dm.dispose();
-            dm = null;
-        }
-        if(memo != null){
-            memo.dispose();
-            memo = null;
-        }
+        dm = null;
+        Assertions.assertNotNull(memo);
+        memo.dispose();
+        memo = null;
         t = null;
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 

@@ -117,7 +117,7 @@ public class MatrixSignalMastXml
             m = (MatrixSignalMast) InstanceManager.getDefault(jmri.SignalMastManager.class)
                     .provideCustomSignalMast(sys, MatrixSignalMast.class);
         } catch (JmriException e) {
-            log.error("Failed to load MatrixSignalMast {}: {}", sys, e);
+            log.error("Failed to load MatrixSignalMast {}", sys, e);
             return false;
         }
 
@@ -187,6 +187,6 @@ public class MatrixSignalMastXml
         log.error("Invalid method called");
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MatrixSignalMastXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MatrixSignalMastXml.class);
 
 }

@@ -12,11 +12,8 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipInputStream;
 import jmri.jmrit.XmlFile;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Open a VSD file and validate the configuration part.
@@ -24,17 +21,18 @@ import org.slf4j.LoggerFactory;
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2011
+ * @author Klaus Killinger Copyright (C) 2025
  */
 public class VSDFile extends ZipFile {
 
@@ -45,37 +43,23 @@ public class VSDFile extends ZipFile {
     }
 
     protected Element root;
-    protected boolean initialized = false;
+    private boolean initialized;
     private String _statusMsg = Bundle.getMessage("ButtonOK"); // File Status = OK
     private String missedFileName;
     private int num_cylinders;
 
-    ZipInputStream zis;
-
-    public VSDFile(File file) throws ZipException, IOException {
-        super(file);
-        initialized = init();
-    }
-
-    public VSDFile(File file, int mode) throws ZipException, IOException {
-        super(file, mode);
-        initialized = init();
-    }
-
     public VSDFile(String name) throws ZipException, IOException {
         super(name);
-        initialized = init();
-    }
-
-    public boolean isInitialized() {
-        return initialized;
+        initialized = false;
     }
 
     public String getStatusMessage() {
         return _statusMsg;
     }
 
-    protected boolean init() {
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+            justification="error text in _statusMsg kept for later use")
+    final boolean isInitialized() {
         VSDXmlFile xmlfile = new VSDXmlFile();
         initialized = false;
 
@@ -103,15 +87,11 @@ public class VSDFile extends ZipFile {
             return initialized;
 
         } catch (java.io.IOException ioe) {
-            _statusMsg = "IO Error auto-loading VSD File: " + VSDXmlFileName + " " + ioe.toString();
-            log.error(_statusMsg);
-            return false;
-        } catch (NullPointerException npe) {
-            _statusMsg = "NP Error auto-loading VSD File: path = " + VSDXmlFileName + " " + npe.toString();
+            _statusMsg = "IO Error auto-loading VSD File: " + VSDXmlFileName + " " + ioe;
             log.error(_statusMsg);
             return false;
         } catch (org.jdom2.JDOMException ex) {
-            _statusMsg = "JDOM Exception loading VSDecoder from path " + VSDXmlFileName + " " + ex.toString();
+            _statusMsg = "JDOM Exception loading VSDecoder from path " + VSDXmlFileName + " " + ex;
             log.error(_statusMsg);
             return false;
         }
@@ -139,20 +119,17 @@ public class VSDFile extends ZipFile {
         } catch (IOException e) {
             log.error("IOException caught", e);
             rv = null;
-        } catch (NullPointerException ne) {
-            log.error("Null Pointer Exception caught. name: {}", name, ne);
-            rv = null;
         }
         return rv;
     }
 
     public java.io.File getFile(String name) {
-        try {
-            ZipEntry e = this.getEntry(name);
+        ZipEntry e = this.getEntry(name);
+        if (e == null) {
+            return null;
+        } else {
             File f = new File(e.getName());
             return f;
-        } catch (NullPointerException e) {
-            return null;
         }
     }
 
@@ -169,9 +146,6 @@ public class VSDFile extends ZipFile {
             // return the name of the tempfile
             return t.getPath();
 
-        } catch (NullPointerException e) {
-            log.error("Null pointer exception", e);
-            return null;
         } catch (IOException e) {
             log.error("IO exception", e);
             return null;
@@ -413,7 +387,7 @@ public class VSDFile extends ZipFile {
         String s = el.getChildText(name);
         if ((s != null) && (getFile(s) == null)) {
             missedFileName = s;
-            log.error("File {} for Element {} not found", s, name, el.getAttributeValue("name"));
+            log.error("File {} for Element {} not found {}", s, name, el.getAttributeValue("name"));
             return false;
         }
         return true;
@@ -448,7 +422,7 @@ public class VSDFile extends ZipFile {
                 while (ns_if.hasNext()) {
                     Element ns_ef = ns_if.next();
                     s = ns_ef.getText();
-                    log.debug("  {}", s);
+                    log.debug("  getText: {}", s);
                     if ((s == null) || (getFile(s) == null)) {
                         log.error("File {} for Element {} in Element {} not found", s, fn, name);
                         missedFileName = s; // Pass missing file name to global variable
@@ -461,6 +435,8 @@ public class VSDFile extends ZipFile {
         return true;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+            justification="error text in _statusMsg kept for later use")
     protected boolean validateFilesNumbers(Element el, String name, String[] fnames, Boolean required) {
         List<Element> elist = el.getChildren(name);
 
@@ -509,6 +485,6 @@ public class VSDFile extends ZipFile {
         return true;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(VSDFile.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(VSDFile.class);
 
 }

@@ -1,8 +1,5 @@
 package jmri.jmrit.logixng.implementation;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyVetoException;
 import java.util.*;
 
 import javax.annotation.Nonnull;
@@ -69,10 +66,10 @@ public class DefaultMaleAnalogActionSocket extends AbstractMaleSocket implements
             }
         } catch (RuntimeException e) {
             handleError(this, Bundle.getMessage("ExceptionSetValue", e.getLocalizedMessage()), e, log);
+        } finally {
+            conditionalNG.getStack().setCount(currentStackPos);
+            conditionalNG.getSymbolTable().removeSymbols(_localVariables);
         }
-        
-        conditionalNG.getStack().setCount(currentStackPos);
-        conditionalNG.getSymbolTable().removeSymbols(_localVariables);
     }
 
     @Override
@@ -85,7 +82,7 @@ public class DefaultMaleAnalogActionSocket extends AbstractMaleSocket implements
      */
     @Override
     public void registerListenersForThisClass() {
-        ((AnalogActionBean)getObject()).registerListeners();
+        getObject().registerListeners();
     }
     
     /**
@@ -93,7 +90,7 @@ public class DefaultMaleAnalogActionSocket extends AbstractMaleSocket implements
      */
     @Override
     public void unregisterListenersForThisClass() {
-        ((AnalogActionBean)getObject()).unregisterListeners();
+        getObject().unregisterListeners();
     }
     
     @Override
@@ -214,6 +211,6 @@ public class DefaultMaleAnalogActionSocket extends AbstractMaleSocket implements
         
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleAnalogActionSocket.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleAnalogActionSocket.class);
 
 }

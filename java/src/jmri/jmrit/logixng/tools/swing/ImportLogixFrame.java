@@ -5,7 +5,6 @@ import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
-import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +13,7 @@ import javax.swing.*;
 import jmri.*;
 import jmri.jmrit.logixng.tools.ImportLogix;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.swing.JTitledSeparator;
 
 /**
@@ -136,7 +136,6 @@ public final class ImportLogixFrame extends JmriJFrame {
             _cancelDone.setText(Bundle.getMessage("ButtonDone"));
 //            dispose();
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
         _importLogix.setToolTipText("ImportLogixButtonHint");      // NOI18N
 //        panel5.setAlignmentX(LEFT_ALIGNMENT);
         // Cancel
@@ -145,8 +144,7 @@ public final class ImportLogixFrame extends JmriJFrame {
         _cancelDone.addActionListener((ActionEvent e) -> {
             dispose();
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        _cancelDone.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        _cancelDone.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
 //        panel5.setAlignmentX(LEFT_ALIGNMENT);
         contentPanel.add(panel5);
 
@@ -188,21 +186,21 @@ public final class ImportLogixFrame extends JmriJFrame {
                 }
             }
         } else if (_whichLogix_All.isSelected()) {
-            throw new RuntimeException("Currently not supported");
+            throw new JmriUncheckedException("Currently not supported");
         } else if (_whichLogix_All.isSelected()) {
-            throw new RuntimeException("Currently not supported");
+            throw new JmriUncheckedException("Currently not supported");
         } else {
-            throw new RuntimeException("No choice selected");
+            throw new JmriUncheckedException("No choice selected");
         }
 
         boolean error = false;
         StringBuilder errorMessage = new StringBuilder("<html><table border=\"1\" cellspacing=\"0\" cellpadding=\"2\">");
         errorMessage.append("<tr><th>");
-        errorMessage.append("System name");
+        errorMessage.append(Bundle.getMessage("ColumnSystemName"));
         errorMessage.append("</th><th>");
-        errorMessage.append("User name");
+        errorMessage.append(Bundle.getMessage("ColumnUserName"));
         errorMessage.append("</th><th>");
-        errorMessage.append("Error");
+        errorMessage.append(Bundle.getMessage("ImportLogixColumnError"));
         errorMessage.append("</th></tr>");
 
         for (Logix logix : logixs) {
@@ -228,16 +226,19 @@ public final class ImportLogixFrame extends JmriJFrame {
                     ImportLogix importLogix = new ImportLogix(logix, _includeSystemLogixs.isSelected(), false);
                     importLogix.doImport();
                 } catch (JmriException e) {
-                    throw new RuntimeException("Unexpected error: "+e.getMessage(), e);
+                    throw new JmriUncheckedException("Unexpected error: "+e.getMessage(), e);
                 }
             }
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("LogixsAreImported"),
+                Bundle.getMessage("TitleLogixsImportSuccess"), JmriJOptionPane.INFORMATION_MESSAGE);
         } else {
             errorMessage.append("</table></html>");
-            JOptionPane.showMessageDialog(this, errorMessage.toString(), "Error during import", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, errorMessage.toString(),
+                Bundle.getMessage("TitleLogixImportError"), JmriJOptionPane.ERROR_MESSAGE);
         }
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ImportLogixFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ImportLogixFrame.class);
 
 }

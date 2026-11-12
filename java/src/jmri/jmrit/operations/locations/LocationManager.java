@@ -1,10 +1,7 @@
 package jmri.jmrit.operations.locations;
 
 import java.beans.PropertyChangeListener;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
 
 import javax.swing.JComboBox;
 
@@ -12,14 +9,11 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jmri.InstanceManager;
-import jmri.InstanceManagerAutoDefault;
-import jmri.InstanceManagerAutoInitialize;
-import jmri.Reporter;
+import jmri.*;
 import jmri.beans.PropertyChangeSupport;
+import jmri.jmrit.operations.OperationsPanel;
 import jmri.jmrit.operations.rollingstock.cars.CarLoad;
 import jmri.jmrit.operations.setup.OperationsSetupXml;
-import jmri.jmrit.operations.trains.TrainCommon;
 
 /**
  * Manages locations.
@@ -30,6 +24,8 @@ import jmri.jmrit.operations.trains.TrainCommon;
 public class LocationManager extends PropertyChangeSupport implements InstanceManagerAutoDefault, InstanceManagerAutoInitialize, PropertyChangeListener {
 
     public static final String LISTLENGTH_CHANGED_PROPERTY = "locationsListLength"; // NOI18N
+
+    protected boolean _showId = false; // when true show location ids 
 
     public LocationManager() {
     }
@@ -69,9 +65,10 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
     public Location getLocationById(String id) {
         return _locationHashTable.get(id);
     }
-    
+
     /**
      * Used to determine if a division name has been assigned to a location
+     * 
      * @return true if a location has a division name
      */
     public boolean hasDivisions() {
@@ -82,7 +79,7 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         }
         return false;
     }
-    
+
     public boolean hasWork() {
         for (Location location : getList()) {
             if (location.hasWork()) {
@@ -91,9 +88,10 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         }
         return false;
     }
-    
+
     /**
      * Used to determine if a reporter has been assigned to a location
+     * 
      * @return true if a location has a RFID reporter
      */
     public boolean hasReporters() {
@@ -105,6 +103,14 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         return false;
     }
 
+    public void setShowIdEnabled(boolean showId) {
+        _showId = showId;
+    }
+
+    public boolean isShowIdEnabled() {
+        return _showId;
+    }
+
     /**
      * Request a location associated with a given reporter.
      *
@@ -113,13 +119,10 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
      */
     public Location getLocationByReporter(Reporter r) {
         for (Location location : _locationHashTable.values()) {
-            try {
+            if (location.getReporter() != null) {
                 if (location.getReporter().equals(r)) {
                     return location;
                 }
-            } catch (java.lang.NullPointerException npe) {
-                // it's valid for a reporter to be null (no reporter
-                // at a given location.
             }
         }
         return null;
@@ -133,13 +136,10 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
      */
     public Track getTrackByReporter(Reporter r) {
         for (Track track : getTracks(null)) {
-            try {
+            if (track.getReporter() != null) {
                 if (track.getReporter().equals(r)) {
                     return track;
                 }
-            } catch (java.lang.NullPointerException npe) {
-                // it's valid for a reporter to be null (no reporter
-                // at a given location.
             }
         }
         return null;
@@ -150,8 +150,6 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
      * location's name creates a unique id for this location
      *
      * @param name The string name for a new Location.
-     *
-     *
      * @return new location or existing location
      */
     public Location newLocation(String name) {
@@ -159,11 +157,10 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         if (location == null) {
             _id++;
             location = new Location(Integer.toString(_id), name);
-            Integer oldSize = Integer.valueOf(_locationHashTable.size());
+            int oldSize = _locationHashTable.size();
             _locationHashTable.put(location.getId(), location);
             resetNameLengths();
-            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize,
-                    Integer.valueOf(_locationHashTable.size()));
+            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _locationHashTable.size());
         }
         return location;
     }
@@ -174,14 +171,14 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
      * @param location The Location to add.
      */
     public void register(Location location) {
-        Integer oldSize = Integer.valueOf(_locationHashTable.size());
+        int oldSize = _locationHashTable.size();
         _locationHashTable.put(location.getId(), location);
         // find last id created
         int id = Integer.parseInt(location.getId());
         if (id > _id) {
             _id = id;
         }
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_locationHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _locationHashTable.size());
     }
 
     /**
@@ -194,9 +191,9 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
             return;
         }
         location.dispose();
-        Integer oldSize = Integer.valueOf(_locationHashTable.size());
+        int oldSize = _locationHashTable.size();
         _locationHashTable.remove(location.getId());
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_locationHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _locationHashTable.size());
     }
 
     /**
@@ -221,7 +218,36 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
             }
         }
         return out;
+    }
 
+    /**
+     * Get unique locations list by location name.
+     *
+     * @return list of locations ordered by name. Locations with "similar" names
+     *         to the primary location are not returned. Also checks and updates
+     *         the primary location for any changes to the other "similar"
+     *         locations.
+     */
+    public List<Location> getUniqueLocationsByNameList() {
+        List<Location> locations = getLocationsByNameList();
+        List<Location> out = new ArrayList<Location>();
+        Location mainLocation = null;
+
+        // also update the primary location for locations with similar names
+        for (Location location : locations) {
+            String name = location.getSplitName();
+            if (mainLocation != null && mainLocation.getSplitName().equals(name)) {
+                location.setSwitchListEnabled(mainLocation.isSwitchListEnabled());
+                if (mainLocation.isSwitchListEnabled() && location.getStatus().equals(Location.MODIFIED)) {
+                    mainLocation.setStatus(Location.MODIFIED); // we need to update the primary location
+                    location.setStatus(Location.UPDATED); // and clear the secondaries
+                }
+                continue;
+            }
+            mainLocation = location;
+            out.add(location);
+        }
+        return out;
     }
 
     /**
@@ -286,8 +312,8 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
     }
 
     /**
-     * Returns all tracks of type sorted by use. Alternate tracks
-     * are not included.
+     * Returns all tracks of type sorted by use. Alternate tracks are not
+     * included.
      *
      * @param type Spur (Track.SPUR), Yard (Track.YARD), Interchange
      *             (Track.INTERCHANGE), Staging (Track.STAGING), or null
@@ -317,6 +343,9 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         return moveList;
     }
 
+    /**
+     * Sets move count to 0 for all tracks
+     */
     public void resetMoves() {
         List<Location> locations = getList();
         for (Location loc : locations) {
@@ -325,15 +354,22 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
     }
 
     /**
-     *
+     * Returns a JComboBox with locations sorted alphabetically.
+     * 
      * @return locations for this railroad
      */
     public JComboBox<Location> getComboBox() {
         JComboBox<Location> box = new JComboBox<>();
         updateComboBox(box);
+        OperationsPanel.padComboBox(box, getMaxLocationNameLength());
         return box;
     }
 
+    /**
+     * Updates JComboBox alphabetically with a list of locations.
+     * 
+     * @param box The JComboBox to update.
+     */
     public void updateComboBox(JComboBox<Location> box) {
         box.removeAllItems();
         box.addItem(null);
@@ -345,7 +381,7 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
     /**
      * Replace all track car load names for a given type of car
      * 
-     * @param type type of car
+     * @param type        type of car
      * @param oldLoadName load name to replace
      * @param newLoadName new load name
      */
@@ -421,6 +457,8 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         return _maxLocationAndTrackNameLength;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+            justification = "I18N of Info Message")
     private void calculateMaxNameLengths() {
         if (_maxLocationNameLength != 0) // only do this once
         {
@@ -431,27 +469,32 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         String maxLocationName = "";
         String maxLocationAndTrackName = "";
         for (Track track : getTracks(null)) {
-            if (TrainCommon.splitString(track.getName()).length() > _maxTrackNameLength) {
+            if (track.getSplitName().length() > _maxTrackNameLength) {
                 maxTrackName = track.getName();
                 maxLocNameForTrack = track.getLocation().getName();
-                _maxTrackNameLength = TrainCommon.splitString(track.getName()).length();
+                _maxTrackNameLength = track.getSplitName().length();
             }
-            if (TrainCommon.splitString(track.getLocation().getName()).length() > _maxLocationNameLength) {
+            if (track.getLocation().getSplitName().length() > _maxLocationNameLength) {
                 maxLocationName = track.getLocation().getName();
-                _maxLocationNameLength = TrainCommon.splitString(track.getLocation().getName()).length();
+                _maxLocationNameLength = track.getLocation().getSplitName().length();
             }
-            if (TrainCommon.splitString(track.getLocation().getName()).length()
-                    + TrainCommon.splitString(track.getName()).length() > _maxLocationAndTrackNameLength) {
+            if (track.getLocation().getSplitName().length() +
+                    track.getSplitName().length() > _maxLocationAndTrackNameLength) {
                 maxLocationAndTrackName = track.getLocation().getName() + ", " + track.getName();
-                _maxLocationAndTrackNameLength = TrainCommon.splitString(track.getLocation().getName()).length()
-                        + TrainCommon.splitString(track.getName()).length();
+                _maxLocationAndTrackNameLength =
+                        track.getLocation().getSplitName().length() + track.getSplitName().length();
             }
         }
-        log.info("Max track name ({}) at ({}) length {}", maxTrackName, maxLocNameForTrack, _maxTrackNameLength);
-        log.info("Max location name ({}) length {}", maxLocationName, _maxLocationNameLength);
-        log.info("Max location and track name ({}) length {}", maxLocationAndTrackName, _maxLocationAndTrackNameLength);
+        log.info(Bundle.getMessage("InfoMaxTrackName", maxTrackName, _maxTrackNameLength, maxLocNameForTrack));
+        log.info(Bundle.getMessage("InfoMaxLocationName", maxLocationName, _maxLocationNameLength));
+        log.info(Bundle.getMessage("InfoMaxLocAndTrackName", maxLocationAndTrackName, _maxLocationAndTrackNameLength));
     }
 
+    /**
+     * Load the locations from a xml file.
+     * 
+     * @param root xml file
+     */
     public void load(Element root) {
         if (root.getChild(Xml.LOCATIONS) != null) {
             List<Element> locs = root.getChild(Xml.LOCATIONS).getChildren(Xml.LOCATION);
@@ -487,7 +530,7 @@ public class LocationManager extends PropertyChangeSupport implements InstanceMa
         firePropertyChange(p, old, n);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LocationManager.class);
+    private static final Logger log = LoggerFactory.getLogger(LocationManager.class);
 
     @Override
     public void initialize() {

@@ -67,7 +67,7 @@ public class CopyRosterItemAction extends AbstractRosterItemAction {
         try {
             lroot = lf.rootFromName(mFullFromFilename);
         } catch (Exception e) {
-            log.error("Exception while loading loco XML file: {} exception: {}", mFullFromFilename, e);
+            log.error("Exception while loading loco XML file: {}", mFullFromFilename, e);
             return false;
         }
 
@@ -90,7 +90,7 @@ public class CopyRosterItemAction extends AbstractRosterItemAction {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(CopyRosterItemAction.class);
+    private static final Logger log = LoggerFactory.getLogger(CopyRosterItemAction.class);
 
     // never invoked, because we overrode actionPerformed above
     @Override

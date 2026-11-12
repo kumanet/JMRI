@@ -2,8 +2,6 @@ package jmri.jmrix.tams.swing;
 
 import javax.swing.JMenu;
 import jmri.jmrix.tams.TamsSystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Create a "Systems" menu containing the Tams-specific tools.
@@ -32,13 +30,6 @@ public class TamsMenu extends JMenu {
             }
         }
 
-        if (jmri.InstanceManager.getNullableDefault(jmri.jmrit.beantable.ListedTableFrame.class) == null) {
-            try {
-                new jmri.jmrit.beantable.ListedTableFrame();
-            } catch (java.lang.NullPointerException ex) {
-                log.error("Unable to register Tams table");
-            }
-        }
     }
 
     Item[] panelItems = new Item[]{
@@ -58,6 +49,6 @@ public class TamsMenu extends JMenu {
         String load;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TamsMenu.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TamsMenu.class);
 
 }

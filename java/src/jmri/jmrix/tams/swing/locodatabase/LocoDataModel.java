@@ -1,18 +1,21 @@
 package jmri.jmrix.tams.swing.locodatabase;
 
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableColumnModel;
+
 import jmri.jmrix.tams.TamsListener;
 import jmri.jmrix.tams.TamsMessage;
 import jmri.jmrix.tams.TamsReply;
+import jmri.util.swing.JmriMouseEvent;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,13 +26,13 @@ import org.slf4j.LoggerFactory;
  */
 public class LocoDataModel extends javax.swing.table.AbstractTableModel implements TamsListener {
 
-    static public final int ADDRCOLUMN = 0;
-    static public final int SPDCOLUMN = 1;
-    static public final int FMTCOLUMN = 2;
-    static public final int NAMECOLUMN = 3;
-    static public final int DELCOLUMN = 4;
+    public static final int ADDRCOLUMN = 0;
+    public static final int SPDCOLUMN = 1;
+    public static final int FMTCOLUMN = 2;
+    public static final int NAMECOLUMN = 3;
+    public static final int DELCOLUMN = 4;
 
-    static public final int NUMCOLUMN = 5;
+    public static final int NUMCOLUMN = 5;
 
     jmri.jmrix.tams.TamsSystemConnectionMemo memo;
 
@@ -213,7 +216,7 @@ public class LocoDataModel extends javax.swing.table.AbstractTableModel implemen
         tcm.getColumn(column).setCellRenderer(buttonRenderer);
         TableCellEditor buttonEditor = new ButtonEditor(new JButton()) {
             @Override
-            public void mousePressed(MouseEvent e) {
+            public void mousePressed(JmriMouseEvent e) {
                 stopCellEditing();
             }
         };
@@ -241,12 +244,12 @@ public class LocoDataModel extends javax.swing.table.AbstractTableModel implemen
                 TamsMessage m = new TamsMessage("xLOCDUMP");
                 memo.getTrafficController().sendTamsMessage(m, this);
             } else {
-                locolist = new ArrayList<String[]>();
+                locolist = new ArrayList<>();
                 String msg = r.toString();
                 String[] rawlocolist = msg.split("\\r");
                 log.info("Raw loco list length: {}", rawlocolist.length);
                 for (String loco : rawlocolist) {
-                    log.info(loco);
+                    log.info("Loco: {}", loco );
                     if (!loco.equals("*END*")) {
                         String[] locodetails = loco.split(",");
                         locolist.add(locodetails);
@@ -263,6 +266,6 @@ public class LocoDataModel extends javax.swing.table.AbstractTableModel implemen
         memo.getTrafficController().sendTamsMessage(m, this);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LocoDataModel.class);
+    private static final Logger log = LoggerFactory.getLogger(LocoDataModel.class);
 
 }

@@ -1,7 +1,13 @@
 package jmri.jmrix.lenz;
 
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
+import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jmri.SpeedStepMode;
@@ -19,20 +25,6 @@ import jmri.SpeedStepMode;
  */
 public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Serializable {
 
-    private static final String X_NET_MESSAGE_REQUEST_LI_BAUD = "XNetMessageRequestLIBaud";
-    private static final String X_NET_MESSAGE_REQUEST_SERVICE_MODE_READ_DIRECT_V_36 = "XNetMessageRequestServiceModeReadDirectV36";
-    private static final String X_NET_MESSAGE_REQUEST_SERVICE_MODE_WRITE_DIRECT_V_36 = "XNetMessageRequestServiceModeWriteDirectV36";
-    private static final String FORWARD = "Forward";
-    private static final String REVERSE = "Reverse";
-    private static final String X_NET_MESSAGE_SET_SPEED = "XNetMessageSetSpeed";
-    private static final String X_NET_MESSAGE_SET_DIRECTION = "XNetMessageSetDirection";
-    private static final String X_NET_MESSAGE_SET_FUNCTION_GROUP_X = "XNetMessageSetFunctionGroupX";
-    private static final String POWER_STATE_ON = "PowerStateOn";
-    private static final String POWER_STATE_OFF = "PowerStateOff";
-    private static final String SPEED_STEP_MODE_X = "SpeedStepModeX";
-    private static final String X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY = "XNetMessageSetFunctionGroupXMomentary";
-    private static final String FUNCTION_CONTINUOUS = "FunctionContinuous";
-    private static final String FUNCTION_MOMENTARY = "FunctionMomentary";
     private static int _nRetries = 5;
 
     /* According to the specification, XpressNet has a maximum timing
@@ -110,7 +102,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
 
     // note that the opcode is part of the message, so we treat it
     // directly
-    // WARNING: use this only with opcodes that have a variable number 
+    // WARNING: use this only with opcodes that have a variable number
     // of arguments following included. Otherwise, just use setElement
     @Override
     public void setOpCode(int i) {
@@ -200,7 +192,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
     /**
      * Most messages are sent with a reply expected, but
      * we have a few that we treat as though the reply is always
-     * a broadcast message, because the reply usually comes to us 
+     * a broadcast message, because the reply usually comes to us
      * that way.
      * {@inheritDoc}
      */
@@ -247,10 +239,10 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         return (msg);
     }
 
-    /* 
-     * The next group of routines are used by Feedback and/or turnout 
-     * control code.  These are used in multiple places within the code, 
-     * so they appear here. 
+    /*
+     * The next group of routines are used by Feedback and/or turnout
+     * control code.  These are used in multiple places within the code,
+     * so they appear here.
      */
 
     /**
@@ -278,7 +270,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         } else {
             loadr |= 0x88;
         }
-        // If we are sending a "throw" command, we set the LSB of the 
+        // If we are sending a "throw" command, we set the LSB of the
         // lower nibble on, otherwise, we leave it "off".
         if (pThrow) {
             loadr |= 0x01;
@@ -324,7 +316,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         return l;
     }
 
-    /* 
+    /*
      * Next, we have some messages related to sending programming commands.
      */
 
@@ -445,7 +437,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         m.setElement(2, AH);
         m.setElement(3, AL);
         /* Element 4 is 0xEC + the upper two  bits of the 10 bit CV address.
-         NOTE: This is the track packet CV, not the human readable CV, so 
+         NOTE: This is the track packet CV, not the human readable CV, so
          its value actually is one less than what we normally think of it as.*/
         int temp = (cv - 1) & 0x0300;
         temp = temp / 0x00FF;
@@ -460,11 +452,11 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
     public static XNetMessage getVerifyOpsModeCVMsg(int AH, int AL, int cv, int val) {
         XNetMessage m = new XNetMessage(8);
         m.setElement(0, XNetConstants.OPS_MODE_PROG_REQ);
-        m.setElement(1, XNetConstants.OPS_MODE_PROG_WRITE_REQ);
+        m.setElement(1, XNetConstants.OPS_MODE_PROG_READ_REQ);
         m.setElement(2, AH);
         m.setElement(3, AL);
         /* Element 4 is 0xE4 + the upper two  bits of the 10 bit CV address.
-         NOTE: This is the track packet CV, not the human readable CV, so 
+         NOTE: This is the track packet CV, not the human readable CV, so
          its value actually is one less than what we normally think of it as.*/
         int temp = (cv - 1) & 0x0300;
         temp = temp / 0x00FF;
@@ -483,7 +475,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         m.setElement(2, AH);
         m.setElement(3, AL);
         /* Element 4 is 0xE8 + the upper two  bits of the 10 bit CV address.
-         NOTE: This is the track packet CV, not the human readable CV, so 
+         NOTE: This is the track packet CV, not the human readable CV, so
          its value actually is one less than what we normally think of it as.*/
         int temp = (cv - 1) & 0x0300;
         temp = temp / 0x00FF;
@@ -511,7 +503,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         m.setElement(2, AH);
         m.setElement(3, AL);
         /* Element 4 is 0xE8 + the upper two  bits of the 10 bit CV address.
-         NOTE: This is the track packet CV, not the human readable CV, so 
+         NOTE: This is the track packet CV, not the human readable CV, so
          its value actually is one less than what we normally think of it as.*/
         int temp = (cv - 1) & 0x0300;
         temp = temp / 0x00FF;
@@ -532,6 +524,14 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         return m;
     }
 
+    public static XNetMessage getOpsModeResultsMsg() {
+        XNetMessage m = new XNetMessage(3);
+        m.setTimeout(XNetProgrammingTimeout);
+        m.setElement(0, XNetConstants.CS_REQUEST);
+        m.setElement(1, XNetConstants.OPS_MODE_CSRESULT);
+        m.setParity(); // Set the parity bit
+        return m;
+    }
     /*
      * Next, we have routines to generate XpressNet Messages for building
      * and tearing down a consist or a double header.
@@ -563,7 +563,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
      * @return message to dissolve a double header.
      */
     public static XNetMessage getDisolveDoubleHeaderMsg(int address) {
-        // All we have to do is call getBuildDoubleHeaderMsg with the 
+        // All we have to do is call getBuildDoubleHeaderMsg with the
         // second address as a zero
         return (getBuildDoubleHeaderMsg(address, 0));
     }
@@ -573,7 +573,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
      *
      * @param consist the consist address (1-99)
      * @param address the locomotive address to add.
-     * @param isNormalDir tells us if the locomotive is going forward when 
+     * @param isNormalDir tells us if the locomotive is going forward when
      * the consist is going forward.
      * @return message to add address to consist.
      */
@@ -618,13 +618,13 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
      */
 
     /**
-     * Given a locomotive address, search the database for the next 
+     * Given a locomotive address, search the database for the next
      * member.
      * (if the Address is zero start at the beginning of the database).
      *
      * @param address is the locomotive address
-     * @param searchForward indicates to search the database Forward if 
-     * true, or backwards if False 
+     * @param searchForward indicates to search the database Forward if
+     * true, or backwards if False
      * @return message to request next address.
      */
     public static XNetMessage getNextAddressOnStackMsg(int address, boolean searchForward) {
@@ -642,12 +642,12 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
     }
 
     /**
-     * Given a consist address, search the database for the next Consist 
+     * Given a consist address, search the database for the next Consist
      * address.
      *
      * @param address is the consist address (in the range 1-99).
      * If the Address is zero start at the beginning of the database.
-     * @param searchForward indicates to search the database Forward if 
+     * @param searchForward indicates to search the database Forward if
      * true, or backwards if false
      * @return message to get next consist address.
      */
@@ -665,15 +665,15 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
     }
 
     /**
-     * Given a consist and a locomotive address, search the database for 
+     * Given a consist and a locomotive address, search the database for
      * the next Locomotive in the consist.
      *
      * @param consist the consist address (1-99).
      * If the Consist Address is zero start at the begining of the database
      * @param address the locomotive address.
      * If the Address is zero start at the begining of the consist
-     * @param searchForward indicates to search the database Forward if 
-     * true, or backwards if False 
+     * @param searchForward indicates to search the database Forward if
+     * true, or backwards if False
      * @return  message to request next loco in consist.
      */
     public static XNetMessage getDBSearchMsgNextMULoco(int consist, int address, boolean searchForward) {
@@ -740,7 +740,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
     }
 
     /**
-     * Given a locomotive address, request the function on/off state 
+     * Given a locomotive address, request the function on/off state
      * for functions 13-28
      *
      * @param address the locomotive address
@@ -797,7 +797,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
      * @param address the locomotive address
      * @param speedStepMode the speedstep mode see @jmri.DccThrottle
      *                       for possible values.
-     * @param speed a normalized speed value (a floating point number between 0 
+     * @param speed a normalized speed value (a floating point number between 0
      *              and 1).  A negative value indicates emergency stop.
      * @param isForward true for forward, false for reverse.
      * @return set speed and direction message.
@@ -942,7 +942,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f4) {
         XNetMessage msg = new XNetMessage(6);
         msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_Group1);
+        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_GROUP1_MOMENTARY);
         msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
         // set to the upper byte of the  DCC address
         msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
@@ -1027,7 +1027,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f8) {
         XNetMessage msg = new XNetMessage(6);
         msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_Group2);
+        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_GROUP2_MOMENTARY);
         msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
         // set to the upper byte of the  DCC address
         msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
@@ -1109,7 +1109,7 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f12) {
         XNetMessage msg = new XNetMessage(6);
         msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_Group3);
+        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_GROUP3_MOMENTARY);
         msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
         // set to the upper byte of the  DCC address
         msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
@@ -1156,42 +1156,8 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f18,
             boolean f19,
             boolean f20) {
-        XNetMessage msg = new XNetMessage(6);
-        msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_GROUP4);
-        msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
-        // set to the upper byte of the  DCC address
-        msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
-        // set to the lower byte of the DCC address
-        // Now, we need to figure out what to send in element 3
-        int element4value = 0;
-        if (f13) {
-            element4value += 1;
-        }
-        if (f14) {
-            element4value += 2;
-        }
-        if (f15) {
-            element4value += 4;
-        }
-        if (f16) {
-            element4value += 8;
-        }
-        if (f17) {
-            element4value += 16;
-        }
-        if (f18) {
-            element4value += 32;
-        }
-        if (f19) {
-            element4value += 64;
-        }
-        if (f20) {
-            element4value += 128;
-        }
-        msg.setElement(4, element4value);
-        msg.setParity(); // Set the parity bit
-        return msg;
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP4,
+                f13, f14, f15, f16, f17, f18, f19, f20);
     }
 
     /**
@@ -1217,42 +1183,8 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f18,
             boolean f19,
             boolean f20) {
-        XNetMessage msg = new XNetMessage(6);
-        msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_Group4);
-        msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
-        // set to the upper byte of the  DCC address
-        msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
-        // set to the lower byte of the DCC address
-        // Now, we need to figure out what to send in element 3
-        int element4value = 0;
-        if (f13) {
-            element4value += 1;
-        }
-        if (f14) {
-            element4value += 2;
-        }
-        if (f15) {
-            element4value += 4;
-        }
-        if (f16) {
-            element4value += 8;
-        }
-        if (f17) {
-            element4value += 16;
-        }
-        if (f18) {
-            element4value += 32;
-        }
-        if (f19) {
-            element4value += 64;
-        }
-        if (f20) {
-            element4value += 128;
-        }
-        msg.setElement(4, element4value);
-        msg.setParity(); // Set the parity bit
-        return msg;
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP4_MOMENTARY,
+                f13, f14, f15, f16, f17, f18, f19, f20);
     }
 
     /**
@@ -1278,42 +1210,8 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f26,
             boolean f27,
             boolean f28) {
-        XNetMessage msg = new XNetMessage(6);
-        msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_GROUP5);
-        msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
-        // set to the upper byte of the  DCC address
-        msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
-        // set to the lower byte of the DCC address
-        // Now, we need to figure out what to send in element 3
-        int element4value = 0;
-        if (f21) {
-            element4value += 1;
-        }
-        if (f22) {
-            element4value += 2;
-        }
-        if (f23) {
-            element4value += 4;
-        }
-        if (f24) {
-            element4value += 8;
-        }
-        if (f25) {
-            element4value += 16;
-        }
-        if (f26) {
-            element4value += 32;
-        }
-        if (f27) {
-            element4value += 64;
-        }
-        if (f28) {
-            element4value += 128;
-        }
-        msg.setElement(4, element4value);
-        msg.setParity(); // Set the parity bit
-        return msg;
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP5,
+            f21, f22, f23, f24, f25, f26, f27, f28);
     }
 
     /**
@@ -1339,42 +1237,126 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
             boolean f26,
             boolean f27,
             boolean f28) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP5_MOMENTARY,
+            f21, f22, f23, f24, f25, f26, f27, f28);
+    }
+
+    // Generate a Function Group Operation Request message for some specific case.
+    private static XNetMessage getFunctionGroupNOpsMsg(int address, int byte1,
+            boolean fA,
+            boolean fB,
+            boolean fC,
+            boolean fD,
+            boolean fE,
+            boolean fF,
+            boolean fG,
+            boolean fH) {
         XNetMessage msg = new XNetMessage(6);
         msg.setElement(0, XNetConstants.LOCO_OPER_REQ);
-        msg.setElement(1, XNetConstants.LOCO_SET_FUNC_Group5);
+        msg.setElement(1, byte1);
         msg.setElement(2, LenzCommandStation.getDCCAddressHigh(address));
         // set to the upper byte of the  DCC address
         msg.setElement(3, LenzCommandStation.getDCCAddressLow(address));
         // set to the lower byte of the DCC address
         // Now, we need to figure out what to send in element 3
         int element4value = 0;
-        if (f21) {
+        if (fA) {
             element4value += 1;
         }
-        if (f22) {
+        if (fB) {
             element4value += 2;
         }
-        if (f23) {
+        if (fC) {
             element4value += 4;
         }
-        if (f24) {
+        if (fD) {
             element4value += 8;
         }
-        if (f25) {
+        if (fE) {
             element4value += 16;
         }
-        if (f26) {
+        if (fF) {
             element4value += 32;
         }
-        if (f27) {
+        if (fG) {
             element4value += 64;
         }
-        if (f28) {
+        if (fH) {
             element4value += 128;
         }
         msg.setElement(4, element4value);
         msg.setParity(); // Set the parity bit
         return msg;
+    }
+
+    public static XNetMessage getFunctionGroup6OpsMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP6,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup7OpsMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP7,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup8OpsMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP8,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup9OpsMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP9,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup10OpsMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP10,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup6SetMomMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP6_MOMENTARY,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup7SetMomMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP7_MOMENTARY,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup8SetMomMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP8_MOMENTARY,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup9SetMomMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP9_MOMENTARY,
+            fA, fB, fC, fD, fE, fF, fG, fH);
+    }
+
+    public static XNetMessage getFunctionGroup10SetMomMsg(int address,
+            boolean fA, boolean fB, boolean fC, boolean fD,
+            boolean fE, boolean fF, boolean fG, boolean fH) {
+        return getFunctionGroupNOpsMsg(address, XNetConstants.LOCO_SET_FUNC_GROUP10_MOMENTARY,
+            fA, fB, fC, fD, fE, fF, fG, fH);
     }
 
     /**
@@ -1501,732 +1483,31 @@ public class XNetMessage extends jmri.jmrix.AbstractMRMessage implements Seriali
         return msg;
     }
 
+    private static final List<XPressNetMessageFormatter> formatterList = new ArrayList<>();
+
    /**
     * Generate text translations of messages for use in the XpressNet monitor.
     *
     * @return representation of the XNetMessage as a string.
     */
     @Override
-   public String toMonitorString(){
-        String text;
-        /* Start decoding messages sent by the computer */
-        /* Start with LI101F requests */
-        if (getElement(0) == XNetConstants.LI_VERSION_REQUEST) {
-            text = Bundle.getMessage("XNetMessageRequestLIVersion");
-        } else if (getElement(0) == XNetConstants.LI101_REQUEST) {
-            switch (getElement(1)) {
-                case XNetConstants.LI101_REQUEST_ADDRESS:
-                    text = Bundle.getMessage("XNetMessageRequestLIAddress", getElement(2));
-                    break;
-                case XNetConstants.LI101_REQUEST_BAUD:
-                    switch (getElement(2)) {
-                        case 1:
-                            text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_LI_BAUD,
-                                   Bundle.getMessage("LIBaud19200"));
-                            break;
-                        case 2:
-                            text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_LI_BAUD,
-                                   Bundle.getMessage("Baud38400"));
-                            break;
-                        case 3:
-                            text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_LI_BAUD,
-                                   Bundle.getMessage("Baud57600"));
-                            break;
-                        case 4:
-                            text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_LI_BAUD,
-                                   Bundle.getMessage("Baud115200"));
-                            break;
-                        default:
-                            text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_LI_BAUD,
-                                   Bundle.getMessage("BaudOther"));
-                    }
-                    break;
-                default:
-                    text = toString();
+   public String toMonitorString() {
+        if (formatterList.isEmpty()) {
+            try {
+                Reflections reflections = new Reflections("jmri.jmrix");
+                Set<Class<? extends XPressNetMessageFormatter>> f = reflections.getSubTypesOf(XPressNetMessageFormatter.class);
+                for (Class<?> c : f) {
+                    log.debug("Found formatter: {}", f.getClass().getName());
+                    Constructor<?> ctor = c.getConstructor();
+                    formatterList.add((XPressNetMessageFormatter) ctor.newInstance());
+                }
+            } catch (NoSuchMethodException | SecurityException | InstantiationException |
+                     IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                log.error("Error instantiating formatter", e);
             }
-            /* Next, we have generic requests */
-        } else if (getElement(0) == XNetConstants.CS_REQUEST) {
-            switch (getElement(1)) {
-                case XNetConstants.EMERGENCY_OFF:
-                    text = Bundle.getMessage("XNetMessageRequestEmergencyOff");
-                    break;
-                case XNetConstants.RESUME_OPS:
-                    text = Bundle.getMessage("XNetMessageRequestNormalOps");
-                    break;
-                case XNetConstants.SERVICE_MODE_CSRESULT:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeResult");
-                    break;
-                case XNetConstants.CS_VERSION:
-                    text = Bundle.getMessage("XNetMessageRequestCSVersion");
-                    break;
-                case XNetConstants.CS_STATUS:
-                    text = Bundle.getMessage("XNetMessageRequestCSStatus");
-                    break;
-                default:
-                    text = toString();
-            }
-        } else if (getElement(0) == XNetConstants.CS_SET_POWERMODE
-                && getElement(1) == XNetConstants.CS_SET_POWERMODE
-                && getElement(2) == XNetConstants.CS_POWERMODE_AUTO) {
-            text = Bundle.getMessage("XNetMessageRequestCSPowerModeAuto");
-        } else if (getElement(0) == XNetConstants.CS_SET_POWERMODE
-                && getElement(1) == XNetConstants.CS_SET_POWERMODE
-                && getElement(2) == XNetConstants.CS_POWERMODE_MANUAL) {
-            text = Bundle.getMessage("XNetMessageRequestCSPowerModeManual");
-            /* Next, we have Programming Requests */
-        } else if (getElement(0) == XNetConstants.PROG_READ_REQUEST) {
-            switch (getElement(1)) {
-                case XNetConstants.PROG_READ_MODE_REGISTER:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeReadRegister",getElement(2));
-                    break;
-                case XNetConstants.PROG_READ_MODE_CV:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeReadDirect",getElement(2));
-                    break;
-                case XNetConstants.PROG_READ_MODE_PAGED:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeReadPaged",getElement(2));
-                    break;
-                case XNetConstants.PROG_READ_MODE_CV_V36:
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_READ_DIRECT_V_36,(getElement(2)== 0 ? 1024 : getElement(2)));
-                    break;
-                case XNetConstants.PROG_READ_MODE_CV_V36 + 1:
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_READ_DIRECT_V_36,(256 + getElement(2)));
-                    break;
-                case XNetConstants.PROG_READ_MODE_CV_V36 + 2:
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_READ_DIRECT_V_36,(512 + getElement(2)));
-                    break;
-                case XNetConstants.PROG_READ_MODE_CV_V36 + 3:
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_READ_DIRECT_V_36,(768 + getElement(2)));
-                    break;
-                default:
-                    text = toString();
-            }
-        } else if (getElement(0) == XNetConstants.PROG_WRITE_REQUEST) {
-            switch (getElement(1)) {
-                case XNetConstants.PROG_WRITE_MODE_REGISTER:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeWriteRegister",getElement(2),getElement(3));
-                    break;
-                case XNetConstants.PROG_WRITE_MODE_CV:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeWriteDirect",getElement(2),getElement(3));
-                    break;
-                case XNetConstants.PROG_WRITE_MODE_PAGED:
-                    text = Bundle.getMessage("XNetMessageRequestServiceModeWritePaged",getElement(2),getElement(3));
-                    break;
-                case XNetConstants.PROG_WRITE_MODE_CV_V36:
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_WRITE_DIRECT_V_36,(getElement(2)== 0 ? 1024 : getElement(2)),getElement(3));
-                    break;
-                case (XNetConstants.PROG_WRITE_MODE_CV_V36 + 1):
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_WRITE_DIRECT_V_36,(256 + getElement(2)),getElement(3));
-                    break;
-                case (XNetConstants.PROG_WRITE_MODE_CV_V36 + 2):
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_WRITE_DIRECT_V_36,(512 + getElement(2)),getElement(3));
-                    break;
-                case (XNetConstants.PROG_WRITE_MODE_CV_V36 + 3):
-                    text = Bundle.getMessage(X_NET_MESSAGE_REQUEST_SERVICE_MODE_WRITE_DIRECT_V_36,(768 + getElement(2)),getElement(3));
-                    break;
-                default:
-                    text = toString();
-            }
-        } else if (getElement(0) == XNetConstants.OPS_MODE_PROG_REQ) {
-            switch (getElement(1)) {
-                case XNetConstants.OPS_MODE_PROG_WRITE_REQ:
-                    if ((getElement(4) & 0xEC) == 0xEC
-                            || (getElement(4) & 0xE4) == 0xE4) {
-                        String message = "";
-                        if ((getElement(4) & 0xEC) == 0xEC) {
-                            message ="XNetMessageOpsModeByteWrite";
-                        } else if ((getElement(4) & 0xE4) == 0xE4) {
-                            message ="XNetMessageOpsModeByteVerify";
-                        }
-                        text = Bundle.getMessage(message,
-                               getElement(6),
-                               (1 + getElement(5) + ((getElement(4) & 0x03) << 8)),
-                               LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                        break;
-                    } else if ((getElement(4) & 0xE8) == 0xE8) {
-                        String message;
-                        if ((getElement(6) & 0x10) == 0x10) {
-                            message ="XNetMessageOpsModeBitVerify";
-                        } else {
-                            message ="XNetMessageOpsModeBitWrite";
-                        }
-                        text = Bundle.getMessage(message,
-                                ((getElement(6) & 0x08) >> 3),
-                                (1 + getElement(5) + ((getElement(4) & 0x03) << 8)),
-                                (getElement(6) & 0x07),
-                                LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                        break;
-                    }
-                    //$FALL-THROUGH$
-                default:
-                    text = toString();
-            }
-            // Next, decode the locomotive operation requests
-        } else if (getElement(0) == XNetConstants.LOCO_OPER_REQ) {
-            text = "Mobile Decoder Operations Request: ";
-            int speed;
-            String direction;
-            switch (getElement(1)) {
-                case XNetConstants.LOCO_SPEED_14:
-                    if ((getElement(4) & 0x80) != 0) {
-                        direction = Bundle.getMessage(FORWARD);
-                    } else {
-                        direction = Bundle.getMessage(REVERSE);
-                    }
-                    text = text
-                            + Bundle.getMessage(X_NET_MESSAGE_SET_SPEED,
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)))
-                            + " " + (getElement(4) & 0x0f)
-                            + " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, direction);
-                    text += " " + Bundle.getMessage(SPEED_STEP_MODE_X, 14) + ".";
-                    break;
-                case XNetConstants.LOCO_SPEED_27:
-                    text = text
-                            + Bundle.getMessage(X_NET_MESSAGE_SET_SPEED,
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)))
-                            + " ";
-                    if(log.isDebugEnabled()) {
-                        log.debug("{}", LenzCommandStation.calcLocoAddress(getElement(2), getElement(3))); // address printed as: "1234" = OK
-                        log.debug(text); // address printed as: "1,234" = WRONG
-                    }
-                    speed
-                            = (((getElement(4) & 0x10) >> 4)
-                            + ((getElement(4) & 0x0F) << 1));
-                    if (speed >= 3) {
-                        speed -= 3;
-                    }
-                    text += speed;
-                    if ((getElement(4) & 0x80) != 0) {
-                        text += " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, Bundle.getMessage(FORWARD));
-                    } else {
-                        text += " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, Bundle.getMessage(REVERSE));
-                    }
-                    text += " " + Bundle.getMessage(SPEED_STEP_MODE_X, 27) + ".";
-                    break;
-                case XNetConstants.LOCO_SPEED_28:
-                    text = text
-                            + Bundle.getMessage(X_NET_MESSAGE_SET_SPEED,
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)))
-                            + " ";
-                    speed
-                            = (((getElement(4) & 0x10) >> 4)
-                            + ((getElement(4) & 0x0F) << 1));
-                    if (speed >= 3) {
-                        speed -= 3;
-                    }
-                    text += speed;
-                    if ((getElement(4) & 0x80) != 0) {
-                        text += " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, Bundle.getMessage(FORWARD));
-                    } else {
-                        text += " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, Bundle.getMessage(REVERSE));
-                    }
-                    text += " " + Bundle.getMessage(SPEED_STEP_MODE_X, 28) + ".";
-                    break;
-                case XNetConstants.LOCO_SPEED_128:
-                    if ((getElement(4) & 0x80) != 0) {
-                        direction = Bundle.getMessage(FORWARD);
-                    } else {
-                        direction = Bundle.getMessage(REVERSE);
-                    }
-                    text = text
-                            + Bundle.getMessage(X_NET_MESSAGE_SET_SPEED,
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)))
-                            + " "
-                            + (getElement(4) & 0x7F) + " " + Bundle.getMessage(X_NET_MESSAGE_SET_DIRECTION, direction);
-                    text += " " + Bundle.getMessage(SPEED_STEP_MODE_X, 128) + ".";
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_GROUP1:
-                    text = text + buildSetFunctionGroup1MonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_GROUP2:
-                    text = text + buildSetFunctionGroup2MonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_GROUP3:
-                    text = text + buildSetFunctionGroup3MonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_GROUP4:
-                    text = text + buildSetFunctionGroup4MonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_GROUP5:
-                    text = text + buildSetFunctionGroup5MonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_Group1:
-                    text = text + buildSetFunctionGroup1MomentaryMonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_Group2:
-                    text = text + buildSetFunctionGroup2MomentaryMonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_Group3:
-                    text = text + buildSetFunctionGroup3MomentaryMonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_Group4:
-                    text = text + buildSetFunctionGroup4MomentaryMonitorString();
-                    break;
-                case XNetConstants.LOCO_SET_FUNC_Group5:
-                    text = text + buildSetFunctionGroup5MomentaryMonitorString();
-                    break;
-                case XNetConstants.LOCO_ADD_MULTI_UNIT_REQ:
-                    text = Bundle.getMessage("XNetMessageAddToConsistDirNormalRequest",
-                           LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)),
-                           getElement(4));
-                    break;
-                case (XNetConstants.LOCO_ADD_MULTI_UNIT_REQ | 0x01):
-                    text = Bundle.getMessage("XNetMessageAddToConsistDirReverseRequest",
-                           LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)),
-                           getElement(4));
-                    break;
-                case (XNetConstants.LOCO_REM_MULTI_UNIT_REQ):
-                    text = Bundle.getMessage("XNetMessageRemoveFromConsistRequest",
-                           LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)),
-                           getElement(4));
-                    break;
-                case (XNetConstants.LOCO_IN_MULTI_UNIT_REQ_FORWARD):
-                    text = Bundle.getMessage("XNetMessageSearchCSStackForwardNextMULoco",
-                           getElement(2),
-                           LenzCommandStation.calcLocoAddress(getElement(3), getElement(4)));
-                    break;
-                case (XNetConstants.LOCO_IN_MULTI_UNIT_REQ_BACKWARD):
-                    text = Bundle.getMessage("XNetMessageSearchCSStackBackwardNextMULoco",
-                           getElement(2),
-                           LenzCommandStation.calcLocoAddress(getElement(3), getElement(4)));
-                    break;
-                default:
-                    text = toString();
-            }
-            // Emergency Stop a locomotive
-        } else if (getElement(0) == XNetConstants.EMERGENCY_STOP) {
-            text = Bundle.getMessage("XNetMessageAddressedEmergencyStopRequest",
-              LenzCommandStation.calcLocoAddress(getElement(1), getElement(2)));
-            // Disolve or Establish a Double Header
-        } else if (getElement(0) == XNetConstants.LOCO_DOUBLEHEAD
-                && getElement(1) == XNetConstants.LOCO_DOUBLEHEAD_BYTE2) {
-            int loco1 = LenzCommandStation.calcLocoAddress(getElement(2), getElement(3));
-            int loco2 = LenzCommandStation.calcLocoAddress(getElement(4), getElement(5));
-            if (loco2 == 0) {
-                text = Bundle.getMessage("XNetMessageDisolveDoubleHeaderRequest",loco1);
-            } else {
-                text = Bundle.getMessage("XNetMessageBuildDoubleHeaderRequest",loco1,loco2);
-            }
-            // Locomotive Status Request messages
-        } else if (getElement(0) == XNetConstants.LOCO_STATUS_REQ) {
-            switch (getElement(1)) {
-                case XNetConstants.LOCO_INFO_REQ_FUNC:
-                    text = Bundle.getMessage("XNetMessageRequestLocoFunctionMomStatus",
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_INFO_REQ_FUNC_HI_ON:
-                    text = Bundle.getMessage("XNetMessageRequestLocoFunctionHighStatus",
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_INFO_REQ_FUNC_HI_MOM:
-                    text = Bundle.getMessage("XNetMessageRequestLocoFunctionHighMomStatus",
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_INFO_REQ_V3:
-                    text = Bundle.getMessage("XNetMessageRequestLocoInfo",
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_STACK_SEARCH_FWD:
-                    text = Bundle.getMessage("XNetMessageSearchCSStackForward",
-                           LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_STACK_SEARCH_BKWD:
-                    text = Bundle.getMessage("XNetMessageSearchCSStackBackward",
-                           LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                case XNetConstants.LOCO_STACK_DELETE:
-                    text = Bundle.getMessage("XNetMessageDeleteAddressOnStack",
-                            LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)));
-                    break;
-                default:
-                    text = toString();
-            }
-        } else if(getElement(0) == XNetConstants.CS_MULTI_UNIT_REQ) {
-            if (getElement(1) == XNetConstants.CS_MULTI_UNIT_REQ_FWD){
-                text = Bundle.getMessage("XNetMessageSearchCSStackForwardConsistAddress",
-                           getElement(2));
-            } else if(getElement(1) == XNetConstants.CS_MULTI_UNIT_REQ_BKWD){
-                text = Bundle.getMessage("XNetMessageSearchCSStackBackwardConsistAddress",
-                           getElement(2));
-            } else {
-                    text = toString();
-            }
-            // Accessory Info Request message
-        } else if (getElement(0) == XNetConstants.ACC_INFO_REQ) {
-            String nibblekey=(((getElement(2) & 0x01) == 0x01) ? "FeedbackEncoderUpperNibble" : "FeedbackEncoderLowerNibble");
-            text = Bundle.getMessage("XNetMessageFeedbackRequest",
-                       getElement(1),
-                       Bundle.getMessage(nibblekey));
-        } else if (getElement(0) == XNetConstants.ACC_OPER_REQ) {
-            String messageKey =(((getElement(2) & 0x08) == 0x08) ? "XNetMessageAccessoryDecoderOnRequest" : "XNetMessageAccessoryDecoderOffRequest");
-            int baseaddress = getElement(1);
-            int subaddress = ((getElement(2) & 0x06) >> 1);
-            int address = (baseaddress * 4) + subaddress + 1;
-            int output = (getElement(2) & 0x01);
-            text = Bundle.getMessage(messageKey,address, baseaddress,subaddress,output);
-        } else if (getElement(0) == XNetConstants.ALL_ESTOP) {
-            text = Bundle.getMessage("XNetMessageRequestEmergencyStop");
-        } else {
-            text = toString();
         }
-        return text;
-   }
 
-   private String buildSetFunctionGroup1MonitorString() {
-       String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X, 1) +
-               " " + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-       int element4 = getElement(4);
-       if ((element4 & 0x10) != 0) {
-           text += "F0 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F0 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x01) != 0) {
-           text += "F1 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F1 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x02) != 0) {
-           text += "F2 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F2 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x04) != 0) {
-           text += "F3 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F3 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x08) != 0) {
-           text += "F4 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F4 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-
-       }
-       return text;
-   }
-
-   private String buildSetFunctionGroup2MonitorString(){
-       String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X, 2) + " "
-               + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-       int element4 = getElement(4);
-       if ((element4 & 0x01) != 0) {
-           text += "F5 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F5 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x02) != 0) {
-           text += "F6 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F6 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x04) != 0) {
-           text += "F7 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F7 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       if ((element4 & 0x08) != 0) {
-           text += "F8 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-       } else {
-           text += "F8 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-       }
-       return text;
-   }
-
-    private String buildSetFunctionGroup3MonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X, 3) + " "
-                + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) != 0) {
-            text += "F9 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F9 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x02) != 0) {
-            text += "F10 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F10 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x04) != 0) {
-            text += "F11 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F11 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x08) != 0) {
-            text += "F12 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F12 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        return text;
-    }
-
-    private String buildSetFunctionGroup4MonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X, 4) + " " + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) != 0) {
-            text += "F13 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F13 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x02) != 0) {
-            text += "F14 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F14 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x04) != 0) {
-            text += "F15 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F15 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x08) != 0) {
-            text += "F16 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F16 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x10) != 0) {
-            text += "F17 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F17 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x20) != 0) {
-            text += "F18 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F18 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x40) != 0) {
-            text += "F19 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F19 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x80) != 0) {
-            text += "F20 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F20 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        return text;
-    }
-
-    private String buildSetFunctionGroup5MonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X, 5) + " " + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) != 0) {
-            text += "F21 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F21 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x02) != 0) {
-            text += "F22 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F22 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x04) != 0) {
-            text += "F23 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F23 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x08) != 0) {
-            text += "F24 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F24 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x10) != 0) {
-            text += "F25 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F25 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x20) != 0) {
-            text += "F26 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F26 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x40) != 0) {
-            text += "F27 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F27 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        if ((element4 & 0x80) != 0) {
-            text += "F28 " + Bundle.getMessage(POWER_STATE_ON) + "; ";
-        } else {
-            text += "F28 " + Bundle.getMessage(POWER_STATE_OFF) + "; ";
-        }
-        return text;
-    }
-
-        private String buildSetFunctionGroup1MomentaryMonitorString() {
-            String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY, 1) + " "
-                + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x10) == 0) {
-            text += "F0 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F0 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x01) == 0) {
-            text += "F1 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F1 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x02) == 0) {
-            text += "F2 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F2 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x04) == 0) {
-            text += "F3 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F3 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x08) == 0) {
-            text += "F4 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F4 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        return text;
-    }
-
-    private String buildSetFunctionGroup2MomentaryMonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY, 2) + " "
-                + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) == 0) {
-            text += "F5 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F5 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x02) == 0) {
-            text += "F6 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F6 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x04) == 0) {
-            text += "F7 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F7 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x08) == 0) {
-            text += "F8 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F8 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        return text;
-    }
-
-    private String buildSetFunctionGroup3MomentaryMonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY, 3) + " " + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) == 0) {
-            text += "F9 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F9 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x02) == 0) {
-            text += "F10 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F10 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x04) == 0) {
-            text += "F11 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F11 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x08) == 0) {
-            text += "F12 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F12 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        return text;
-    }
-
-
-    private String buildSetFunctionGroup4MomentaryMonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY, 4) + " "
-                + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) == 0) {
-            text += "F13 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F13 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x02) == 0) {
-            text += "F14 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F14 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x04) == 0) {
-            text += "F15 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F15 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x08) == 0) {
-            text += "F16 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F16 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x10) == 0) {
-            text += "F17 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F17 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x20) == 0) {
-            text += "F18 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F18 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x40) == 0) {
-            text += "F19 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F19 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x80) == 0) {
-            text += "F20 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F20 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        return text;
-}
-
-    private String buildSetFunctionGroup5MomentaryMonitorString() {
-        String text = Bundle.getMessage(X_NET_MESSAGE_SET_FUNCTION_GROUP_X_MOMENTARY, 5) + " " + LenzCommandStation.calcLocoAddress(getElement(2), getElement(3)) + " ";
-        int element4 = getElement(4);
-        if ((element4 & 0x01) == 0) {
-            text += "F21 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F21 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x02) == 0) {
-            text += "F22 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F22 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x04) == 0) {
-            text += "F23 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F23 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x08) == 0) {
-            text += "F24 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F24 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x10) == 0) {
-            text += "F25 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F25 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x20) == 0) {
-            text += "F26 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F26 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x40) == 0) {
-            text += "F27 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F27 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        if ((element4 & 0x80) == 0) {
-            text += "F28 " + Bundle.getMessage(FUNCTION_CONTINUOUS) + "; ";
-        } else {
-            text += "F28 " + Bundle.getMessage(FUNCTION_MOMENTARY) + "; ";
-        }
-        return text;
+        return formatterList.stream().filter(f -> f.handlesMessage(this)).findFirst().map(f -> f.formatMessage(this)).orElse(this.toString());
     }
 
     // initialize logging

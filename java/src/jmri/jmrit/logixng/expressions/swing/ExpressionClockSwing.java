@@ -81,15 +81,14 @@ public class ExpressionClockSwing extends AbstractDigitalExpressionSwing {
     public boolean validate(@Nonnull List<String> errorMessages) {
         _beginMinutes = validateTime(errorMessages, _beginTextField);
         _endMinutes = validateTime(errorMessages, _endTextField);
-
-        if (!errorMessages.isEmpty()) return false;
-        return true;
+        return errorMessages.isEmpty();
     }
 
     private int validateTime(List<String> errorMessages, JTextField timeField) {
         int minutes = 0;
         try {
             LocalTime newHHMM = LocalTime.parse(timeField.getText().trim(), DateTimeFormatter.ofPattern("H:mm"));
+
             minutes = newHHMM.getHour() * 60 + newHHMM.getMinute();
             if (minutes < 0 || minutes > 1439) {
                 errorMessages.add(Bundle.getMessage("Clock_RangeError"));
@@ -104,7 +103,7 @@ public class ExpressionClockSwing extends AbstractDigitalExpressionSwing {
     @Override
     public MaleSocket createNewObject(@Nonnull String systemName, @CheckForNull String userName) {
         ExpressionClock expression = new ExpressionClock(systemName, userName);
-        expression.setType(ExpressionClock.Type.FastClock);
+        updateObject(expression);
         return InstanceManager.getDefault(DigitalExpressionManager.class).registerExpression(expression);
     }
 
@@ -131,6 +130,6 @@ public class ExpressionClockSwing extends AbstractDigitalExpressionSwing {
     }
 
 
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrueSwing.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrueSwing.class);
 
 }

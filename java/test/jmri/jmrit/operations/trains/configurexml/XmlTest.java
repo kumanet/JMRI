@@ -1,7 +1,7 @@
 package jmri.jmrit.operations.trains.configurexml;
 
 import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.*;
 
 import jmri.jmrit.operations.OperationsTestCase;
 
@@ -17,6 +17,6 @@ public class XmlTest extends OperationsTestCase {
         Assert.assertNotNull("exists", t);
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(XmlTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(XmlTest.class);
 
 }

@@ -1,18 +1,20 @@
 package jmri.jmrit.display;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Map;
+
+import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
-import javax.swing.JTextField;
+
 import jmri.InstanceManager;
 import jmri.Memory;
 import jmri.NamedBeanHandle;
@@ -21,11 +23,11 @@ import jmri.NamedBean.DisplayOptions;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.roster.RosterIconFactory;
-import jmri.jmrit.throttle.ThrottleFrame;
 import jmri.jmrit.throttle.ThrottleFrameManager;
+import jmri.jmrit.throttle.interfaces.ThrottleControllerUI;
 import jmri.util.datatransfer.RosterEntrySelection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * An icon to display a status of a Memory.
@@ -34,7 +36,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bob Jacobsen Copyright (c) 2004
  */
-public class MemoryIcon extends PositionableLabel implements java.beans.PropertyChangeListener/*, DropTargetListener*/ {
+public class MemoryIcon extends MemoryOrGVIcon implements java.beans.PropertyChangeListener/*, DropTargetListener*/ {
 
     NamedIcon defaultIcon = null;
     // the map of icons
@@ -187,6 +189,12 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
     }
 
     @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_MemoryIcon");
+    }
+
+    @Override
     public String getNameString() {
         String name;
         if (namedMemory == null) {
@@ -229,9 +237,9 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    ThrottleFrame tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
+                    ThrottleControllerUI tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
                     tf.toFront();
-                    tf.getAddressPanel().setRosterEntry(re);
+                    tf.setRosterEntry(re);
                 }
             });
             //don't like the idea of refering specifically to the layout block manager for this, but it has to be done if we are to allow the panel editor to also assign trains to block, when used with a layouteditor
@@ -244,7 +252,7 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
 
                             @Override
                             public void actionPerformed(ActionEvent e) {
-                                df.terminateActiveTrain(at);
+                                df.terminateActiveTrain(at,true,false);
                             }
                         });
                         popup.add(new AbstractAction(Bundle.getMessage("MenuAllocateExtra")) {
@@ -315,6 +323,7 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
     /**
      * Drive the current state of the display from the state of the Memory.
      */
+    @Override
     public void displayState() {
         log.debug("displayState()");
 
@@ -360,9 +369,9 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
                 if (val instanceof String) {
                     String str = (String) val;
                     _icon = false;
-                    _text = true;
+                    setIcon(null);
                     setText(str);
-                    updateIcon(null);
+                    _text = true;
                     if (log.isDebugEnabled()) {
                         log.debug("String str= \"{}\" str.trim().length()= {}", str, str.trim().length());
                         log.debug("  maxWidth()= {}, maxHeight()= {}", maxWidth(), maxHeight());
@@ -381,24 +390,30 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
                     setText(null);
                 } else if (val instanceof Number) {
                     _icon = false;
-                    _text = true;
-                    setText(val.toString());
                     setIcon(null);
+                    setText(val.toString());
+                    _text = true;
+                    _editor.setAttributes(getPopupUtility(), this);
                 } else if (val instanceof jmri.IdTag){
-                    // most IdTags are Reportable objects, so 
+                    // most IdTags are Reportable objects, so
                     // this needs to be before Reportable
                     _icon = false;
                     _text = true;
-                    setText(((jmri.IdTag)val).getDisplayName());
                     setIcon(null);
+                    setText(((jmri.IdTag)val).getDisplayName());
                 } else if (val instanceof Reportable) {
                     _icon = false;
                     _text = true;
                     setText(((Reportable)val).toReportString());
                     setIcon(null);
                 } else {
-                    log.warn("can't display current value of {}, val= {} of Class {}",
+                    // don't recognize the type, do our best with toString
+                    log.debug("display current value of {} as String, val= {} of Class {}",
                             getNameString(), val, val.getClass().getName());
+                    _icon = false;
+                    _text = true;
+                    setIcon(null);
+                    setText(val.toString());
                 }
             } else {
                 // map exists, use it
@@ -418,9 +433,10 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
         } else {
             log.debug("object null");
             _icon = true;
-            _text = false;
             setIcon(defaultIcon);
             setText(null);
+            _text = false;
+            _editor.setAttributes(getPopupUtility(), this);
         }
         updateSize();
     }
@@ -440,8 +456,10 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
             if (flipRosterIcon) {
                 flipIcon(NamedIcon.HORIZONTALFLIP);
             }
-            jmri.InstanceManager.throttleManagerInstance().attachListener(re.getDccLocoAddress(), this);
-            Object isForward = jmri.InstanceManager.throttleManagerInstance().getThrottleInfo(re.getDccLocoAddress(), jmri.Throttle.ISFORWARD);
+            // use the roster parameter, not the re field: displayState() can clear
+            // re from another thread between the assignment above and here
+            jmri.InstanceManager.throttleManagerInstance().attachListener(roster.getDccLocoAddress(), this);
+            Object isForward = jmri.InstanceManager.throttleManagerInstance().getThrottleInfo(roster.getDccLocoAddress(), jmri.Throttle.ISFORWARD);
             if (isForward != null) {
                 if (!(Boolean) isForward) {
                     flipIcon(NamedIcon.HORIZONTALFLIP);
@@ -455,7 +473,9 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
 
     /*As the size of a memory label can change we want to adjust the position of the x,y
      if the width is fixed*/
+    @SuppressWarnings("hiding")  // Overriding value from SwingConstants
     static final int LEFT = 0x00;
+    @SuppressWarnings("hiding")  // Overriding value from SwingConstants
     static final int RIGHT = 0x02;
     static final int CENTRE = 0x04;
 
@@ -478,6 +498,7 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
                     break;
             }
             setSize(maxWidth(), maxHeight());
+            setPreferredSize(new Dimension(maxWidth(), maxHeight()));
         } else {
             super.updateSize();
             if (_icon && _namedIcon != null) {
@@ -497,10 +518,12 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
         updateSize();
     }
 
+    @Override
     public int getOriginalX() {
         return originalX;
     }
 
+    @Override
     public int getOriginalY() {
         return originalY;
     }
@@ -558,27 +581,23 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
     }
 
     @Override
-    public void doMouseClicked(java.awt.event.MouseEvent e) {
+    public void doMouseClicked(JmriMouseEvent e) {
         if (e.getClickCount() == 2) { // double click?
+            if (!getEditor().isEditable() && isValueEditDisabled()) {
+                log.debug("Double click memory value edit is disabled");
+                return;
+            }
             editMemoryValue();
         }
     }
 
     protected void editMemoryValue() {
-        JTextField newMemory = new JTextField(20);
-        if (getMemory().getValue() != null) {
-            newMemory.setText(getMemory().getValue().toString());
-        }
-        Object[] options = {Bundle.getMessage("ButtonCancel"), Bundle.getMessage("ButtonOK"), newMemory};
-        int retval = JOptionPane.showOptionDialog(this,
-                "Edit Current Memory Value", namedMemory.getName(),
-                0, JOptionPane.INFORMATION_MESSAGE, null,
-                options, options[2]);
 
-        if (retval != 1) {
-            return;
-        }
-        setValue(newMemory.getText());
+        String reval = (String)JmriJOptionPane.showInputDialog(this,
+                                     Bundle.getMessage("EditCurrentMemoryValue", namedMemory.getName()),
+                                     getMemory().getValue());
+
+        setValue(reval);
         updateSize();
     }
 
@@ -599,19 +618,19 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
         Object[] options = {"Facing West",
             "Facing East",
             "Do Not Add"};
-        int n = JOptionPane.showOptionDialog(this, // TODO I18N
+        int n = JmriJOptionPane.showOptionDialog(this, // TODO I18N
                 "Would you like to assign loco "
                 + roster.titleString() + " to this location",
                 "Assign Loco",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
+                JmriJOptionPane.DEFAULT_OPTION,
+                JmriJOptionPane.QUESTION_MESSAGE,
                 null,
                 options,
                 options[2]);
-        if (n == 2) {
+        if ( n == 2 || n==JmriJOptionPane.CLOSED_OPTION ) { // option array 2 Do Not Add, or Dialog closed
             return;
         }
-        flipRosterIcon = (n == 0);
+        flipRosterIcon = (n == 0); // true if option array position 0, Facing West
         if (getValue() == roster) {
             //No change in the loco but a change in direction facing might have occurred
             updateIconFromRosterVal(roster);
@@ -650,13 +669,13 @@ public class MemoryIcon extends PositionableLabel implements java.beans.Property
                     addRosterToIcon(roster);
                 }
             } catch (java.awt.datatransfer.UnsupportedFlavorException | java.io.IOException e) {
-                log.error(e.getLocalizedMessage(), e);
+                log.error("Could not add a RosterEntry to Icon.", e);
             }
             return true;
         }
 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MemoryIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MemoryIcon.class);
 
 }

@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DefaultCatalogTreeManagerXml extends XmlFile {
 
-    private final static String DEFAULT_FILE_NAME = FileUtil.getUserFilesPath() + "catalogTrees.xml";
+    private static final String DEFAULT_FILE_NAME = FileUtil.getUserFilesPath() + "catalogTrees.xml";
 
     public DefaultCatalogTreeManagerXml() {
     }
@@ -53,7 +53,6 @@ public class DefaultCatalogTreeManagerXml extends XmlFile {
                 CatalogTreeNode root = tree.getRoot();
                 log.debug("enumerateTree called for root= {}, has {} children", root, root.getChildCount());
 
-                @SuppressWarnings("unchecked") // root.depthFirstEnumeration isn't fully typed in JDOM2
                 Enumeration<TreeNode> e = root.depthFirstEnumeration();
                 while (e.hasMoreElements()) {
                     CatalogTreeNode n = (CatalogTreeNode)e.nextElement();
@@ -225,7 +224,13 @@ public class DefaultCatalogTreeManagerXml extends XmlFile {
             if (ct != null) {
                 continue;   // tree already registered
             }
-            ct = mgr.newCatalogTree(sysName, userName);
+            try {
+                ct = mgr.newCatalogTree(sysName, userName);
+            }
+            catch (IllegalArgumentException ex){
+                log.error("Could not create CatalogTree: {}",ex.getMessage());
+                continue;
+            }
             if (ct instanceof DefaultTreeModel) {
                 log.debug("CatalogTree: sysName= {}, userName= {}", sysName, userName);
                 CatalogTreeNode root = ct.getRoot();
@@ -280,6 +285,6 @@ public class DefaultCatalogTreeManagerXml extends XmlFile {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DefaultCatalogTreeManagerXml.class);
+    private static final Logger log = LoggerFactory.getLogger(DefaultCatalogTreeManagerXml.class);
 
 }

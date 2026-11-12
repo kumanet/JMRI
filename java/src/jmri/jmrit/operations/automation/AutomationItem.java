@@ -14,9 +14,7 @@ import jmri.beans.PropertyChangeSupport;
 import jmri.jmrit.operations.automation.actions.*;
 import jmri.jmrit.operations.routes.RouteLocation;
 import jmri.jmrit.operations.setup.Control;
-import jmri.jmrit.operations.trains.Train;
-import jmri.jmrit.operations.trains.TrainManager;
-import jmri.jmrit.operations.trains.TrainManagerXml;
+import jmri.jmrit.operations.trains.*;
 import jmri.jmrit.operations.trains.schedules.TrainSchedule;
 import jmri.jmrit.operations.trains.schedules.TrainScheduleManager;
 
@@ -50,6 +48,7 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
     protected String _trainScheduleId = NONE;
 
     public static final String DISPOSE = "automationItemDispose"; // NOI18N
+    public static final String AUTOMATION_ITEM_MESSAGE_CHANGED_PROPERTY = "AutomationItemMessageChange"; // NOI18N
 
     public AutomationItem(String id) {
         log.debug("New automation item id: {}", id);
@@ -239,7 +238,7 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
     }
     
     public TrainSchedule getTrainSchedule() {
-        if (getAction() != null && getAction().isOtherMenuEnabled()) {
+        if (getAction() != null && getAction().getCode() == ActionCodes.ACTIVATE_TRAIN_SCHEDULE) {
             return InstanceManager.getDefault(TrainScheduleManager.class).getScheduleById(_trainScheduleId);
         }
         return null;
@@ -253,7 +252,7 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
         String old = _message;
         _message = message;
         if (!old.equals(message)) {
-            setDirtyAndFirePropertyChange("AutomationItemMessageChange", old, message); // NOI18N
+            setDirtyAndFirePropertyChange(AUTOMATION_ITEM_MESSAGE_CHANGED_PROPERTY, old, message); // NOI18N
         }
     }
 
@@ -322,14 +321,10 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
     }
 
     public String getStatus() {
-        if (isActionRunning())
-            return Bundle.getMessage("Running");
-        if (!isActionRan())
-            return NONE;
-        if (getAction() != null)
-            return isActionSuccessful() ? getAction().getActionSuccessfulString() : getAction().getActionFailedString();
-        else
-            return "unknown"; // NOI18N
+        if (getAction() != null) {
+            return getAction().getStatus();
+        }
+        return "unknown"; // NOI18N
     }
     
     public void reset() {
@@ -375,6 +370,7 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
         list.add(new BuildTrainIfSelectedAction());
         list.add(new PrintTrainManifestAction());
         list.add(new PrintTrainManifestIfSelectedAction());
+        list.add(new PrintTrainBuildReportAction());
         list.add(new RunTrainAction());
         list.add(new MoveTrainAction());
         list.add(new TerminateTrainAction());
@@ -387,16 +383,19 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
         list.add(new SelectTrainAction());
         list.add(new DeselectTrainAction());
         list.add(new PrintSwitchListAction());
-//        list.add(new PrintSwitchListChangesAction()); // see UpdateSwitchListAction
         list.add(new UpdateSwitchListAction());
         list.add(new WaitSwitchListAction());
         list.add(new GenerateSwitchListAction());
         list.add(new GenerateSwitchListChangesAction());
+        list.add(new ResetSwitchListsAction());
         list.add(new RunSwitchListAction());
         list.add(new RunSwitchListChangesAction());
         list.add(new RunAutomationAction());
         list.add(new ResumeAutomationAction());
         list.add(new StopAutomationAction());
+        list.add(new WaitAutomationAction());
+        list.add(new CounterAction());
+        list.add(new DownCounterAction());
         list.add(new MessageYesNoAction());
         list.add(new GotoAction());
         list.add(new GotoSuccessAction());
@@ -448,7 +447,7 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
             _train = InstanceManager.getDefault(TrainManager.class).getTrainById(a.getValue());
         }
         if ((a = e.getAttribute(Xml.ROUTE_LOCATION_ID)) != null && getTrain() != null) {
-            _routeLocation = getTrain().getRoute().getLocationById(a.getValue());
+            _routeLocation = getTrain().getRoute().getRouteLocationById(a.getValue());
         }
         if ((a = e.getAttribute(Xml.AUTOMATION_ID)) != null) {
             // in the process of loading automations, so we can't get them now, save id and get later.
@@ -535,6 +534,6 @@ public class AutomationItem extends PropertyChangeSupport implements java.beans.
         firePropertyChange(p, old, n);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AutomationItem.class);
+    private static final Logger log = LoggerFactory.getLogger(AutomationItem.class);
 
 }

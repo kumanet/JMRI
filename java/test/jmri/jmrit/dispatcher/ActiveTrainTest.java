@@ -13,7 +13,7 @@ public class ActiveTrainTest {
 
     @Test
     public void testCTor() {
-        jmri.Transit transit = new jmri.Transit("TT1");
+        jmri.Transit transit = new jmri.implementation.DefaultTransit("TT1");
         ActiveTrain t = new ActiveTrain(transit,"Train",ActiveTrain.USER);
         Assert.assertNotNull("exists",t);
     }
@@ -28,6 +28,6 @@ public class ActiveTrainTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ActiveTrainTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ActiveTrainTest.class);
 
 }

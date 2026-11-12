@@ -38,7 +38,7 @@ public class LnProgrammerManager extends DefaultProgrammerManager {
      * {@inheritDoc}
      */
     @Override
-    public AddressedProgrammer getAddressedProgrammer(boolean pLongAddress, int pAddress) {
+    protected AddressedProgrammer getConcreteAddressedProgrammer(boolean pLongAddress, int pAddress) {
         return new LnOpsModeProgrammer(memo, pAddress, pLongAddress);
     }
 
@@ -46,19 +46,19 @@ public class LnProgrammerManager extends DefaultProgrammerManager {
      * {@inheritDoc}
      */
     @Override
-    public AddressedProgrammer reserveAddressedProgrammer(boolean pLongAddress, int pAddress) {
+    protected AddressedProgrammer reserveConcreteAddressedProgrammer(boolean pLongAddress, int pAddress) {
         return null;
     }
 
     /**
      * Programming in Ops mode via the LocoNet cable.
      */
-    static final ProgrammingMode LOCONETOPSBOARD    = new ProgrammingMode("LOCONETOPSBOARD", Bundle.getMessage("LOCONETOPSBOARD"));
+    public static final ProgrammingMode LOCONETOPSBOARD    = new ProgrammingMode("LOCONETOPSBOARD", Bundle.getMessage("LOCONETOPSBOARD"));
 
     /**
      * Programming for LocoNet System Variables using version 1 of the protocol.
      */
-    static final ProgrammingMode LOCONETSV1MODE    = new ProgrammingMode("LOCONETSV1MODE", Bundle.getMessage("LOCONETSV1MODE"));
+    public static final ProgrammingMode LOCONETSV1MODE    = new ProgrammingMode("LOCONETSV1MODE", Bundle.getMessage("LOCONETSV1MODE"));
 
     /**
      * Programming for LocoNet System Variables using version 2 of the protocol.
@@ -70,16 +70,20 @@ public class LnProgrammerManager extends DefaultProgrammerManager {
      */
     public static final ProgrammingMode LOCONETLNCVMODE    = new ProgrammingMode("LOCONETLNCVMODE", Bundle.getMessage("LOCONETLNCVMODE"));
 
-
     /**
      * Programming via LocoNet messages for Digitrax DS*, PM*, BDL*, SE* boards
      */
-    static final ProgrammingMode LOCONETBDOPSWMODE = new ProgrammingMode("LOCONETBDOPSWMODE", Bundle.getMessage("LOCONETBDOPSWMODE"));
+    public static final ProgrammingMode LOCONETBDOPSWMODE = new ProgrammingMode("LOCONETBDOPSWMODE", Bundle.getMessage("LOCONETBDOPSWMODE"));
 
     /**
      * Programming via LocoNet messages for Digitrax Command Station op switches
      */
-    static final ProgrammingMode LOCONETCSOPSWMODE = new ProgrammingMode("LOCONETCSOPSWMODE", Bundle.getMessage("LOCONETCSOPSWMODE"));
+    public static final ProgrammingMode LOCONETCSOPSWMODE = new ProgrammingMode("LOCONETCSOPSWMODE", Bundle.getMessage("LOCONETCSOPSWMODE"));
+
+    /**
+     * Programming via LocoNet messages for Series 7* op switches
+     */
+    public static final ProgrammingMode LOCONETBD7OPSWMODE = new ProgrammingMode("LOCONETBD7OPSWMODE", Bundle.getMessage("LOCONETBD7OPSWMODE"));
 
     /**
      * Types implemented here.
@@ -89,6 +93,7 @@ public class LnProgrammerManager extends DefaultProgrammerManager {
     public List<ProgrammingMode> getDefaultModes() {
         List<ProgrammingMode> ret = new ArrayList<ProgrammingMode>();
         ret.add(ProgrammingMode.OPSBYTEMODE);
+        ret.add(LOCONETBD7OPSWMODE);
         ret.add(LOCONETOPSBOARD);
         ret.add(LOCONETSV2MODE);
         ret.add(LOCONETSV1MODE); // they show in the interface in the order listed here

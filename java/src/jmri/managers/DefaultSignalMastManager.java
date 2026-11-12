@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import jmri.*;
@@ -25,43 +26,62 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
 
     public DefaultSignalMastManager(InternalSystemConnectionMemo memo) {
         super(memo);
-        InstanceManager.getDefault(SignalHeadManager.class).addVetoableChangeListener(this);
-        InstanceManager.turnoutManagerInstance().addVetoableChangeListener(this);
+        repeaterList = new ArrayList<>();
+        addListeners();
     }
 
+    final void addListeners(){
+        signalHeadManager = InstanceManager.getDefault(SignalHeadManager.class);
+        signalHeadManager.addVetoableChangeListener(this);
+        turnoutManager = InstanceManager.getDefault(TurnoutManager.class);
+        turnoutManager.addVetoableChangeListener(this);
+    }
+
+    /**
+     * The SignalHeadManager and TurnoutManager this manager listens to for deletions, so that {@link #dispose()}
+     * stops listening to those, not to whatever the InstanceManager holds by then.
+     */
+    private SignalHeadManager signalHeadManager;
+    private TurnoutManager turnoutManager;
+
+    /** {@inheritDoc} */
     @Override
     public int getXMLOrder() {
         return Manager.SIGNALMASTS;
     }
 
+    /** {@inheritDoc} */
     @Override
     public char typeLetter() {
         return 'F';
     }
 
+    /**
+     * {@inheritDoc}
+     * Searches by UserName then SystemName.
+     */
     @Override
+    @CheckForNull
     public SignalMast getSignalMast(@Nonnull String name) {
         if (Objects.isNull(name) || name.length() == 0) {
             return null;
         }
         SignalMast t = getByUserName(name);
-        if (t != null) {
-            return t;
-        }
-
-        return getBySystemName(name);
+        return ( t != null ? t : getBySystemName(name));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
     public SignalMast provideSignalMast(@Nonnull String prefix, // nominally IF$shsm
                                         @Nonnull String signalSystem,
                                         @Nonnull String mastName,
-                                        @Nonnull String[] heads) {
+                                        @Nonnull String[] heads) throws JmriException {
         StringBuilder name = new StringBuilder(prefix);
         name.append(":");
         name.append(signalSystem);
         name.append(":");
+        name.append(mastName);
         for (String s : heads) {
             name.append("(");
             name.append(StringUtil.parenQuote(s));
@@ -70,13 +90,14 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
         return provideSignalMast(new String(name));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Nonnull
-    public SignalMast provideSignalMast(@Nonnull String name) {
+    public SignalMast provideSignalMast(@Nonnull String name) throws IllegalArgumentException {
         SignalMast m = getSignalMast(name);
         if (m == null) {
-            // this should be replaced by a Service based approach, 
-            // perhaps along the lines of SignalMastAddPane, but 
+            // this should be replaced by a Service based approach,
+            // perhaps along the lines of SignalMastAddPane, but
             // for now we manually check types
             if (name.startsWith("IF$shsm")) {
                 m = new SignalHeadSignalMast(name);
@@ -94,6 +115,7 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
         return m;
     }
 
+    /** {@inheritDoc} */
     @Nonnull
     @Override
     public SignalMast provideCustomSignalMast(@Nonnull String systemName, Class<? extends
@@ -118,12 +140,16 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
         return m;
     }
 
+    /** {@inheritDoc} */
     @Override
+    @CheckForNull
     public SignalMast getBySystemName(@Nonnull String key) {
         return _tsys.get(key);
     }
 
+    /** {@inheritDoc} */
     @Override
+    @CheckForNull
     public SignalMast getByUserName(@Nonnull String key) {
         return _tuser.get(key);
     }
@@ -142,7 +168,7 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
         return SignalMast.class;
     }
 
-    ArrayList<SignalMastRepeater> repeaterList = new ArrayList<>();
+    private final ArrayList<SignalMastRepeater> repeaterList;
 
     /**
      * Creates or retrieves a signal mast repeater.
@@ -167,34 +193,34 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
             rp = new SignalMastRepeater(master, slave);
             repeaterList.add(rp);
         }
-        firePropertyChange("repeaterlength", null, null);
+        firePropertyChange(PROPERTY_REPEATER_LENGTH, null, null);
         return rp;
     }
 
     public void addRepeater(SignalMastRepeater rp) throws JmriException {
         for (SignalMastRepeater rpeat : repeaterList) {
-            if (rpeat.getMasterMast() == rp.getMasterMast()
-                    && rpeat.getSlaveMast() == rp.getSlaveMast()) {
-                log.error("Signal repeater already Exists");
-                throw new JmriException("Signal mast Repeater already exists");
-            } else if (rpeat.getMasterMast() == rp.getSlaveMast()
-                    && rpeat.getSlaveMast() == rp.getMasterMast()) {
+            if  ( ( rpeat.getMasterMast() == rp.getMasterMast() && rpeat.getSlaveMast() == rp.getSlaveMast())
+                || ( rpeat.getMasterMast() == rp.getSlaveMast() && rpeat.getSlaveMast() == rp.getMasterMast()) ) {
                 log.error("Signal repeater already Exists");
                 throw new JmriException("Signal mast Repeater already exists");
             }
         }
         repeaterList.add(rp);
-        firePropertyChange("repeaterlength", null, null);
+        firePropertyChange(PROPERTY_REPEATER_LENGTH, null, null);
     }
 
     public void removeRepeater(SignalMastRepeater rp) {
         rp.dispose();
         repeaterList.remove(rp);
-        firePropertyChange("repeaterlength", null, null);
+        firePropertyChange(PROPERTY_REPEATER_LENGTH, null, null);
     }
 
+    /**
+     * Get the list of SignalMastRepeaters.
+     * @return copy of the list.
+     */
     public List<SignalMastRepeater> getRepeaterList() {
-        return repeaterList;
+        return new ArrayList<>(repeaterList);
     }
 
     public void initialiseRepeaters() {
@@ -203,10 +229,20 @@ public class DefaultSignalMastManager extends AbstractManager<SignalMast>
         }
     }
 
+    /** {@inheritDoc} */
+    @Nonnull
     @Override
     public SignalMast provide(String name) throws IllegalArgumentException {
         return provideSignalMast(name);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultSignalMastManager.class);
+    /** {@inheritDoc} */
+    @Override
+    public void dispose(){
+        signalHeadManager.removeVetoableChangeListener(this);
+        turnoutManager.removeVetoableChangeListener(this);
+        super.dispose();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultSignalMastManager.class);
 }

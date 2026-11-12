@@ -54,12 +54,12 @@ public class ListedTableAction extends AbstractAction {
         this(Bundle.getMessage("TitleListedTable"));
     }
 
-    ListedTableFrame f;
+    ListedTableFrame<?> f;
     int dividerLocation = 0;
 
     public void actionPerformed() {
         // create the JTable model, with changes for specific NamedBean
-        /* create the frame outside of swing so that we do not 
+        /* create the frame outside of swing so that we do not
          hog Swing/AWT execution, then finally display on Swing */
         Runnable r = new Runnable() {
             @Override
@@ -81,7 +81,7 @@ public class ListedTableAction extends AbstractAction {
                 } catch (InterruptedException ex) {
                     log.error("interrupted while setting ListedTable visible", ex );
                 }
-                
+
             }
         };
         Thread thr = jmri.util.ThreadingUtil.newThread(r, "Listed Table Generation");
@@ -93,13 +93,13 @@ public class ListedTableAction extends AbstractAction {
         actionPerformed();
     }
 
-    public void addToFrame(ListedTableFrame f) {
+    public void addToFrame(ListedTableFrame<?> f) {
     }
 
     String helpTarget() {
         return "package.jmri.jmrit.beantable.ListedTableAction";
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ListedTableAction.class);
+    private static final Logger log = LoggerFactory.getLogger(ListedTableAction.class);
 
 }

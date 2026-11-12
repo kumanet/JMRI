@@ -7,8 +7,6 @@ import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.jmrix.loconet.locobuffer.LocoBufferAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import purejavacomm.SerialPort;
-import purejavacomm.UnsupportedCommOperationException;
 
 /**
  * Override {@link jmri.jmrix.loconet.locobuffer.LocoBufferAdapter} so that it refers to the
@@ -29,28 +27,9 @@ public class PR4Adapter extends LocoBufferAdapter {
 
     }
 
-    /**
-     * Sets up the serial port characteristics.  Always uses flow control, which is
-     * not considered a user-settable option.  Sets the PR4 for the appropriate
-     * operating mode, based on the selected "command station type".
-     *
-     * @param activeSerialPort  the port to be configured
-     */
     @Override
-    protected void setSerialPort(SerialPort activeSerialPort) throws UnsupportedCommOperationException {
-        // find the baud rate value, configure comm options
-        int baud = currentBaudNumber(mBaudRate);
-        activeSerialPort.setSerialPortParams(baud, SerialPort.DATABITS_8,
-                SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-
-        // configure flow control to always on
-        int flow = SerialPort.FLOWCONTROL_RTSCTS_OUT;
-        if (getOptionState(option1Name).equals(validOption1[1])) {
-            flow = SerialPort.FLOWCONTROL_NONE;
-        }
-        configureLeadsAndFlowControl(activeSerialPort, flow);
-
-        log.info("PR4 adapter{}{} RTSCTS_OUT=" + SerialPort.FLOWCONTROL_RTSCTS_OUT + " RTSCTS_IN=" + SerialPort.FLOWCONTROL_RTSCTS_IN, activeSerialPort.getFlowControlMode() == SerialPort.FLOWCONTROL_RTSCTS_OUT ? " set hardware flow control, mode=" : " set no flow control, mode=", activeSerialPort.getFlowControlMode());
+    protected void reportOpen(String portName) {
+        log.info("Connecting PR4 via {} {}", portName, currentSerialPort);
     }
 
     /**
@@ -76,13 +55,14 @@ public class PR4Adapter extends LocoBufferAdapter {
             // end up with two "LocoNet" menus...)
             jmri.jmrix.loconet.pr2.LnPr2Packetizer packets =
                     new jmri.jmrix.loconet.pr2.LnPr2Packetizer(this.getSystemConnectionMemo());
+            packets.setLoconetUpdateSlotOnMessageCreation(Bundle.getMessage("ButtonYes").equals(getOptionState("LoconetUpdateSlotOnMessageCreation")));
             packets.connectPort(this);
 
             // set traffic controller and configure command station and mangers
             this.getSystemConnectionMemo().setLnTrafficController(packets);
             // do the common manager config
             this.getSystemConnectionMemo().configureCommandStation(commandStationType,
-                    mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable);  // never transponding!
+                    mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable, mInterrogateAtStart, mLoconetProtocolAutoDetect);  // never transponding!
             this.getSystemConnectionMemo().configureManagersPR2();
 
             // start operation
@@ -101,15 +81,18 @@ public class PR4Adapter extends LocoBufferAdapter {
             // MS100 modes - connecting to a separate command station
             // get transponding option
             setTranspondingAvailable(getOptionState("TranspondingPresent"));
+            setInterrogateOnStart(getOptionState("InterrogateOnStart"));
+            setLoconetProtocolAutoDetect(getOptionState("LoconetProtocolAutoDetect"));
             // connect to a packetizing traffic controller
             LnPacketizer packets = getPacketizer(getOptionState(option4Name));
+            packets.setLoconetUpdateSlotOnMessageCreation(Bundle.getMessage("ButtonYes").equals(getOptionState("LoconetUpdateSlotOnMessageCreation")));
             packets.connectPort(this);
 
             // set traffic controller and configure command station and mangers
             this.getSystemConnectionMemo().setLnTrafficController(packets);
             // do the common manager config
             this.getSystemConnectionMemo().configureCommandStation(commandStationType,
-                    mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable);
+                    mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable, mInterrogateAtStart, mLoconetProtocolAutoDetect);
 
             this.getSystemConnectionMemo().configureManagersMS100();
 
@@ -171,7 +154,7 @@ public class PR4Adapter extends LocoBufferAdapter {
         // Add "Standalone LocoNet" option
         // Note: PR4 does not provide "LocoNet Data Termination" and _requires_
         // some external source of that feature.
-        retval[retval.length - 1] = LnCommandStationType.COMMAND_STATION_STANDALONE.getName() + " (using external LocoNet Data Termination!)"; // NOI18N
+        retval[retval.length - 1] = LnCommandStationType.COMMAND_STATION_STANDALONE_EXT_TERM.getName(); // NOI18N
         return retval;
     }
 
@@ -185,5 +168,5 @@ public class PR4Adapter extends LocoBufferAdapter {
         return null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PR4Adapter.class);
+    private static final Logger log = LoggerFactory.getLogger(PR4Adapter.class);
 }

@@ -1,12 +1,11 @@
 package apps.util;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests for the apps.util.Log4JUtil class.
@@ -20,9 +19,9 @@ public class Log4JUtilTest {
         log.warn("WARN message succeeds");
         JUnitAppender.assertWarnMessage("WARN message succeeds");
 
-        log.debug("DEBUG message"); // should be suppressed see tests.lcf
+        log.debug("DEBUG message"); // should be suppressed see tests_lcf.xml
 
-        Assert.assertTrue(JUnitAppender.verifyNoBacklog());        
+        assertTrue(JUnitAppender.verifyNoBacklog());        
     }
 
     @Test
@@ -33,21 +32,21 @@ public class Log4JUtilTest {
         logger.log(java.util.logging.Level.WARNING, "j.u.l WARNING message");
         JUnitAppender.assertWarnMessage("j.u.l WARNING message");
 
-        logger.log(java.util.logging.Level.FINER, "j.u.l FINER message"); // should be suppressed see tests.lcf
+        logger.log(java.util.logging.Level.FINER, "j.u.l FINER message"); // should be suppressed see tests_lcf.xml
 
-        Assert.assertTrue(JUnitAppender.verifyNoBacklog());
+        assertTrue(JUnitAppender.verifyNoBacklog());
     }
-    
+
     @BeforeEach
-    public void setUp() throws Exception {
+    public void setUp() {
         JUnitUtil.setUp();
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
+    public void tearDown() {
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Log4JUtilTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Log4JUtilTest.class);
 
 }

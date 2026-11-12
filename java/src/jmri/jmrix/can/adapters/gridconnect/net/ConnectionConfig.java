@@ -1,7 +1,6 @@
 package jmri.jmrix.can.adapters.gridconnect.net;
 
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ResourceBundle;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
@@ -20,7 +19,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig {
 
-    public final static String NAME = "CAN via GridConnect Network Interface";
+    public static final String NAME = "CAN via GridConnect Network Interface";
 
     /**
      * Create a connection configuration with a preexisting adapter. This is
@@ -47,7 +46,7 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
     @Override
     public void loadDetails(JPanel details) {
         setInstance();
-        ConfigPaneHelper.maybeAddOpenLCBProtocolOptionsButton(this, additionalItems);
+        ConfigPaneHelper.maybeAddOpenLCBProtocolOptionsButton(this, getAdditionalItems());
         super.loadDetails(details);
     }
 
@@ -70,11 +69,8 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
 
         updateUserNameField();
 
-        ((JComboBox<Option>) options.get("Protocol").getComponent()).addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                updateUserNameField();
-            }
+        ((JComboBox<Option>) options.get("Protocol").getComponent()).addActionListener((ActionEvent e) -> {
+            updateUserNameField();
         });
     }
 
@@ -101,11 +97,8 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
     }
 
     /**
-     * Access to current selected command station mode
+     * {@inheritDoc}
      */
-    /*public String getMode() {
-     return opt2Box.getSelectedItem().toString();
-     }*/
     @Override
     public boolean isPortAdvanced() {
         return false;
@@ -129,6 +122,6 @@ public class ConnectionConfig extends jmri.jmrix.AbstractNetworkConnectionConfig
         return ResourceBundle.getBundle("jmri.jmrix.can.CanActionListBundle");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ConnectionConfig.class);
+    private static final Logger log = LoggerFactory.getLogger(ConnectionConfig.class);
 
 }

@@ -29,15 +29,24 @@ public class LocoNetInterfaceScaffold extends LnTrafficController {
     /**
      * Record LocoNet messages sent, provide access for making sure they are OK.
      */
-    public Vector<LocoNetMessage> outbound = new Vector<LocoNetMessage>();  // public OK here, so long as this is a test class
+    public Vector<LocoNetMessage> outbound = new Vector<>();  // public OK here, so long as this is a test class
+
+    public void clearReceivedMessages() {
+        outbound = new Vector<>();
+    }
 
     @Override
-    public void sendLocoNetMessage(LocoNetMessage m) {
-        log.debug("sendLocoNetMessage [{}]", m);
+    public void sendLocoNetMessage(LocoNetMessage m, boolean requestIgnoreEcho) {
+        log.debug("sendLocoNetMessage [{}] and requestIgnore Echo {}", m, requestIgnoreEcho);
         // save a copy
         outbound.addElement(m);
         // we don't return an echo so that the processing before the echo can be
         // separately tested
+    }
+
+    @Override
+    public void sendLocoNetMessage(LocoNetMessage m) {
+        sendLocoNetMessage(m, false);
     }
 
     @Override
@@ -77,6 +86,16 @@ public class LocoNetInterfaceScaffold extends LnTrafficController {
         return listeners;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LocoNetInterfaceScaffold.class);
+    /**
+     * Resets the outbound message log.
+     * {@inheritDoc }
+     */
+    @Override
+    public void resetStatistics() {
+        outbound.clear();
+        super.resetStatistics();
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(LocoNetInterfaceScaffold.class);
 
 }

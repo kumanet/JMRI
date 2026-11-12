@@ -1,17 +1,21 @@
 package jmri.jmrit.logixng.implementation.configurexml;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
 import jmri.jmrit.logixng.ConditionalNG_Manager;
 import jmri.jmrit.logixng.implementation.DefaultConditionalNGManager;
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
+
 import org.jdom2.Element;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-// import org.junit.Ignore;
-import org.junit.Test;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  *
@@ -22,23 +26,23 @@ public class DefaultConditionalNGManagerXmlTest {
     @Test
     public void testCTor() {
         DefaultConditionalNGManagerXml b = new DefaultConditionalNGManagerXml();
-        Assert.assertNotNull("exists", b);
+        assertNotNull( b, "exists");
     }
 
     @Test
     public void testLoad() {
         DefaultConditionalNGManagerXml b = new DefaultConditionalNGManagerXml();
-        Assert.assertNotNull("exists", b);
-        
+        assertNotNull( b, "exists");
+
         // Test loading a conditionalng without system name
         Element e = new Element("ConditionalNGs");
         Element e2 = new Element("ConditionalNG");
         e.addContent(e2);
         b.loadConditionalNGs(e);
         JUnitAppender.assertWarnMessage("unexpected null in systemName [Element: <ConditionalNG/>]");
-        
+
         // Fix this later!!!
-/***************************        
+/***************************
         // Test load ConditionalNG without attribute "enable"
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -47,7 +51,7 @@ public class DefaultConditionalNGManagerXmlTest {
         e2.addContent(eConditionals);
         e.addContent(e2);
         b.loadConditionalNGs(e);
-        
+
         // Test load ConditionalNG with bad conditionalng (no systemName in the conditionalNG)
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -60,7 +64,7 @@ public class DefaultConditionalNGManagerXmlTest {
         b.loadConditionalNGs(e);
 //        JUnitAppender.assertWarnMessage("unexpected null in systemName [Element: <ConditionalNG/>]");
 //        JUnitAppender.assertErrorMessage("exception thrown");
-        
+
         // Test loading a ConditionalNG that already exists
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -70,7 +74,7 @@ public class DefaultConditionalNGManagerXmlTest {
         e2.addContent(new Element("systemName").addContent(systemName));
         e.addContent(e2);
         b.loadConditionalNGs(e);
-        
+
         // Test load ConditionalNG with attribute "enable" as empty string
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -83,7 +87,7 @@ public class DefaultConditionalNGManagerXmlTest {
         ConditionalNG conditionalNG = InstanceManager.getDefault(ConditionalNG_Manager.class).getBySystemName("IQC1003");
         Assert.assertNotNull("bean is not null", conditionalNG);
         Assert.assertFalse("bean is not enabled", conditionalNG.isEnabled());
-        
+
         // Test load ConditionalNG with attribute "enable" as invalid value
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -96,7 +100,7 @@ public class DefaultConditionalNGManagerXmlTest {
         conditionalNG = InstanceManager.getDefault(ConditionalNG_Manager.class).getBySystemName("IQC1004");
         Assert.assertNotNull("bean is not null", conditionalNG);
         Assert.assertFalse("bean is not enabled", conditionalNG.isEnabled());
-        
+
         // Test load ConditionalNG with attribute "enable" as yes
         e = new Element("ConditionalNGs");
         e2 = new Element("ConditionalNG");
@@ -109,8 +113,8 @@ public class DefaultConditionalNGManagerXmlTest {
         conditionalNG = InstanceManager.getDefault(ConditionalNG_Manager.class).getBySystemName("IQC1005");
         Assert.assertNotNull("bean is not null", conditionalNG);
         Assert.assertTrue("bean is enabled", conditionalNG.isEnabled());
-        
-/*        
+
+/*
         // Test loading the same class twice, in order to check field "xmlClasses"
         e = new Element("ConditionalNGs");
         e2 = new Element("existing_class");
@@ -118,14 +122,14 @@ public class DefaultConditionalNGManagerXmlTest {
         e.addContent(e2);
         e2.addContent(new Element("systemName").addContent("IQAA1"));
         b.loadConditionalNGs(e);
-        
+
         e = new Element("ConditionalNGs");
         e2 = new Element("existing_class");
         e2.setAttribute("class", "jmri.jmrit.logixng.actions.configurexml.AnalogActionMemoryXml");
         e.addContent(e2);
         e2.addContent(new Element("systemName").addContent("IQAA2"));
         b.loadConditionalNGs(e);
-/*        
+/*
         // Test trying to load a class with private constructor
         e = new Element("ConditionalNGs");
         e2 = new Element("existing_class");
@@ -133,7 +137,7 @@ public class DefaultConditionalNGManagerXmlTest {
         e.addContent(e2);
         b.loadConditionalNGs(e);
         JUnitAppender.assertErrorMessage("cannot create constructor");
-        
+
         // Test trying to load a class which throws an exception
         e = new Element("ConditionalNGs");
         e2 = new Element("existing_class");
@@ -147,14 +151,14 @@ public class DefaultConditionalNGManagerXmlTest {
     @Test
     public void testStore() {
         DefaultConditionalNGManagerXml b = new DefaultConditionalNGManagerXml();
-        Assert.assertNotNull("exists", b);
+        assertNotNull( b, "exists");
         // Calling store() with null is OK.
         b.store((Object)null);
     }
 
     @Test
     public void testReplaceActionManagerWithoutConfigManager() {
-/*        
+/*
         // if old manager exists, remove it from configuration process
         if (InstanceManager.getNullableDefault(jmri.jmrit.logixng.AnalogActionManager.class) != null) {
             ConfigureManager cmOD = InstanceManager.getNullableDefault(jmri.ConfigureManager.class);
@@ -172,34 +176,33 @@ public class DefaultConditionalNGManagerXmlTest {
         if (cmOD != null) {
             cmOD.registerConfig(pManager, jmri.Manager.LOGIXNG_CONDITIONALNGS);
         }
-        
-        Assert.assertTrue("manager is a MyManager",
-                InstanceManager.getDefault(ConditionalNG_Manager.class)
-                        instanceof MyManager);
-        
+
+        assertInstanceOf( MyManager.class, InstanceManager.getDefault(ConditionalNG_Manager.class),
+            "manager is a MyManager");
+
         // Test replacing the manager
         DefaultConditionalNGManagerXml b = new DefaultConditionalNGManagerXml();
         b.replaceConditionalNGManager();
-        
-        Assert.assertFalse("manager is not a MyManager",
-                InstanceManager.getDefault(ConditionalNG_Manager.class)
-                        instanceof MyManager);
-        
+
+        assertFalse( InstanceManager.getDefault(ConditionalNG_Manager.class)
+            instanceof MyManager,
+                "manager is not a MyManager");
+
         // Test replace the manager when where is no manager registered yet
         InstanceManager.deregister(
                 InstanceManager.getDefault(ConditionalNG_Manager.class),
                 ConditionalNG_Manager.class);
-        
-        Assert.assertNotNull("manager is not null",
-                InstanceManager.getDefault(ConditionalNG_Manager.class));
+
+        assertNotNull( InstanceManager.getDefault(ConditionalNG_Manager.class),
+                "manager is not null");
     }
-    
-//    @Ignore("When debug is enabled, jmri.configurexml.ConfigXmlManager.registerConfig checks if the manager has a XML class, which our fake manager doesn't have")
+
+//    @Disabled("When debug is enabled, jmri.configurexml.ConfigXmlManager.registerConfig checks if the manager has a XML class, which our fake manager doesn't have")
     @Test
     public void testReplaceActionManagerWithConfigManager() {
-        
+
         JUnitUtil.initConfigureManager();
-/*        
+/*
         // if old manager exists, remove it from configuration process
         if (InstanceManager.getNullableDefault(jmri.jmrit.logixng.AnalogActionManager.class) != null) {
             ConfigureManager cmOD = InstanceManager.getNullableDefault(jmri.ConfigureManager.class);
@@ -217,22 +220,20 @@ public class DefaultConditionalNGManagerXmlTest {
         if (cmOD != null) {
             cmOD.registerConfig(pManager, jmri.Manager.LOGIXNG_CONDITIONALNGS);
         }
-        
-        Assert.assertTrue("manager is a MyManager",
-                InstanceManager.getDefault(ConditionalNG_Manager.class)
-                        instanceof MyManager);
-        
+
+        assertInstanceOf( MyManager.class, InstanceManager.getDefault(ConditionalNG_Manager.class),
+                "manager is a MyManager");
+
         // Test replacing the manager
         DefaultConditionalNGManagerXml b = new DefaultConditionalNGManagerXml();
         b.replaceConditionalNGManager();
-        
-        Assert.assertFalse("manager is not a MyManager",
-                InstanceManager.getDefault(ConditionalNG_Manager.class)
-                        instanceof MyManager);
+
+        assertFalse( InstanceManager.getDefault(ConditionalNG_Manager.class)
+            instanceof MyManager,
+                "manager is not a MyManager");
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -241,29 +242,30 @@ public class DefaultConditionalNGManagerXmlTest {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
-/*    
+
+/*
     private class MyConditionalNG extends jmri.jmrit.logixng.implementation.DefaultConditionalNG {
-        
+
         MyConditionalNG() {
             super("IQ9999");
         }
-        
+
     }
-    
-/*    
+
+/*
     // This class is loaded by reflection. The class cannot be private since
     // Spotbugs will in that case flag it as "is never used locally"
     class PrivateConstructorXml extends DefaultConditionalNGXml {
         private PrivateConstructorXml() {
         }
     }
-    
+
     // This class is loaded by reflection. The class cannot be private since
     // Spotbugs will in that case flag it as "is never used locally"
     class ThrowExceptionXml extends DefaultConditionalNGXml {
@@ -272,8 +274,8 @@ public class DefaultConditionalNGManagerXmlTest {
             throw new JmriConfigureXmlException();
         }
     }
-*/    
-    class MyManager extends DefaultConditionalNGManager {
+*/
+    static class MyManager extends DefaultConditionalNGManager {
     }
-    
+
 }

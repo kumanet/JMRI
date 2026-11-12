@@ -1,12 +1,11 @@
 package jmri;
 
-import java.util.Hashtable;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
+
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+
 import jmri.jmrit.display.layoutEditor.LayoutBlock;
-import jmri.jmrit.display.layoutEditor.LayoutEditor;
 import jmri.jmrit.display.layoutEditor.LevelXing;
 
 /**
@@ -25,19 +24,71 @@ public interface SignalMastLogic extends NamedBean {
      * signal mast logic are stored. Automatically generated details that have
      * been entered via the setAutoBean are not stored.
      */
-    public int STOREALL = 0;
+    int STOREALL = 0;
+    
     /**
      * Constant representing that only the basic Signal Mast Logic details are
      * stored. All details that determine the triggering of the logic are not
      * stored.
      */
-    public int STOREMASTSONLY = 2;
+    int STOREMASTSONLY = 2;
+    
     /**
      * Constant representing that this Signal Mast Logic is not stored with the
      * panel file. This is used where another piece of code uses handles the
      * dynamic creation of signalmast logic
      */
-    public int STORENONE = 4;
+    int STORENONE = 4;
+
+    /**
+     * String constant for sensors.
+     */
+    String PROPERTY_SENSORS = "sensors";
+
+    /**
+     * String constant for turnouts.
+     */
+    String PROPERTY_TURNOUTS = "turnouts";
+
+    /**
+     * String constant for auto turnouts.
+     */
+    String PROPERTY_AUTO_TURNOUTS = "autoturnouts";
+
+    /**
+     * String constant for blocks.
+     */
+    String PROPERTY_BLOCKS = "blocks";
+
+    /**
+     * String constant for auto blocks.
+     */
+    String PROPERTY_AUTO_BLOCKS = "autoblocks";
+
+    /**
+     * String constant for masts.
+     */
+    String PROPERTY_MASTS = "masts";
+
+    /**
+     * String constant for auto masts.
+     */
+    String PROPERTY_AUTO_MASTS = "automasts";
+
+    /**
+     * String constant for updated source.
+     */
+    String PROPERTY_UPDATED_SOURCE = "updatedSource";
+
+    /**
+     * String constant for updated destination.
+     */
+    String PROPERTY_UPDATED_DESTINATION = "updatedDestination";
+
+    /**
+     * String constant for length.
+     */
+    String PROPERTY_LENGTH = "length";
 
     /**
      * Query if we are allowing the system to automatically generate a list of
@@ -46,7 +97,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if this is allowed.
      */
-    public boolean allowAutoMaticSignalMastGeneration(SignalMast destination);
+    boolean allowAutoMaticSignalMastGeneration(SignalMast destination);
 
     /**
      * Sets whether we should allow the system to automatically generate a list
@@ -55,7 +106,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param allow       set true if we are to allow automatic generation.
      * @param destination controlled signal mast
      */
-    public void allowAutoMaticSignalMastGeneration(boolean allow, SignalMast destination);
+    void allowAutoMaticSignalMastGeneration(boolean allow, SignalMast destination);
 
     /**
      * Sets whether we should lock all turnouts between the source and
@@ -65,7 +116,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param lock        set true if the system should lock the turnout.
      * @param destination controlled signal mast
      */
-    public void allowTurnoutLock(boolean lock, SignalMast destination);
+    void allowTurnoutLock(boolean lock, SignalMast destination);
 
     /**
      * Returns true if any of the blocks in the supplied list are included in
@@ -74,7 +125,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param blks A list of Layout Blocks to query against
      * @return whether all supplied blocks are in at least one of the logics
      */
-    public boolean areBlocksIncluded(List<Block> blks);
+    boolean areBlocksIncluded(List<Block> blks);
 
     /**
      * Replace the existing source Signal Mast with another signal mast. This is
@@ -85,7 +136,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param oldMast Signal Mast currently configured as the source mast
      * @param newMast Signal Mast to act as the replacement source mast
      */
-    public void replaceSourceMast(SignalMast oldMast, SignalMast newMast);
+    void replaceSourceMast(SignalMast oldMast, SignalMast newMast);
 
     /**
      * Replace the existing destination Signal Mast with another signal mast.
@@ -96,14 +147,14 @@ public interface SignalMastLogic extends NamedBean {
      * @param oldMast Signal Mast currently configured as the destination mast
      * @param newMast Signal Mast to act as the replacement destination mast
      */
-    public void replaceDestinationMast(SignalMast oldMast, SignalMast newMast);
+    void replaceDestinationMast(SignalMast oldMast, SignalMast newMast);
 
     /**
      * Remove references to and from this object, so that it can eventually be
      * garbage-collected.
      */
     @Override
-    public void dispose();
+    void dispose();
 
     /**
      * Return the Section configured between the source and destination mast.
@@ -111,7 +162,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return The section object
      */
-    public Section getAssociatedSection(SignalMast destination);
+    Section getAssociatedSection(SignalMast destination);
 
     /**
      * Define a Section between the source and destination mast.
@@ -119,7 +170,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param sec         The section
      * @param destination controlled signal mast
      */
-    public void setAssociatedSection(Section sec, SignalMast destination);
+    void setAssociatedSection(Section sec, SignalMast destination);
 
     /**
      * Return the Set State of a control block as it is configured between the
@@ -130,7 +181,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return The int value representing the occupancy state that the block
      *         should show
      */
-    public int getAutoBlockState(Block block, SignalMast destination);
+    int getAutoBlockState(Block block, SignalMast destination);
 
     /**
      * Return all the blocks that have been detected as being in use for this
@@ -140,7 +191,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Block objects
      */
-    public List<Block> getAutoBlocks(SignalMast destination);
+    List<Block> getAutoBlocks(SignalMast destination);
 
     /**
      * Return a list of blocks just that have been detected as being directly
@@ -150,7 +201,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of block objects
      */
-    public List<Block> getAutoBlocksBetweenMasts(SignalMast destination);
+    @Nonnull
+    List<Block> getAutoBlocksBetweenMasts(SignalMast destination);
 
     /**
      * Return a list of control masts that have been automatically detected as
@@ -160,7 +212,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of signal mast objects
      */
-    public List<SignalMast> getAutoMasts(SignalMast destination);
+    List<SignalMast> getAutoMasts(SignalMast destination);
 
     /**
      * Return the Set State (Aspect) of a control mast as it is configured
@@ -170,7 +222,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return The name of the Aspect the Control Mast should display
      */
-    public String getAutoSignalMastState(SignalMast mast, SignalMast destination);
+    @CheckForNull
+    String getAutoSignalMastState(SignalMast mast, SignalMast destination);
 
     /**
      * Return the Set State of a control turnout as it is configured between the
@@ -180,7 +233,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return The name of the Aspect the Control Mast should display
      */
-    public int getAutoTurnoutState(Turnout turnout, SignalMast destination);
+    int getAutoTurnoutState(Turnout turnout, SignalMast destination);
 
     /**
      * Return only the turnouts that have been detected as being directly
@@ -190,7 +243,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of turnout objects
      */
-    public List<Turnout> getAutoTurnouts(SignalMast destination);
+    @Nonnull
+    List<Turnout> getAutoTurnouts(SignalMast destination);
 
     /**
      * Return the Set To State of a control block as it is configured between
@@ -200,7 +254,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return Integer representing the state the control block should be in
      */
-    public int getBlockState(Block block, SignalMast destination);
+    int getBlockState(Block block, SignalMast destination);
 
     /**
      * Return the Layout Blocks that have been defined by the user to control
@@ -209,7 +263,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Block objects
      */
-    public List<Block> getBlocks(SignalMast destination);
+    @Nonnull
+    List<Block> getBlocks(SignalMast destination);
 
     /**
      * Get the comment set on this SML.
@@ -218,7 +273,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return the comment or an empty string
      */
     @Nonnull
-    public String getComment(SignalMast destination);
+    String getComment(SignalMast destination);
 
     /**
      * Return a list of all Signal Masts that have been configured as
@@ -226,7 +281,8 @@ public interface SignalMastLogic extends NamedBean {
      *
      * @return A list of Signal Mast objects
      */
-    public List<SignalMast> getDestinationList();
+    @Nonnull
+    List<SignalMast> getDestinationList();
 
     /**
      * Get the Maximum Speed set for the destination Signal Mast in this SML.
@@ -234,7 +290,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination the destination mast
      * @return A number representing the speed
      */
-    public float getMaximumSpeed(SignalMast destination);
+    float getMaximumSpeed(SignalMast destination);
 
     /**
      * Return the number of current listeners defined on this SML.
@@ -243,7 +299,7 @@ public interface SignalMastLogic extends NamedBean {
      *         for some reason.
      */
     @Override
-    public int getNumPropertyChangeListeners();
+    int getNumPropertyChangeListeners();
 
     /**
      * Return the Set To State of a control Sensor as it is configured between
@@ -253,7 +309,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return Integer representing the state the control Sensor should be in
      */
-    public int getSensorState(Sensor sensor, SignalMast destination);
+    int getSensorState(Sensor sensor, SignalMast destination);
 
     /**
      * Return the Sensors that have been defined by the user to control the SML
@@ -262,7 +318,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Sensor objects
      */
-    public List<Sensor> getSensors(SignalMast destination);
+    @Nonnull
+    List<Sensor> getSensors(SignalMast destination);
 
     /**
      * Return the Sensors that have been defined by the user to control the SML
@@ -271,7 +328,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Sensor NamedBeanHandles
      */
-    public List<NamedBeanHandle<Sensor>> getNamedSensors(SignalMast destination);
+    @Nonnull
+    List<NamedBeanHandle<Sensor>> getNamedSensors(SignalMast destination);
 
     /**
      * Return the Set To State (Aspect) of a control Signal Mast as it is
@@ -282,7 +340,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return Integer representing the state the control Signal Mast should be
      *         in
      */
-    public String getSignalMastState(SignalMast mast, SignalMast destination);
+    String getSignalMastState(SignalMast mast, SignalMast destination);
 
     /**
      * Return the Signal Masts that have been defined by the user to control the
@@ -291,9 +349,15 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Signal Mast objects
      */
-    public List<SignalMast> getSignalMasts(SignalMast destination);
+    @Nonnull
+    List<SignalMast> getSignalMasts(SignalMast destination);
 
-    public SignalMast getSourceMast();
+    /**
+     * Get the Source Mast.
+     * @return Signal Mast object.
+     */ 
+    @Nonnull
+    SignalMast getSourceMast();
 
     /**
      * Return the Set State of a control Turnout as it is configured between the
@@ -303,7 +367,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return Integer representing the state the control Sensor should be in
      */
-    public int getTurnoutState(Turnout turnout, SignalMast destination);
+    int getTurnoutState(Turnout turnout, SignalMast destination);
 
     /**
      * Return the Turnouts that have been defined by the user to control the SML
@@ -312,7 +376,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Turnout objects
      */
-    public List<Turnout> getTurnouts(SignalMast destination);
+    @Nonnull
+    List<Turnout> getTurnouts(SignalMast destination);
 
     /**
      * Return the Turnouts that have been defined by the user to control the SML
@@ -321,20 +386,21 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return A list of Turnout NamedBeanHandles
      */
-    public List<NamedBeanHandle<Turnout>> getNamedTurnouts(SignalMast destination);
+    @Nonnull
+    List<NamedBeanHandle<Turnout>> getNamedTurnouts(SignalMast destination);
 
     /**
      * General method to initialise all SMLs on the source SIgnal Mast using
      * destList
      */
-    public void initialise();
+    void initialise();
 
     /**
      * Initialise the signal mast after all the parameters have been set.
      *
      * @param destination controlled signal mast
      */
-    public void initialise(SignalMast destination);
+    void initialise(SignalMast destination);
 
     /**
      * Query if the Signal Mast Logic from the current source signal mast to the
@@ -343,7 +409,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if active; false otherwise
      */
-    public boolean isActive(SignalMast destination);
+    boolean isActive(SignalMast destination);
 
     /**
      * Get the active destination Signal Mast for this Signal Mast Logic.
@@ -351,7 +417,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return the active signal mast or null if none
      */
     @CheckForNull
-    public SignalMast getActiveDestination();
+    SignalMast getActiveDestination();
 
     /**
      * Check whether the Block is part of at least one of the logics.
@@ -361,7 +427,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if block is included in any of the Signal Mast Logics that
      *         set destination
      */
-    public boolean isBlockIncluded(Block block, SignalMast destination);
+    boolean isBlockIncluded(Block block, SignalMast destination);
 
     /**
      * Check if signal mast is a destination signal mast in one of the logics
@@ -369,7 +435,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if destination is a destination mast in this object
      */
-    public boolean isDestinationValid(SignalMast destination);
+    boolean isDestinationValid(SignalMast destination);
 
     /**
      * Query if the Signal Mast Logic from the current source signal mast to the
@@ -378,7 +444,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if enabled
      */
-    public boolean isEnabled(SignalMast destination);
+    boolean isEnabled(SignalMast destination);
 
     /**
      * Check if a sensor is part of at least one of the logics that set a
@@ -389,7 +455,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if sensor is included in any of the Signal Mast Logics that
      *         set destination
      */
-    public boolean isSensorIncluded(Sensor sensor, SignalMast destination);
+    boolean isSensorIncluded(Sensor sensor, SignalMast destination);
 
     /**
      * Check if a signal mast is part of at least one of the logics that set
@@ -400,7 +466,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if signal is included in any of the Signal Mast Logics that
      *         set destination
      */
-    public boolean isSignalMastIncluded(SignalMast signal, SignalMast destination);
+    boolean isSignalMastIncluded(SignalMast signal, SignalMast destination);
 
     /**
      * Check if a turnout is part of at least one of the logics that set a
@@ -411,7 +477,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if turnout is included in any of the Signal Mast Logics that
      *         set destination
      */
-    public boolean isTurnoutIncluded(Turnout turnout, SignalMast destination);
+    boolean isTurnoutIncluded(Turnout turnout, SignalMast destination);
 
     /**
      * Query if we are allowing the system to lock turnouts when the logic goes
@@ -420,7 +486,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if locking is allowed.
      */
-    public boolean isTurnoutLockAllowed(SignalMast destination);
+    boolean isTurnoutLockAllowed(SignalMast destination);
 
     /**
      * Remove control elements for a SML pair containing a destination signal
@@ -429,7 +495,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param sm The destination Signal Mast
      * @param lx The LevelXing Layout Editor element
      */
-    public void removeConflictingLogic(SignalMast sm, LevelXing lx);
+    void removeConflictingLogic(SignalMast sm, LevelXing lx);
 
     /**
      * Remove the destination signal mast as a pair in this SML.
@@ -437,7 +503,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return true if there are no more destination signal masts
      */
-    public boolean removeDestination(SignalMast destination);
+    boolean removeDestination(SignalMast destination);
 
     /**
      * Set which blocks must be in a given state for the signal mast not to be
@@ -447,7 +513,7 @@ public interface SignalMastLogic extends NamedBean {
      *                    state to be checked
      * @param destination controlled signal mast
      */
-    public void setAutoBlocks(LinkedHashMap<Block, Integer> blocks, SignalMast destination);
+    void setAutoBlocks(LinkedHashMap<Block, Integer> blocks, SignalMast destination);
 
     /**
      * Set which control signal masts must be in a given state before our source
@@ -457,7 +523,7 @@ public interface SignalMastLogic extends NamedBean {
      *                    to state to be checked
      * @param destination controlled signal mast
      */
-    public void setAutoMasts(Hashtable<SignalMast, String> masts, SignalMast destination);
+    void setAutoMasts(Hashtable<SignalMast, String> masts, SignalMast destination);
 
     /**
      * Set which turnouts must be set to a given state for the signal mast not
@@ -467,7 +533,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param turnouts    map of turnouts and their respective set to state
      * @param destination controlled signal mast
      */
-    public void setAutoTurnouts(Hashtable<Turnout, Integer> turnouts, SignalMast destination);
+    void setAutoTurnouts(Hashtable<Turnout, Integer> turnouts, SignalMast destination);
 
     /**
      * Set which blocks must be in a given state for the signal mast not to be
@@ -476,7 +542,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param blocks      map of Blocks and their respective set to state
      * @param destination controlled signal mast
      */
-    public void setBlocks(Hashtable<Block, Integer> blocks, SignalMast destination);
+    void setBlocks(Hashtable<Block, Integer> blocks, SignalMast destination);
 
     /**
      * Set the comment for this SML.
@@ -484,7 +550,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param comment     text to add as comment
      * @param destination signal mast to add comment to
      */
-    public void setComment(String comment, SignalMast destination);
+    void setComment(String comment, SignalMast destination);
 
     /**
      * Add control elements for a SML pair containing a destination signal mast
@@ -494,42 +560,42 @@ public interface SignalMastLogic extends NamedBean {
      * @param sm The destination Signal Mast
      * @param lx The LevelXing Layout Editor element
      */
-    public void setConflictingLogic(SignalMast sm, LevelXing lx);
+    void setConflictingLogic(SignalMast sm, LevelXing lx);
 
     /**
      * Set the destination signal mast for this SML.
      *
      * @param destination controlled signal mast
      */
-    public void setDestinationMast(SignalMast destination);
+    void setDestinationMast(SignalMast destination);
 
     /**
      * Set the logic to the destination signal mast to Disabled.
      *
      * @param destination controlled signal mast
      */
-    public void setDisabled(SignalMast destination);
+    void setDisabled(SignalMast destination);
 
     /**
      * Set the logic to the destination signal mast to Enabled.
      *
      * @param destination controlled signal mast
      */
-    public void setEnabled(SignalMast destination);
+    void setEnabled(SignalMast destination);
 
     /**
      * Set the block facing our source signal mast.
      *
      * @param facing The Layout Block facing the source Signal Mast
      */
-    public void setFacingBlock(LayoutBlock facing);
+    void setFacingBlock(LayoutBlock facing);
 
     /**
      * Get the block defined as facing our source signal mast.
      *
      * @return The Layout Block facing the source Signal Mast
      */
-    public LayoutBlock getFacingBlock();
+    LayoutBlock getFacingBlock();
 
     /**
      * Set which control signal masts must be in a given state before our source
@@ -539,7 +605,7 @@ public interface SignalMastLogic extends NamedBean {
      *                    states to be checked
      * @param destination controlled signal mast
      */
-    public void setMasts(Hashtable<SignalMast, String> masts, SignalMast destination);
+    void setMasts(Hashtable<SignalMast, String> masts, SignalMast destination);
 
     /**
      * Set which sensors must be in a given state before our source signal mast
@@ -548,7 +614,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param sensors     The {@link Sensor}s to be checked
      * @param destination controlled signal mast
      */
-    public void setSensors(Hashtable<NamedBeanHandle<Sensor>, Integer> sensors, SignalMast destination);
+    void setSensors(Hashtable<NamedBeanHandle<Sensor>, Integer> sensors, SignalMast destination);
 
     /**
      * Add an individual control Sensor and its set to state to the Signal Mast
@@ -559,7 +625,7 @@ public interface SignalMastLogic extends NamedBean {
      *                    should be in
      * @param destination controlled signal mast
      */
-    public void addSensor(String sensorName, int state, SignalMast destination);
+    void addSensor(String sensorName, int state, SignalMast destination);
 
     /**
      * Remove an individual control Sensor from the Signal Mast Logic.
@@ -567,7 +633,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param sensorName  The sensor to be removed
      * @param destination controlled signal mast
      */
-    public void removeSensor(String sensorName, SignalMast destination);
+    void removeSensor(String sensorName, SignalMast destination);
 
     /**
      * Determine if the signal mast logic is stored in the panel file and if all
@@ -577,7 +643,7 @@ public interface SignalMastLogic extends NamedBean {
      *                    {@link #STORENONE}
      * @param destination controlled signal mast
      */
-    public void setStore(int store, SignalMast destination);
+    void setStore(int store, SignalMast destination);
 
     /**
      * Return where the signal mast logic should be stored, if so how much.
@@ -586,7 +652,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return one of {@link #STOREALL}, {@link #STOREMASTSONLY} or
      *         {@link #STORENONE}
      */
-    public int getStoreState(SignalMast destination);
+    int getStoreState(SignalMast destination);
 
     /**
      * Set the states that each control turnout must be in for the source signal
@@ -596,13 +662,13 @@ public interface SignalMastLogic extends NamedBean {
      *                    state to check
      * @param destination controlled signal mast
      */
-    public void setTurnouts(Hashtable<NamedBeanHandle<Turnout>, Integer> turnouts, SignalMast destination);
+    void setTurnouts(Hashtable<NamedBeanHandle<Turnout>, Integer> turnouts, SignalMast destination);
 
     /**
      * Set up a Signal Mast Logic from the Layout Editor panel where its source
      * Signal Mast is present, when useLayoutEditor is set to true.
      */
-    public void setupLayoutEditorDetails();
+    void setupLayoutEditorDetails();
 
     /**
      * Set whether this logic should use the details stored in the Layout Editor
@@ -614,7 +680,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination the Destination Signal Mast
      * @throws jmri.JmriException if a path on the layout editor is not valid
      */
-    public void useLayoutEditor(boolean boo, SignalMast destination) throws JmriException;
+    void useLayoutEditor(boolean boo, SignalMast destination) throws JmriException;
 
     /**
      * Query if we are using the Layout Editor panels to build the signal mast
@@ -624,7 +690,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if we are using the Layout Editor to build the signal mast
      *         logic.
      */
-    public boolean useLayoutEditor(SignalMast destination);
+    boolean useLayoutEditor(SignalMast destination);
 
     /**
      * Query if we are using the Layout Editor block information in the signal
@@ -634,7 +700,7 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if we are using the block information from the Layout
      *         Editor.
      */
-    public boolean useLayoutEditorBlocks(SignalMast destination);
+    boolean useLayoutEditorBlocks(SignalMast destination);
 
     /**
      * Set whether this logic should use the information from the Layout Editor
@@ -647,7 +713,7 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination Destination Signal Mast
      * @throws jmri.JmriException if a path on the layout editor is not valid
      */
-    public void useLayoutEditorDetails(boolean turnouts, boolean blocks, SignalMast destination) throws JmriException;
+    void useLayoutEditorDetails(boolean turnouts, boolean blocks, SignalMast destination) throws JmriException;
 
     /**
      * Query if we are using the Layout Editor turnout information in the signal
@@ -657,26 +723,26 @@ public interface SignalMastLogic extends NamedBean {
      * @return true if we are using the turnout information from the Layout
      *         Editor.
      */
-    public boolean useLayoutEditorTurnouts(SignalMast destination);
+    boolean useLayoutEditorTurnouts(SignalMast destination);
 
     /**
      * Set direction sensors in SML need to autoActiveTrains.
      * @return number of errors
      */
-    public int setupDirectionSensors();
+    int setupDirectionSensors();
 
     /**
      * remove direction sensors from SML need to autoActiveTrains.
      */
-    public void removeDirectionSensors();
+    void removeDirectionSensors();
 
-    public void disableLayoutEditorUse();
-
-    @Override
-    public void removePropertyChangeListener(java.beans.PropertyChangeListener l);
+    void disableLayoutEditorUse();
 
     @Override
-    public void addPropertyChangeListener(java.beans.PropertyChangeListener l);
+    void removePropertyChangeListener(java.beans.PropertyChangeListener l);
+
+    @Override
+    void addPropertyChangeListener(java.beans.PropertyChangeListener l);
 
     /**
      * Get the block that the source signal is protecting on the path to the
@@ -685,7 +751,8 @@ public interface SignalMastLogic extends NamedBean {
      * @param destination controlled signal mast
      * @return the Layout Block
      */
-    public LayoutBlock getProtectingBlock(SignalMast destination);
+    @CheckForNull
+    LayoutBlock getProtectingBlock(@Nonnull SignalMast destination);
 
     /**
      * Set the auto turnouts based upon a given list of layout blocks for a
@@ -697,9 +764,10 @@ public interface SignalMastLogic extends NamedBean {
      *         plus any blocks found on double cross-overs that also need to be
      *         un-occupied.
      */
-    public LinkedHashMap<Block, Integer> setupLayoutEditorTurnoutDetails(List<LayoutBlock> blks, SignalMast destination);
+    @Nonnull
+    LinkedHashMap<Block, Integer> setupLayoutEditorTurnoutDetails(List<LayoutBlock> blks, SignalMast destination);
 
     @Override
-    public void vetoableChange(java.beans.PropertyChangeEvent evt) throws java.beans.PropertyVetoException;
+    void vetoableChange(java.beans.PropertyChangeEvent evt) throws java.beans.PropertyVetoException;
 
 }

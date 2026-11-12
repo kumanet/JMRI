@@ -9,7 +9,7 @@ import jmri.ProgrammingMode;
 import jmri.jmrix.AbstractProgrammer;
 
 /**
- * Programmer support for DCC++.
+ * Programmer support for DCC-EX.
  * <p>
  * The read operation state sequence is:
  * <ul>
@@ -27,24 +27,24 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
     // NOTE: We will embed the command opcode in the CALLBACKSUB field
     // so that we can tell what type of message the response keys to.
 
-    static protected final int DCCppProgrammerTimeout = 90000;
+    protected static final int DCCppProgrammerTimeout = 90000;
 
     // keep track of whether or not the command station is in service 
     // mode.  Used for determining if "OK" message is an aproriate 
     // response to a request to a programming request. 
-    protected boolean _service_mode = false;  // TODO: Is this even meaningful for DCC++?
+    protected boolean _service_mode = false;  // TODO: Is this even meaningful for DCC-EX?
 
-    public DCCppProgrammer(DCCppTrafficController tc) {
+    protected static final int LISTENER_MASK = DCCppInterface.CS_INFO | DCCppInterface.COMMINFO | DCCppInterface.INTERFACE;
+
+    public DCCppProgrammer(@Nonnull DCCppTrafficController tc) {
         // error if more than one constructed?
-
         _controller = tc;
+        init();
+    }
 
+    private void init() {
         // connect to listen
-        controller().addDCCppListener(DCCppInterface.CS_INFO
-                | DCCppInterface.COMMINFO
-                | DCCppInterface.INTERFACE,
-                this);
-
+        controller().addDCCppListener(LISTENER_MASK, this);
         setMode(ProgrammingMode.DIRECTBYTEMODE);
     }
 
@@ -93,9 +93,7 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
      */
     @Override
     public boolean getCanWrite(String addr) {
-        if (log.isDebugEnabled()) {
-            log.debug("check CV {}", addr);
-        }
+        log.debug("check CV {}", addr);
         log.debug("cs Type: {} CS Build: {}", controller().getCommandStation().getStationType(), controller().getCommandStation().getBuild());
         if (!getCanWrite()) {
             return false; // check basic implementation first
@@ -116,9 +114,9 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
 
     // members for handling the programmer interface
     protected int progState = 0;
-    static protected final int NOTPROGRAMMING = 0; // is notProgramming
-    static protected final int REQUESTSENT = 1; // waiting reply to command to go into programming mode
-    static protected final int INQUIRESENT = 2; // read/write command sent, waiting reply
+    protected static final int NOTPROGRAMMING = 0; // is notProgramming
+    protected static final int REQUESTSENT = 1; // waiting reply to command to go into programming mode
+    protected static final int INQUIRESENT = 2; // read/write command sent, waiting reply
     protected boolean _progRead = false;
     protected int _val; // remember the value being read/written for confirmative reply
     protected int _cv; // remember the cv being read/written
@@ -146,7 +144,12 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
 
         // format and send message to go to program mode
         if (getMode().equals(ProgrammingMode.DIRECTBYTEMODE)) {
-            DCCppMessage msg = DCCppMessage.makeWriteDirectCVMsg(CV, val);
+            DCCppMessage msg;
+            if (controller().getCommandStation().isProgramV4Supported()) { //drops the callbacks
+                msg = DCCppMessage.makeWriteDirectCVMsgV4(CV, val);
+            } else {
+                msg = DCCppMessage.makeWriteDirectCVMsg(CV, val); //older syntax with dummy callbacks
+            }
             controller().sendDCCppMessage(msg, this);
         }
     }
@@ -226,7 +229,7 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
                 m.getElement(0) == DCCppConstants.VERIFY_REPLY) {
             if (log.isDebugEnabled()) {
                 log.debug("reply in REQUESTSENT state");
-                log.debug("DCC++ Program or Verify Reply value = {}", m.getCVString());
+                log.debug("DCC-EX Program or Verify Reply value = {}", m.getCVString());
             }
             _val = m.getReadValueInt();
             progState = NOTPROGRAMMING;
@@ -293,12 +296,19 @@ public class DCCppProgrammer extends AbstractProgrammer implements DCCppListener
         notifyProgListenerEnd(temp,value,status);
     }
 
-    DCCppTrafficController _controller;
+    private final DCCppTrafficController _controller;
 
     protected DCCppTrafficController controller() {
         return _controller;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DCCppProgrammer.class);
+    @Override
+    public void dispose() {
+        if ( _controller != null ) {
+            _controller.removeDCCppListener(LISTENER_MASK, this);
+        }
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DCCppProgrammer.class);
 
 }

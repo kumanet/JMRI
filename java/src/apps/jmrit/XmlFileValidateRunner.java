@@ -1,14 +1,7 @@
 package apps.jmrit;
 
-import jmri.jmrit.*;
-
 import java.awt.Component;
 import java.io.File;
-
-import jmri.util.swing.WindowInterface;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Make sure an XML file is readable, and validates OK against its schema and
@@ -35,13 +28,15 @@ public class XmlFileValidateRunner extends jmri.jmrit.XmlFileValidateAction {
     }
 
     // Main entry point fires the action
-    static public void main(String[] args) {
+    public static void main(String[] args) {
         // if a 1st argument provided, act
         if (args.length == 0) {
             new XmlFileValidateRunner("", (Component) null).actionPerformed(null);
         } else {
-            apps.util.Log4JUtil.initLogging("default.lcf");
+            apps.util.Log4JUtil.initLogging("default_lcf.xml");
             new XmlFileValidateRunner("", (Component) null) {
+                @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value="SLF4J_SIGN_ONLY_FORMAT",
+                                                                    justification="I18N of log message")
                 @Override
                 protected void showFailResults(Component who, String fileName, String text) {
                     log.error("{}: {}", Bundle.getMessage("ValidationErrorInFile", fileName), text);
@@ -55,7 +50,6 @@ public class XmlFileValidateRunner extends jmri.jmrit.XmlFileValidateAction {
         }
     }
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(XmlFileValidateRunner.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(XmlFileValidateRunner.class);
 
 }

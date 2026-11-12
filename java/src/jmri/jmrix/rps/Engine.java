@@ -550,7 +550,7 @@ public class Engine implements ReadingListener {
                 // use throttle; first, get throttle
                 if (t.checkInit()) {
                     // now send F2
-                    t.getThrottle().setF2(true);
+                    t.getThrottle().setFunction(2, true);
                 } else {
                     return;  // bail if not ready
                 }
@@ -574,7 +574,7 @@ public class Engine implements ReadingListener {
                 // use throttle; first, get throttle
                 if (t.checkInit()) {
                     // now send F2
-                    t.getThrottle().setF2(false);
+                    t.getThrottle().setFunction(2, false);
                 } else {
                     return;  // bail if not ready
                 }
@@ -591,11 +591,10 @@ public class Engine implements ReadingListener {
     }
 
     // for now, we only allow one Engine
-    @SuppressFBWarnings(value = "MS_PKGPROTECT") // for tests
     static volatile protected Engine _instance = null;
 
     @SuppressFBWarnings(value = "LI_LAZY_INIT_UPDATE_STATIC") // see comment in method
-    static public Engine instance() {
+    public static Engine instance() {
         if (_instance == null) {
             // NOTE: _instance has to be initialized before loadValues()
             // is called, because it invokes instance() indirectly.
@@ -616,6 +615,6 @@ public class Engine implements ReadingListener {
         prop.addPropertyChangeListener(p);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Engine.class);
+    private static final Logger log = LoggerFactory.getLogger(Engine.class);
 
 }

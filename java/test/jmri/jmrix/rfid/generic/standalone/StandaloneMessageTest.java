@@ -17,11 +17,12 @@ public class StandaloneMessageTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new StandaloneMessage(5);
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(StandaloneMessageTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(StandaloneMessageTest.class);
 }

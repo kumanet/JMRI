@@ -47,14 +47,13 @@ public class LnSensor extends AbstractSensor  {
 
     /**
      * Request an update on status by sending a LocoNet message.
+     * The only known way to do this from LocoNet is to request the
+     * status of _all_ devices, which is here considered too
+     * heavyweight.
+     * See LnSensorManager.updateAll()
      */
     @Override
     public void requestUpdateFromLayout() {
-        // the only known way to do this from LocoNet is to request the
-        // status of _all_ devices, which is here considered too
-        // heavyweight.  Perhaps this is telling us we need
-        // a "update all" in the SensorManager (and/or TurnoutManager)
-        // interface?
     }
 
     /**
@@ -103,12 +102,12 @@ public class LnSensor extends AbstractSensor  {
                         if (log.isDebugEnabled()) {
                             log.debug("Set ACTIVE"); // NOI18N
                         }
-                        setOwnState(Sensor.ACTIVE);
+                        setOwnState(Sensor.ACTIVE, l.getReceivedTime());
                     } else if ((!state) && getRawState() != Sensor.INACTIVE) {
                         if (log.isDebugEnabled()) {
                             log.debug("Set INACTIVE"); // NOI18N
                         }
-                        setOwnState(Sensor.INACTIVE);
+                        setOwnState(Sensor.INACTIVE, l.getReceivedTime());
                     }
                 }
                 return;
@@ -119,6 +118,6 @@ public class LnSensor extends AbstractSensor  {
         // reach here only in error
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnSensor.class);
+    private static final Logger log = LoggerFactory.getLogger(LnSensor.class);
 
 }

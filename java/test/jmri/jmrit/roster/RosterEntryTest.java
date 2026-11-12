@@ -9,26 +9,26 @@ import jmri.InstanceManager;
 import jmri.util.*;
 
 import org.jdom2.JDOMException;
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
  * Tests for the jmrit.roster.RosterEntry class.
  *
- * @author Bob Jacobsen Copyright (C) 2001, 2002, 2018
+ * @author Bob Jacobsen Copyright (C) 2001, 2002, 2018, 2025
  */
 public class RosterEntryTest {
 
     @Test
     public void testCreate() {
         RosterEntry r = new RosterEntry("file here");
-        Assert.assertEquals("file name ", "file here", r.getFileName());
-        Assert.assertEquals("DCC Address ", "3", r.getDccAddress());
-        Assert.assertEquals("road name ", "", r.getRoadName());
-        Assert.assertEquals("road number ", "", r.getRoadNumber());
-        Assert.assertEquals("manufacturer ", "", r.getMfg());
-        Assert.assertEquals("model ", "", r.getDecoderModel());
-        Assert.assertEquals("family ", "", r.getDecoderFamily());
+        Assertions.assertEquals("file here", r.getFileName(), "file name ");
+        Assertions.assertEquals("3", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("", r.getRoadName(), "road name ");
+        Assertions.assertEquals("", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("", r.getMfg(), "manufacturer ");
+        Assertions.assertEquals("", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("", r.getProgrammingModes(), "programmingModes ");
     }
 
     @Test
@@ -51,13 +51,14 @@ public class RosterEntryTest {
 
         RosterEntry r = new RosterEntry(e);
         // check
-        Assert.assertEquals("file name ", "file here", r.getFileName());
-        Assert.assertEquals("DCC Address ", "1234", r.getDccAddress());
-        Assert.assertEquals("road name ", "SP", r.getRoadName());
-        Assert.assertEquals("road number ", "431", r.getRoadNumber());
-        Assert.assertEquals("manufacturer ", "Athearn", r.getMfg());
-        Assert.assertEquals("model ", "", r.getDecoderModel());
-        Assert.assertEquals("family ", "", r.getDecoderFamily());
+        Assertions.assertEquals("file here", r.getFileName(), "file name ");
+        Assertions.assertEquals("1234", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("SP", r.getRoadName(), "road name ");
+        Assertions.assertEquals("431", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("Athearn", r.getMfg(), "manufacturer ");
+        Assertions.assertEquals("", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("", r.getProgrammingModes(), "programmingModes ");
     }
 
     @Test
@@ -73,13 +74,14 @@ public class RosterEntryTest {
             }
         };
         // check
-        Assert.assertEquals("file name ", "file here", r.getFileName());
-        Assert.assertEquals("DCC Address ", "3", r.getDccAddress());
-        Assert.assertEquals("road name ", "", r.getRoadName());
-        Assert.assertEquals("road number ", "", r.getRoadNumber());
-        Assert.assertEquals("manufacturer ", "", r.getMfg());
-        Assert.assertEquals("model ", "", r.getDecoderModel());
-        Assert.assertEquals("family ", "", r.getDecoderFamily());
+        Assertions.assertEquals("file here", r.getFileName(), "file name ");
+        Assertions.assertEquals("3", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("", r.getRoadName(), "road name ");
+        Assertions.assertEquals("", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("", r.getMfg(), "manufacturer ");
+        Assertions.assertEquals("", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("", r.getProgrammingModes(), "programmingModes ");
     }
 
     @Test
@@ -92,6 +94,7 @@ public class RosterEntryTest {
                 .setAttribute("roadName", "SP")
                 .setAttribute("mfg", "Athearn")
                 .setAttribute("dccAddress", "1234")
+                .setAttribute("decoderModes", "AMODE")
                 .addContent(new org.jdom2.Element("decoder")
                         .setAttribute("family", "91")
                         .setAttribute("model", "33")
@@ -104,46 +107,63 @@ public class RosterEntryTest {
         };
 
         // check
-        Assert.assertEquals("file name ", "file here", r.getFileName());
-        Assert.assertEquals("DCC Address ", "1234", r.getDccAddress());
-        Assert.assertEquals("road name ", "SP", r.getRoadName());
-        Assert.assertEquals("road number ", "431", r.getRoadNumber());
-        Assert.assertEquals("manufacturer ", "Athearn", r.getMfg());
-        Assert.assertEquals("model ", "33", r.getDecoderModel());
-        Assert.assertEquals("family ", "91", r.getDecoderFamily());
+        Assertions.assertEquals("file here", r.getFileName(), "file name ");
+        Assertions.assertEquals("1234", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("SP", r.getRoadName(), "road name ");
+        Assertions.assertEquals("431", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("Athearn", r.getMfg(), "manufacturer ");
+        Assertions.assertEquals("33", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("91", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("AMODE", r.getProgrammingModes(), "programmingModes ");
     }
 
     @Test
     public void testFromSchemaFile() throws JDOMException, IOException {
-        
+
         // Create a RosterEntry from a test xml file
         // This one references the Schema version
         RosterEntry r = RosterEntry.fromFile(new File("java/test/jmri/jmrit/roster/ACL1012-Schema.xml"));
 
         // check for various values
-        Assert.assertEquals("file name ", "ACL1012-Schema.xml", r.getFileName());
-        Assert.assertEquals("DCC Address ", "1012", r.getDccAddress());
-        Assert.assertEquals("road name ", "Atlantic Coast Line", r.getRoadName());
-        Assert.assertEquals("road number ", "1012", r.getRoadNumber());
-        Assert.assertEquals("model ", "Synch Diesel Sound 1812 - N Scale Atlas Short Board Dropin", r.getDecoderModel());
-        Assert.assertEquals("family ", "Brilliance Sound Decoders", r.getDecoderFamily());
+        Assertions.assertEquals("ACL1012-Schema.xml", r.getFileName(), "file name ");
+        Assertions.assertEquals("1012", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("Atlantic Coast Line", r.getRoadName(), "road name ");
+        Assertions.assertEquals("1012", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("Synch Diesel Sound 1812 - N Scale Atlas Short Board Dropin", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("Brilliance Sound Decoders", r.getDecoderFamily(), "family ");
     }
 
     @Test
     public void testFromDtdFile() throws JDOMException, IOException {
-        
+
         // Create a RosterEntry from a test xml file
         // This one references the DTD to make sure that still works
         // post migration
         RosterEntry r = RosterEntry.fromFile(new File("java/test/jmri/jmrit/roster/ACL1012-DTD.xml"));
 
         // check for various values
-        Assert.assertEquals("file name ", "ACL1012-DTD.xml", r.getFileName());
-        Assert.assertEquals("DCC Address ", "1012", r.getDccAddress());
-        Assert.assertEquals("road name ", "Atlantic Coast Line", r.getRoadName());
-        Assert.assertEquals("road number ", "1012", r.getRoadNumber());
-        Assert.assertEquals("model ", "Synch Diesel Sound 1812 - N Scale Atlas Short Board Dropin", r.getDecoderModel());
-        Assert.assertEquals("family ", "Brilliance Sound Decoders", r.getDecoderFamily());
+        Assertions.assertEquals("ACL1012-DTD.xml", r.getFileName(), "file name ");
+        Assertions.assertEquals("1012", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("Atlantic Coast Line", r.getRoadName(), "road name ");
+        Assertions.assertEquals("1012", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("Synch Diesel Sound 1812 - N Scale Atlas Short Board Dropin", r.getDecoderModel(), "model ");
+        Assertions.assertEquals("Brilliance Sound Decoders", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("", r.getProgrammingModes(), "programmingModes ");
+    }
+
+    @Test
+    public void testFromExistingEntry() throws JDOMException, IOException {
+
+        RosterEntry re = new RosterEntry(RosterEntry.fromFile(
+            new File("java/test/jmri/jmrit/roster/ACL1012-Schema.xml")),"New pID");
+        Assertions.assertNotNull(re);
+        Assertions.assertEquals( "New pID", re.getId());
+        Assertions.assertNull( re.getFileName(), "no file name");
+        Assertions.assertEquals( "1012", re.getDccAddress(), "DCC Address");
+        Assertions.assertEquals( "Atlantic Coast Line", re.getRoadName(), "road name");
+        Assertions.assertEquals( "1012", re.getRoadNumber(), "road number");
+        Assertions.assertEquals( "Synch Diesel Sound 1812 - N Scale Atlas Short Board Dropin", re.getDecoderModel());
+        Assertions.assertEquals( "Brilliance Sound Decoders", re.getDecoderFamily(), "family");
     }
 
     @Test
@@ -151,9 +171,8 @@ public class RosterEntryTest {
         RosterEntry r = new RosterEntry("file here");
 
         r.setFunctionLabel(3, "tree");
-        Assert.assertEquals("tree", r.getFunctionLabel(3));
-        Assert.assertEquals(null, r.getFunctionLabel(4));
-
+        Assertions.assertEquals("tree", r.getFunctionLabel(3));
+        Assertions.assertNull(r.getFunctionLabel(4));
     }
 
     @Test
@@ -162,8 +181,8 @@ public class RosterEntryTest {
 
         r.setId("test Id");
         r.setDateUpdated("unparseable date");
-        
-        jmri.util.JUnitAppender.assertWarnMessage("Unable to parse \"unparseable date\" as a date in roster entry \"test Id\"."); 
+
+        jmri.util.JUnitAppender.assertWarnMessage("Unable to parse \"unparseable date\" as a date in roster entry \"test Id\".");
     }
 
     @Test
@@ -178,9 +197,9 @@ public class RosterEntryTest {
         } finally {
             TimeZone.setDefault(tz);
         }
-        
-        Assert.assertTrue(jmri.util.JUnitAppender.verifyNoBacklog()); 
-        Assert.assertEquals("2015-10-03T18:19:12.000+0000", r.getDateUpdated());
+
+        Assertions.assertTrue(JUnitAppender.verifyNoBacklog());
+        Assertions.assertEquals("2015-10-03T18:19:12.000+00:00", r.getDateUpdated());
     }
 
     @Test
@@ -189,9 +208,21 @@ public class RosterEntryTest {
 
         r.setId("test Id");
         r.setDateUpdated("2018-03-05T02:34:55Z");
-        
-        Assert.assertTrue(jmri.util.JUnitAppender.verifyNoBacklog()); 
-        Assert.assertEquals("2018-03-05T02:34:55.000+0000", r.getDateUpdated());
+
+        Assertions.assertTrue(JUnitAppender.verifyNoBacklog());
+        Assertions.assertEquals("2018-03-05T02:34:55.000+00:00", r.getDateUpdated());
+    }
+
+    @Test
+    public void testDateFormatPreviousJackson() {
+        RosterEntry r = new RosterEntry("file here");
+
+        r.setId("test Id");
+        r.setDateUpdated("2018-03-05T02:34:55.000+0000");
+
+        Assertions.assertTrue(JUnitAppender.verifyNoBacklog());
+        Assertions.assertEquals("2018-03-05T02:34:55.000+00:00", r.getDateUpdated());
+
     }
 
     @Test
@@ -199,7 +230,7 @@ public class RosterEntryTest {
         RosterEntry r = new RosterEntry("file here");
 
         r.setId("test Id");
-        
+
         TimeZone tz = TimeZone.getDefault();
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("GMT-7"));
@@ -207,11 +238,11 @@ public class RosterEntryTest {
         } finally {
             TimeZone.setDefault(tz);
         }
-        
-        Assert.assertTrue(jmri.util.JUnitAppender.verifyNoBacklog()); 
-        
+
+        Assertions.assertTrue(JUnitAppender.verifyNoBacklog());
+
         // convert that same local time in ISO format and compare
-        Assert.assertEquals("2016-03-02T16:57:04.000+0000", r.getDateUpdated());
+        Assertions.assertEquals("2016-03-02T16:57:04.000+00:00", r.getDateUpdated());
     }
 
     @Test
@@ -224,12 +255,41 @@ public class RosterEntryTest {
         r.setFunctionLabel(4, "fort");
         r.setFunctionLockable(4, false);
 
-        Assert.assertEquals("tree", r.getFunctionLabel(3));
-        Assert.assertEquals(true, r.getFunctionLockable(3));
-        Assert.assertEquals("fort", r.getFunctionLabel(4));
-        Assert.assertEquals(false, r.getFunctionLockable(4));
-        Assert.assertEquals(null, r.getFunctionLabel(5));
+        Assertions.assertEquals("tree", r.getFunctionLabel(3));
+        Assertions.assertTrue(r.getFunctionLockable(3));
+        Assertions.assertEquals("fort", r.getFunctionLabel(4));
+        Assertions.assertFalse(r.getFunctionLockable(4));
+        Assertions.assertNull(r.getFunctionLabel(5));
 
+    }
+
+    @Test
+    public void testSetAndGet() {
+        RosterEntry r = new RosterEntry("file here");
+        r.setId("New One");
+        r.setDccAddress("6");
+        r.setRoadName("SNCF");
+        r.setRoadNumber("3601");
+        r.setMfg("Lima");
+        r.setDeveloperID("23");
+        r.setManufacturerID("100");
+        r.setProgrammingModes("A,B");
+        r.setComment("notes");
+        r.setDecoderFamily("fam1");
+        r.setDecoderModel("model A");
+
+        Assertions.assertEquals("file here", r.getFileName(), "file name ");
+        Assertions.assertEquals("New One", r.getId(), "ID ");
+        Assertions.assertEquals("6", r.getDccAddress(), "DCC Address ");
+        Assertions.assertEquals("SNCF", r.getRoadName(), "road name ");
+        Assertions.assertEquals("3601", r.getRoadNumber(), "road number ");
+        Assertions.assertEquals("Lima", r.getMfg(), "manufacturer ");
+        Assertions.assertEquals("23", r.getDeveloperID(), "developerID ");
+        Assertions.assertEquals("100", r.getManufacturerID(), "manufacturer ID ");
+        Assertions.assertEquals("A,B", r.getProgrammingModes(), "programming modes ");
+        Assertions.assertEquals("notes", r.getComment(), "comment ");
+        Assertions.assertEquals("fam1", r.getDecoderFamily(), "family ");
+        Assertions.assertEquals("model A", r.getDecoderModel(), "model ");
     }
 
     @Test
@@ -256,11 +316,11 @@ public class RosterEntryTest {
 
         org.jdom2.Element o = r.store();
         // check
-        Assert.assertEquals("XML Element ", e.toString(), o.toString());
-        Assert.assertEquals("family ", "91", o.getChild("decoder").getAttribute("family").getValue());
-        Assert.assertEquals("model ", "33", o.getChild("decoder").getAttribute("model").getValue());
-        Assert.assertEquals("comment", "decoder comment", o.getChild("decoder").getAttribute("comment").getValue());
-        Assert.assertEquals("default maxFnNum ", "28", o.getChild("decoder").getAttribute("maxFnNum").getValue());
+        Assertions.assertEquals(e.toString(), o.toString(), "XML Element ");
+        Assertions.assertEquals("91", o.getChild("decoder").getAttribute("family").getValue(), "family ");
+        Assertions.assertEquals("33", o.getChild("decoder").getAttribute("model").getValue(), "model ");
+        Assertions.assertEquals("decoder comment", o.getChild("decoder").getAttribute("comment").getValue(), "comment");
+        Assertions.assertEquals("28", o.getChild("decoder").getAttribute("maxFnNum").getValue(), "default maxFnNum ");
     }
 
     @Test
@@ -273,6 +333,7 @@ public class RosterEntryTest {
                 .setAttribute("roadName", "SP")
                 .setAttribute("mfg", "Athearn")
                 .setAttribute("dccAddress", "1234")
+                .setAttribute("decoderModes", "BMODE")
                 .addContent(new org.jdom2.Element("decoder")
                         .setAttribute("family", "91")
                         .setAttribute("model", "33")
@@ -297,35 +358,35 @@ public class RosterEntryTest {
         };
 
         // check loaded
-        Assert.assertEquals(null, r.getFunctionLabel(1));
-        Assert.assertEquals("label 2", r.getFunctionLabel(2));
-        Assert.assertEquals("lockable 2", true, r.getFunctionLockable(2));
-        Assert.assertEquals("label 3", r.getFunctionLabel(3));
-        Assert.assertEquals("lockable 2", false, r.getFunctionLockable(3));
-        Assert.assertEquals(null, r.getFunctionLabel(4));
+        Assertions.assertNull(r.getFunctionLabel(1));
+        Assertions.assertEquals("label 2", r.getFunctionLabel(2));
+        Assertions.assertTrue(r.getFunctionLockable(2), "lockable 2");
+        Assertions.assertEquals("label 3", r.getFunctionLabel(3));
+        Assertions.assertFalse(r.getFunctionLockable(3), "lockable 2");
+        Assertions.assertNull(r.getFunctionLabel(4));
 
         org.jdom2.Element o = r.store();
 
         // check stored element
-        Assert.assertEquals("num 2", "2", o.getChild("functionlabels").getChild("functionlabel").getAttribute("num").getValue());
-        Assert.assertEquals("lockable 2", "true", o.getChild("functionlabels").getChild("functionlabel").getAttribute("lockable").getValue());
-        Assert.assertEquals("label 2", "label 2", o.getChild("functionlabels").getChild("functionlabel").getText());
+        Assertions.assertEquals("2", o.getChild("functionlabels").getChild("functionlabel").getAttribute("num").getValue(), "num 2");
+        Assertions.assertEquals("true", o.getChild("functionlabels").getChild("functionlabel").getAttribute("lockable").getValue(), "lockable 2");
+        Assertions.assertEquals("label 2", o.getChild("functionlabels").getChild("functionlabel").getText(), "label 2");
     }
 
     @Test
     public void testEnsureFilenameExistsNew() {
         RosterEntry r = new RosterEntry();
-        Assert.assertEquals("initial filename ", null, r.getFileName());
+        Assertions.assertNull(r.getFileName(), "initial filename ");
         r.setId("test Roster Entry 123456789ABC");
-        Assert.assertEquals("initial ID ", "test Roster Entry 123456789ABC", r.getId());
+        Assertions.assertEquals("test Roster Entry 123456789ABC", r.getId(), "initial ID ");
         File f = new File(Roster.getDefault().getRosterFilesLocation() + "test_Roster_Entry_123456789ABC.xml");
         if (f.exists()) {
-            f.delete();
+            Assertions.assertTrue(f.delete());
         }
         r.ensureFilenameExists();
-        Assert.assertEquals("final filename ", "test_Roster_Entry_123456789ABC.xml", r.getFileName());
+        Assertions.assertEquals("test_Roster_Entry_123456789ABC.xml", r.getFileName(), "final filename ");
         if (f.exists()) {
-            f.delete();  // clean up afterwards
+            Assertions.assertTrue(f.delete());  // clean up afterwards
         }
     }
 
@@ -333,44 +394,42 @@ public class RosterEntryTest {
     public void testEnsureFilenameExistsOld() throws IOException {
         FileUtil.createDirectory(Roster.getDefault().getRosterFilesLocation());
         RosterEntry r = new RosterEntry();
-        Assert.assertEquals("initial filename ", null, r.getFileName());
+        Assertions.assertNull(r.getFileName(), "initial filename ");
         r.setId("test Roster Entry 123456789ABC");
-        Assert.assertEquals("initial ID ", "test Roster Entry 123456789ABC", r.getId());
+        Assertions.assertEquals("test Roster Entry 123456789ABC", r.getId(), "initial ID ");
         File f1 = new File(Roster.getDefault().getRosterFilesLocation() + "test_Roster_Entry_123456789ABC.xml");
         if (!f1.exists()) {
-            // create a dummy
-            FileOutputStream f = new FileOutputStream(f1);
-            f.write(0);
-            f.close();
+            try ( FileOutputStream f = new FileOutputStream(f1)) { // create a dummy
+                f.write(0);
+            }
         }
         File f2 = new File(Roster.getDefault().getRosterFilesLocation() + "test_Roster_Entry_123456789ABC0.xml");
         if (!f2.exists()) {
-            // create a dummy
-            FileOutputStream f = new FileOutputStream(f2);
-            f.write(0);
-            f.close();
+            try ( FileOutputStream f = new FileOutputStream(f2)) { // create a dummy
+                f.write(0);
+            }
         }
         r.ensureFilenameExists();
-        Assert.assertEquals("final filename ", "test_Roster_Entry_123456789ABC1.xml", r.getFileName());
+        Assertions.assertEquals("test_Roster_Entry_123456789ABC1.xml", r.getFileName(), "final filename ");
         if (f1.exists()) {
-            f1.delete();  // clean up afterwards
+            Assertions.assertTrue(f1.delete());  // clean up afterwards
         }
         if (f2.exists()) {
-            f2.delete();
+            Assertions.assertTrue(f2.delete());
         }
     }
 
     @Test
     public void testNoAttribute() {
         RosterEntry r = new RosterEntry();
-        Assert.assertNull(r.getAttribute("foo"));
+        Assertions.assertNull(r.getAttribute("foo"));
     }
 
     @Test
     public void testOneAttribute() {
         RosterEntry r = new RosterEntry();
         r.putAttribute("foo", "bar");
-        Assert.assertEquals("bar", r.getAttribute("foo"));
+        Assertions.assertEquals("bar", r.getAttribute("foo"));
     }
 
     @Test
@@ -378,7 +437,7 @@ public class RosterEntryTest {
         RosterEntry r = new RosterEntry();
         r.putAttribute("foo", "bar");
         r.putAttribute("foo", "a nicer bar");
-        Assert.assertEquals("a nicer bar", r.getAttribute("foo"));
+        Assertions.assertEquals("a nicer bar", r.getAttribute("foo"));
     }
 
     @Test
@@ -386,22 +445,23 @@ public class RosterEntryTest {
         RosterEntry r = new RosterEntry();
         r.putAttribute("foo", "bar");
         r.putAttribute("foo", null);
-        Assert.assertNull(r.getAttribute("foo"));
+        Assertions.assertNull(r.getAttribute("foo"));
     }
 
     @Test
     public void testAttributeList() {
         RosterEntry r = new RosterEntry();
-        r.putAttribute("key 2", "value 2");
-        r.putAttribute("key 3", "value 3");
-        r.putAttribute("key 1", "value 1");
+        String[] k = { "key 1", "key 2", "key 3" };
+        String[] v = { "value 1", "value 2", "value 3" };
+        for (int i = 0; i < 3; i++) {
+            r.putAttribute(k[i], v[i]);
+        }
         java.util.Set<String> l = r.getAttributes();
-        Assert.assertEquals("number returned", 3, l.size());
-        java.util.Iterator<String> i = l.iterator();
-        Assert.assertEquals("1st item", "key 1", i.next());
-        Assert.assertEquals("2nd item", "key 2", i.next());
-        Assert.assertEquals("3rd item", "key 3", i.next());
-        Assert.assertTrue(!i.hasNext());
+        Assertions.assertEquals(3, l.size(), "number returned"); // 3 elements
+        Assertions.assertTrue(l.containsAll(java.util.Arrays.asList(k))); // all keys in
+        for (int i = 0; i < 3; i++) { // all values match
+            Assertions.assertEquals(r.getAttribute(k[i]), v[i]);
+        }
     }
 
     @Test
@@ -443,9 +503,9 @@ public class RosterEntryTest {
             }
         };
 
-        Assert.assertEquals("value 1", r.getAttribute("key 1"));
-        Assert.assertEquals("value 2", r.getAttribute("key 2"));
-        Assert.assertEquals(null, r.getAttribute("key 4"));
+        Assertions.assertEquals("value 1", r.getAttribute("key 1"));
+        Assertions.assertEquals("value 2", r.getAttribute("key 2"));
+        Assertions.assertNull(r.getAttribute("key 4"));
     }
 
     @Test
@@ -454,22 +514,28 @@ public class RosterEntryTest {
         r.putAttribute("foo", "bar");
 
         org.jdom2.Element e = r.store();
-        Assert.assertNotNull(e);
-        Assert.assertNotNull(e.getChild("attributepairs"));
-        Assert.assertNotNull(e.getChild("attributepairs")
+        Assertions.assertNotNull(e);
+        Assertions.assertNotNull(e.getChild("attributepairs"));
+        Assertions.assertNotNull(e.getChild("attributepairs")
                 .getChild("keyvaluepair"));
-        Assert.assertNotNull(e.getChild("attributepairs")
+        Assertions.assertNotNull(e.getChild("attributepairs")
                 .getChild("keyvaluepair")
                 .getChild("key"));
-        Assert.assertNotNull(e.getChild("attributepairs")
+        Assertions.assertNotNull(e.getChild("attributepairs")
                 .getChild("keyvaluepair")
                 .getChild("value"));
-        Assert.assertEquals("foo", e.getChild("attributepairs")
+        Assertions.assertEquals("foo", e.getChild("attributepairs")
                 .getChild("keyvaluepair")
                 .getChild("key").getText());
-        Assert.assertNotNull("bar", e.getChild("attributepairs")
+        Assertions.assertNotNull(e.getChild("attributepairs")
                 .getChild("keyvaluepair")
-                .getChild("value").getText());
+                .getChild("value").getText(), "bar");
+    }
+
+    @Test
+    public void testToString() {
+        Assertions.assertEquals("[RosterEntry: id 3 file here SP 431 Athearn   14  35 91     ]",
+            RosterEntryImplementations.id3().toString());
     }
 
     @BeforeEach

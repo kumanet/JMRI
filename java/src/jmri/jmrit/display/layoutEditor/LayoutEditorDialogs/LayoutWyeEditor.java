@@ -1,16 +1,8 @@
 package jmri.jmrit.display.layoutEditor.LayoutEditorDialogs;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.event.MouseEvent;
-import java.awt.geom.*;
-import java.util.*;
 import javax.annotation.*;
-import javax.swing.JPopupMenu;
-
 import jmri.*;
 import jmri.jmrit.display.layoutEditor.*;
-import jmri.util.*;
 
 /**
  * MVC Editor component for LayoutWye objects.
@@ -42,5 +34,5 @@ public class LayoutWyeEditor extends LayoutTurnoutEditor {
     }
     
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutWyeEditor.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutWyeEditor.class);
 }

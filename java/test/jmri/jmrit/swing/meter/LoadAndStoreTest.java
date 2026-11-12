@@ -1,12 +1,11 @@
 package jmri.jmrit.swing.meter;
 
 import java.io.File;
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.stream.Stream;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,6 +13,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import jmri.InstanceManager;
+import jmri.JmriException;
 import jmri.jmrix.roco.z21.RocoZ21CommandStation;
 import jmri.jmrix.roco.z21.Z21InterfaceScaffold;
 import jmri.jmrix.roco.z21.Z21PredefinedMeters;
@@ -46,7 +46,7 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
 
     @ParameterizedTest(name = "{index}: {0} (pass={1})")
     @MethodSource("data")
-    public void loadAndStoreTest(File file, boolean pass) throws Exception {
+    public void loadAndStoreTest(File file, boolean pass) throws IOException, JmriException, ParseException {
         this.loadLoadStoreFileCheck(file);
     }
 
@@ -54,19 +54,10 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         super(SaveType.User, true);
     }
     
-    @TempDir 
-    protected java.nio.file.Path tempDir;
-
     @BeforeEach
     @Override
-    public void setUp() {
-        super.setUp();
-        try {
-            JUnitUtil.resetProfileManager( new jmri.profile.NullProfile( tempDir.toFile()));
-        }
-        catch (java.io.IOException e){
-            Assert.fail("Unable to create temp directory");
-        }
+    public void setUp(@TempDir java.io.File tempDir) throws IOException  {
+        super.setUp(tempDir);
         
         // This test requires a registred connection config since ProxyMeterManager
         // auto creates system meter managers using the connection configs.
@@ -95,6 +86,6 @@ public class LoadAndStoreTest extends jmri.configurexml.LoadAndStoreTestBase {
         super.tearDown();
     }
 
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoadAndStoreTest.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoadAndStoreTest.class);
 
 }

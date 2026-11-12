@@ -9,7 +9,7 @@ import jmri.jmrit.logixng.util.ReferenceUtil;
 import jmri.jmrit.logixng.util.parser.*;
 import jmri.jmrit.logixng.util.parser.ExpressionNode;
 import jmri.jmrit.logixng.util.parser.RecursiveDescentParser;
-import jmri.script.ScriptOutput;
+import jmri.script.swing.ScriptOutput;
 
 /**
  * This action logs some data.
@@ -105,14 +105,8 @@ public class LogData extends AbstractDigitalAction
 
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.OTHER;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return true;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.OTHER;
     }
 
     private List<Object> getDataValues() throws JmriException {
@@ -139,7 +133,7 @@ public class LogData extends AbstractDigitalAction
                     if (_data._expressionNode != null) {
                         values.add(_data._expressionNode.calculate(getConditionalNG().getSymbolTable()));
                     }
-                    
+
                     break;
 
                 default:
@@ -176,9 +170,18 @@ public class LogData extends AbstractDigitalAction
             default:
                 throw new IllegalArgumentException("_formatType has invalid value: "+_formatType.name());
         }
+        doLogging(str);
+    }
 
-        if (_logToLog) log.warn(str);
-        if (_logToScriptOutput) ScriptOutput.getDefault().getOutputArea().append(str+"\n");
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification="Pass generated String unchanged")
+    private void doLogging(String logString) {
+        if (_logToLog) {
+            log.warn(logString);
+        }
+        if (_logToScriptOutput) {
+            ScriptOutput.getDefault().getOutputArea().append(logString+"\n");
+        }
     }
 
     @Override
@@ -198,7 +201,21 @@ public class LogData extends AbstractDigitalAction
 
     @Override
     public String getLongDescription(Locale locale) {
-        return Bundle.getMessage(locale, "LogData_Long");
+        String bundleKey;
+        switch (_formatType) {
+            case OnlyText:
+                bundleKey = "LogData_Long_TextOnly";
+                break;
+            case CommaSeparatedList:
+                bundleKey = "LogData_Long_CommaSeparatedList";
+                break;
+            case StringFormat:
+                bundleKey = "LogData_Long_StringFormat";
+                break;
+            default:
+                throw new JmriUncheckedException("_formatType has unknown value: "+_formatType.name());
+        }
+        return Bundle.getMessage(locale, bundleKey, _format);
     }
 
     /** {@inheritDoc} */
@@ -234,7 +251,7 @@ public class LogData extends AbstractDigitalAction
     /** {@inheritDoc} */
     @Override
     public void getUsageDetail(int level, NamedBean bean, List<NamedBeanUsageReport> report, NamedBean cdl) {
-/*        
+/*
         log.debug("getUsageReport :: LogData: bean = {}, report = {}", cdl, report);
         for (NamedBeanReference namedBeanReference : _namedBeanReferences.values()) {
             if (namedBeanReference._handle != null) {
@@ -335,6 +352,6 @@ public class LogData extends AbstractDigitalAction
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogData.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogData.class);
 
 }

@@ -51,6 +51,8 @@ public class MemoryComboIconXml extends PositionableLabelXml {
         storeCommonAttributes(memoryIcon, element);
         storeTextInfo(memoryIcon, element);
 
+        storeLogixNG_Data(memoryIcon, element);
+
         element.setAttribute("class", "jmri.jmrit.display.configurexml.MemoryComboIconXml");
         return element;
     }
@@ -114,9 +116,12 @@ public class MemoryComboIconXml extends PositionableLabelXml {
         } catch (Positionable.DuplicateIdException e) {
             throw new JmriConfigureXmlException("Positionable id is not unique", e);
         }
+
+        loadLogixNG_Data(l, element);
+
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, Editor.MEMORIES, element);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MemoryComboIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(MemoryComboIconXml.class);
 }

@@ -1,20 +1,10 @@
 package jmri.script;
 
-import jmri.InstanceManager;
-import jmri.Memory;
-import jmri.MemoryManager;
-import jmri.TurnoutManager;
-import jmri.profile.NullProfile;
-import jmri.profile.ProfileManager;
-import jmri.util.FileUtil;
-import jmri.util.JUnitAppender;
-import jmri.util.JUnitUtil;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +17,16 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 import javax.script.ScriptException;
 import javax.script.SimpleBindings;
+
+import jmri.InstanceManager;
+import jmri.Memory;
+import jmri.MemoryManager;
+import jmri.TurnoutManager;
+import jmri.profile.NullProfile;
+import jmri.profile.ProfileManager;
+import jmri.util.FileUtil;
+import jmri.util.JUnitAppender;
+import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
 import org.python.util.PythonInterpreter;
@@ -42,12 +42,10 @@ public class JmriScriptEngineManagerTest {
 
     @Test
     public void testEval_String_ScriptEngine() throws ScriptException {
-        Object result = null;
         TurnoutManager manager = InstanceManager.getDefault(TurnoutManager.class);
-        assertNull(result);
         assertNull(manager.getBySystemName("IT1"));
-        ScriptEngine engine = jsem.getEngine(JmriScriptEngineManager.PYTHON);
-        result = jsem.eval("turnouts.provideTurnout(\"1\")", engine);
+        ScriptEngine engine = jsem.getEngine(JmriScriptEngineManager.JYTHON);
+        Object result = jsem.eval("turnouts.provideTurnout(\"1\")", engine);
         assertNotNull(result);
         assertNotNull(manager.getBySystemName("IT1"));
         assertEquals(manager.getBySystemName("IT1"), result);
@@ -55,11 +53,9 @@ public class JmriScriptEngineManagerTest {
 
     @Test
     public void testEval_File() throws IOException, ScriptException {
-        Object result = null;
         TurnoutManager manager = InstanceManager.getDefault(TurnoutManager.class);
-        assertNull(result);
         assertNull(manager.getBySystemName("IT1"));
-        result = jsem.eval(FileUtil.getFile("program:java/test/jmri/script/exec-file-profile/turnout.py"));
+        Object result = jsem.eval(FileUtil.getFile("program:java/test/jmri/script/exec-file-profile/turnout.py"));
         assertNotNull(result);
         assertNotNull(manager.getBySystemName("IT1"));
         assertEquals(InstanceManager.getDefault(TurnoutManager.class).getBySystemName("IT1"), result);
@@ -74,12 +70,12 @@ public class JmriScriptEngineManagerTest {
         JUnitUtil.resetProfileManager();
         Bindings bindings = new SimpleBindings();
         bindings.put("profiles", ProfileManager.getDefault());
-        Object result = null;
+
         ProfileManager manager = ProfileManager.getDefault();
-        assertNull(result);
-        result = jsem.eval(FileUtil.getFile("program:java/test/jmri/script/exec-file-profile/profile.py"), bindings);
+        assertNotNull(manager);
+        Object result = jsem.eval(FileUtil.getFile("program:java/test/jmri/script/exec-file-profile/profile.py"), bindings);
         assertNotNull(result);
-        assertEquals(Integer.valueOf(manager.getAutoStartActiveProfileTimeout()), result);
+        assertEquals(manager.getAutoStartActiveProfileTimeout(), result);
     }
 
     @Test
@@ -91,8 +87,9 @@ public class JmriScriptEngineManagerTest {
 
     @Test
     public void testGetDefault() {
-        assertEquals("getDefault ==s InstanceManager instance", InstanceManager.getDefault(JmriScriptEngineManager.class), JmriScriptEngineManager.getDefault());
-        assertNotEquals("getDefault !=s test object", jsem, JmriScriptEngineManager.getDefault());
+        assertEquals( InstanceManager.getDefault(JmriScriptEngineManager.class),
+            JmriScriptEngineManager.getDefault(), "getDefault ==s InstanceManager instance");
+        assertNotEquals( jsem, JmriScriptEngineManager.getDefault(), "getDefault !=s test object");
     }
 
     @Test
@@ -103,7 +100,7 @@ public class JmriScriptEngineManagerTest {
     @Test
     public void testInitializePython() {
         jsem.initializePython();
-        assertNull("no non-engine python", jsem.getPythonInterpreter());
+        assertNull( jsem.getPythonInterpreter(), "no non-engine python");
     }
 
     @Test
@@ -112,15 +109,18 @@ public class JmriScriptEngineManagerTest {
         JUnitUtil.resetProfileManager(new NullProfile(new File("java/test/jmri/script/jython-exec-profile")));
         jsem.initializePython();
         PythonInterpreter pi = jsem.getPythonInterpreter();
-        assertNotNull("got non-engine python", pi);
+        assertNotNull( pi, "got non-engine python");
         // now test that bindings are correct
-        jsem.getDefaultContext().getBindings(ScriptContext.GLOBAL_SCOPE)
-                .forEach((name, value) -> assertEquals("value in bindings is in non-engine python", value, pi.get(name, value.getClass())));
+        jsem.getDefaultContext().getBindings(ScriptContext.GLOBAL_SCOPE).forEach((name, value) -> {
+            assertNotNull(value);
+            var piGet = pi.get(name, value.getClass());
+            assertEquals( value, piGet, "value in bindings is in non-engine python");
+        });
     }
 
     @Test
     public void testGetEnginePython() {
-        assertNotNull(jsem.getEngine(JmriScriptEngineManager.PYTHON));
+        assertNotNull(jsem.getEngine(JmriScriptEngineManager.JYTHON));
     }
 
     @Test
@@ -154,43 +154,40 @@ public class JmriScriptEngineManagerTest {
 
     @Test
     public void testGetEngineByExtensionInvalidExtension() {
-        try {
-            jsem.getEngineByExtension("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for extension \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getEngineByExtension("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for extension \"invalid\", expected one of ");
     }
 
     @Test
     public void testGetEngineByMimeTypeInvalidMimeType() {
-        try {
-            jsem.getEngineByMimeType("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for mime type \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getEngineByMimeType("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for mime type \"invalid\", expected one of ");
     }
 
     @Test
     public void testGetEngineByNameInvalidName() {
-        try {
-            jsem.getEngineByName("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for name \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getEngineByName("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine for name \"invalid\", expected one of ");
     }
 
     @Test
     public void testGetFactoryPython() {
-        assertNotNull(jsem.getFactory(JmriScriptEngineManager.PYTHON));
+        assertNotNull(jsem.getFactory(JmriScriptEngineManager.JYTHON));
     }
 
     @Test
@@ -224,38 +221,35 @@ public class JmriScriptEngineManagerTest {
 
     @Test
     public void testGetFactoryByExtensionInvalidExtension() {
-        try {
-            jsem.getFactoryByExtension("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for extension \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getFactoryByExtension("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for extension \"invalid\", expected one of ");
     }
 
     @Test
     public void testGetFactoryByMimeTypeInvalidMimeType() {
-        try {
-            jsem.getFactoryByMimeType("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for mime type \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getFactoryByMimeType("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for mime type \"invalid\", expected one of ");
     }
 
     @Test
     public void testGetFactoryByNameInvalidName() {
-        try {
-            jsem.getFactoryByName("invalid");
-            fail("Expected exception not thrown");
-        } catch (ScriptException e) {
-            // not asserting full error message because ends with list of known extensions
-            // which can vary based on JVM
-            JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for name \"invalid\", expected one of ");
-        }
+        ScriptException ex = assertThrows( ScriptException.class, () ->
+            jsem.getFactoryByName("invalid"),
+            "Expected exception not thrown");
+        assertNotNull(ex);
+        // not asserting full error message because ends with list of known extensions
+        // which can vary based on JVM
+        JUnitAppender.assertErrorMessageStartsWith("Could not find script engine factory for name \"invalid\", expected one of ");
     }
 
     @Test
@@ -264,15 +258,17 @@ public class JmriScriptEngineManagerTest {
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
         HashMap<String, ScriptEngineFactory> factories = (HashMap<String, ScriptEngineFactory>) field.get(jsem);
+        assertNotNull(factories);
         field = jsem.getClass().getDeclaredField("engines");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
         HashMap<String, ScriptEngine> engines = (HashMap<String, ScriptEngine>) field.get(jsem);
         assertNotEquals("factories is not empty", factories.size());
-        assertNotEquals("engines is empty", factories.size(), engines.size());
+        assertNotEquals( factories.size(), engines.size(), "engines is empty");
         jsem.initializeAllEngines();
-        assertEquals("one engine per factory", factories.size(), engines.size());
-        factories.keySet().forEach(name -> assertNotNull("factory " + name + " has engine", engines.get(name)));
+        assertEquals( factories.size(), engines.size(), "one engine per factory");
+        factories.keySet().forEach(name ->
+            assertNotNull( engines.get(name), () -> "factory " + name + " has engine"));
     }
 
     @BeforeEach
@@ -292,7 +288,6 @@ public class JmriScriptEngineManagerTest {
     public void tearDown() {
         jsem = null;
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 

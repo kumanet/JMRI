@@ -3,19 +3,23 @@ package jmri.jmrit.display;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
 import java.util.List;
+
 import javax.swing.AbstractAction;
 import javax.swing.ButtonGroup;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
+
 import jmri.InstanceManager;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.logix.TrackerTableAction;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.throttle.ThrottleFrameManager;
+import jmri.jmrit.throttle.interfaces.ThrottleControllerUI;
+import jmri.util.swing.JmriMouseEvent;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,19 +105,22 @@ public class LocoIcon extends PositionableLabel {
         return false;
     }
 
-    jmri.jmrit.throttle.ThrottleFrame tf = null;
+    ThrottleControllerUI tf = null;
 
     /**
      * Pop-up only if right click and not dragged
      */
     @Override
     public boolean showPopUp(JPopupMenu popup) {
+        if (_editor.isLocoMarkerPopupDisabled()) {
+            return false;
+        }
         if (_entry != null) {
             popup.add(new AbstractAction("Throttle") {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
-                    tf.getAddressPanel().setRosterEntry(_entry);
+                    tf.setRosterEntry(_entry);
                     tf.toFront();
                 }
             });
@@ -214,7 +221,7 @@ public class LocoIcon extends PositionableLabel {
     public static String[] getLocoColors() {
         return new String[]{WHITE, GREEN, GRAY, RED, BLUE, YELLOW};
     }
-    
+
     public Color getLocoColor() {
         return _locoColor;
     }
@@ -313,7 +320,7 @@ public class LocoIcon extends PositionableLabel {
      * Set display attributes for Tracker
      */
     @Override
-    public void doMouseReleased(MouseEvent event) {
+    public void doMouseReleased(JmriMouseEvent event) {
         List<Positionable> selections = _editor.getSelectedItems(event);
         for (Positionable selection : selections) {
             if (selection instanceof IndicatorTrack) {
@@ -336,5 +343,5 @@ public class LocoIcon extends PositionableLabel {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LocoIcon.class);
+    private static final Logger log = LoggerFactory.getLogger(LocoIcon.class);
 }

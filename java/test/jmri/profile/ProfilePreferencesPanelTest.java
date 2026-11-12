@@ -3,10 +3,7 @@ package jmri.profile;
 import jmri.swing.PreferencesPanelTestBase;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -22,6 +19,6 @@ public class ProfilePreferencesPanelTest extends PreferencesPanelTestBase<Profil
         prefsPanel = new ProfilePreferencesPanel();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ProfilePreferencesPanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ProfilePreferencesPanelTest.class);
 
 }

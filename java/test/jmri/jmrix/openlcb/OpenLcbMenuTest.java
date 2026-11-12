@@ -13,7 +13,7 @@ public class OpenLcbMenuTest {
 
     @Test
     public void testCTor() {
-        OpenLcbMenu t = new OpenLcbMenu(new OlcbSystemConnectionMemo());
+        OpenLcbMenu t = new OpenLcbMenu(new OlcbSystemConnectionMemoScaffold());
         Assert.assertNotNull("exists",t);
     }
 
@@ -27,6 +27,6 @@ public class OpenLcbMenuTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(OpenLcbMenuTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(OpenLcbMenuTest.class);
 
 }

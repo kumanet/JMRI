@@ -2,8 +2,11 @@ package jmri.jmrit.operations.locations;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import jmri.InstanceManager;
+import jmri.Reporter;
+import jmri.implementation.decorators.TimeoutReporter;
 import jmri.jmrit.operations.OperationsTestCase;
 import jmri.jmrit.operations.locations.divisions.Division;
 import jmri.jmrit.operations.rollingstock.cars.CarLoad;
@@ -39,54 +42,54 @@ public class LocationManagerTest extends OperationsTestCase {
     
     @Test
     public void testReplaceShipLoadNames() {
-        JUnitOperationsUtil.createSevenNormalLocations();
+        JUnitOperationsUtil.createTwoStagingLocations();
         LocationManager lm = InstanceManager.getDefault(LocationManager.class);
         Assert.assertNotNull("exists", lm);
-        Location boston = lm.getLocationByName("Boston");
-        Assert.assertNotNull("exists", boston);
-        Track spur = boston.getTrackByName("Boston Spur 1", null);
-        Assert.assertNotNull("exists", spur);
-        spur.addShipLoadName("Boxes");
-        spur.addShipLoadName("Boxcar" + CarLoad.SPLIT_CHAR + "Paper");
-        spur.addShipLoadName("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts");
-        spur.setShipLoadOption(Track.INCLUDE_LOADS);
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("boxes"));
+        Location northEndStaging = lm.getLocationByName("North End Staging");
+        Assert.assertNotNull("exists", northEndStaging);
+        Track staging = northEndStaging.getTrackByName("North End 1", null);
+        Assert.assertNotNull("exists", staging);
+        staging.addShipLoadName("Boxes");
+        staging.addShipLoadName("Boxcar" + CarLoad.SPLIT_CHAR + "Paper");
+        staging.addShipLoadName("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts");
+        staging.setShipLoadOption(Track.INCLUDE_LOADS);
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("boxes"));
         
         lm.replaceLoad("Boxcar", "Boxes", "boxes");
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
         
         lm.replaceLoad("Boxcar", "Paper", "tissue");
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
         
         lm.replaceLoad("Boxcar", "boxes", null);
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
 
         lm.replaceLoad("boxcar", "Nuts", null);
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
 
         lm.replaceLoad("Boxcar", "Nuts", null);
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxes"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
-        Assert.assertTrue("load is accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
-        Assert.assertFalse("load is not accepted", spur.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxes"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Paper"));
+        Assert.assertTrue("load is accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "tissue"));
+        Assert.assertFalse("load is not accepted", staging.isLoadNameShipped("Boxcar" + CarLoad.SPLIT_CHAR + "Nuts"));
     }
     
     @Test
@@ -159,6 +162,33 @@ public class LocationManagerTest extends OperationsTestCase {
         Assert.assertFalse(lm.hasDivisions());
         boston.setDivision(new Division("testId", "testName"));
         Assert.assertTrue(lm.hasDivisions());
+    }
+
+    @Test
+    void getTrackByReporter() {
+        JUnitOperationsUtil.initOperationsData();
+        LocationManager lm = InstanceManager.getDefault(LocationManager.class);
+        Reporter baseReporter= Mockito.mock(Reporter.class);
+        Mockito.when(baseReporter.getSystemName()).thenReturn("foo");
+        TimeoutReporter timeoutReporter = new TimeoutReporter(baseReporter);
+        Location expectedLocation = lm.getLocationByName("North Industries");
+        Track expected = expectedLocation.getTracksList().get(0);
+        expected.setReporter(timeoutReporter);
+        Assert.assertEquals(expected,lm.getTrackByReporter(timeoutReporter));
+        Assert.assertEquals(expected,lm.getTrackByReporter(baseReporter));
+    }
+
+    @Test
+    void getLocationByReporter() {
+        JUnitOperationsUtil.initOperationsData();
+        LocationManager lm = InstanceManager.getDefault(LocationManager.class);
+        Reporter baseReporter= Mockito.mock(Reporter.class);
+        Mockito.when(baseReporter.getSystemName()).thenReturn("foo");
+        Location expected = lm.getLocationByName("North Industries");
+        TimeoutReporter timeoutReporter = new TimeoutReporter(baseReporter);
+        expected.setReporter(timeoutReporter);
+        Assert.assertEquals(expected,lm.getLocationByReporter(timeoutReporter));
+        Assert.assertEquals(expected,lm.getLocationByReporter(baseReporter));
     }
 
 }

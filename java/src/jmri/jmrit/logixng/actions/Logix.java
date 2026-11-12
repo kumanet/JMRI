@@ -5,23 +5,26 @@ import java.util.Map;
 
 import jmri.InstanceManager;
 import jmri.JmriException;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.logixng.*;
 
 /**
  * Emulates Logix.
- * 
+ *
  * @author Daniel Bergqvist Copyright 2018
  */
 public class Logix extends AbstractDigitalAction
         implements FemaleSocketListener {
 
-    private boolean _executeOnChange = true;
-    private boolean _lastExpressionResult = false;
+    private ExecuteType _executeType = ExecuteType.ExecuteOnChange;
+    // null until the first evaluation, as a Logix conditional starts UNKNOWN,
+    // so that the first result counts as a change whether true or false
+    private Boolean _lastExpressionResult = null;
     private String _expressionSocketSystemName;
     private String _actionSocketSystemName;
     private final FemaleDigitalExpressionSocket _expressionSocket;
     private final FemaleDigitalBooleanActionSocket _actionSocket;
-    
+
     public Logix(String sys, String user) {
         super(sys, user);
         _expressionSocket = InstanceManager.getDefault(DigitalExpressionManager.class)
@@ -29,7 +32,7 @@ public class Logix extends AbstractDigitalAction
         _actionSocket = InstanceManager.getDefault(DigitalBooleanActionManager.class)
                 .createFemaleSocket(this, this, "A");
     }
-    
+
     @Override
     public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws JmriException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
@@ -38,83 +41,67 @@ public class Logix extends AbstractDigitalAction
         if (sysName == null) sysName = manager.getAutoSystemName();
         Logix copy = new Logix(sysName, userName);
         copy.setComment(getComment());
+        copy.setExecuteType(_executeType);
         return manager.registerAction(copy).deepCopyChildren(this, systemNames, userNames);
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public Category getCategory() {
-        return Category.OTHER;
     }
 
     /** {@inheritDoc} */
     @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.OTHER;
     }
-    
+
+    /**
+     * Get the execute type.
+     * @return the type
+     */
+    public ExecuteType getExecuteType() {
+        return _executeType;
+    }
+
+    /**
+     * Set the execute type.
+     * @param type the type
+     */
+    public void setExecuteType(ExecuteType type) {
+        _executeType = type;
+    }
+
     /** {@inheritDoc} */
     @Override
     public void execute() throws JmriException {
         boolean result = _expressionSocket.evaluate();
-        boolean hasChangedToTrue = result && !_lastExpressionResult;
-        boolean hasChangedToFalse = !result && _lastExpressionResult;
-        
-        if (!_executeOnChange || (result != _lastExpressionResult)) {
-            _actionSocket.execute(hasChangedToTrue, hasChangedToFalse);
+
+        // result is either true or false
+        // _lastExpressionResult is true, false or null
+        if ((_executeType == ExecuteType.ExecuteAlways) || !Boolean.valueOf(result).equals(_lastExpressionResult)) {
+            _actionSocket.execute(result);
         }
         _lastExpressionResult = result;
     }
-    
-    /**
-     * Sets whenether actions should only be executed when the result of the
-     * evaluation of the expression changes, or if the actions should always
-     * be executed.
-     * <p>
-     * This is the counterpart of Conditional.setTriggerOnChange()
-     * 
-     * @param b if true, execution is only done on change. if false, execution
-     *          is always done.
-     */
-    public void setExecuteOnChange(boolean b) {
-        _executeOnChange = b;
-    }
-    
-    /**
-     * Determines whenether actions should only be executed when the result of
-     * the evaluation of the expression changes, or if the actions should always
-     * be executed.
-     * <p>
-     * This is the counterpart of Conditional.getTriggerOnChange()
-     * 
-     * @return true if execution is only done on change, false otherwise
-     */
-    public boolean isExecuteOnChange() {
-        return _executeOnChange;
-    }
-    
+
     /** {@inheritDoc} */
     @Override
     public FemaleSocket getChild(int index) throws IllegalArgumentException, UnsupportedOperationException {
         switch (index) {
             case 0:
                 return _expressionSocket;
-                
+
             case 1:
                 return _actionSocket;
-                
+
             default:
                 throw new IllegalArgumentException(
                         String.format("index has invalid value: %d", index));
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public int getChildCount() {
         return 2;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void connected(FemaleSocket socket) {
@@ -126,7 +113,7 @@ public class Logix extends AbstractDigitalAction
             throw new IllegalArgumentException("unkown socket");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disconnected(FemaleSocket socket) {
@@ -138,45 +125,43 @@ public class Logix extends AbstractDigitalAction
             throw new IllegalArgumentException("unkown socket");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public String getShortDescription(Locale locale) {
         return Bundle.getMessage(locale, "Logix_Short");
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public String getLongDescription(Locale locale) {
-        return Bundle.getMessage(locale, "Logix_Long",
-                _expressionSocket.getName(),
-                _actionSocket.getName());
+        return Bundle.getMessage(locale, "Logix_Long", _executeType.toString());
     }
-    
+
     public FemaleDigitalExpressionSocket getExpressionSocket() {
         return _expressionSocket;
     }
-    
+
     public String getExpressionSocketSystemName() {
         return _expressionSocketSystemName;
     }
-    
+
     public void setExpressionSocketSystemName(String systemName) {
         _expressionSocketSystemName = systemName;
     }
-    
+
     public FemaleDigitalBooleanActionSocket getActionSocket() {
         return _actionSocket;
     }
-    
+
     public String getActionSocketSystemName() {
         return _actionSocketSystemName;
     }
-    
+
     public void setActionSocketSystemName(String systemName) {
         _actionSocketSystemName = systemName;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void setup() {
@@ -184,7 +169,7 @@ public class Logix extends AbstractDigitalAction
             if ( !_expressionSocket.isConnected()
                     || !_expressionSocket.getConnectedSocket().getSystemName()
                             .equals(_expressionSocketSystemName)) {
-                
+
                 String socketSystemName = _expressionSocketSystemName;
                 _expressionSocket.disconnect();
                 if (socketSystemName != null) {
@@ -195,17 +180,17 @@ public class Logix extends AbstractDigitalAction
                         _expressionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load digital expression " + socketSystemName);
+                        log.error("cannot load digital expression {}", socketSystemName);
                     }
                 }
             } else {
                 _expressionSocket.getConnectedSocket().setup();
             }
-            
+
             if ( !_actionSocket.isConnected()
                     || !_actionSocket.getConnectedSocket().getSystemName()
                             .equals(_actionSocketSystemName)) {
-                
+
                 String socketSystemName = _actionSocketSystemName;
                 _actionSocket.disconnect();
                 if (socketSystemName != null) {
@@ -217,7 +202,7 @@ public class Logix extends AbstractDigitalAction
                         _actionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load digital boolean action " + socketSystemName);
+                        log.error("cannot load digital boolean action {}", socketSystemName);
                     }
                 }
             } else {
@@ -225,25 +210,61 @@ public class Logix extends AbstractDigitalAction
             }
         } catch (SocketAlreadyConnectedException ex) {
             // This shouldn't happen and is a runtime error if it does.
-            throw new RuntimeException("socket is already connected");
+            throw new JmriUncheckedException("socket is already connected");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void registerListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void unregisterListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disposeMe() {
     }
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Logix.class);
+
+
+    /**
+     * The type of Action. If the type is changed, the action is aborted if it
+     * is currently running.
+     */
+    public enum ExecuteType {
+        /**
+         * The "then" or "else" action is executed when the expression changes
+         * its result. If the expression has returned "false", but now returns
+         * "true", the "then" action is executed. If the expression has
+         * returned "true", but now returns "false", the "else" action is executed.
+         */
+        ExecuteOnChange(Bundle.getMessage("Logix_ExecuteOnChange")),
+
+        /**
+         * The "then" or "else" action is always executed when this action is
+         * executed. If the expression returns "true", the "then" action is
+         * executed. If the expression returns "false", the "else" action is
+         * executed.
+         */
+        ExecuteAlways(Bundle.getMessage("Logix_ExecuteAlways"));
+
+        private final String _text;
+
+        private ExecuteType(String text) {
+            this._text = text;
+        }
+
+        @Override
+        public String toString() {
+            return _text;
+        }
+
+    }
+
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Logix.class);
 
 }

@@ -5,8 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import javax.swing.AbstractAction;
-import javax.swing.JOptionPane;
+
 import jmri.InstanceManager;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Display a combo list of panels. A selected panel will be deleted if selected
@@ -42,10 +43,10 @@ public class PanelDeleteAction extends AbstractAction {
                 panelNames.add(editor.getTitle());
             });
 
-            String panelName = (String) JOptionPane.showInputDialog(null,
+            String panelName = (String) JmriJOptionPane.showInputDialog(null,
                     Bundle.getMessage("PanelDeleteMessage"),  // NOI18N
                     Bundle.getMessage("PanelDeleteTitle"),    // NOI18N
-                    JOptionPane.PLAIN_MESSAGE,
+                    JmriJOptionPane.PLAIN_MESSAGE,
                     null,
                     panelNames.toArray(),
                     null);
@@ -53,8 +54,14 @@ public class PanelDeleteAction extends AbstractAction {
             if (panelName != null && !panelName.isEmpty()) {
                 Editor selected = InstanceManager.getDefault(EditorManager.class).get(panelName);
                 if (selected != null) {
-                    if (selected instanceof jmri.jmrit.display.panelEditor.PanelEditor ||
-                             selected instanceof jmri.jmrit.display.switchboardEditor.SwitchboardEditor) {
+                    if (selected instanceof jmri.jmrit.display.layoutEditor.LayoutEditor) {
+                        if (!selected.deletePanel()) {
+                            return;
+                        }
+                    } else {
+                        if (!selected.deletePanel()) {
+                            return;
+                        }
                         selected.getTargetFrame().dispose();
                     }
                     selected.dispose();

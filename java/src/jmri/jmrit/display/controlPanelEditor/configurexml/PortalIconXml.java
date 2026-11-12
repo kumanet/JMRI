@@ -76,6 +76,8 @@ public class PortalIconXml extends PositionableLabelXml {
             }
         }
 
+        storeLogixNG_Data(p, element);
+
         element.setAttribute("class", "jmri.jmrit.display.controlPanelEditor.configurexml.PortalIconXml");
         return element;
     }
@@ -119,7 +121,7 @@ public class PortalIconXml extends PositionableLabelXml {
         } catch (Positionable.DuplicateIdException e) {
             throw new JmriConfigureXmlException("Positionable id is not unique", e);
         }
-        
+
         // load individual item's option settings after editor has set its global settings
         loadCommonAttributes(l, ControlPanelEditor.MARKERS, element);
         Attribute a = element.getAttribute("scale");
@@ -128,7 +130,7 @@ public class PortalIconXml extends PositionableLabelXml {
             try {
                 scale = a.getDoubleValue();
             } catch (org.jdom2.DataConversionException dce) {
-                log.error("{} can't convert scale {}", l.getNameString(), dce);
+                log.error("{} can't convert scale", l.getNameString(), dce);
             }
         }
         l.setScale(scale);
@@ -139,7 +141,7 @@ public class PortalIconXml extends PositionableLabelXml {
             try {
                 deg = a.getIntValue();
             } catch (org.jdom2.DataConversionException dce) {
-                log.error("{} can't convert rotate {}", l.getNameString(), dce);
+                log.error("{} can't convert rotate", l.getNameString(), dce);
             }
         }
         l.setDegrees(deg);
@@ -179,7 +181,9 @@ public class PortalIconXml extends PositionableLabelXml {
             ItemPalette.loadIcons();
             l.makeIconMap();
         }
+
+        loadLogixNG_Data(l, element);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PortalIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(PortalIconXml.class);
 }

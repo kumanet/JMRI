@@ -1,16 +1,19 @@
 package jmri.managers;
 
-import java.beans.PropertyChangeListener;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
 import javax.annotation.Nonnull;
 import jmri.*;
 import jmri.implementation.AbstractNamedBean;
 import jmri.jmrix.internal.InternalStringIOManager;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
-import org.junit.Test;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
+
+import org.junit.jupiter.api.*;
 
 /**
  * Test the ProxyStringIOManager.
@@ -18,22 +21,10 @@ import org.junit.Before;
  * @author  Bob Jacobsen 2003, 2006, 2008
  * @author  Daniel Bergqvist Copyright (C) 2020
  */
-public class ProxyStringIOManagerTest {
+public class ProxyStringIOManagerTest extends AbstractProxyManagerTestBase<ProxyStringIOManager, StringIO> {
 
     public String getSystemName(int i) {
         return "JC" + i;
-    }
-
-    protected StringIOManager l = null;     // holds objects under test
-
-    static protected boolean listenerResult = false;
-
-    protected class Listen implements PropertyChangeListener {
-
-        @Override
-        public void propertyChange(java.beans.PropertyChangeEvent e) {
-            listenerResult = true;
-        }
     }
 
     private StringIO newStringIO(String sysName, String userName) {
@@ -51,9 +42,10 @@ public class ProxyStringIOManagerTest {
         StringIO t = newStringIO(getSystemName(getNumToTest1()), "mine");
         l.register(t);
         // check
-        Assert.assertTrue("real object returned ", t != null);
-        Assert.assertTrue("user name correct ", t == l.getByUserName("mine"));
-        Assert.assertTrue("system name correct ", t == l.getBySystemName(getSystemName(getNumToTest1())));
+        assertNotNull( t, "real object returned ");
+        assertSame( t, l.getByUserName("mine"), "user name correct ");
+        assertSame( t, l.getBySystemName(getSystemName(getNumToTest1())),
+            "system name correct ");
     }
 
     @Test
@@ -61,56 +53,58 @@ public class ProxyStringIOManagerTest {
         // test that you always get the same representation
         StringIO t1 = newStringIO(getSystemName(getNumToTest1()), "mine");
         l.register(t1);
-        Assert.assertTrue("t1 real object returned ", t1 != null);
-        Assert.assertTrue("same by user ", t1 == l.getByUserName("mine"));
-        Assert.assertTrue("same by system ", t1 == l.getBySystemName(getSystemName(getNumToTest1())));
+        assertNotNull( t1, "t1 real object returned ");
+        assertSame( t1, l.getByUserName("mine"), "same by user ");
+        assertSame( t1, l.getBySystemName(getSystemName(getNumToTest1())),
+            "same by system ");
     }
 
     @Test
     public void testMisses() {
         // try to get nonexistant lights
-        Assert.assertTrue(null == l.getByUserName("foo"));
-        Assert.assertTrue(null == l.getBySystemName("bar"));
+        assertNull( l.getByUserName("foo"));
+        assertNull( l.getBySystemName("bar"));
     }
 
     @Test
     public void testRename() {
         // get light
         StringIO t1 = newStringIO(getSystemName(getNumToTest1()), "before");
-        Assert.assertNotNull("t1 real object ", t1);
+        assertNotNull( t1, "t1 real object ");
         l.register(t1);
         t1.setUserName("after");
         StringIO t2 = l.getByUserName("after");
-        Assert.assertEquals("same object", t1, t2);
-        Assert.assertEquals("no old object", null, l.getByUserName("before"));
+        assertEquals( t1, t2, "same object");
+        assertNull( l.getByUserName("before"), "no old object");
     }
 
     @Test
     public void testInstanceManagerIntegration() {
-        jmri.util.JUnitUtil.resetInstanceManager();
-        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class));
+        JUnitUtil.resetInstanceManager();
+        assertNotNull(InstanceManager.getDefault(StringIOManager.class));
 
 //        jmri.util.JUnitUtil.initInternalStringIOManager();
 
-        Assert.assertTrue(InstanceManager.getDefault(StringIOManager.class) instanceof ProxyStringIOManager);
+        assertInstanceOf(ProxyStringIOManager.class,
+            InstanceManager.getDefault(StringIOManager.class));
 
-        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class));
+        assertNotNull(InstanceManager.getDefault(StringIOManager.class));
         StringIO b = newStringIO("IC1", null);
         InstanceManager.getDefault(StringIOManager.class).register(b);
-        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
-//        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("IL1"));
+        assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
+//        assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("IL1"));
 
         InternalStringIOManager m = new InternalStringIOManager(new InternalSystemConnectionMemo("J", "Juliet"));
         InstanceManager.setStringIOManager(m);
 
         b = newStringIO("IC2", null);
         InstanceManager.getDefault(StringIOManager.class).register(b);
-        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
-//        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("JL1"));
+        assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
+//        assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("JL1"));
         b = newStringIO("IC3", null);
         InstanceManager.getDefault(StringIOManager.class).register(b);
-        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
-//        Assert.assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("IL2"));
+        assertNotNull(InstanceManager.getDefault(StringIOManager.class).getBySystemName("IC1"));
+//        assertNotNull(InstanceManager.getDefault(StringIOManager.class).provideStringIO("IL2"));
     }
 
     /**
@@ -127,25 +121,29 @@ public class ProxyStringIOManagerTest {
         return 7;
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         // create and register the manager object
-        l = new InternalStringIOManager(new InternalSystemConnectionMemo("J", "Juliet"));
-        jmri.InstanceManager.setStringIOManager(l);
+        StringIOManager siom = new InternalStringIOManager(new InternalSystemConnectionMemo("J", "Juliet"));
+        InstanceManager.setStringIOManager(siom);
+        StringIOManager irman = InstanceManager.getDefault(StringIOManager.class);
+        assertInstanceOf( ProxyStringIOManager.class, irman,
+            "StringIOManager is not a ProxyStringIOManager");
+        l = (ProxyStringIOManager) irman;
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         JUnitUtil.tearDown();
     }
 
     
-    private class MyStringIO extends AbstractNamedBean implements StringIO {
+    private static class MyStringIO extends AbstractNamedBean implements StringIO {
 
         String _value = "";
         
-        public MyStringIO(String sys, String userName) {
+        MyStringIO(String sys, String userName) {
             super(sys, userName);
         }
         

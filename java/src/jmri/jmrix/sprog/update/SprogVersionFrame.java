@@ -1,9 +1,7 @@
 package jmri.jmrix.sprog.update;
 
-import javax.swing.JOptionPane;
 import jmri.jmrix.sprog.SprogSystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Display the firmware version of the attached SPROG hardware.
@@ -13,6 +11,7 @@ import org.slf4j.LoggerFactory;
 public class SprogVersionFrame extends jmri.util.JmriJFrame implements SprogVersionListener {
 
     private SprogSystemConnectionMemo _memo = null;
+    private volatile boolean disposed = false;
 
     public SprogVersionFrame(SprogSystemConnectionMemo memo) {
         super();
@@ -23,7 +22,7 @@ public class SprogVersionFrame extends jmri.util.JmriJFrame implements SprogVers
      * {@inheritDoc}
      */
     @Override
-    synchronized public void initComponents() {
+    public void initComponents() {
         setTitle(Bundle.getMessage("SprogVersionTitle"));
 
         // add help menu to window
@@ -34,17 +33,38 @@ public class SprogVersionFrame extends jmri.util.JmriJFrame implements SprogVers
         query.requestVersion(this);
     }
 
-    /** 
+    /**
+     * Handle the version reply. May be called on any thread (serial event
+     * thread or Swing timer thread), so dispatch to the EDT to show the dialog
+     * and dispose the frame. Not synchronized — dispatching via
+     * runOnGUIEventually ensures neither the calling thread nor the EDT blocks
+     * waiting for a lock held by the other.
      * {@inheritDoc}
      */
     @Override
-    synchronized public void notifyVersion(SprogVersion v) {
+    public void notifyVersion(SprogVersion v) {
         log.debug("Version {} notified", v.toString());
-        JOptionPane.showMessageDialog(null, Bundle.getMessage("SprogVersionDialogString", v.toString()),
-                Bundle.getMessage("SprogVersionTitle"), JOptionPane.INFORMATION_MESSAGE);
-        setVisible(false);
-        dispose();
+        jmri.util.ThreadingUtil.runOnGUIEventually(() -> {
+            if (!disposed) {
+                JmriJOptionPane.showMessageDialog(SprogVersionFrame.this,
+                        Bundle.getMessage("SprogVersionDialogString", v.toString()),
+                        Bundle.getMessage("SprogVersionTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
+                setVisible(false);
+                dispose();
+            }
+        });
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SprogVersionFrame.class);
+    /**
+     * Removes SprogVersionListener.
+     * {@inheritDoc}
+     */
+    @Override
+    public void dispose() {
+        disposed = true;
+        _memo.getSprogVersionQuery().removeSprogVersionListener(this);
+        super.dispose();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SprogVersionFrame.class);
 }

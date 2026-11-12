@@ -5,20 +5,21 @@ import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map.Entry;
+
 import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.ButtonGroup;
 import javax.swing.JMenu;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
+
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.SignalHead;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.palette.SignalHeadItemPanel;
 import jmri.jmrit.picker.PickListModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * An icon to display a status of a SignalHead.
@@ -55,7 +56,6 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
         return super.finishClone(pos);
     }
 
-    // private SignalHead mHead;
     private NamedBeanHandle<SignalHead> namedHead;
 
     private HashMap<String, NamedIcon> _saveMap;
@@ -167,6 +167,12 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
     }
 
     @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_SignalHead");
+    }
+
+    @Override
     public @Nonnull
     String getNameString() {
         if (namedHead == null) {
@@ -175,10 +181,9 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
         return namedHead.getName(); // short NamedIcon name
     }
 
-    private ButtonGroup litButtonGroup = null;
-
     /**
-     * Pop-up just displays the name
+     * If editable, adds custom options to the Pop-up menu.
+     * {@inheritDoc}
      */
     @Override
     public boolean showPopUp(JPopupMenu popup) {
@@ -190,63 +195,39 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
             r = new JRadioButtonMenuItem(Bundle.getMessage("ChangeAspect"));
             r.addActionListener(e -> setClickMode(3));
             clickButtonGroup.add(r);
-            if (clickMode == 3) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected(clickMode == 3);
             clickMenu.add(r);
             r = new JRadioButtonMenuItem(Bundle.getMessage("Cycle3Aspects"));
             r.addActionListener(e -> setClickMode(0));
             clickButtonGroup.add(r);
-            if (clickMode == 0) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected( clickMode == 0 );
             clickMenu.add(r);
             r = new JRadioButtonMenuItem(Bundle.getMessage("AlternateLit"));
             r.addActionListener(e -> setClickMode(1));
             clickButtonGroup.add(r);
-            if (clickMode == 1) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected( clickMode == 1 );
             clickMenu.add(r);
             r = new JRadioButtonMenuItem(Bundle.getMessage("AlternateHeld"));
             r.addActionListener(e -> setClickMode(2));
             clickButtonGroup.add(r);
-            if (clickMode == 2) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected( clickMode == 2 );
             clickMenu.add(r);
             popup.add(clickMenu);
 
             // add menu to select handling of lit parameter
             JMenu litMenu = new JMenu(Bundle.getMessage("WhenNotLit"));
-            litButtonGroup = new ButtonGroup();
+            ButtonGroup litButtonGroup = new ButtonGroup();
             r = new JRadioButtonMenuItem(Bundle.getMessage("ShowAppearance"));
             r.setIconTextGap(10);
             r.addActionListener(e -> setLitMode(false));
             litButtonGroup.add(r);
-            if (!litMode) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected( !litMode );
             litMenu.add(r);
             r = new JRadioButtonMenuItem(Bundle.getMessage("ShowDarkIcon"));
             r.setIconTextGap(10);
             r.addActionListener(e -> setLitMode(true));
             litButtonGroup.add(r);
-            if (litMode) {
-                r.setSelected(true);
-            } else {
-                r.setSelected(false);
-            }
+            r.setSelected( litMode );
             litMenu.add(r);
             popup.add(litMenu);
 
@@ -255,7 +236,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
                 public void actionPerformed(ActionEvent e) {
                     jmri.jmrit.blockboss.BlockBossFrame f = new jmri.jmrit.blockboss.BlockBossFrame();
                     String name = getNameString();
-                    f.setTitle(java.text.MessageFormat.format(Bundle.getMessage("SignalLogic"), name));
+                    f.setTitle( Bundle.getMessage("SignalLogic", name));
                     f.setSignal(getSignalHead());
                     f.setVisible(true);
                 }
@@ -337,8 +318,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
 
     @Override
     public boolean setEditItemMenu(JPopupMenu popup) {
-        String txt = java.text.MessageFormat.format(Bundle.getMessage("EditItem"),
-                Bundle.getMessage("BeanNameSignalHead"));
+        String txt = Bundle.getMessage("EditItem",Bundle.getMessage("BeanNameSignalHead"));
         popup.add(new AbstractAction(txt) {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -349,8 +329,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
     }
 
     protected void editItem() {
-        _paletteFrame = makePaletteFrame(java.text.MessageFormat.format(Bundle.getMessage("EditItem"),
-                Bundle.getMessage("BeanNameSignalHead")));
+        _paletteFrame = makePaletteFrame(Bundle.getMessage("EditItem",Bundle.getMessage("BeanNameSignalHead")));
         _itemPanel = new SignalHeadItemPanel(_paletteFrame, "SignalHead", getFamily(),
                 PickListModel.signalHeadPickModelInstance()); // NOI18N
         ActionListener updateAction = a -> updateItem();
@@ -389,7 +368,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
 
     @Override
     public boolean setEditIconMenu(JPopupMenu popup) {
-        String txt = java.text.MessageFormat.format(Bundle.getMessage("EditItem"), Bundle.getMessage("BeanNameSignalHead"));
+        String txt = Bundle.getMessage("EditItem", Bundle.getMessage("BeanNameSignalHead"));
         popup.add(new AbstractAction(txt) {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -486,7 +465,7 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
      * head.
      */
     @Override
-    public void doMouseClicked(java.awt.event.MouseEvent e) {
+    public void doMouseClicked(JmriMouseEvent e) {
         if (!_editor.getFlag(Editor.OPTION_CONTROLS, isControlling())) {
             return;
         }
@@ -499,12 +478,12 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
      *
      * @param e the mouse click event
      */
-    public void performMouseClicked(java.awt.event.MouseEvent e) {
+    public void performMouseClicked(JmriMouseEvent e) {
         if (e.isMetaDown() || e.isAltDown()) {
             return;
         }
         if (getSignalHead() == null) {
-            log.error("No turnout connection, can't process click");
+            log.error("No SignalHead connection, can't process click");
             return;
         }
         switch (clickMode) {
@@ -553,7 +532,6 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
         }
     }
 
-    //private static boolean warned = false;
     @Override
     public void dispose() {
         if (getSignalHead() != null) {
@@ -564,6 +542,6 @@ public class SignalHeadIcon extends PositionableIcon implements java.beans.Prope
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SignalHeadIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignalHeadIcon.class);
 
 }

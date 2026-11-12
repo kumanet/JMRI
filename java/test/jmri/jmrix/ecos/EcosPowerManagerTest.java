@@ -1,8 +1,10 @@
 package jmri.jmrix.ecos;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -15,7 +17,10 @@ public class EcosPowerManagerTest {
     public void testCTor() {
         EcosTrafficController tc = new EcosInterfaceScaffold();
         EcosPowerManager t = new EcosPowerManager(tc);
-        Assert.assertNotNull("exists",t);
+        assertNotNull( t, "exists");
+
+        assertDoesNotThrow( () -> t.dispose() );
+        tc.terminateThreads();
     }
 
     @BeforeEach
@@ -25,10 +30,9 @@ public class EcosPowerManagerTest {
 
     @AfterEach
     public void tearDown() {
-        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EcosPowerManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EcosPowerManagerTest.class);
 
 }

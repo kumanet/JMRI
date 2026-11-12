@@ -5,8 +5,6 @@ import jmri.jmrix.can.ConfigurationManager;
 import jmri.jmrix.can.TrafficController;
 import jmri.jmrix.can.adapters.gridconnect.GcTrafficController;
 import jmri.jmrix.can.adapters.gridconnect.canrs.MergTrafficController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implements SerialPortAdapter for the OpenLCB system network connection.
@@ -24,7 +22,7 @@ public class NetworkDriverAdapter extends jmri.jmrix.AbstractNetworkPortControll
         options.put(option1Name, new Option(Bundle.getMessage("ConnectionGateway"), new String[]{"Pass All", "Filtering"}));
         option2Name = "Protocol"; // NOI18N
         options.put(option2Name, new Option(Bundle.getMessage("ConnectionProtocol"), jmri.jmrix.can.ConfigurationManager.getSystemOptions(), false));
-        setManufacturer(jmri.jmrix.openlcb.OlcbConnectionTypeList.OPENLCB);
+        super.setManufacturer(jmri.jmrix.openlcb.OlcbConnectionTypeList.OPENLCB); // overriden by MERG Connections.
         allowConnectionRecovery = true;
     }
 
@@ -35,26 +33,16 @@ public class NetworkDriverAdapter extends jmri.jmrix.AbstractNetworkPortControll
     @Override
     public void configure() {
         TrafficController tc;
-        if (getOptionState(option2Name).equals(ConfigurationManager.MERGCBUS)) {
-            // Register the CAN traffic controller being used for this connection
-            tc = new MergTrafficController();
-            try {
-                tc.setCanId(Integer.parseInt(getOptionState("CANID")));
-            } catch (Exception e) {
-                log.error("Cannot parse CAN ID - check your preference settings {}", e);
-                log.error("Now using default CAN ID");
-            }
-        } else if (getOptionState(option2Name).equals(ConfigurationManager.SPROGCBUS)) {
-            // Register the CAN traffic controller being used for this connection
-            tc = new MergTrafficController();
-            try {
-                tc.setCanId(Integer.parseInt(getOptionState("CANID")));
-            } catch (Exception e) {
-                log.error("Cannot parse CAN ID - check your preference settings {}", e);
-                log.error("Now using default CAN ID");
-            }
-        } else {
-            tc = new GcTrafficController();
+        switch (getOptionState(option2Name)) {
+            case ConfigurationManager.MERGCBUS:
+            case ConfigurationManager.SPROGCBUS:
+                // Register the CAN traffic controller being used for this connection
+                tc = new MergTrafficController();
+                tc.setCanId(getOptionState("CANID"));
+                break;
+            default:
+                tc = new GcTrafficController();
+                break;
         }
         this.getSystemConnectionMemo().setTrafficController(tc);
 
@@ -63,10 +51,29 @@ public class NetworkDriverAdapter extends jmri.jmrix.AbstractNetworkPortControll
         tc.connectPort(this);
         this.getSystemConnectionMemo().setProtocol(getOptionState(option2Name));
 
-        // do central protocol-specific configuration    
+        // do central protocol-specific configuration
         this.getSystemConnectionMemo().configureManagers();
         if (socketConn != null) {
-            log.info("Connection complete with {}", socketConn.getInetAddress());
+            log.info("{} Connection via {} complete with {}",
+                this.getSystemConnectionMemo().getUserName(),
+                getOptionState(option2Name), socketConn.getInetAddress());
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Each GridConnect frame is written to the socket in a single write, so
+     * TCP's delay for small writes while an earlier one is unacknowledged
+     * (Nagle's algorithm) cannot combine the parts of a frame; it only holds
+     * frames back, by up to the gateway's delayed acknowledgement time. It is
+     * turned off, on the first connection and on every reconnection.
+     */
+    @Override
+    public void connect() throws java.io.IOException {
+        super.connect();
+        if (opened && socketConn != null) {
+            socketConn.setTcpNoDelay(true);
         }
     }
 
@@ -79,7 +86,7 @@ public class NetworkDriverAdapter extends jmri.jmrix.AbstractNetworkPortControll
     public CanSystemConnectionMemo getSystemConnectionMemo() {
         return (CanSystemConnectionMemo) super.getSystemConnectionMemo();
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -91,6 +98,6 @@ public class NetworkDriverAdapter extends jmri.jmrix.AbstractNetworkPortControll
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NetworkDriverAdapter.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NetworkDriverAdapter.class);
 
 }

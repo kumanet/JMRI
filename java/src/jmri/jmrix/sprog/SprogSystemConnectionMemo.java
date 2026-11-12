@@ -44,7 +44,7 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
         super("S", SprogConnectionTypeList.SPROG); // default to S
         init(sm, type);
     }
-    
+
     private void init(SprogMode sm, SprogType type) {
         sprogMode = sm;  // static
         sprogVersion = new SprogVersion(type);
@@ -127,12 +127,12 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
     public Thread getSlotThread() {
         return slotThread;
     }
-    
+
     private int numSlots = SprogConstants.DEFAULT_MAX_SLOTS;
-    
+
     /**
      * Get the number of command station slots
-     * 
+     *
      * @return The number fo slots
      */
     public int getNumSlots() {
@@ -141,14 +141,17 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
 
     /**
      * Configure the programming manager and "command station" objects.
+     * 
+     * @param powerOption true if track power at startup is ON
      */
-    public void configureCommandStation() {
+    public void configureCommandStation(boolean powerOption) {
         if(classObjectMap.containsKey(CommandStation.class)) {
             return;
         }
         log.debug("start command station queuing thread");
         SprogCommandStation commandStation = new jmri.jmrix.sprog.SprogCommandStation(st);
         commandStation.setSystemConnectionMemo(this);
+        commandStation.setPowerState(powerOption);
         jmri.InstanceManager.store(commandStation, jmri.CommandStation.class);
         store(commandStation, jmri.CommandStation.class);
         switch (sprogMode) {
@@ -166,18 +169,42 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
         }
     }
 
-    public void configureCommandStation(int slots) {
-        numSlots = slots;
-        this.configureCommandStation();
+    public void configureCommandStation() {
+        this.configureCommandStation(false);
     }
     
     /**
-     * Get the command station object associated with this connection.
+     * Configure the programming manager and "command station" objects.
      * 
+     * @param slots number of command station slots
+     */
+    public void configureCommandStation(int slots) {
+        numSlots = slots;
+        this.configureCommandStation(false);
+    }
+
+    /**
+     * Configure the programming manager and "command station" objects.
+     * 
+     * @param slots number of command station slots
+     * @param powerOption true if track power at startup is ON
+     */
+    public void configureCommandStation(int slots, String powerOption) {
+        numSlots = slots;
+        if (powerOption != null && powerOption.equals(Bundle.getMessage("PowerStateOn"))) {
+            this.configureCommandStation(true);
+        } else {
+            this.configureCommandStation(false);
+        }
+    }
+
+    /**
+     * Get the command station object associated with this connection.
+     *
      * @return the command station
      */
     public SprogCommandStation getCommandStation() {
-        return get(CommandStation.class);
+        return (SprogCommandStation)get(CommandStation.class);
     }
 
     @Override
@@ -205,6 +232,7 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
     /**
      * Configure the common managers for Sprog connections.
      */
+    @Override
     public void configureManagers() {
 
         configureCommandStation();
@@ -246,7 +274,7 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
 
     public SprogProgrammerManager getProgrammerManager() {
 
-        return (SprogProgrammerManager) classObjectMap.computeIfAbsent(SprogProgrammerManager.class, (Class c) -> new SprogProgrammerManager(new SprogProgrammer(this), sprogMode, this));
+        return (SprogProgrammerManager) classObjectMap.computeIfAbsent(SprogProgrammerManager.class, (Class<?> c) -> new SprogProgrammerManager(new SprogProgrammer(this), sprogMode, this));
     }
 
     public void setProgrammerManager(SprogProgrammerManager p) {
@@ -254,7 +282,7 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
     }
 
     public SprogPowerManager getPowerManager() {
-        return get(PowerManager.class);
+        return (SprogPowerManager)get(PowerManager.class);
     }
 
     public ThrottleManager getThrottleManager() {
@@ -277,6 +305,9 @@ public class SprogSystemConnectionMemo extends DefaultSystemConnectionMemo imple
 
     @Override
     public void dispose() {
+        if (st != null) {
+            st.dispose();
+        }
         st = null;
         InstanceManager.deregister(this, SprogSystemConnectionMemo.class);
         if (cf != null) {

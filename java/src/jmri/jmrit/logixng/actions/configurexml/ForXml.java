@@ -4,7 +4,6 @@ import jmri.InstanceManager;
 import jmri.jmrit.logixng.DigitalActionManager;
 import jmri.jmrit.logixng.actions.For;
 
-import org.jdom2.Attribute;
 import org.jdom2.Element;
 
 import jmri.jmrit.logixng.MaleSocket;
@@ -35,7 +34,7 @@ public class ForXml extends jmri.managers.configurexml.AbstractNamedBeanManagerC
 
         Element e2 = new Element("InitSocket");
         e2.addContent(new Element("socketName").addContent(p.getChild(0).getName()));
-        MaleSocket socket = p.getThenActionSocket().getConnectedSocket();
+        MaleSocket socket = p.getInitActionSocket().getConnectedSocket();
         String socketSystemName;
         if (socket != null) {
             socketSystemName = socket.getSystemName();
@@ -99,28 +98,28 @@ public class ForXml extends jmri.managers.configurexml.AbstractNamedBeanManagerC
         loadCommon(h, shared);
         
         Element socketName = shared.getChild("InitSocket").getChild("socketName");
-        h.getChild(0).setName(socketName.getTextTrim());
+        h.getInitActionSocket().setName(socketName.getTextTrim());
         Element socketSystemName = shared.getChild("InitSocket").getChild("systemName");
         if (socketSystemName != null) {
             h.setInitActionSocketSystemName(socketSystemName.getTextTrim());
         }
         
         socketName = shared.getChild("WhileSocket").getChild("socketName");
-        h.getChild(1).setName(socketName.getTextTrim());
+        h.getWhileExpressionSocket().setName(socketName.getTextTrim());
         socketSystemName = shared.getChild("WhileSocket").getChild("systemName");
         if (socketSystemName != null) {
             h.setWhileExpressionSocketSystemName(socketSystemName.getTextTrim());
         }
         
         socketName = shared.getChild("AfterEachSocket").getChild("socketName");
-        h.getChild(2).setName(socketName.getTextTrim());
+        h.getAfterEachActionSocket().setName(socketName.getTextTrim());
         socketSystemName = shared.getChild("AfterEachSocket").getChild("systemName");
         if (socketSystemName != null) {
             h.setAfterEachActionSocketSystemName(socketSystemName.getTextTrim());
         }
         
         socketName = shared.getChild("DoSocket").getChild("socketName");
-        h.getChild(3).setName(socketName.getTextTrim());
+        h.getDoActionSocket().setName(socketName.getTextTrim());
         socketSystemName = shared.getChild("DoSocket").getChild("systemName");
         if (socketSystemName != null) {
             h.setDoActionSocketSystemName(socketSystemName.getTextTrim());
@@ -130,5 +129,5 @@ public class ForXml extends jmri.managers.configurexml.AbstractNamedBeanManagerC
         return true;
     }
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ForXml.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ForXml.class);
 }

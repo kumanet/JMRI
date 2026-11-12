@@ -1,10 +1,15 @@
 package jmri.jmrit.display;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import java.util.ResourceBundle;
+
 import javax.swing.JFrame;
-import org.netbeans.jemmy.operators.JButtonOperator;
-import org.netbeans.jemmy.operators.JDialogOperator;
-import org.netbeans.jemmy.operators.JFrameOperator;
-import org.netbeans.jemmy.operators.JMenuOperator;
+
+import jmri.util.JmriJFrame;
+import jmri.util.JUnitUtil;
+
+import org.netbeans.jemmy.operators.*;
 
 
 /**
@@ -15,6 +20,9 @@ import org.netbeans.jemmy.operators.JMenuOperator;
  */
 public class EditorFrameOperator extends JFrameOperator {
 
+    private static final String LABEL_EDITOR = ResourceBundle.getBundle("jmri.jmrit.display.DisplayBundle").
+        getString("LabelEditor");
+
     public EditorFrameOperator(String title){
        super(title);
     }
@@ -23,17 +31,28 @@ public class EditorFrameOperator extends JFrameOperator {
        super(frame);
     }
 
+    private static final String HIDE_THREAD_NAME = "EditorFrameOperator: Hide Dialog Close Thread";
+    private static final String DELETE_THREAD_NAME = "EditorFrameOperator: Delete Dialog Close Thread";
+
     public void closeFrameWithConfirmations(){
         // if OK to here, close window
-        this.requestClose();
+
+        // dispose of Hidden Switchboard Editor Frames
+        JFrame jf = JmriJFrame.getFrame(getTitle() + " " + LABEL_EDITOR);
+        if (jf != null) {
+            JUnitUtil.dispose(jf);
+        }
 
         dismissClosingDialogs();
+        this.requestClose();
+        JUnitUtil.dispose( getWindow());
+        this.waitClosed();
     }
 
     public void deleteViaFileMenuWithConfirmations(){
         JMenuOperator jmo = new JMenuOperator(this,Bundle.getMessage("MenuFile"));
-        jmo.pushMenuNoBlock(Bundle.getMessage("MenuFile") +"/"+ Bundle.getMessage("DeletePanel"), "/");
         dismissClosingDialogs();
+        jmo.pushMenu(Bundle.getMessage("MenuFile") +"/"+ Bundle.getMessage("DeletePanel"), "/");
 
     }
 
@@ -43,37 +62,56 @@ public class EditorFrameOperator extends JFrameOperator {
         // the dialog appears, it will get clicked, but it's not an error
         // if it doesn't appear.
         Thread t = new Thread( () -> {
-            try {
-                JDialogOperator d = new JDialogOperator(Bundle.getMessage("PanelHideTitle"));
-                // Find the button that deletes the panel
-                JButtonOperator bo = new JButtonOperator(d,Bundle.getMessage("ButtonHide"));
-
-                // Click button to delete panel and close window
-                bo.push();
-            } catch (Exception e) {
-                // exceptions in this thread are not considered an error.
-                return;
-            }
+            triggerPanelHideOperators();
         });
-        t.setName("Hide Dialog Close Thread");
+        t.setName(HIDE_THREAD_NAME);
         t.start();
 
         Thread t2 = new Thread( () -> {
-            try {
-                JDialogOperator d = new JDialogOperator(Bundle.getMessage("DeleteVerifyTitle"));
-                // Find the button that deletes the panel
-                JButtonOperator bo = new JButtonOperator(d,Bundle.getMessage("ButtonYesDelete"));
-
-                // Click button to delete panel and close window
-                bo.push();
-            } catch (Exception e) {
-                // exceptions in this thread are not considered an error.
-                return;
-            }
+            triggerDeleteYesOperators();
         });
-        t2.setName("Delete Dialog Close Thread");
+        t2.setName(DELETE_THREAD_NAME);
         t2.start();
 
+    }
+
+    @SuppressFBWarnings( value = {"DCN_NULLPOINTER_EXCEPTION"},
+        justification = "ok for JDialog not to be present")
+    private void triggerPanelHideOperators() {
+        try {
+            JDialogOperator d = new JDialogOperator(Bundle.getMessage("PanelHideTitle"));
+            // Find the button that deletes the panel
+            JButtonOperator bo = new JButtonOperator(d,Bundle.getMessage("ButtonHide"));
+
+            // Click button to delete panel and close window
+            bo.push();
+        } catch (NullPointerException e) {
+            // exceptions in this thread are not considered an error.
+        }
+    }
+
+    @SuppressFBWarnings( value = {"DCN_NULLPOINTER_EXCEPTION"},
+        justification = "ok for JDialog not to be present")
+    private void triggerDeleteYesOperators() {
+        try {
+            JDialogOperator d = new JDialogOperator(Bundle.getMessage("DeleteVerifyTitle"));
+            // Find the button that deletes the panel
+            JButtonOperator bo = new JButtonOperator(d,Bundle.getMessage("ButtonYesDelete"));
+
+            // Click button to delete panel and close window
+            bo.push();
+        } catch (NullPointerException e) {
+            // exceptions in this thread are not considered an error.
+        }
+    }
+
+    /**
+     * Call this at the end of tests that have invoked dismissClosingDialogs
+     * to clean up any threads that have been left hanging.
+     */
+    public static void clearEditorFrameOperatorThreads() {
+        JUnitUtil.removeMatchingThreads(HIDE_THREAD_NAME);
+        JUnitUtil.removeMatchingThreads(DELETE_THREAD_NAME);
     }
 
 }

@@ -2,7 +2,6 @@ package jmri.util.prefs;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -14,14 +13,14 @@ import org.junit.jupiter.api.*;
 public class InitializationExceptionTest {
 
    @Test
-   public void ConstructorTest(){
-      Assert.assertNotNull("InitializationException constructor",new InitializationException("test exception",null));
+   public void testCtor(){
+      Assertions.assertNotNull( new InitializationException("test exception",null), "InitializationException constructor");
    }
 
    @BeforeEach
    public void setUp() {
         JUnitUtil.setUp();
-        jmri.util.JUnitUtil.initDefaultUserMessagePreferences();
+        JUnitUtil.initDefaultUserMessagePreferences();
    }
 
    @AfterEach

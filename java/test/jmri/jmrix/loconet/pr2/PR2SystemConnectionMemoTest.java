@@ -20,7 +20,7 @@ public class PR2SystemConnectionMemoTest extends SystemConnectionMemoTestBase<PR
        scm = new PR2SystemConnectionMemo();
        LocoNetInterfaceScaffold lnis = new LocoNetInterfaceScaffold(scm);
        scm.setLnTrafficController(lnis);
-       scm.configureCommandStation(jmri.jmrix.loconet.LnCommandStationType.COMMAND_STATION_DCS100,false,false,false);
+       scm.configureCommandStation(jmri.jmrix.loconet.LnCommandStationType.COMMAND_STATION_DCS100,false,false,false,false,false);
        scm.configureManagers();
     }
 
@@ -31,6 +31,6 @@ public class PR2SystemConnectionMemoTest extends SystemConnectionMemoTestBase<PR
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(PR2SystemConnectionMemoTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(PR2SystemConnectionMemoTest.class);
 
 }

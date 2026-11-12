@@ -1,15 +1,18 @@
 package jmri.managers;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import javax.annotation.OverridingMethodsMustInvokeSuper;
+
 import jmri.*;
 import jmri.implementation.SignalSpeedMap;
 import jmri.SystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract partial implementation of a TurnoutManager.
@@ -22,18 +25,28 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
     public AbstractTurnoutManager(SystemConnectionMemo memo) {
         super(memo);
         InstanceManager.getDefault(TurnoutOperationManager.class); // force creation of an instance
-        InstanceManager.sensorManagerInstance().addVetoableChangeListener(this);
-
-        // set listener for changes in memo
-        memo.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
-            @Override
-            public void propertyChange(java.beans.PropertyChangeEvent e) {
-                if (e.getPropertyName().equals(SystemConnectionMemo.INTERVAL)) {
-                    handleIntervalChange((Integer) e.getNewValue());
-                }
-            }
-        });
+        init();
     }
+
+    final void init() {
+        sensorManager = InstanceManager.getDefault(SensorManager.class);
+        sensorManager.addVetoableChangeListener(this);
+        // set listener for changes in memo
+        memo.addPropertyChangeListener(pcl);
+    }
+
+    /**
+     * The SensorManager this manager listens to for deletions, so that
+     * {@link #dispose()} stops listening to that one, not whatever the
+     * InstanceManager holds by then.
+     */
+    private SensorManager sensorManager;
+
+    final PropertyChangeListener pcl = (PropertyChangeEvent e) -> {
+        if (e.getPropertyName().equals(SystemConnectionMemo.INTERVAL)) {
+            handleIntervalChange((Integer) e.getNewValue());
+        }
+    };
 
     /** {@inheritDoc} */
     @Override
@@ -70,8 +83,10 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
     /** {@inheritDoc} */
     @Override
     @Nonnull
-    public Turnout newTurnout(@Nonnull String systemName, @CheckForNull String userName) throws IllegalArgumentException {
-        Objects.requireNonNull(systemName, "SystemName cannot be null. UserName was " + ((userName == null) ? "null" : userName));  // NOI18N
+    public Turnout newTurnout(@Nonnull String systemName, @CheckForNull String userName)
+            throws IllegalArgumentException {
+        Objects.requireNonNull(systemName, "SystemName cannot be null. UserName was "
+            + ((userName == null) ? "null" : userName));  // NOI18N
         // add normalize? see AbstractSensor
         log.debug("newTurnout: {};{}", systemName, userName);
 
@@ -101,7 +116,8 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
             if ((t.getUserName() == null) && (userName != null)) {
                 t.setUserName(userName);
             } else if (userName != null) {
-                log.warn("Found turnout via system name ({}) with non-null user name ({}). Turnout \"{} ({})\" cannot be used.",
+                log.warn("Found turnout via system name ({}) with non-null user name ({})."
+                    + " Turnout \"{} ({})\" cannot be used.",
                         systemName, t.getUserName(), systemName, userName);
             }
             return t;
@@ -112,7 +128,7 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
         // if that failed, will throw an IllegalArgumentException
 
         // Some implementations of createNewTurnout() register the new bean,
-        // some don't. 
+        // some don't.
         if (getBySystemName(t.getSystemName()) == null) {
             // save in the maps if successful
             register(t);
@@ -121,13 +137,13 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
         try {
             t.setStraightSpeed("Global");
         } catch (jmri.JmriException ex) {
-            log.error(ex.toString());
+            log.error("Turnout : {} : {}", t, ex.getMessage());
         }
 
         try {
             t.setDivergingSpeed("Global");
         } catch (jmri.JmriException ex) {
-            log.error(ex.toString());
+            log.error("Turnout : {} : {}", t, ex.getMessage());
         }
         return t;
     }
@@ -214,7 +230,8 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
      * @throws IllegalArgumentException if unsuccessful
      */
     @Nonnull
-    abstract protected Turnout createNewTurnout(@Nonnull String systemName, String userName) throws IllegalArgumentException;
+    protected abstract Turnout createNewTurnout(@Nonnull String systemName, String userName)
+        throws IllegalArgumentException;
 
     /** {@inheritDoc} */
     @Override
@@ -228,28 +245,15 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
     }
 
     /**
-     * A temporary method that determines if it is possible to add a range of
-     * turnouts in numerical order eg 10 to 30, primarily used to enable/disable the Add
-     * range box in the Add new turnout panel.
-     *
-     * @param systemName configured system connection name
-     * @return false as default, unless overridden by implementations as supported
-     */
-    @Override
-    public boolean allowMultipleAdditions(@Nonnull String systemName) {
-        return false;
-    }
-
-    /**
      * Default Turnout ensures a numeric only system name.
-     * {@inheritDoc} 
+     * {@inheritDoc}
      */
     @Nonnull
     @Override
     public String createSystemName(@Nonnull String curAddress, @Nonnull String prefix) throws JmriException {
         return prefix + typeLetter() + checkNumeric(curAddress);
     }
-    
+
     private String defaultClosedSpeed = "Normal";
     private String defaultThrownSpeed = "Restricted";
 
@@ -273,13 +277,14 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
                 try {
                     jmri.InstanceManager.getDefault(SignalSpeedMap.class).getSpeed(speed);
                 } catch (IllegalArgumentException ex) {
-                    throw new JmriException("Value of requested turnout default closed speed is not valid");
+                    throw new JmriException("Value of requested turnout default closed speed is not valid. "
+                        + ex.getMessage());
                 }
             }
         }
         String oldSpeed = defaultClosedSpeed;
         defaultClosedSpeed = speed;
-        firePropertyChange("DefaultTurnoutClosedSpeedChange", oldSpeed, speed);
+        firePropertyChange(PROPERTY_DEFAULT_CLOSED_SPEED, oldSpeed, speed);
     }
 
     /** {@inheritDoc} */
@@ -303,13 +308,14 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
                 try {
                     jmri.InstanceManager.getDefault(SignalSpeedMap.class).getSpeed(speed);
                 } catch (IllegalArgumentException ex) {
-                    throw new JmriException("Value of requested turnout default thrown speed is not valid");
+                    throw new JmriException("Value of requested turnout default thrown speed is not valid. "
+                        + ex.getMessage());
                 }
             }
         }
         String oldSpeed = defaultThrownSpeed;
         defaultThrownSpeed = speed;
-        firePropertyChange("DefaultTurnoutThrownSpeedChange", oldSpeed, speed);
+        firePropertyChange(PROPERTY_DEFAULT_THROWN_SPEED, oldSpeed, speed);
     }
 
     /** {@inheritDoc} */
@@ -360,7 +366,7 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
     /** {@inheritDoc} */
     @Override
     @Nonnull
-    public LocalDateTime outputIntervalEnds() {
+    public synchronized LocalDateTime outputIntervalEnds() {
         log.debug("outputIntervalEnds called in AbstractTurnoutManager");
         if (waitUntil.isAfter(LocalDateTime.now())) {
             waitUntil = waitUntil.plus(turnoutInterval, ChronoUnit.MILLIS);
@@ -370,6 +376,18 @@ public abstract class AbstractTurnoutManager extends AbstractManager<Turnout>
         return waitUntil;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractTurnoutManager.class);
+    /**
+     * Removes SensorManager and SystemConnectionMemo change listeners.
+     * {@inheritDoc}
+     */
+    @OverridingMethodsMustInvokeSuper
+    @Override
+    public void dispose(){
+        memo.removePropertyChangeListener(pcl);
+        sensorManager.removeVetoableChangeListener(this);
+        super.dispose();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractTurnoutManager.class);
 
 }

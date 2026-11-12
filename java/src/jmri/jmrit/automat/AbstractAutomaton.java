@@ -9,26 +9,16 @@ import javax.annotation.Nonnull;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JTextArea;
-import jmri.BasicRosterEntry;
-import jmri.DccThrottle;
-import jmri.InstanceManager;
-import jmri.NamedBean;
-import jmri.Programmer;
-import jmri.ProgrammerException;
-import jmri.Sensor;
-import jmri.ThrottleListener;
-import jmri.ThrottleManager;
-import jmri.Turnout;
+
+import jmri.*;
 import jmri.jmrit.logix.OBlock;
 import jmri.jmrit.logix.Warrant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract base for user automaton classes, which provide individual bits of
  * automation.
  * <p>
- * Each individual automaton runs in a separate thread, so they can operate
+ * Each individual automaton object runs in a separate thread, so they can operate
  * independently. This class handles thread creation and scheduling, and
  * provides a number of services for the user code.
  * <p>
@@ -38,9 +28,9 @@ import org.slf4j.LoggerFactory;
  * it is more efficient to use the explicit wait services when waiting for some
  * specific condition.
  * <p>
- * handle() is executed repeatedly until either the Automate object is halted(),
- * or it returns "false". Returning "true" will just cause handle() to be
- * invoked again, so you can cleanly restart the Automaton by returning from
+ * handle() is executed repeatedly until either the Automate object's stop() method is called,
+ * or handle() returns "false". Returning "true" will just cause handle() to be
+ * invoked again, so you can cleanly restart the Automaton's handle processing by returning from
  * multiple points in the function.
  * <p>
  * Since handle() executes outside the GUI thread, it is important that access
@@ -48,10 +38,10 @@ import org.slf4j.LoggerFactory;
  * routines.
  * <p>
  * Services are provided by public member functions, described below. They must
- * only be invoked from the init and handle methods, as they must be used in a
+ * only be invoked from within the init() and handle() methods, as they must be used in a
  * delayable thread. If invoked from the GUI thread, for example, the program
  * will appear to hang. To help ensure this, a warning will be logged if they
- * are used before the thread starts.
+ * are used outside the proper thread.
  * <p>
  * For general use, e.g. in scripts, the most useful functions are:
  * <ul>
@@ -66,6 +56,10 @@ import org.slf4j.LoggerFactory;
  * {@link #waitSensorState(jmri.Sensor, int)}
  * <li>Wait for a specific sensor to change:
  * {@link #waitSensorChange(int, jmri.Sensor)}
+ * <li>Wait for a specific signal head to show a specific appearance:
+ * {@link #waitSignalHeadState(jmri.SignalHead, int)}
+ * <li>Wait for a specific signal mast to show a specific aspect:
+ * {@link #waitSignalMastState(jmri.SignalMast, String)}
  * <li>Wait for a specific warrant to change run state:
  * {@link #waitWarrantRunState(Warrant, int)}
  * <li>Wait for a specific warrant to enter or leave a specific block:
@@ -92,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * Although this is named an "Abstract" class, it's actually concrete so scripts
  * can easily use some of the methods.
  *
- * @author Bob Jacobsen Copyright (C) 2003
+ * @author Bob Jacobsen Copyright (C) 2003, 2025
  */
 public class AbstractAutomaton implements Runnable {
 
@@ -106,27 +100,39 @@ public class AbstractAutomaton implements Runnable {
         setName(name);
     }
 
-    AutomatSummary summary = AutomatSummary.instance();
+    private final AutomatSummary summary = AutomatSummary.instance();
 
-    Thread currentThread = null;
+    private Thread currentThread = null;
+    private volatile boolean threadIsStopped = false;
 
     /**
-     * Start this automat processing.
+     * Start this automat's processing loop.
      * <p>
-     * Overrides the superclass method to do local accounting.
+     * Will execute the init() method, if present, then
+     * repeatedly execute the handle() method until complete.
      */
     public void start() {
+        log.trace("start() invoked");
         if (currentThread != null) {
-            log.error("Start with currentThread not null!");
+            log.error("Start with a thread already running!");
+            log.error("This causes an additional thread to be started.");
         }
         currentThread = jmri.util.ThreadingUtil.newThread(this, name);
         currentThread.start();
         summary.register(this);
         count = 0;
+        log.trace("start() ends");
     }
 
-    private boolean running = false;
+    private volatile boolean running = false;
 
+    /**
+     * Is the thread in this object currently running?
+     *
+     * @return true from the time the {@link #start} method is called
+     *          until the thread has completed running after
+     *          the {@link #stop} method is called.
+     */
     public boolean isRunning() {
         return running;
     }
@@ -137,69 +143,63 @@ public class AbstractAutomaton implements Runnable {
      * This is invoked on currentThread.
      */
     @Override
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "IMSE_DONT_CATCH_IMSE",
-            justification = "get these when stop() issued against thread doing BlockingQueue.take() in waitChange, should remove when stop() reimplemented")
     public void run() {
+        log.trace("run starts with threadIsStopped {}", threadIsStopped);
         try {
             inThread = true;
             init();
             // the real processing in the next statement is in handle();
             // and the loop call is just doing accounting
             running = true;
-            while (handle()) {
+            while (!threadIsStopped && handle()) {
                 count++;
                 summary.loop(this);
             }
-            log.debug("normal termination, handle() returned false");
-            currentThread = null;
-            done();
-        } catch (ThreadDeath e1) {
-            if (currentThread == null) {
-                log.debug("Received ThreadDeath, likely due to stop()");
+            if (threadIsStopped) {
+                log.debug("Current thread has been stopped()");
             } else {
-                log.warn("Received ThreadDeath while not stopped", e1);
+                log.debug("normal termination, handle() returned false");
             }
-        } catch (IllegalMonitorStateException e2) {
-            if (currentThread == null) {
-                log.debug("Received IllegalMonitorStateException, likely due to stop()");
-            } else {
-                log.warn("Received IllegalMonitorStateException while not stopped", e2);
-            }
-        } catch (Exception e3) {
-            log.warn("Unexpected Exception ends AbstractAutomaton thread", e3);
+        } catch (StopThreadException e1) {
+            log.debug("Current thread is stopped() via StopThreadException");
+        } catch (Exception e2) {
+            log.warn("Unexpected Exception ends AbstractAutomaton thread", e2);
         } finally {
+            log.trace("setting currentThread to null");
             currentThread = null;
+            threadIsStopped = false;
+
             done();
         }
+        log.trace("setting running to false");
         running = false;
     }
 
     /**
-     * Stop the thread immediately.
+     * Stop the thread as soon as possible.
      * <p>
-     * Overrides superclass method to handle local accounting.
+     * This interrupts the thread, which will cause it to
+     * terminate soon.  There's no guarantee as to how long that will
+     * take. It should be just a few milliseconds.
+     * <p>
+     * To see if the thread has terminated, check the
+     * {@link #isRunning} status method.
+     * <p>
+     * Once the thread has terminated, it can be started again.
      */
-    @SuppressWarnings("deprecation") // AbstractAutomaton objects can be waiting on _lots_ of things, so
-                                     // we need to find another way to deal with this besides Interrupt
     public void stop() {
-        log.trace("stop() invoked");
+        log.debug("stop() invoked");
         if (currentThread == null) {
-            log.error("Stop with currentThread null!");
+            log.error("Stop called with no current thread running!");
             return;
         }
 
-        Thread stoppingThread = currentThread;
-        currentThread = null;
-
-        try {
-            stoppingThread.stop();
-        } catch (java.lang.ThreadDeath e) {
-            log.error("Exception while in stop(): {}", e.toString());
-        }
+        threadIsStopped = true;
+        currentThread.interrupt();
 
         done();
         // note we don't set running = false here.  It's still running until the run() routine thinks it's not.
-        log.trace("stop() completed");
+        log.debug("stop() completed");
     }
 
     /**
@@ -208,6 +208,7 @@ public class AbstractAutomaton implements Runnable {
      * Common internal end-time processing
      */
     void done() {
+        log.trace("done invoked");
         summary.remove(this);
     }
 
@@ -216,13 +217,14 @@ public class AbstractAutomaton implements Runnable {
     private int count;
 
     /**
-     * Get the number of times the handle routine has executed.
+     * Get the number of times the handle routine has executed
+     * since the last time {@link #start()} was called on it.
      * <p>
-     * Used by classes such as {@link jmri.jmrit.automat.monitor} to monitor
+     * Used by classes such as those in {@link jmri.jmrit.automat.monitor} to monitor
      * progress.
      *
-     * @return the number of times {@link #handle()} has been called on this
-     *         AbstractAutomation
+     * @return the number of times {@link #handle()} has executed in this
+     *         AbstractAutomation since it was last started.
      */
     public int getCount() {
         return count;
@@ -233,6 +235,7 @@ public class AbstractAutomaton implements Runnable {
      * such as {@link jmri.jmrit.automat.monitor}.
      *
      * @return the name of this thread
+     * @see #setName(String)
      */
     public String getName() {
         return name;
@@ -242,21 +245,25 @@ public class AbstractAutomaton implements Runnable {
      * Update the name of this object.
      * <p>
      * name is not a bound parameter, so changes are not notified to listeners.
+     * <p>
+     * If you're going to use this, it should generally be called
+     * before calling {@link #start()}.
      *
      * @param name the new name
      * @see #getName()
      */
-    public void setName(String name) {
+    public final void setName(String name) {
         this.name = name;
     }
 
+    @Deprecated(since="5.13.6", forRemoval=true) // This doesn't seem to have a purpose...
     void defaultName() {
     }
 
     /**
      * User-provided initialization routine.
      * <p>
-     * This is called exactly once for each object created. This is where you
+     * This is called exactly once each time the object's start() method is called. This is where you
      * put all the code that needs to be run when your object starts up: Finding
      * sensors and turnouts, getting a throttle, etc.
      */
@@ -296,6 +303,9 @@ public class AbstractAutomaton implements Runnable {
             try {
                 Thread.sleep(stillToGo);
             } catch (InterruptedException e) {
+                if (threadIsStopped) {
+                    throw new StopThreadException();
+                }
                 Thread.currentThread().interrupt(); // retain if needed later
             }
         }
@@ -318,14 +328,14 @@ public class AbstractAutomaton implements Runnable {
     /**
      * Internal common routine to handle start-of-wait bookkeeping.
      */
-    final private void startWait() {
+    private void startWait() {
         waiting = true;
     }
 
     /**
      * Internal common routine to handle end-of-wait bookkeeping.
      */
-    final private void endWait() {
+    private void endWait() {
         if (promptOnWait) {
             debuggingWait();
         }
@@ -354,6 +364,9 @@ public class AbstractAutomaton implements Runnable {
                     super.wait(milliseconds);
                 }
             } catch (InterruptedException e) {
+                if (threadIsStopped) {
+                    throw new StopThreadException();
+                }
                 Thread.currentThread().interrupt(); // retain if needed later
                 log.warn("interrupted in wait");
             }
@@ -387,9 +400,7 @@ public class AbstractAutomaton implements Runnable {
         if (!inThread) {
             log.warn("waitSensorChange invoked from invalid context");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitSensorChange starts: {}", mSensor.getSystemName());
-        }
+        log.debug("waitSensorChange starts: {}", mSensor.getSystemName());
         // register a listener
         PropertyChangeListener l;
         mSensor.addPropertyChangeListener(l = (PropertyChangeEvent e) -> {
@@ -415,9 +426,7 @@ public class AbstractAutomaton implements Runnable {
      * @param mSensor Sensor to watch
      */
     public void waitSensorActive(Sensor mSensor) {
-        if (log.isDebugEnabled()) {
-            log.debug("waitSensorActive starts");
-        }
+        log.debug("waitSensorActive starts");
         waitSensorState(mSensor, Sensor.ACTIVE);
     }
 
@@ -428,9 +437,7 @@ public class AbstractAutomaton implements Runnable {
      * @param mSensor Sensor to watch
      */
     public void waitSensorInactive(Sensor mSensor) {
-        if (log.isDebugEnabled()) {
-            log.debug("waitSensorInActive starts");
-        }
+        log.debug("waitSensorInActive starts");
         waitSensorState(mSensor, Sensor.INACTIVE);
     }
 
@@ -453,9 +460,7 @@ public class AbstractAutomaton implements Runnable {
         if (mSensor.getKnownState() == state) {
             return;
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitSensorState starts: {} {}", mSensor.getSystemName(), state);
-        }
+        log.debug("waitSensorState starts: {} {}", mSensor.getSystemName(), state);
         // register a listener
         PropertyChangeListener l;
         mSensor.addPropertyChangeListener(l = (PropertyChangeEvent e) -> {
@@ -541,6 +546,75 @@ public class AbstractAutomaton implements Runnable {
     }
 
     /**
+     * Internal service routine to wait for one SignalHead to be in (or become in) a
+     * specific state.
+     * <p>
+     * This works by registering a listener, which is likely to run in another
+     * thread. That listener then interrupts this thread to confirm the change.
+     *
+     * @param mSignalHead the signal head to wait for
+     * @param state   the expected state
+     */
+    public synchronized void waitSignalHeadState(SignalHead mSignalHead, int state) {
+        if (!inThread) {
+            log.warn("waitSignalHeadState invoked from invalid context");
+        }
+        if (mSignalHead.getAppearance() == state) {
+            return;
+        }
+        log.debug("waitSignalHeadState starts: {} {}", mSignalHead.getSystemName(), state);
+        // register a listener
+        PropertyChangeListener l;
+        mSignalHead.addPropertyChangeListener(l = (PropertyChangeEvent e) -> {
+            synchronized (self) {
+                self.notifyAll(); // should be only one thread waiting, but just in case
+            }
+        });
+
+        while (state != mSignalHead.getAppearance()) {
+            wait(-1);  // wait for notification
+        }
+
+        // remove the listener & report new state
+        mSignalHead.removePropertyChangeListener(l);
+
+    }
+
+    /**
+     * Internal service routine to wait for one signal mast to be showing a specific aspect
+     * <p>
+     * This works by registering a listener, which is likely to run in another
+     * thread. That listener then interrupts this thread to confirm the change.
+     *
+     * @param mSignalMast the mast to wait for
+     * @param aspect   the expected aspect
+     */
+    public synchronized void waitSignalMastState(@Nonnull SignalMast mSignalMast, @Nonnull String aspect) {
+        if (!inThread) {
+            log.warn("waitSignalMastState invoked from invalid context");
+        }
+        if (aspect.equals(mSignalMast.getAspect())) {
+            return;
+        }
+        log.debug("waitSignalMastState starts: {} {}", mSignalMast.getSystemName(), aspect);
+        // register a listener
+        PropertyChangeListener l;
+        mSignalMast.addPropertyChangeListener(l = (PropertyChangeEvent e) -> {
+            synchronized (self) {
+                self.notifyAll(); // should be only one thread waiting, but just in case
+            }
+        });
+
+        while (! aspect.equals(mSignalMast.getAspect())) {
+            wait(-1);  // wait for notification
+        }
+
+        // remove the listener & report new state
+        mSignalMast.removePropertyChangeListener(l);
+
+    }
+
+    /**
      * Wait for a warrant to change into or out of running state.
      * <p>
      * This works by registering a listener, which is likely to run in another
@@ -554,9 +628,7 @@ public class AbstractAutomaton implements Runnable {
         if (!inThread) {
             log.warn("waitWarrantRunState invoked from invalid context");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitWarrantRunState {}, {} starts", warrant.getDisplayName(), state);
-        }
+        log.debug("waitWarrantRunState {}, {} starts", warrant.getDisplayName(), state);
 
         // do a quick check first, just in case
         if (warrant.getRunMode() == state) {
@@ -596,9 +668,7 @@ public class AbstractAutomaton implements Runnable {
         if (!inThread) {
             log.warn("waitWarrantBlock invoked from invalid context");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitWarrantBlock {}, {} {} starts", warrant.getDisplayName(), block, occupied);
-        }
+        log.debug("waitWarrantBlock {}, {} {} starts", warrant.getDisplayName(), block, occupied);
 
         // do a quick check first, just in case
         if (warrant.getCurrentBlockName().equals(block) == occupied) {
@@ -642,9 +712,7 @@ public class AbstractAutomaton implements Runnable {
         if (!inThread) {
             log.warn("waitWarrantBlockChange invoked from invalid context");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitWarrantBlockChange {}", warrant.getDisplayName());
-        }
+        log.debug("waitWarrantBlockChange {}", warrant.getDisplayName());
 
         // do a quick check first, just in case
         if (warrant.getRunMode() != Warrant.MODE_RUN) {
@@ -661,7 +729,7 @@ public class AbstractAutomaton implements Runnable {
                 blockChanged = true;
                 blockName = ((OBlock) e.getNewValue()).getDisplayName();
             }
-            if (e.getPropertyName().equals("runMode") && !Integer.valueOf(Warrant.MODE_RUN).equals(e.getNewValue())) {
+            if (e.getPropertyName().equals("StopWarrant")) {
                 blockName = null;
                 blockChanged = true;
             }
@@ -694,9 +762,7 @@ public class AbstractAutomaton implements Runnable {
         if (!inThread) {
             log.warn("waitTurnoutConsistent invoked from invalid context");
         }
-        if (log.isDebugEnabled()) {
-            log.debug("waitTurnoutConsistent[] starts");
-        }
+        log.debug("waitTurnoutConsistent[] starts");
 
         // do a quick check first, just in case
         if (checkForConsistent(mTurnouts)) {
@@ -854,6 +920,9 @@ public class AbstractAutomaton implements Runnable {
                 log.trace("waitChange continues");
             }
         } catch (InterruptedException e) {
+            if (threadIsStopped) {
+                throw new StopThreadException();
+            }
             Thread.currentThread().interrupt(); // retain if needed later
             log.warn("AbstractAutomaton {} waitChange interrupted", getName());
         }
@@ -871,8 +940,9 @@ public class AbstractAutomaton implements Runnable {
     BlockingQueue<PropertyChangeEvent> waitChangeQueue = new LinkedBlockingQueue<PropertyChangeEvent>();
 
     /**
-     * Wait forever for one of a list of NamedBeans (sensors, signal heads
-     * and/or turnouts) to change, or for a specific time to pass.
+     * Remembers the current state of a set of NamedBeans
+     * so that a later looping call to waitChange(..) on that same
+     * list won't miss any intervening changes.
      *
      * @param mInputs Array of NamedBeans to watch
      */
@@ -887,7 +957,7 @@ public class AbstractAutomaton implements Runnable {
 
     /**
      * Wait forever for one of a list of NamedBeans (sensors, signal heads
-     * and/or turnouts) to change, or for a specific time to pass.
+     * and/or turnouts) to change.
      *
      * @param mInputs Array of NamedBeans to watch
      */
@@ -976,7 +1046,7 @@ public class AbstractAutomaton implements Runnable {
             public void notifyDecisionRequired(jmri.LocoAddress address, DecisionType question) {
             }
         };
-        boolean ok = InstanceManager.getDefault(ThrottleManager.class).requestThrottle( 
+        boolean ok = InstanceManager.getDefault(ThrottleManager.class).requestThrottle(
             new jmri.DccLocoAddress(address, longAddress), throttleListener, false);
 
         // check if reply is coming
@@ -1041,7 +1111,7 @@ public class AbstractAutomaton implements Runnable {
                     self.notifyAll(); // should be only one thread waiting, but just in case
                 }
             }
-            
+
             /**
              * No steal or share decisions made locally
              * {@inheritDoc}
@@ -1086,11 +1156,11 @@ public class AbstractAutomaton implements Runnable {
     /**
      * Write a CV on the service track, including waiting for completion.
      *
-     * @param CV    Number 1 through 512
+     * @param cv    Number 1 through 512
      * @param value Value 0-255 to be written
      * @return true if completed OK
      */
-    public boolean writeServiceModeCV(String CV, int value) {
+    public boolean writeServiceModeCV(String cv, int value) {
         // get service mode programmer
         Programmer programmer = InstanceManager.getDefault(jmri.GlobalProgrammerManager.class)
                 .getGlobalProgrammer();
@@ -1102,13 +1172,13 @@ public class AbstractAutomaton implements Runnable {
 
         // do the write, response will wake the thread
         try {
-            programmer.writeCV(CV, value, (int value1, int status) -> {
+            programmer.writeCV(cv, value, (int value1, int status) -> {
                 synchronized (self) {
                     self.notifyAll(); // should be only one thread waiting, but just in case
                 }
             });
         } catch (ProgrammerException e) {
-            log.warn("Exception during writeServiceModeCV: {}", e);
+            log.warn("Exception during writeServiceModeCV", e);
             return false;
         }
         // wait for the result
@@ -1122,10 +1192,10 @@ public class AbstractAutomaton implements Runnable {
     /**
      * Read a CV on the service track, including waiting for completion.
      *
-     * @param CV Number 1 through 512
+     * @param cv Number 1 through 512
      * @return -1 if error, else value
      */
-    public int readServiceModeCV(String CV) {
+    public int readServiceModeCV(String cv) {
         // get service mode programmer
         Programmer programmer = InstanceManager.getDefault(jmri.GlobalProgrammerManager.class)
                 .getGlobalProgrammer();
@@ -1138,14 +1208,14 @@ public class AbstractAutomaton implements Runnable {
         // do the read, response will wake the thread
         cvReturnValue = -1;
         try {
-            programmer.readCV(CV, (int value, int status) -> {
+            programmer.readCV(cv, (int value, int status) -> {
                 cvReturnValue = value;
                 synchronized (self) {
                     self.notifyAll(); // should be only one thread waiting, but just in case
                 }
             });
         } catch (ProgrammerException e) {
-            log.warn("Exception during writeServiceModeCV: {}", e);
+            log.warn("Exception during writeServiceModeCV", e);
             return -1;
         }
         // wait for the result
@@ -1156,13 +1226,13 @@ public class AbstractAutomaton implements Runnable {
     /**
      * Write a CV in ops mode, including waiting for completion.
      *
-     * @param CV          Number 1 through 512
+     * @param cv          Number 1 through 512
      * @param value       0-255 value to be written
      * @param loco        Locomotive decoder address
      * @param longAddress true is the locomotive is using a long address
      * @return true if completed OK
      */
-    public boolean writeOpsModeCV(String CV, int value, boolean longAddress, int loco) {
+    public boolean writeOpsModeCV(String cv, int value, boolean longAddress, int loco) {
         // get service mode programmer
         Programmer programmer = InstanceManager.getDefault(jmri.AddressedProgrammerManager.class)
                 .getAddressedProgrammer(longAddress, loco);
@@ -1174,13 +1244,13 @@ public class AbstractAutomaton implements Runnable {
 
         // do the write, response will wake the thread
         try {
-            programmer.writeCV(CV, value, (int value1, int status) -> {
+            programmer.writeCV(cv, value, (int value1, int status) -> {
                 synchronized (self) {
                     self.notifyAll(); // should be only one thread waiting, but just in case
                 }
             });
         } catch (ProgrammerException e) {
-            log.warn("Exception during writeServiceModeCV: {}", e);
+            log.warn("Exception during writeServiceModeCV", e);
             return false;
         }
         // wait for the result
@@ -1188,9 +1258,6 @@ public class AbstractAutomaton implements Runnable {
 
         return true;
     }
-
-    JFrame messageFrame = null;
-    String message = null;
 
     /**
      * Internal class to show a Frame
@@ -1312,10 +1379,21 @@ public class AbstractAutomaton implements Runnable {
         try {
             super.wait();
         } catch (InterruptedException e) {
+            if (threadIsStopped) {
+                throw new StopThreadException();
+            }
             Thread.currentThread().interrupt(); // retain if needed later
             log.warn("Interrupted during debugging wait, not expected");
         }
     }
+
+    /**
+     * An exception that's used internally in AbstractAutomation to stop
+     * the thread.
+     */
+    private static class StopThreadException extends RuntimeException {
+    }
+
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(AbstractAutomaton.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractAutomaton.class);
 }

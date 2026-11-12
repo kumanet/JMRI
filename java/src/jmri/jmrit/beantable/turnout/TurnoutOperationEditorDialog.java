@@ -1,5 +1,6 @@
 package jmri.jmrit.beantable.turnout;
 
+
 import javax.annotation.Nonnull;
 import javax.swing.*;
 
@@ -7,9 +8,7 @@ import jmri.Turnout;
 import jmri.TurnoutOperation;
 import static jmri.jmrit.beantable.turnout.TurnoutTableDataModel.editingOps;
 import jmri.jmrit.turnoutoperations.TurnoutOperationConfig;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Display a TurnoutOperationConfig Dialog for the turnout.
@@ -29,26 +28,27 @@ public class TurnoutOperationEditorDialog extends JDialog {
     /**
      * Pop up a TurnoutOperationConfig Dialog for the turnout.
      *
-     * @param op TunoutOperation to edit.
-     * @param t   turnout
-     * @param box JComboBox that triggered the edit, currently unused.
+     * @param op TunoutOperation to edit, not null.
+     * @param t  The turnout.
+     * @param window  Parent Window for the Dialog, can be null.
      */
-    TurnoutOperationEditorDialog( @Nonnull TurnoutOperation op, Turnout t, JComboBox<String> box) {
-        super();
+    TurnoutOperationEditorDialog( @Nonnull TurnoutOperation op, @Nonnull Turnout t,
+            @javax.annotation.CheckForNull java.awt.Window window) {
+        super(window);
         self = this;
         myOp = op;
         myTurnout = t;
         init();
     }
-        
+
     private void init() {
-        
+
         myOp.addPropertyChangeListener(evt -> {
             if (evt.getPropertyName().equals("Deleted")) {
                 setVisible(false);
             }
         });
-        
+
         TurnoutOperationConfig config = TurnoutOperationConfig.getConfigPanel(myOp);
         setTitle();
         log.debug("TurnoutOpsEditDialog title set");
@@ -59,11 +59,11 @@ public class TurnoutOperationEditorDialog extends JDialog {
             Box buttonBox = Box.createHorizontalBox();
             JButton nameButton = new JButton(Bundle.getMessage("NameSetting"));
             nameButton.addActionListener(e -> {
-                String newName = JOptionPane.showInputDialog(Bundle.getMessage("NameParameterSetting"));
+                String newName = JmriJOptionPane.showInputDialog(self, Bundle.getMessage("NameParameterSetting"),"");
                 if (newName != null && !newName.isEmpty()) {
                     if (!myOp.rename(newName)) {
-                        JOptionPane.showMessageDialog(self, Bundle.getMessage("TurnoutErrorDuplicate"),
-                                Bundle.getMessage("WarningTitle"), JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(self, Bundle.getMessage("TurnoutErrorDuplicate"),
+                                Bundle.getMessage("WarningTitle"), JmriJOptionPane.ERROR_MESSAGE);
                     }
                     setTitle();
                     myTurnout.setTurnoutOperation(null);
@@ -115,7 +115,7 @@ public class TurnoutOperationEditorDialog extends JDialog {
         setTitle(title);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TurnoutOperationEditorDialog.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TurnoutOperationEditorDialog.class);
 
 }
 

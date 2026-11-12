@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import jmri.InstanceManager;
-import jmri.JmriException;
+import jmri.*;
 import jmri.jmrit.logixng.*;
 
 /**
@@ -19,17 +18,16 @@ public final class DefaultFemaleDigitalBooleanActionSocket
     public DefaultFemaleDigitalBooleanActionSocket(Base parent, FemaleSocketListener listener, String name) {
         super(parent, listener, name);
     }
-    
+
     @Override
     public boolean isCompatible(MaleSocket socket) {
         return socket instanceof MaleDigitalBooleanActionSocket;
     }
-    
+
     @Override
-    public void execute(boolean hasChangedToTrue, boolean hasChangedToFalse) throws JmriException {
+    public void execute(boolean value) throws JmriException {
         if (isConnected()) {
-            ((MaleDigitalBooleanActionSocket)getConnectedSocket())
-                    .execute(hasChangedToTrue, hasChangedToFalse);
+            ((MaleDigitalBooleanActionSocket)getConnectedSocket()).execute(value);
         }
     }
 

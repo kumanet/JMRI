@@ -54,7 +54,7 @@ public class ConsistController extends AbstractController implements ProgListene
                 try {
                     file.readFile();
                 } catch (IOException | JDOMException e) {
-                    log.warn("error reading consist file: {}", (Object) e);
+                    log.warn("error reading consist file", (Object) e);
                 }
             }
             isValid = true;
@@ -361,7 +361,7 @@ public class ConsistController extends AbstractController implements ProgListene
                         log.debug("Unable to communicate with programmer manager.");
                     }
                 } catch (NumberFormatException nfe) {
-                    log.warn("Error in setting CVs: {}", (Object) nfe);
+                    log.warn("Error in setting CVs", nfe);
                 }
             }
             InstanceManager.getDefault(AddressedProgrammerManager.class).releaseAddressedProgrammer(pom);
@@ -374,7 +374,7 @@ public class ConsistController extends AbstractController implements ProgListene
     }
 
     // this method may belong somewhere else.
-    static public DccLocoAddress stringToDcc(String s) {
+    public static DccLocoAddress stringToDcc(String s) {
         int num = Integer.parseInt(s.substring(1));
         boolean isLong = (s.charAt(0) == 'L');
         return (new DccLocoAddress(num, isLong));
@@ -405,6 +405,6 @@ public class ConsistController extends AbstractController implements ProgListene
         throw new UnsupportedOperationException("Not used.");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ConsistController.class);
+    private static final Logger log = LoggerFactory.getLogger(ConsistController.class);
 
 }

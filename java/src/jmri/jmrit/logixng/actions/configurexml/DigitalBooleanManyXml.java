@@ -1,6 +1,5 @@
 package jmri.jmrit.logixng.actions.configurexml;
 
-import java.lang.reflect.Field;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +89,6 @@ public class DigitalBooleanManyXml extends jmri.managers.configurexml.AbstractNa
     }
     
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ManyXml.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ManyXml.class);
 
 }

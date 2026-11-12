@@ -12,7 +12,7 @@ import org.openide.util.lookup.ServiceProvider;
 
 /**
  * Remove remnants of prior issue reports.
- * 
+ *
  * @author Randall Wood Copyright 2020
  */
 @API(status = API.Status.INTERNAL)
@@ -23,7 +23,7 @@ public final class IssueReporterStartupRunnable implements StartupRunnable {
 
     @Override
     public void run() {
-            Path tempDir = new File(System.getProperty("java.io.tmpdir")).toPath();
+        Path tempDir = new File(System.getProperty("java.io.tmpdir")).toPath();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(tempDir, entry -> entry.toFile().getName().startsWith("jmri-issue-report-"))) {
                     stream.forEach(entry -> FileUtil.delete(entry.toFile()));
         } catch (IOException ex) {

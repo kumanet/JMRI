@@ -10,7 +10,6 @@ import jmri.NamedBeanPropertyDescriptor;
 import jmri.Turnout;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.managers.AbstractTurnoutManager;
-import org.openlcb.OlcbInterface;
 
 /**
  * OpenLCB implementation of a TurnoutManager.
@@ -82,7 +81,7 @@ public class OlcbTurnoutManager extends AbstractTurnoutManager {
     @Override
     protected Turnout createNewTurnout(@Nonnull String systemName, String userName) throws IllegalArgumentException {
         String addr = systemName.substring(getSystemPrefix().length() + 1);
-        OlcbTurnout t = new OlcbTurnout(getSystemPrefix(), addr, memo.get(OlcbInterface.class));
+        OlcbTurnout t = new OlcbTurnout(getSystemPrefix(), addr, (CanSystemConnectionMemo) memo);
         t.setUserName(userName);
         synchronized (pendingTurnouts) {
             if (isLoading) {
@@ -126,8 +125,10 @@ public class OlcbTurnoutManager extends AbstractTurnoutManager {
     @Override
     public String createSystemName(@Nonnull String curAddress, @Nonnull String prefix) throws JmriException {
         // don't check for integer; should check for validity here
+        String tmpPrefix = prefix + typeLetter();
+        String tmpSName  = tmpPrefix + curAddress;
         try {
-            OlcbAddress.validateSystemNameFormat(curAddress,Locale.getDefault(),getSystemNamePrefix());
+            OlcbAddress.validateSystemNameFormat(tmpSName,Locale.getDefault(),tmpPrefix, (CanSystemConnectionMemo) memo);
         } catch (jmri.NamedBean.BadSystemNameException e) {
             throw new JmriException(e.getMessage());
         }
@@ -135,27 +136,24 @@ public class OlcbTurnoutManager extends AbstractTurnoutManager {
     }
 
     @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix, boolean ignoreInitialExisting) throws JmriException {
-        // always return this (the current) name without change
-        try {
-            OlcbAddress.validateSystemNameFormat(curAddress,Locale.getDefault(),prefix+"T");
-        } catch (jmri.NamedBean.BadSystemNameException e) {
-            throw new JmriException(e.getMessage());
-        }
-        return curAddress;
+    @javax.annotation.Nonnull
+    @javax.annotation.CheckReturnValue
+    public String getNextValidSystemName(@Nonnull NamedBean currentBean) throws JmriException {
+        throw new jmri.JmriException("getNextValidSystemName should not have been called");
     }
-    
+
     /**
-     * Validates to OpenLCB format.
+     * Validates to OpenLCB 2 part address format.
      * {@inheritDoc}
      */
     @Override
     @Nonnull
-    public String validateSystemNameFormat(@Nonnull String name, @Nonnull java.util.Locale locale) throws jmri.NamedBean.BadSystemNameException {
-        name = super.validateSystemNameFormat(name,locale);
-        return OlcbAddress.validateSystemNameFormat(name,locale,getSystemNamePrefix());
+    public String validateSystemNameFormat(@Nonnull String name, @Nonnull java.util.Locale locale)
+        throws jmri.NamedBean.BadSystemNameException {
+        return OlcbAddress.validateSystemNameFormat2Part(super.validateSystemNameFormat(
+            name,locale),locale,getSystemNamePrefix(), (CanSystemConnectionMemo) memo);
     }
-    
+
     /**
      * {@inheritDoc}
      */

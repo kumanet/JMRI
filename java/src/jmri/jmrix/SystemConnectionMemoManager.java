@@ -16,7 +16,8 @@ import jmri.SystemConnectionMemo;
  * Also provides an object that other objects can listen to for notification of
  * changes in SystemConnectionMemos.
  *
- * @author Randall Wood Copyright 2017
+ * @author Randall Wood      Copyright 2017
+ * @author Daniel Bergqvist  Copyright 2022
  */
 public class SystemConnectionMemoManager extends Bean implements InstanceManagerAutoDefault {
 
@@ -24,12 +25,12 @@ public class SystemConnectionMemoManager extends Bean implements InstanceManager
      * Property name change fired when a connection is registered. The fired
      * event has a null old value and the added connection as the new value.
      */
-    public final static String CONNECTION_ADDED = "ConnectionAdded";
+    public static final String CONNECTION_ADDED = "ConnectionAdded";
     /**
      * Property name change fired when a connection is deregistered. The fired
      * event has the removed connection as the old value and a null new value.
      */
-    public final static String CONNECTION_REMOVED = "ConnectionRemoved";
+    public static final String CONNECTION_REMOVED = "ConnectionRemoved";
 
     /**
      * Register a SystemConnectionMemo in the InstanceManager.
@@ -140,5 +141,61 @@ public class SystemConnectionMemoManager extends Bean implements InstanceManager
         return InstanceManager.getDefault(SystemConnectionMemoManager.class);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SystemConnectionMemoManager.class);
+    /**
+     * Find the connection by its name.
+     * <p>
+     * Example:<br>
+     * LocoNetSystemConnectionMemo memo = getConnection("L2", LocoNetSystemConnectionMemo.class);
+     * </p>
+     * @param <T>                   The type of connection
+     * @param systemConnectionName  The connection name
+     * @param clazz                 The class of the connection type
+     * @return                      The memo if found, null otherwise
+     */
+    @CheckForNull
+    public static <T extends SystemConnectionMemo> T getConnection(
+            @Nonnull String systemConnectionName,
+            @Nonnull Class<T> clazz) {
+
+        List<T> systemConnections = jmri.InstanceManager.getList(clazz);
+
+        for (T memo : systemConnections) {
+            if (memo.getSystemPrefix().equals(systemConnectionName)) {
+                return memo;
+            }
+        }
+
+        // Connection is not found
+        return null;
+    }
+
+    /**
+     * Find the connection by its user name.
+     * <p>
+     * Example:<br>
+     * LocoNetSystemConnectionMemo memo = getConnectionByUserName("LocoNet", LocoNetSystemConnectionMemo.class);
+     * </p>
+     * @param <T>       The type of connection
+     * @param userName  The connection user name
+     * @param clazz     The class of the connection type
+     * @return          The memo if found, null otherwise
+     */
+    @CheckForNull
+    public static <T extends SystemConnectionMemo> T getConnectionByUserName(
+            @Nonnull String userName,
+            @Nonnull Class<T> clazz) {
+
+        List<T> systemConnections = jmri.InstanceManager.getList(clazz);
+
+        for (T memo : systemConnections) {
+            if (memo.getUserName().equals(userName)) {
+                return memo;
+            }
+        }
+
+        // Connection is not found
+        return null;
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SystemConnectionMemoManager.class);
 }

@@ -23,7 +23,7 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param numColumns number of columns in the table
      * @return the new table
      */
-    public AnonymousTable newAnonymousTable(int numRows, int numColumns);
+    AnonymousTable newAnonymousTable(int numRows, int numColumns);
     
     /**
      * Create a new CSV table.
@@ -35,8 +35,12 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param fileName the file name of the CSV file
      * @return the new table
      */
-    public NamedTable newCSVTable(String systemName, String userName, String fileName);
-    
+    NamedTable newCSVTable(String systemName, String userName, String fileName);
+
+
+    NamedTable newCSVTable(String systemName, String userName, String fileName, Table.CsvType csvType);
+
+
     /**
      * Create a new internal named table.
      * This table is stored in the manager together with its contents. Note
@@ -49,7 +53,7 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param numColumns number of columns in the table
      * @return the new table
      */
-    public NamedTable newInternalTable(String systemName, String userName, int numRows, int numColumns);
+    NamedTable newInternalTable(String systemName, String userName, int numRows, int numColumns);
     
     /**
      * Load a table from a CSV text.
@@ -57,10 +61,11 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param user the user name of the new table or null if no user name
      * @param text the CSV text
      * @return the loaded table
+     * @throws java.io.IOException in case of an exception
      */
-    public NamedTable loadTableFromCSVData(
+    NamedTable loadTableFromCSVData(
             @Nonnull String sys, @CheckForNull String user, @Nonnull String text)
-            throws NamedBean.BadUserNameException, NamedBean.BadSystemNameException;
+            throws IOException;
     
     /**
      * Load a table from a CSV finle.
@@ -70,10 +75,10 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @return the loaded table
      * @throws java.io.IOException in case of an exception
      */
-    public NamedTable loadTableFromCSV(
+    NamedTable loadTableFromCSV(
             @Nonnull String sys, @CheckForNull String user,
             @Nonnull String fileName)
-            throws NamedBean.BadUserNameException, NamedBean.BadSystemNameException, IOException;
+            throws IOException;
     
     /**
      * Load a table from a CSV finle.
@@ -83,10 +88,10 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @return the loaded table
      * @throws java.io.IOException in case of an exception
      */
-    public NamedTable loadTableFromCSV(
+    NamedTable loadTableFromCSV(
             @Nonnull String sys, @CheckForNull String user,
             @Nonnull File file)
-            throws NamedBean.BadUserNameException, NamedBean.BadSystemNameException, IOException;
+            throws IOException;
     
     /**
      * Locate via user name, then system name if needed. Does not create a new
@@ -95,21 +100,21 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param name User name or system name to match
      * @return null if no match found
      */
-    public NamedTable getNamedTable(String name);
+    NamedTable getNamedTable(String name);
     
     /** {@inheritDoc} */
     @Override
-    public NamedTable getByUserName(String name);
+    NamedTable getByUserName(String name);
     
     /** {@inheritDoc} */
     @Override
-    public NamedTable getBySystemName(String name);
+    NamedTable getBySystemName(String name);
     
     /**
      * Create a new system name for a LogixNG.
      * @return a new system name
      */
-    public String getAutoSystemName();
+    String getAutoSystemName();
     
     /**
      * {@inheritDoc}
@@ -118,7 +123,7 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * {@link #getSystemNamePrefix() } and "T";
      */
     @Override
-    public default String getSubSystemNamePrefix() {
+    default String getSubSystemNamePrefix() {
         return getSystemNamePrefix() + "T";
     }
     
@@ -135,7 +140,7 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param writer the stream to print the tree to
      * @param indent the indentation of each level
      */
-    public void printTree(PrintWriter writer, String indent);
+    void printTree(PrintWriter writer, String indent);
     
     /**
      * Print the tree to a stream.
@@ -144,6 +149,6 @@ public interface NamedTableManager extends Manager<NamedTable> {
      * @param writer the stream to print the tree to
      * @param indent the indentation of each level
      */
-    public void printTree(Locale locale, PrintWriter writer, String indent);
+    void printTree(Locale locale, PrintWriter writer, String indent);
 
 }

@@ -27,7 +27,7 @@ public class LncvDevices {
      * Add a device that responded to a PROG_START request to the list of LNCV Devices.
      *
      * @param d the device object, containing its properties
-     * @return true if device was addded, false if not eg it was already in the list
+     * @return true if device was added, false if not eg it was already in the list
      */
     public synchronized boolean addDevice(LncvDevice d) {
         if (!deviceExists(d)) {
@@ -47,7 +47,7 @@ public class LncvDevices {
     }
 
     /**
-     * Get index of device with matching Mfg, ProdID, Num and
+     * Get index in deviceList of the first device matching Mfg, ProdID, Num and
      * Device Address.
      * Where a deviceToBeFound parameter is -1, that parameter is not compared.
      *
@@ -96,6 +96,6 @@ public class LncvDevices {
         return deviceList.size();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LncvDevices.class);
+    private static final Logger log = LoggerFactory.getLogger(LncvDevices.class);
 
 }

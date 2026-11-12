@@ -1,32 +1,34 @@
 package jmri.jmrix.openlcb.swing.downloader;
 
-import java.awt.FlowLayout;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
+
 import jmri.jmrit.MemoryContents;
 import jmri.jmrix.can.CanSystemConnectionMemo;
+import jmri.util.swing.JmriPanel;
+import jmri.util.swing.WrapLayout;
+
 import org.openlcb.Connection;
 import org.openlcb.LoaderClient;
 import org.openlcb.LoaderClient.LoaderStatusReporter;
 import org.openlcb.MimicNodeStore;
 import org.openlcb.NodeID;
+import org.openlcb.OlcbInterface;
 import org.openlcb.implementations.DatagramService;
 import org.openlcb.implementations.MemoryConfigurationService;
 import org.openlcb.swing.NodeSelector;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.openlcb.swing.MemorySpaceSelector;
 
 /**
  * Pane for downloading firmware files files to OpenLCB devices which support
  * firmware updates according to the Firmware Upgrade Protocol.
- * <p>
  *
  * @author Bob Jacobsen Copyright (C) 2005, 2015 (from the LocoNet version by B.
  * Milhaupt Copyright (C) 2013, 2014) David R Harris (C) 2016 Balazs Racz (C)
@@ -42,10 +44,11 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
     MimicNodeStore store;
     NodeSelector nodeSelector;
     JPanel selectorPane;
-    JTextField spaceField;
+    MemorySpaceSelector spaceField;
     JCheckBox lockNode;
     LoaderClient loaderClient;
     NodeID nid;
+    OlcbInterface iface;
 
     public String getTitle(String menuTitle) {
         return Bundle.getMessage("TitleLoader");
@@ -58,32 +61,34 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
         this.mcs = memo.get(MemoryConfigurationService.class);
         this.dcs = memo.get(DatagramService.class);
         this.store = memo.get(MimicNodeStore.class);
-        this.nodeSelector = new NodeSelector(store);
+        this.nodeSelector = new NodeSelector(store, Integer.MAX_VALUE);  // display all ID terms available
         this.loaderClient = memo.get(LoaderClient.class);
         this.nid = memo.get(NodeID.class);
+        this.iface = memo.get(OlcbInterface.class);
+        
         // We can add to GUI here
-        loadButton.setText("Load");
-        loadButton.setToolTipText("Start Load Process");
+        loadButton.setText(Bundle.getMessage("ButtonLoad"));
+        loadButton.setToolTipText(Bundle.getMessage("ButtonLoadTt"));
         JPanel p;
 
         p = new JPanel();
-        p.setLayout(new FlowLayout());
-        p.add(new JLabel("Target Node ID: "));
+        p.setLayout(new WrapLayout());
+        p.add(new JLabel(Bundle.getMessage("LabelTargetNode")));
         p.add(nodeSelector);
         selectorPane.add(p);
 
         p = new JPanel();
-        p.setLayout(new FlowLayout());
-        p.add(new JLabel("Address Space: "));
+        p.setLayout(new WrapLayout());
+        p.add(new JLabel(Bundle.getMessage("LabelAddressSpace")));
 
-        spaceField = new JTextField("" + 0xEF);
+        spaceField = new MemorySpaceSelector(0xEF);
         p.add(spaceField);
         selectorPane.add(p);
-        spaceField.setToolTipText("The decimal number of the address space, e.g. 239");
+        spaceField.setToolTipText(Bundle.getMessage("LabelSpaceFieldTt"));
 
         p = new JPanel();
-        p.setLayout(new FlowLayout());
-        lockNode = new JCheckBox("Lock Node");
+        p.setLayout(new WrapLayout());
+        lockNode = new JCheckBox(Bundle.getMessage("LabelLockNode"));
         p.add(lockNode);
         selectorPane.add(p);
 
@@ -97,6 +102,9 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
 
     @Override
     public void doRead(JFileChooser chooser) {
+        // has a file been selected? Might not been if Chooser was cancelled
+        if (chooser == null || chooser.getSelectedFile() == null) return;
+
         String fn = chooser.getSelectedFile().getPath();
         readFile(fn);
         bar.setValue(0);
@@ -113,6 +121,9 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
 
     @Override
     public String getTitle() {
+        if (memo != null) {
+            return (memo.getUserName() + " " + Bundle.getMessage("TitleLoader"));
+        }
         return getTitle(Bundle.getMessage("TitleLoader"));
     }
 
@@ -131,10 +142,15 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
     @Override
     protected void doLoad() {
         super.doLoad();
+        
+        // if window referencing this node is open, close it
+        // Then decache any CDI for the node
+        jmri.jmrix.openlcb.swing.DropCdiCache.drop(destNodeID(), memo.get(OlcbInterface.class));
+
+        // start firmware load operation
         setOperationAborted(false);
-        abortButton.setEnabled(false);
-        abortButton.setToolTipText(Bundle.getMessage("TipAbortDisabled"));
-        int ispace = Integer.parseInt(spaceField.getText());
+
+        int ispace = spaceField.getMemorySpace();
         long addr = 0;
         loaderClient.doLoad(nid, destNodeID(), ispace, addr, fdata, new LoaderStatusReporter() {
             @Override
@@ -142,6 +158,8 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
                 updateGUI(Math.round(percent));
             }
 
+            @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+                justification = "message String also used in status JLabel")
             @Override
             public void onDone(int errorCode, String errorString) {
                 if (errorCode == 0) {
@@ -157,6 +175,7 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
                     status.setText(msg);
                     setOperationAborted(true);
                     log.info(msg);
+                    jmri.util.swing.JmriJOptionPane.showMessageDialog(LoaderPane.this, msg);
                 }
                 enableDownloadVerifyButtons();
             }
@@ -177,7 +196,14 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
      * @return selected node id
      */
     NodeID destNodeID() {
-        return nodeSelector.getSelectedItem();
+        return nodeSelector.getSelectedNodeID();
+    }
+
+    /**
+     * Set NodeID in the GUI
+     */
+    void setDestNodeID(NodeID nodeID) {
+        nodeSelector.setSelectedNodeID(nodeID);
     }
 
     @Override
@@ -230,12 +256,33 @@ public class LoaderPane extends jmri.jmrix.AbstractLoaderPane
     public static class Default extends jmri.jmrix.can.swing.CanNamedPaneAction {
 
         public Default() {
-            super("Openlcb Firmware Download",
+            super("LCC Firmware Download",
                     new jmri.util.swing.sdi.JmriJFrameInterface(),
                     LoaderAction.class.getName(),
                     jmri.InstanceManager.getDefault(jmri.jmrix.can.CanSystemConnectionMemo.class));
         }
+
+        /**
+         * Constructor that explicits sets the node to be upgraded
+         */
+        public Default(NodeID nodeID) {
+            super("LCC Firmware Download",
+                    new jmri.util.swing.sdi.JmriJFrameInterface(),
+                    LoaderPane.class.getName(),
+                    jmri.InstanceManager.getDefault(jmri.jmrix.can.CanSystemConnectionMemo.class));
+            this.nodeID = nodeID;
+        }
+
+        NodeID nodeID;
+        
+        @Override
+        public JmriPanel makePanel() {
+            var panel = (LoaderPane) super.makePanel();
+            panel.setDestNodeID(nodeID);
+            return panel;
+        }
+        
     }
 
-    private static final Logger log = LoggerFactory.getLogger(LoaderPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoaderPane.class);
 }

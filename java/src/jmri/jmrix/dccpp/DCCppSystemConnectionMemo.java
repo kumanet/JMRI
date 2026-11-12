@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 public class DCCppSystemConnectionMemo extends DefaultSystemConnectionMemo {
 
     public DCCppSystemConnectionMemo(@Nonnull DCCppTrafficController xt) {
-        super("D", "DCC++");
+        super("D", "DCC-EX");
         this.xt = xt;
         xt.setSystemConnectionMemo(this);
         InstanceManager.store(this, DCCppSystemConnectionMemo.class); // also register as specific type
@@ -38,7 +38,7 @@ public class DCCppSystemConnectionMemo extends DefaultSystemConnectionMemo {
     }
 
     public DCCppSystemConnectionMemo() {
-        super("D", "DCC++");
+        super("D", "DCC-EX");
         InstanceManager.store(this, DCCppSystemConnectionMemo.class); // also register as specific type
 
         // create and register the DCCppComponentFactory
@@ -96,11 +96,24 @@ public class DCCppSystemConnectionMemo extends DefaultSystemConnectionMemo {
      */
     public ThrottleManager getThrottleManager() {
         return (ThrottleManager) classObjectMap.computeIfAbsent(ThrottleManager.class,
-                (Class c) -> new DCCppThrottleManager(this));
+                (Class<?> c) -> new DCCppThrottleManager(this));
     }
 
     public void setThrottleManager(ThrottleManager t) {
         store(t,ThrottleManager.class);
+    }
+    /*
+     * Provides access to the Clock Control for this particular connection.
+     * NOTE: May return null if the Clock Control has not been set.
+     */
+    public ClockControl getClockControl() {
+        return get(ClockControl.class);
+    }
+
+    public void setClockControl(ClockControl t) {
+        store(t,ClockControl.class);
+        InstanceManager.store(t, ClockControl.class);
+        InstanceManager.setDefault(ClockControl.class, t);
     }
 
     /*
@@ -108,7 +121,7 @@ public class DCCppSystemConnectionMemo extends DefaultSystemConnectionMemo {
      */
     @Nonnull
     public PowerManager getPowerManager() {
-        return (PowerManager) classObjectMap.computeIfAbsent(PowerManager.class, (Class c) -> {
+        return (PowerManager) classObjectMap.computeIfAbsent(PowerManager.class, (Class<?> c) -> {
             PowerManager powerManager = new DCCppPowerManager(this);
             log.debug("power manager created: {}", powerManager);
             return powerManager;
@@ -195,7 +208,7 @@ public class DCCppSystemConnectionMemo extends DefaultSystemConnectionMemo {
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppSystemConnectionMemo.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppSystemConnectionMemo.class);
 
 }
 

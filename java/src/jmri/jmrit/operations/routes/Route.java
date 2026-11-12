@@ -1,23 +1,22 @@
 package jmri.jmrit.operations.routes;
 
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
 
 import javax.swing.JComboBox;
-
-import org.jdom2.Attribute;
-import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
 import jmri.beans.PropertyChangeSupport;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.setup.Control;
+import jmri.jmrit.operations.setup.Setup;
 import jmri.jmrit.operations.trains.Train;
 import jmri.jmrit.operations.trains.TrainManager;
+import jmri.jmrit.operations.trains.trainbuilder.TrainCommon;
+
+import org.jdom2.Attribute;
+import org.jdom2.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a route on the layout
@@ -45,6 +44,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
     public static final String LISTCHANGE_CHANGED_PROPERTY = "routeListChange"; // NOI18N
     public static final String ROUTE_STATUS_CHANGED_PROPERTY = "routeStatusChange"; // NOI18N
     public static final String ROUTE_BLOCKING_CHANGED_PROPERTY = "routeBlockingChange"; // NOI18N
+    public static final String ROUTE_NAME_CHANGED_PROPERTY = "routeNameChange"; // NOI18N
     public static final String DISPOSE = "routeDispose"; // NOI18N
 
     public static final String OKAY = Bundle.getMessage("ButtonOK");
@@ -68,7 +68,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         String old = _name;
         _name = name;
         if (!old.equals(name)) {
-            setDirtyAndFirePropertyChange("nameChange", old, name); // NOI18N
+            setDirtyAndFirePropertyChange(ROUTE_NAME_CHANGED_PROPERTY, old, name);
         }
     }
 
@@ -113,11 +113,11 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         log.debug("adding new location to ({}) id: {}", getName(), id);
         RouteLocation rl = new RouteLocation(id, location);
         rl.setSequenceNumber(_sequenceNum);
-        Integer old = Integer.valueOf(_routeHashTable.size());
+        int old = _routeHashTable.size();
         _routeHashTable.put(rl.getId(), rl);
 
         resetBlockingOrder();
-        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, Integer.valueOf(_routeHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, _routeHashTable.size());
         // listen for drop and pick up changes to forward
         rl.addPropertyChangeListener(this);
         return rl;
@@ -134,7 +134,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
      */
     public RouteLocation addLocation(Location location, int sequence) {
         RouteLocation rl = addLocation(location);
-        if (sequence < 1 || sequence > _routeHashTable.size()) {
+        if (sequence < START || sequence > _routeHashTable.size()) {
             return rl;
         }
         for (int i = 0; i < _routeHashTable.size() - sequence; i++) {
@@ -149,7 +149,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
      * @param rl The RouteLocation to add to this route.
      */
     public void register(RouteLocation rl) {
-        Integer old = Integer.valueOf(_routeHashTable.size());
+        int old = _routeHashTable.size();
         _routeHashTable.put(rl.getId(), rl);
 
         // find last id created
@@ -162,7 +162,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         if (rl.getSequenceNumber() > _sequenceNum) {
             _sequenceNum = rl.getSequenceNumber();
         }
-        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, Integer.valueOf(_routeHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, _routeHashTable.size());
         // listen for drop and pick up changes to forward
         rl.addPropertyChangeListener(this);
     }
@@ -176,14 +176,13 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
     public void deleteLocation(RouteLocation rl) {
         if (rl != null) {
             rl.removePropertyChangeListener(this);
-            // subtract from the locations's available track length
             String id = rl.getId();
             rl.dispose();
-            Integer old = Integer.valueOf(_routeHashTable.size());
+            int old = _routeHashTable.size();
             _routeHashTable.remove(id);
             resequence();
             resetBlockingOrder();
-            setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, Integer.valueOf(_routeHashTable.size()));
+            setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, old, _routeHashTable.size());
         }
     }
 
@@ -197,7 +196,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
     private void resequence() {
         List<RouteLocation> routeList = getLocationsBySequenceList();
         for (int i = 0; i < routeList.size(); i++) {
-            _sequenceNum = i + 1; // start sequence numbers at 1
+            _sequenceNum = i + START; // start sequence numbers at 1
             routeList.get(i).setSequenceNumber(_sequenceNum);
         }
     }
@@ -215,6 +214,13 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         return null;
     }
 
+    public String getDepartureDirection() {
+        if (getDepartsRouteLocation() != null) {
+            return getDepartsRouteLocation().getTrainDirectionString();
+        }
+        return NONE;
+    }
+
     /**
      * Get the last location in a route
      *
@@ -224,6 +230,14 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         List<RouteLocation> list = getLocationsBySequenceList();
         if (list.size() > 0) {
             return list.get(list.size() - 1);
+        }
+        return null;
+    }
+    
+    public RouteLocation get2ndToLastRouteLocation() {
+        List<RouteLocation> list = getLocationsBySequenceList();
+        if (list.size() > 1) {
+            return list.get(list.size() - 2);
         }
         return null;
     }
@@ -263,6 +277,22 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         }
         return null;
     }
+    
+    /**
+     * Used to determine if a "similar" location name is in the route. Note that
+     * a similar name might not actually be part of the route.
+     * 
+     * @param name the name of the location
+     * @return true if a "similar" name was found
+     */
+    public boolean isLocationNameInRoute(String name) {
+        for (RouteLocation rl : getLocationsBySequenceList()) {
+            if (rl.getSplitName().equals(TrainCommon.splitString(name))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Get a RouteLocation by id
@@ -271,7 +301,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
      *
      * @return route location
      */
-    public RouteLocation getLocationById(String id) {
+    public RouteLocation getRouteLocationById(String id) {
         return _routeHashTable.get(id);
     }
 
@@ -325,6 +355,22 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         }
         return out;
     }
+    
+    public RouteLocation getBlockingLocationFrontOfTrain() {
+        List<RouteLocation> list = getBlockingOrder();
+        if (list.size() > 0) {
+            return list.get(0);
+        }
+        return null;
+    }
+    
+    public RouteLocation getBlockingLocationRearOfTrain() {
+        List<RouteLocation> list = getBlockingOrder();
+        if (list.size() > 0) {
+            return list.get(list.size() - 1);
+        }
+        return null;
+    }
 
     public void setBlockingOrderUp(RouteLocation rl) {
         List<RouteLocation> blockingOrder = getBlockingOrder();
@@ -357,14 +403,13 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         rl.setBlockingOrder(order);
         setDirtyAndFirePropertyChange(ROUTE_BLOCKING_CHANGED_PROPERTY, order - 1, order);
     }
-    
+
     public void resetBlockingOrder() {
         for (RouteLocation rl : getLocationsByIdList()) {
             rl.setBlockingOrder(0);
         }
         setDirtyAndFirePropertyChange(ROUTE_BLOCKING_CHANGED_PROPERTY, "Order", "Reset");
     }
-
 
     /**
      * Places a RouteLocation earlier in the route.
@@ -388,7 +433,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
             }
         }
         resetBlockingOrder();
-        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, null, Integer.toString(sequenceNum));
+        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, null, sequenceNum);
     }
 
     /**
@@ -413,9 +458,9 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
             }
         }
         resetBlockingOrder();
-        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, null, Integer.toString(sequenceNum));
+        setDirtyAndFirePropertyChange(LISTCHANGE_CHANGED_PROPERTY, null, sequenceNum);
     }
-    
+
     /**
      * 1st RouteLocation in a route starts at 1.
      * 
@@ -443,8 +488,13 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         if (routeList.size() == 0) {
             return ERROR;
         }
+        List<String> directions = Setup.getTrainDirectionList();
         for (RouteLocation rl : routeList) {
             if (rl.getName().equals(RouteLocation.DELETED)) {
+                return ERROR;
+            }
+            // did user eliminate the train direction for this route location?
+            if (!directions.contains(rl.getTrainDirectionString())) {
                 return ERROR;
             }
         }
@@ -464,7 +514,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
     }
 
     private void addTrainListeners() {
-        for (Train train : InstanceManager.getDefault(TrainManager.class).getTrainsByIdList()) {
+        for (Train train : InstanceManager.getDefault(TrainManager.class).getList()) {
             if (train.getRoute() == this) {
                 train.addPropertyChangeListener(this);
             }
@@ -472,7 +522,7 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
     }
 
     private void removeTrainListeners() {
-        for (Train train : InstanceManager.getDefault(TrainManager.class).getTrainsByIdList()) {
+        for (Train train : InstanceManager.getDefault(TrainManager.class).getList()) {
             train.removePropertyChangeListener(this);
         }
     }
@@ -572,10 +622,11 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
             log.debug("Property change: ({}) old: ({}) new: ({})", e.getPropertyName(), e.getOldValue(),
                     e.getNewValue());
         }
-        // forward drops, pick ups, train direction, max moves, and max length as a list
+        // forward drops, pick ups, local moves, train direction, max moves, and max length as a list
         // change
         if (e.getPropertyName().equals(RouteLocation.DROP_CHANGED_PROPERTY) ||
                 e.getPropertyName().equals(RouteLocation.PICKUP_CHANGED_PROPERTY) ||
+                e.getPropertyName().equals(RouteLocation.LOCAL_MOVES_CHANGED_PROPERTY) ||
                 e.getPropertyName().equals(RouteLocation.TRAIN_DIRECTION_CHANGED_PROPERTY) ||
                 e.getPropertyName().equals(RouteLocation.MAX_MOVES_CHANGED_PROPERTY) ||
                 e.getPropertyName().equals(RouteLocation.MAX_LENGTH_CHANGED_PROPERTY)) {
@@ -591,6 +642,6 @@ public class Route extends PropertyChangeSupport implements java.beans.PropertyC
         firePropertyChange(p, old, n);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Route.class);
+    private static final Logger log = LoggerFactory.getLogger(Route.class);
 
 }

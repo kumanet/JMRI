@@ -3,10 +3,7 @@ package jmri.jmrix.loconet.loconetovertcp;
 import jmri.swing.PreferencesPanelTestBase;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Paul Bender Copyright (C) 2017
@@ -22,6 +19,6 @@ public class LnTcpPreferencesPanelTest extends PreferencesPanelTestBase<LnTcpPre
         prefsPanel = new LnTcpPreferencesPanel();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(LnTcpPreferencesPanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(LnTcpPreferencesPanelTest.class);
 
 }

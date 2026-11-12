@@ -9,10 +9,8 @@ import jmri.InstanceManager;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.locations.LocationManager;
 import jmri.jmrit.operations.setup.Setup;
-import jmri.jmrit.operations.trains.Train;
-import jmri.jmrit.operations.trains.TrainCsvSwitchLists;
-import jmri.jmrit.operations.trains.TrainManager;
-import jmri.jmrit.operations.trains.TrainSwitchLists;
+import jmri.jmrit.operations.trains.*;
+import jmri.jmrit.operations.trains.csv.TrainCsvSwitchLists;
 
 public class GenerateSwitchListChangesAction extends Action {
 
@@ -53,7 +51,7 @@ public class GenerateSwitchListChangesAction extends Action {
             setRunning(true);
             TrainSwitchLists trainSwitchLists = new TrainSwitchLists();
             TrainCsvSwitchLists trainCsvSwitchLists = new TrainCsvSwitchLists();
-            for (Location location : InstanceManager.getDefault(LocationManager.class).getLocationsByNameList()) {
+            for (Location location : InstanceManager.getDefault(LocationManager.class).getUniqueLocationsByNameList()) {
                 if (location.isSwitchListEnabled() &&
                         (!isChanged || location.getStatus().equals(Location.MODIFIED))) {
                     File csvFile = trainCsvSwitchLists.buildSwitchList(location);
@@ -77,6 +75,6 @@ public class GenerateSwitchListChangesAction extends Action {
         // no cancel for this action
     }
 
-    private final static Logger log = LoggerFactory.getLogger(GenerateSwitchListChangesAction.class);
+    private static final Logger log = LoggerFactory.getLogger(GenerateSwitchListChangesAction.class);
 
 }

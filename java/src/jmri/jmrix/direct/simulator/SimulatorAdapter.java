@@ -1,17 +1,11 @@
 package jmri.jmrix.direct.simulator;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
 
-import jmri.jmrix.direct.DirectSystemConnectionMemo;
-import jmri.jmrix.direct.Message;
-import jmri.jmrix.direct.PortController; // no special xSimulatorController
-import jmri.jmrix.direct.Reply;
-import jmri.jmrix.direct.TrafficController;
+// no special xSimulatorController
+import jmri.jmrix.direct.*;
 import jmri.util.ImmediatePipedOutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,10 +27,10 @@ import org.slf4j.LoggerFactory;
  * @author Mark Underwood, Copyright (C) 2015
  * @author Egbert Broerse, Copyright (C) 2018
  */
+@SuppressWarnings("javadoc")
 public class SimulatorAdapter extends PortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
 
     private boolean outputBufferEmpty = true;
@@ -62,7 +56,7 @@ public class SimulatorAdapter extends PortController implements Runnable {
             log.debug("tempPipeI created");
             pout = new DataOutputStream(tempPipeI);
             inpipe = new DataInputStream(new PipedInputStream(tempPipeI));
-            log.debug("inpipe created {}", inpipe != null);
+            log.debug("inpipe created");
             PipedOutputStream tempPipeO = new ImmediatePipedOutputStream();
             outpipe = new DataOutputStream(tempPipeO);
             pin = new DataInputStream(new PipedInputStream(tempPipeO));
@@ -216,15 +210,14 @@ public class SimulatorAdapter extends PortController implements Runnable {
             Reply r;
             if (log.isDebugEnabled()) {
                 StringBuffer buf = new StringBuffer();
-                buf.append("Direct Simulator Thread received message: ");
                 if (m != null) {
                     for (int i = 0; i < m.getNumDataElements(); i++) {
-                        buf.append(Integer.toHexString(0xFF & m.getElement(i)) + " ");
+                        buf.append(Integer.toHexString(0xFF & m.getElement(i))).append(" ");
                     }
                 } else {
                     buf.append("null message buffer");
                 }
-                log.trace(buf.toString()); // generates a lot of traffic
+                log.trace("Direct Simulator Thread received message:  {}", buf); // generates a lot of traffic
             }
             if (m != null) {
                 r = generateReply(m);
@@ -232,11 +225,10 @@ public class SimulatorAdapter extends PortController implements Runnable {
                     writeReply(r);
                     if (log.isDebugEnabled()) {
                         StringBuffer buf = new StringBuffer();
-                        buf.append("Direct Simulator Thread sent reply: ");
                         for (int i = 0; i < r.getNumDataElements(); i++) {
-                            buf.append(Integer.toHexString(0xFF & r.getElement(i)) + " ");
+                            buf.append(Integer.toHexString(0xFF & r.getElement(i))).append(" ");
                         }
-                        log.debug(buf.toString());
+                        log.debug("Direct Simulator Thread sent reply: {}", buf);
                     }
                 }
             }
@@ -282,12 +274,13 @@ public class SimulatorAdapter extends PortController implements Runnable {
                 reply.setElement(0, addr | 0x80);
                 reply.setElement(1, 0); // pretend speed 0
                 // no parity
+                log.debug("Reply generated {}", reply);
                 break;
 
             default:
                 reply = null;
+                log.debug("Message ignored");
         }
-        log.debug(reply == null ? "Message ignored" : "Reply generated " + reply.toString());
         return (reply);
     }
 
@@ -343,6 +336,6 @@ public class SimulatorAdapter extends PortController implements Runnable {
     private DataOutputStream outpipe = null; // feed pin
     private DataInputStream inpipe = null; // feed pout
 
-    private final static Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
 
 }

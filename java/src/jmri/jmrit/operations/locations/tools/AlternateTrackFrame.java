@@ -5,16 +5,14 @@ import java.awt.GridBagLayout;
 
 import javax.swing.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jmri.jmrit.operations.OperationsFrame;
 import jmri.jmrit.operations.OperationsXml;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.locations.Track;
-import jmri.jmrit.operations.locations.TrackEditFrame;
+import jmri.jmrit.operations.locations.gui.TrackEditFrame;
 import jmri.jmrit.operations.setup.Control;
 import jmri.jmrit.operations.setup.Setup;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Frame that allows user to select alternate track and options.
@@ -49,6 +47,7 @@ class AlternateTrackFrame extends OperationsFrame implements java.beans.Property
 
         if (_track != null) {
             updateTrackCombobox();
+            _track.addPropertyChangeListener(this);
             _track.getLocation().addPropertyChangeListener(this);
         }
 
@@ -61,10 +60,10 @@ class AlternateTrackFrame extends OperationsFrame implements java.beans.Property
 
         getContentPane().add(pAlternate);
         getContentPane().add(pControls);
-        
+
         addHelpMenu("package.jmri.jmrit.operations.Operations_AlternateTrack", true); // NOI18N
 
-        initMinimumSize(new Dimension(Control.panelWidth300, Control.panelHeight200));
+        initMinimumSize(new Dimension(Control.panelWidth400, Control.panelHeight200));
     }
 
     private void updateTrackCombobox() {
@@ -78,10 +77,10 @@ class AlternateTrackFrame extends OperationsFrame implements java.beans.Property
         if (ae.getSource() == saveButton) {
             // warn user that planned pickups and alternate track don't work
             // together
-            if (trackBox.getSelectedItem() != null && _track.getIgnoreUsedLengthPercentage() > 0) {
-                JOptionPane.showMessageDialog(null, Bundle.getMessage("PPWarningAlternate"),
+            if (trackBox.getSelectedItem() != null && _track.getIgnoreUsedLengthPercentage() > Track.IGNORE_0) {
+                JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("PPWarningAlternate"),
                         Bundle.getMessage("PPWarningConfiguration"),
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
             }
             _track.setAlternateTrack((Track) trackBox.getSelectedItem());
             OperationsXml.save();
@@ -92,15 +91,25 @@ class AlternateTrackFrame extends OperationsFrame implements java.beans.Property
     }
 
     @Override
+    public void dispose() {
+        if (_track != null) {
+            _track.removePropertyChangeListener(this);
+            _track.getLocation().removePropertyChangeListener(this);
+        }
+        super.dispose();
+    }
+
+    @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
         if (Control.SHOW_PROPERTY) {
             log.debug("Property change: ({}) old: ({}) new: ({})", e.getPropertyName(), e.getOldValue(), e
                     .getNewValue());
         }
-        if (e.getPropertyName().equals(Location.TRACK_LISTLENGTH_CHANGED_PROPERTY)) {
+        if (e.getPropertyName().equals(Track.ALTERNATE_TRACK_CHANGED_PROPERTY) ||
+                e.getPropertyName().equals(Location.TRACK_LISTLENGTH_CHANGED_PROPERTY)) {
             updateTrackCombobox();
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AlternateTrackFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AlternateTrackFrame.class);
 }

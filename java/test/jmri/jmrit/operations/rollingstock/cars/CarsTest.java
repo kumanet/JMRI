@@ -1,11 +1,17 @@
 package jmri.jmrit.operations.rollingstock.cars;
 
+import java.time.LocalDateTime;
+
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
-import jmri.jmrit.operations.locations.Location;
-import jmri.jmrit.operations.locations.Track;
+import jmri.jmrit.operations.locations.*;
+import jmri.jmrit.operations.trains.Train;
+import jmri.jmrit.operations.trains.TrainManager;
+import jmri.util.JUnitOperationsUtil;
+
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for the Operations RollingStock Cars class Last manually cross-checked
@@ -46,9 +52,9 @@ public class CarsTest extends OperationsTestCase {
         e.setAttribute("id", "TESTID");
         e.setAttribute("roadName", "TESTROAD1");
         e.setAttribute("roadNumber", "TESTNUMBER1");
-        e.setAttribute("type", "TESTTYPE");
-        e.setAttribute("length", "TESTLENGTH");
-        e.setAttribute("color", "TESTCOLOR");
+        e.setAttribute(Xml.TYPE, "TESTTYPE");
+        e.setAttribute(Xml.LENGTH, "TESTLENGTH");
+        e.setAttribute(Xml.COLOR, "TESTCOLOR");
         e.setAttribute("weight", "TESTWEIGHT");
         e.setAttribute("weightTons", "TESTWEIGHTTONS");
         e.setAttribute("built", "TESTBUILT");
@@ -59,7 +65,7 @@ public class CarsTest extends OperationsTestCase {
         e.setAttribute("routeDestinationId", "TESTROUTEDESTINATION");
         e.setAttribute("secDestionationId", "TESTDESTINATIONTRACK");
         e.setAttribute("lastRouteId", "SAVEDROUTE");
-        e.setAttribute("moves", "5");
+        e.setAttribute("moves", "BAD5");
         e.setAttribute("date", "2015/05/15 15:15:15");
         e.setAttribute("selected", Xml.FALSE);
         e.setAttribute("lastLocationId", "TESTLASTLOCATION");
@@ -69,8 +75,8 @@ public class CarsTest extends OperationsTestCase {
         e.setAttribute("rifd", "12345");
         e.setAttribute("locUnknown", Xml.FALSE);
         e.setAttribute("outOfService", Xml.FALSE);
-        e.setAttribute("blocking", "5");
-        e.setAttribute("comment", "Test Comment");
+        e.setAttribute("blocking", "BAD6");
+        e.setAttribute("comment", "TESTCOMMENT");
         e.setAttribute(Xml.PASSENGER, Xml.FALSE);
         e.setAttribute(Xml.HAZARDOUS, Xml.FALSE);
         e.setAttribute(Xml.CABOOSE, Xml.TRUE);
@@ -80,12 +86,9 @@ public class CarsTest extends OperationsTestCase {
         e.setAttribute(Xml.LEAD_KERNEL, Xml.FALSE);
         e.setAttribute(Xml.LOAD, "TESTLOAD");
         e.setAttribute(Xml.LOAD_FROM_STAGING, Xml.TRUE);
-        e.setAttribute(Xml.WAIT, "0");
+        e.setAttribute(Xml.WAIT, "BAD7");
         e.setAttribute(Xml.PICKUP_SCHEDULE_ID, "TESTPICKUPSCHEDULE");
         e.setAttribute(Xml.SCHEDULE_ID, "TESTSCHEDULEID");
-        e.setAttribute(Xml.NEXT_LOAD, "TESTLOAD2");
-        e.setAttribute(Xml.NEXT_WAIT, "0");
-        e.setAttribute(Xml.NEXT_PICKUP_SCHEDULE_ID, "TESTNEXTPICKUPSCHEDULEID");
         e.setAttribute(Xml.NEXT_DEST_ID, "TESTNEXTDESTID");
         e.setAttribute(Xml.NEXT_DEST_TRACK_ID, "TESTNEXTDESTTRACKID");
         e.setAttribute(Xml.PREVIOUS_NEXT_DEST_ID, "TESTPREVOIUSNEXTDESTID");
@@ -93,15 +96,39 @@ public class CarsTest extends OperationsTestCase {
         e.setAttribute(Xml.PREVIOUS_SCHEDULE_ID, "TESTPREVIOUSSCHEDULEID");
         e.setAttribute(Xml.RWE_DEST_ID, "TESTRWEDESTID");
         e.setAttribute(Xml.RWE_LOAD, "TESTRWELOAD");
+        e.setAttribute(Xml.RWL_DEST_ID, "TESTRWLDESTID");
+        e.setAttribute(Xml.RWL_LOAD, "TESTRWLLOAD");
+        e.setAttribute(Xml.ROUTE_PATH, "TESTROUTEPATH");
 
-        try {
+        Assertions.assertDoesNotThrow( () -> {
             Car c1 = new Car(e);
-            Assert.assertNotNull("Xml Element Constructor", c1);
-        } catch (java.lang.NullPointerException npe) {
-            Assert.fail("Null Pointer Exception while executing Xml Element Constructor");
-        }
+            Assertions.assertNotNull(c1, "Xml Element Constructor");
+            Assert.assertEquals("Car Road", "TESTROAD1", c1.getRoadName());
+            Assert.assertEquals("Car Number", "TESTNUMBER1", c1.getNumber());
+            Assert.assertEquals("Car ID", "TESTROAD1" + "TESTNUMBER1", c1.getId());
+            Assert.assertEquals("Car Type", "TESTTYPE", c1.getTypeName());
+            Assert.assertEquals("Car Length", "TESTLENGTH", c1.getLength());
+            Assert.assertEquals("Car Color", "TESTCOLOR", c1.getColorName());
+            Assert.assertFalse("Car Hazardous", c1.isHazardous());
+            Assert.assertFalse("Car Fred", c1.hasFred());
+            Assert.assertTrue("Car Caboose", c1.isCaboose());
+            Assert.assertEquals("Car Weight", "TESTWEIGHT", c1.getWeight());
+            Assert.assertEquals("Car Built", "TESTBUILT", c1.getBuilt());
+            Assert.assertEquals("Car Owner", "TESTOWNER", c1.getOwnerName());
+            Assert.assertEquals("Car Comment", "TESTCOMMENT", c1.getComment());
+            Assert.assertEquals("Car Load", "TESTLOAD", c1.getLoadName());
+            Assert.assertEquals("Car RWE Load", "TESTRWELOAD", c1.getReturnWhenEmptyLoadName());
+            Assert.assertEquals("Car RWL Load", "TESTRWLLOAD", c1.getReturnWhenLoadedLoadName());
+            Assert.assertEquals("TESTROUTEPATH", c1.getRoutePath());
+        } ,"Exception while executing Xml Element Constructor");
 
+        jmri.util.JUnitAppender
+                .assertErrorMessage("Move count (BAD5) for rollingstock (TESTROAD1 TESTNUMBER1) isn't a valid number!");
+        jmri.util.JUnitAppender
+                .assertErrorMessage("Blocking (BAD6) for rollingstock (TESTROAD1 TESTNUMBER1) isn't a valid number!");
         jmri.util.JUnitAppender.assertErrorMessage("Kernel TESTKERNEL does not exist");
+        jmri.util.JUnitAppender
+                .assertErrorMessage("Wait count (BAD7) for car (TESTROAD1 TESTNUMBER1) isn't a valid number!");
     }
 
     // test creation
@@ -110,13 +137,13 @@ public class CarsTest extends OperationsTestCase {
         Car c1 = new Car("TESTROAD", "TESTNUMBER1");
         c1.setTypeName("TESTTYPE");
         c1.setLength("TESTLENGTH");
-        c1.setColor("TESTCOLOR");
-        c1.setHazardous(true);
+        c1.setColorName("TESTCOLOR");
+        c1.setCarHazardous(true);
         c1.setFred(true);
         c1.setCaboose(true);
         c1.setWeight("TESTWEIGHT");
         c1.setBuilt("TESTBUILT");
-        c1.setOwner("TESTOWNER");
+        c1.setOwnerName("TESTOWNER");
         c1.setComment("TESTCOMMENT");
         c1.setMoves(5);
 
@@ -125,13 +152,13 @@ public class CarsTest extends OperationsTestCase {
         Assert.assertEquals("Car ID", "TESTROAD" + "TESTNUMBER1", c1.getId());
         Assert.assertEquals("Car Type", "TESTTYPE", c1.getTypeName());
         Assert.assertEquals("Car Length", "TESTLENGTH", c1.getLength());
-        Assert.assertEquals("Car Color", "TESTCOLOR", c1.getColor());
+        Assert.assertEquals("Car Color", "TESTCOLOR", c1.getColorName());
         Assert.assertTrue("Car Hazardous", c1.isHazardous());
         Assert.assertTrue("Car Fred", c1.hasFred());
         Assert.assertTrue("Car Caboose", c1.isCaboose());
         Assert.assertEquals("Car Weight", "TESTWEIGHT", c1.getWeight());
         Assert.assertEquals("Car Built", "TESTBUILT", c1.getBuilt());
-        Assert.assertEquals("Car Owner", "TESTOWNER", c1.getOwner());
+        Assert.assertEquals("Car Owner", "TESTOWNER", c1.getOwnerName());
         Assert.assertEquals("Car Comment", "TESTCOMMENT", c1.getComment());
         Assert.assertEquals("Car Moves", 5, c1.getMoves());
     }
@@ -275,5 +302,122 @@ public class CarsTest extends OperationsTestCase {
         Assert.assertEquals("destination c4", Track.OKAY, c4.setDestination(l2, l2t1));
         Assert.assertEquals("destination c5", Track.OKAY, c5.setDestination(l1, l1t1));
         Assert.assertEquals("destination c6", Track.OKAY, c6.setDestination(l1, l1t2));
+    }
+
+    @Test
+    public void testKernel() {
+
+        CarTypes ct = InstanceManager.getDefault(CarTypes.class);
+        ct.addName("Boxcar");
+        ct.addName("Flatcar");
+        ct.addName("Gon");
+
+        Location westford = JUnitOperationsUtil.createOneNormalLocation("Westford");
+        Track spur1 = westford.getTrackByName("Westford Spur 1", null);
+        Track yard1 = westford.getTrackByName("Westford Yard 1", null);
+        Track yard2 = westford.getTrackByName("Westford Yard 2", null);
+
+        CarLoads carLoads = InstanceManager.getDefault(CarLoads.class);
+        carLoads.addName("Boxcar", "Nuts");
+        carLoads.addName("Flatcar", "Steel");
+        carLoads.addName("Gon", "Scrap");
+
+        Car c1 = JUnitOperationsUtil.createAndPlaceCar("CP", "10", "Boxcar", "40", spur1, 10);
+        Car c2 = JUnitOperationsUtil.createAndPlaceCar("CP", "20", "Flatcar", "40", spur1, 11);
+        Car c3 = JUnitOperationsUtil.createAndPlaceCar("CP", "30", "Gon", "40", spur1, 12);
+
+        // put all three cars in a kernel
+        Kernel k = InstanceManager.getDefault(KernelManager.class).newKernel("K");
+        c1.setKernel(k);
+        c2.setKernel(k);
+        c3.setKernel(k);
+
+        c1.setLoadName("Nuts");
+        c1.setDestination(westford, yard1);
+
+        // try updating the non-lead car, does nothing
+        c2.updateKernel();
+        Assert.assertEquals("Car load", "Nuts", c1.getLoadName());
+        Assert.assertEquals("Car load", "E", c2.getLoadName());
+        Assert.assertEquals("Car load", "E", c3.getLoadName());
+
+        // the update will add a custom load if available to non-lead cars
+        c1.updateKernel();
+        Assert.assertEquals("Car load", "Nuts", c1.getLoadName());
+        Assert.assertEquals("Car load", "Steel", c2.getLoadName());
+        Assert.assertEquals("Car load", "Scrap", c3.getLoadName());
+
+        // disallow steel
+        yard1.setLoadOption(Track.EXCLUDE_LOADS);
+        yard1.addLoadName("Steel");
+        c2.setLoadName("Something");
+
+        c1.updateKernel();
+        Assert.assertEquals("Car load", "Nuts", c1.getLoadName());
+        Assert.assertEquals("Car load", "Something", c2.getLoadName());
+        Assert.assertEquals("Car load", "Scrap", c3.getLoadName());
+
+        // provide a final destination
+        c1.setFinalDestinationTrack(yard2);
+
+        c1.updateKernel();
+        Assert.assertEquals("Car load", "Nuts", c1.getLoadName());
+        Assert.assertEquals("Car load", "Steel", c2.getLoadName());
+        Assert.assertEquals("Car load", "Scrap", c3.getLoadName());
+
+        // allow non-lead car to have the same load name as the lead car
+        carLoads.addName("Flatcar", "Nuts");
+
+        c1.updateKernel();
+        Assert.assertEquals("Car load", "Nuts", c1.getLoadName());
+        Assert.assertEquals("Car load", "Nuts", c2.getLoadName());
+        Assert.assertEquals("Car load", "Scrap", c3.getLoadName());
+    }
+    
+    @Test
+    public void testPropertyChange() {
+        JUnitOperationsUtil.initOperationsData();
+        CarManager manager = InstanceManager.getDefault(CarManager.class);
+
+        // 50 foot Flat
+        Car c1 = manager.getByRoadAndNumber("CP", "777");       
+        c1.setColorName("Red");
+        
+        // also test clone
+        TrainManager tmanager = InstanceManager.getDefault(TrainManager.class);
+        Train train = tmanager.getTrainByName("STF");
+        
+        LocationManager lmanager = InstanceManager.getDefault(LocationManager.class);
+        Location locationNorthEnd = lmanager.getLocationById("1");
+        Track northEndStaging1 = locationNorthEnd.getTrackById("1s1");
+        
+        Car clone = manager.createClone(c1, northEndStaging1, train, LocalDateTime.now());
+        
+        // confirm clone has same attributes as original car
+        Assert.assertEquals("Car length", "50", clone.getLength());
+        Assert.assertEquals("Car road", "CP", clone.getRoadName());
+        Assert.assertEquals("Car type", "Flat", clone.getTypeName());
+        Assert.assertEquals("Car owner", "AT", clone.getOwnerName());
+        Assert.assertEquals("Car color", "Red", clone.getColorName());
+        
+        InstanceManager.getDefault(CarLengths.class).replaceName("50", "55");
+        Assert.assertEquals("Car length", "55", c1.getLength());
+        Assert.assertEquals("Car length", "55", clone.getLength());
+        
+        InstanceManager.getDefault(CarRoads.class).replaceName("CP", "PC");
+        Assert.assertEquals("Car road", "PC", c1.getRoadName());
+        Assert.assertEquals("Car road", "PC", clone.getRoadName());
+        
+        InstanceManager.getDefault(CarTypes.class).replaceName("Flat", "Carbox");
+        Assert.assertEquals("Car type", "Carbox", c1.getTypeName());
+        Assert.assertEquals("Car type", "Carbox", clone.getTypeName());
+ 
+        InstanceManager.getDefault(CarOwners.class).replaceName("AT", "TA");     
+        Assert.assertEquals("Car owner", "TA", c1.getOwnerName());
+        Assert.assertEquals("Car owner", "TA", clone.getOwnerName());
+        
+        InstanceManager.getDefault(CarColors.class).replaceName("Red", "Blue"); 
+        Assert.assertEquals("Car color", "Blue", c1.getColorName());
+        Assert.assertEquals("Car color", "Blue", clone.getColorName());
     }
 }

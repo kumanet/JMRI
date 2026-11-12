@@ -11,19 +11,19 @@ import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JViewport;
 import javax.swing.ListCellRenderer;
+
 import jmri.InstanceManager;
 import jmri.UserPreferencesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Abstract base class for common implementation of the ConnectionConfig
@@ -255,19 +255,20 @@ abstract public class AbstractUsbConnectionConfig extends AbstractConnectionConf
         catch (UnsatisfiedLinkError e1) {
             log.error("UnsatisfiedLinkError - the serial library has not been installed properly");
             log.error("java.library.path={}", System.getProperty("java.library.path", "<unknown>"));
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("ErrorComLibLoad"));
+            log.error("Exception: ", e1);
+            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("ErrorComLibLoad"));
             return;
         }
 
         if (adapter.getSystemConnectionMemo() != null) {
             systemPrefixField.setText(adapter.getSystemConnectionMemo().getSystemPrefix());
             connectionNameField.setText(adapter.getSystemConnectionMemo().getUserName());
-            NUMOPTIONS = NUMOPTIONS + 2;
+            increaseNumOptions(2);
         }
 
         refreshPortBox();
 
-        NUMOPTIONS = NUMOPTIONS + options.size();
+        increaseNumOptions(options.size());
 
         portBoxLabel = new JLabel(Bundle.getMessage("UsbPortLocationLabel"));
 
@@ -280,8 +281,6 @@ abstract public class AbstractUsbConnectionConfig extends AbstractConnectionConf
     }
 
     @Override
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
-            justification = "Type is checked before casting")
     protected void showAdvancedItems() {
         log.debug("*   showAdvancedItems()");
         _details.removeAll();
@@ -336,7 +335,7 @@ abstract public class AbstractUsbConnectionConfig extends AbstractConnectionConf
             }
         }
         cL.gridwidth = 2;
-        for (JComponent item : additionalItems) {
+        for (JComponent item : getAdditionalItems()) {
             cL.gridy = i;
             gbLayout.setConstraints(item, cL);
             _details.add(item);
@@ -489,7 +488,6 @@ abstract public class AbstractUsbConnectionConfig extends AbstractConnectionConf
         return new ArrayList<>();
     }
 
-    private final static Logger log
-            = LoggerFactory.getLogger(AbstractUsbConnectionConfig.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractUsbConnectionConfig.class);
 
 }

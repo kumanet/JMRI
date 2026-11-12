@@ -21,7 +21,6 @@ import jmri.managers.AbstractCabSignalManager;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <p>
  *
  * @author Paul Bender Copyright (C) 2019
  * @author Steve Young Copyright (C) 2019 
@@ -43,5 +42,5 @@ public class CbusCabSignalManager extends AbstractCabSignalManager {
            return new CbusCabSignal(_memo,address);
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusCabSignalManager.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusCabSignalManager.class);
 }

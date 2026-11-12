@@ -3,7 +3,6 @@ package jmri.jmrit.beantable.signalmast;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,7 +12,6 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -32,32 +30,33 @@ import jmri.implementation.SignalMastRepeater;
 import jmri.managers.DefaultSignalMastManager;
 import jmri.swing.NamedBeanComboBox;
 import jmri.swing.RowSorterUtil;
-import jmri.util.JmriJFrame;
+import jmri.util.swing.JComboBoxUtil;
 import jmri.util.swing.JmriPanel;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Frame for Signal Mast Add / Edit Panel
  *
  * @author Kevin Dickerson Copyright (C) 2011
  */
-public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChangeListener {
+public class SignalMastRepeaterPanel extends JmriPanel {
 
-    DefaultSignalMastManager dsmm;
-
-    SignalMastRepeaterModel _RepeaterModel;
-    JScrollPane _SignalAppearanceScrollPane;
-    NamedBeanComboBox<SignalMast> _MasterBox;
-    NamedBeanComboBox<SignalMast> _SlaveBox;
-    JButton _addRepeater;
+    final DefaultSignalMastManager dsmm;
+    private ArrayList<SignalMastRepeater> _signalMastRepeaterList;
+    private SignalMastRepeaterModel _RepeaterModel;
+    private NamedBeanComboBox<SignalMast> _MasterBox;
+    private NamedBeanComboBox<SignalMast> _SlaveBox;
+    private JButton _addRepeater;
 
     public SignalMastRepeaterPanel() {
         super();
         dsmm = (DefaultSignalMastManager) InstanceManager.getDefault(SignalMastManager.class);
-        dsmm.addPropertyChangeListener(this);
+        init();
+    }
+
+    final void init() {
 
         setLayout(new BorderLayout());
 
@@ -70,31 +69,29 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
         add(header, BorderLayout.NORTH);
 
         _RepeaterModel = new SignalMastRepeaterModel();
-        JTable _RepeaterTable = new JTable(_RepeaterModel);
+        JTable repeaterTable = new JTable(_RepeaterModel);
 
         TableRowSorter<SignalMastRepeaterModel> sorter = new TableRowSorter<>(_RepeaterModel); // leave default sorting
         RowSorterUtil.setSortOrder(sorter, SignalMastRepeaterModel.DIR_COLUMN, SortOrder.ASCENDING);
-        _RepeaterTable.setRowSorter(sorter);
+        repeaterTable.setRowSorter(sorter);
 
-        _RepeaterTable.setRowSelectionAllowed(false);
-        _RepeaterTable.setPreferredScrollableViewportSize(new java.awt.Dimension(526, 120));
-        _RepeaterModel.configureTable(_RepeaterTable);
-        _SignalAppearanceScrollPane = new JScrollPane(_RepeaterTable);
+        repeaterTable.setRowSelectionAllowed(false);
+        repeaterTable.setPreferredScrollableViewportSize(new java.awt.Dimension(526, 120));
+        _RepeaterModel.configureTable(repeaterTable);
+        
+        JScrollPane signalAppearanceScrollPane = new JScrollPane(repeaterTable);
         _RepeaterModel.fireTableDataChanged();
-        add(_SignalAppearanceScrollPane, BorderLayout.CENTER);
+        add(signalAppearanceScrollPane, BorderLayout.CENTER);
 
         JPanel footer = new JPanel();
         updateDetails();
 
         _MasterBox = new NamedBeanComboBox<>(dsmm);
-        _MasterBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                setSlaveBoxLists();
-            }
-        });
+        _MasterBox.addActionListener( e -> setSlaveBoxLists());
+        JComboBoxUtil.setupComboBoxMaxRows(_MasterBox);
 
         _SlaveBox = new NamedBeanComboBox<>(dsmm);
+        JComboBoxUtil.setupComboBoxMaxRows(_SlaveBox);
         _SlaveBox.setEnabled(false);
         footer.add(new JLabel(Bundle.getMessage("Master") + " : "));
         footer.add(_MasterBox);
@@ -102,19 +99,16 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
         footer.add(_SlaveBox);
         _addRepeater = new JButton(Bundle.getMessage("ButtonAddText"));
         _addRepeater.setEnabled(false);
-        _addRepeater.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                SignalMastRepeater rp = new SignalMastRepeater(_MasterBox.getSelectedItem(), _SlaveBox.getSelectedItem());
-                try {
-                    dsmm.addRepeater(rp);
-                } catch (JmriException ex) {
-                    log.error(ex.toString());
-                    /**/
-                    JOptionPane.showMessageDialog(null, java.text.MessageFormat.format(Bundle.getMessage("MessageAddFailed"),
-                            new Object[]{_MasterBox.getSelectedItemDisplayName(), _SlaveBox.getSelectedItemDisplayName()}),
-                            Bundle.getMessage("TitleAddFailed"), JOptionPane.ERROR_MESSAGE);
-                }
+        _addRepeater.addActionListener((ActionEvent e) -> {
+            SignalMastRepeater rp = new SignalMastRepeater(_MasterBox.getSelectedItem(), _SlaveBox.getSelectedItem());
+            try {
+                dsmm.addRepeater(rp);
+            } catch (JmriException ex) {
+                String error = java.text.MessageFormat.format(Bundle.getMessage("MessageAddFailed"),
+                    new Object[]{_MasterBox.getSelectedItemDisplayName(), _SlaveBox.getSelectedItemDisplayName()});
+                log.error("Failed to add Repeater. {} {}", error, ex.getMessage());
+                JmriJOptionPane.showMessageDialog(this, error,
+                    Bundle.getMessage("TitleAddFailed"), JmriJOptionPane.ERROR_MESSAGE);
             }
         });
         footer.add(_addRepeater);
@@ -143,9 +137,8 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
         Set<SignalMast> excludedSignalMasts = new HashSet<>();
         while (iter.hasNext()) {
             SignalMast s = iter.next();
-            if (s.getAppearanceMap() != masterMast.getAppearanceMap()) {
-                excludedSignalMasts.add(s);
-            } else if (s == masterMast) {
+            if ( ( s.getAppearanceMap() != masterMast.getAppearanceMap() )
+                    || ( s == masterMast ) ) {
                 excludedSignalMasts.add(s);
             }
         }
@@ -159,40 +152,39 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
         }
     }
 
-    JmriJFrame signalMastLogicFrame = null;
-    JLabel sourceLabel = new JLabel();
-
-    @Override
-    public void propertyChange(java.beans.PropertyChangeEvent e) {
-
-    }
-
-    private ArrayList<SignalMastRepeater> _signalMastRepeaterList;
-
     private void updateDetails() {
-        _signalMastRepeaterList = new ArrayList<SignalMastRepeater>(dsmm.getRepeaterList());
+        _signalMastRepeaterList = new ArrayList<>(dsmm.getRepeaterList());
         _RepeaterModel.fireTableDataChanged();//updateSignalMastLogic(old, sml);
     }
 
-    public class SignalMastRepeaterModel extends AbstractTableModel implements PropertyChangeListener {
+    @Override
+    public void dispose() {
+        _RepeaterModel.dispose();
+        super.dispose();
+    }
+
+    private class SignalMastRepeaterModel extends AbstractTableModel implements PropertyChangeListener {
 
         SignalMastRepeaterModel() {
             super();
-            dsmm.addPropertyChangeListener(this);
+            init();
+        }
+
+        final void init(){
+            dsmm.addPropertyChangeListener(SignalMastRepeaterModel.this);
         }
 
         @Override
         public Class<?> getColumnClass(int c) {
-            if (c == DIR_COLUMN) {
-                return JButton.class;
+            switch (c) {
+                case DIR_COLUMN:
+                case DEL_COLUMN:
+                    return JButton.class;
+                case ENABLE_COLUMN:
+                    return Boolean.class;
+                default:
+                    return String.class;
             }
-            if (c == ENABLE_COLUMN) {
-                return Boolean.class;
-            }
-            if (c == DEL_COLUMN) {
-                return JButton.class;
-            }
-            return String.class;
         }
 
         public void configureTable(JTable table) {
@@ -234,31 +226,28 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
 
         @Override
         public String getColumnName(int col) {
-            if (col == MASTER_COLUMN) {
-                return Bundle.getMessage("ColumnMaster");
+            switch (col) {
+                case MASTER_COLUMN:
+                    return Bundle.getMessage("ColumnMaster");
+                case DIR_COLUMN:
+                    return Bundle.getMessage("ColumnDir");
+                case SLAVE_COLUMN:
+                    return Bundle.getMessage("ColumnSlave");
+                case ENABLE_COLUMN:
+                    return Bundle.getMessage("ColumnHeadEnabled");
+                case DEL_COLUMN:
+                default:
+                    return "";
             }
-            if (col == DIR_COLUMN) {
-                return Bundle.getMessage("ColumnDir");
-            }
-            if (col == SLAVE_COLUMN) {
-                return Bundle.getMessage("ColumnSlave");
-            }
-            if (col == ENABLE_COLUMN) {
-                return Bundle.getMessage("ColumnHeadEnabled");
-            }
-            if (col == DEL_COLUMN) {
-                return "";
-            }
-            return "";
         }
 
-        public void dispose() {
-
+        private void dispose() {
+            dsmm.removePropertyChangeListener(SignalMastRepeaterModel.this);
         }
 
         @Override
         public void propertyChange(java.beans.PropertyChangeEvent e) {
-            if (e.getPropertyName().equals("repeaterlength")) {
+            if ( SignalMastManager.PROPERTY_REPEATER_LENGTH.equals(e.getPropertyName())) {
                 updateDetails();
             }
         }
@@ -297,16 +286,14 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
 
         @Override
         public boolean isCellEditable(int r, int c) {
-            if (c == DEL_COLUMN) {
-                return true;
+            switch (c) {
+                case DEL_COLUMN:
+                case ENABLE_COLUMN:
+                case DIR_COLUMN:
+                    return true;
+                default:
+                    return false;
             }
-            if (c == ENABLE_COLUMN) {
-                return true;
-            }
-            if (c == DIR_COLUMN) {
-                return true;
-            }
-            return (false);
         }
 
         protected void deleteRepeater(int r) {
@@ -319,15 +306,9 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
         public static final int ENABLE_COLUMN = 3;
         public static final int DEL_COLUMN = 4;
 
-        public void setSetToState(String x) {
-        }
-
         @Override
         public int getRowCount() {
-            if (_signalMastRepeaterList == null) {
-                return 0;
-            }
-            return _signalMastRepeaterList.size();
+            return ( _signalMastRepeaterList == null ? 0 : _signalMastRepeaterList.size() );
         }
 
         @Override
@@ -340,16 +321,7 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
                 case MASTER_COLUMN:
                     return _signalMastRepeaterList.get(r).getMasterMastName();
                 case DIR_COLUMN:  // slot number
-                    switch (_signalMastRepeaterList.get(r).getDirection()) {
-                        case SignalMastRepeater.BOTHWAY:
-                            return "< >";
-                        case SignalMastRepeater.MASTERTOSLAVE:
-                            return " > ";
-                        case SignalMastRepeater.SLAVETOMASTER:
-                            return " < ";
-                        default:
-                            return "< >";
-                    }
+                    return getValueAtDirectionCol(r);
                 case SLAVE_COLUMN:
                     return _signalMastRepeaterList.get(r).getSlaveMastName();
                 case ENABLE_COLUMN:
@@ -361,35 +333,53 @@ public class SignalMastRepeaterPanel extends JmriPanel implements PropertyChange
             }
         }
 
-        @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "DB_DUPLICATE_SWITCH_CLAUSES",
-                                justification="better to keep cases in column order rather than to combine")
+        private String getValueAtDirectionCol(int r) {
+            switch (_signalMastRepeaterList.get(r).getDirection()) {
+                case SignalMastRepeater.MASTERTOSLAVE:
+                    return " > ";
+                case SignalMastRepeater.SLAVETOMASTER:
+                    return " < ";
+                case SignalMastRepeater.BOTHWAY:
+                default:
+                    return "< >";
+            }
+        }
+
         @Override
         public void setValueAt(Object type, int r, int c) {
-            if (c == DIR_COLUMN) {
-                switch (_signalMastRepeaterList.get(r).getDirection()) {
-                    case SignalMastRepeater.BOTHWAY:
-                        _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.MASTERTOSLAVE);
-                        break;
-                    case SignalMastRepeater.MASTERTOSLAVE:
-                        _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.SLAVETOMASTER);
-                        break;
-                    case SignalMastRepeater.SLAVETOMASTER:
-                        _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.BOTHWAY);
-                        break;
-                    default:
-                        _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.BOTHWAY);
-                        break;
-                }
-                _RepeaterModel.fireTableDataChanged();
-            } else if (c == DEL_COLUMN) {
-                deleteRepeater(r);
-            } else if (c == ENABLE_COLUMN) {
-                boolean b = ((Boolean) type).booleanValue();
-                _signalMastRepeaterList.get(r).setEnabled(b);
+            switch (c) {
+                case DIR_COLUMN:
+                    setValueAtDirectionCol(r);
+                    _RepeaterModel.fireTableDataChanged();
+                    break;
+                case DEL_COLUMN:
+                    deleteRepeater(r);
+                    break;
+                case ENABLE_COLUMN:
+                    boolean b = ((Boolean) type);
+                    _signalMastRepeaterList.get(r).setEnabled(b);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void setValueAtDirectionCol(int r) {
+            switch (_signalMastRepeaterList.get(r).getDirection()) {
+                case SignalMastRepeater.BOTHWAY:
+                    _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.MASTERTOSLAVE);
+                    break;
+                case SignalMastRepeater.MASTERTOSLAVE:
+                    _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.SLAVETOMASTER);
+                    break;
+                case SignalMastRepeater.SLAVETOMASTER:
+                default:
+                    _signalMastRepeaterList.get(r).setDirection(SignalMastRepeater.BOTHWAY);
+                    break;
             }
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SignalMastRepeaterPanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignalMastRepeaterPanel.class);
 
 }

@@ -6,7 +6,6 @@ import java.awt.event.ActionListener;
 import javax.swing.AbstractAction;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import jmri.InstanceManager;
@@ -16,8 +15,10 @@ import jmri.TurnoutOperation;
 import jmri.TurnoutOperationManager;
 import jmri.NamedBean.DisplayOptions;
 import jmri.implementation.SignalSpeedMap;
+import jmri.util.swing.JComboBoxUtil;
 import jmri.jmrit.turnoutoperations.TurnoutOperationConfig;
 import jmri.swing.NamedBeanComboBox;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Provides an edit panel for a turnout object.
@@ -84,7 +85,7 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
     private String useBlockSpeed = Bundle.getMessage("UseGlobal", "Block Speed");
     private TurnoutOperationConfig config;
     private BeanItemPanel feedback;
-    private JPanel turnoutOperation = new JPanel();
+    private final JPanel turnoutOperation = new JPanel();
 
     private BeanItemPanel feedback() {
         feedback = new BeanItemPanel();
@@ -107,6 +108,7 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
                 bean.getFirstSensor(),
                 DisplayOptions.DISPLAYNAME);
         sensorFeedBack1ComboBox.setAllowNull(true);
+        JComboBoxUtil.setupComboBoxMaxRows(sensorFeedBack1ComboBox);
         feedback.addItem(new BeanEditItem(sensorFeedBack1ComboBox,
                 Bundle.getMessage("FeedbackSensor1"),
                 Bundle.getMessage("FeedbackSensorToolTip")));
@@ -116,6 +118,7 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
                 bean.getSecondSensor(),
                 DisplayOptions.DISPLAYNAME);
         sensorFeedBack2ComboBox.setAllowNull(true);
+        JComboBoxUtil.setupComboBoxMaxRows(sensorFeedBack2ComboBox);
         feedback.addItem(new BeanEditItem(sensorFeedBack2ComboBox,
                 Bundle.getMessage("FeedbackSensor2"),
                 Bundle.getMessage("FeedbackSensorToolTip")));
@@ -155,13 +158,15 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
                 String newName = operationsName.getText();
                 if ((currentOperation != null) && (newName != null) && !newName.isEmpty()) {
                     if (!currentOperation.rename(newName)) {
-                        JOptionPane.showMessageDialog(null,
+                        JmriJOptionPane.showMessageDialog(turnoutOperation,
                                 Bundle.getMessage("ErrorDuplicateUserName", newName),
                                 Bundle.getMessage("ErrorTitle"),
-                                JOptionPane.ERROR_MESSAGE);
+                                JmriJOptionPane.ERROR_MESSAGE);
                     } else {
+                        automationBox.removeActionListener(automationSelectionListener);
                         automationBox.addItem(newName);
                         automationBox.setSelectedItem(newName);
+                        automationBox.addActionListener(automationSelectionListener);
                     }
                     bean.setTurnoutOperation(null);
                     bean.setTurnoutOperation(currentOperation);
@@ -180,8 +185,14 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
                         bean.setInhibitOperation(false);
                         String autoMode = (String) automationBox.getSelectedItem();
                         if (autoMode != null) {
-                            bean.setTurnoutOperation(InstanceManager.getDefault(TurnoutOperationManager.class).
-                                    getOperation((autoMode)));
+                            TurnoutOperation selectedOp = InstanceManager.getDefault(TurnoutOperationManager.class).
+                                    getOperation((autoMode));
+                            if (currentOperation != null && currentOperation.isNonce() && !currentOperation.equivalentTo(selectedOp)) {
+                                // attach the private copy holding the edited values
+                                bean.setTurnoutOperation(currentOperation);
+                            } else {
+                                bean.setTurnoutOperation(selectedOp);
+                            }
                         }
                         break;
                 }
@@ -190,12 +201,12 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
                 try {
                     bean.provideFirstFeedbackSensor(sensorFeedBack1ComboBox.getSelectedItemDisplayName());
                 } catch (jmri.JmriException ex) {
-                    JOptionPane.showMessageDialog(null, ex.toString());
+                    JmriJOptionPane.showMessageDialog(turnoutOperation, ex.toString());
                 }
                 try {
                     bean.provideSecondFeedbackSensor(sensorFeedBack2ComboBox.getSelectedItemDisplayName());
                 } catch (jmri.JmriException ex) {
-                    JOptionPane.showMessageDialog(null, ex.toString());
+                    JmriJOptionPane.showMessageDialog(turnoutOperation, ex.toString());
                 }
             }
         });
@@ -260,7 +271,11 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
 
         if (currentOperation != null) {
             turnoutOperation.remove(config);
-            if (!currentOperation.isNonce()) {
+            TurnoutOperation existing = bean.getTurnoutOperation();
+            if (existing != null && existing.isNonce() && currentOperation.equals(existing.getDefinitive())) {
+                // keep editing the turnout's own copy so its saved values show
+                currentOperation = existing;
+            } else if (!currentOperation.isNonce()) {
                 currentOperation = currentOperation.makeNonce(bean);
             }
             config = TurnoutOperationConfig.getConfigPanel(currentOperation);
@@ -286,10 +301,10 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
         super.cancelButtonAction(e);
     }
 
-    private final static String bothText = "Both"; // TODO I18N using bundle. Note: check how this property is stored/loaded
-    private final static String cabOnlyText = "Cab only";
-    private final static String pushbutText = "Pushbutton only";
-    private final static String noneText = "None";
+    private static final String bothText = "Both"; // TODO I18N using bundle. Note: check how this property is stored/loaded
+    private static final String cabOnlyText = "Cab only";
+    private static final String pushbutText = "Pushbutton only";
+    private static final String noneText = "None";
 
     private JComboBox<String> lockBox;
     protected BeanItemPanel lock() {
@@ -389,7 +404,7 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
         }
         bei.add(lock);
         return lock;
-    }   // lock() 
+    }   // lock()
 
     private java.util.Vector<String> speedListClosed = new java.util.Vector<>();
     private java.util.Vector<String> speedListThrown = new java.util.Vector<>();
@@ -446,26 +461,26 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
       speed.setSaveItem(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String speed = (String) closedSpeedBox.getSelectedItem();
-                if (speed != null) {
+                String newSpeed = (String) closedSpeedBox.getSelectedItem();
+                if (newSpeed != null) {
                     try {
-                        bean.setStraightSpeed(speed);
-                        if ((!speedListClosed.contains(speed)) && !speed.contains("Global")) {
-                            speedListClosed.add(speed);
+                        bean.setStraightSpeed(newSpeed);
+                        if ((!speedListClosed.contains(newSpeed)) && !newSpeed.contains("Global")) {
+                            speedListClosed.add(newSpeed);
                         }
                     } catch (jmri.JmriException ex) {
-                        JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
+                        JmriJOptionPane.showMessageDialog(speed, ex.getMessage() + "\n" + newSpeed);
                     }
                 }
-                speed = (String) thrownSpeedBox.getSelectedItem();
-                if (speed != null) {
+                newSpeed = (String) thrownSpeedBox.getSelectedItem();
+                if (newSpeed != null) {
                     try {
-                        bean.setDivergingSpeed(speed);
-                        if ((!speedListThrown.contains(speed)) && !speed.contains("Global")) {
-                            speedListThrown.add(speed);
+                        bean.setDivergingSpeed(newSpeed);
+                        if ((!speedListThrown.contains(newSpeed)) && !newSpeed.contains("Global")) {
+                            speedListThrown.add(newSpeed);
                         }
                     } catch (jmri.JmriException ex) {
-                        JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
+                        JmriJOptionPane.showMessageDialog(speed, ex.getMessage() + "\n" + newSpeed);
                     }
                 }
             }
@@ -501,4 +516,4 @@ public class TurnoutEditAction extends BeanEditAction<Turnout> {
         return speed;
     }
 
-} 
+}

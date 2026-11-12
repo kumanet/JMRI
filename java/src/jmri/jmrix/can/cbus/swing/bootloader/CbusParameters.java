@@ -1,7 +1,9 @@
 package jmri.jmrix.can.cbus.swing.bootloader;
 
-import java.text.MessageFormat;
 import java.util.Arrays;
+
+import static jmri.jmrix.can.cbus.node.CbusNodeConstants.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,69 +15,43 @@ import org.slf4j.LoggerFactory;
 public class CbusParameters {
 
     /**
-     * Node Parameters
-     *
-     * Para 0 Number of parameters
-     * Para 1 The manufacturer ID
-     * Para 2 Minor code version as an alphabetic character (ASCII)
-     * Para 3 Manufacturer module identifier as a HEX numeric
-     * Para 4 Number of supported events as a HEX numeric
-     * Para 5 Number of Event Variables per event as a HEX numeric
-     * Para 6 Number of supported Node Variables as a HEX numeric
-     * Para 7 Major version
-     * Para 8 Node flags
-     * Para 9 Processor type
-     * Para 10 Bus type
-     * Para 11 load address, 4 bytes
-     * Para 15 CPU manufacturer's id as read from the chip config space, 4 bytes, only 2 bytes used for PICs
-     * Para 19 CPU manufacturer code
-     * Para 20 Beta revision (numeric), or 0 if release
-     *                
+     * Maximum number of parameters.
+     * paramData holds the parameter count at index 0, then the parameters
+     * at indexes 1 to MAX_PARAMS.
      */
-    public static final int NUM_PARAM_IDX = 0;        // Para 1 The manufacturer ID
-    public static final int MANU_ID_IDX = 1;        // Para 1 The manufacturer ID
-    public static final int MINOR_VER_IDX = 2;      // Para 2 Minor code version as an alphabetic character (ASCII)
-    public static final int MODULE_ID_IDX = 3;      // Para 3 Manufacturer module identifier as a HEX numeric
-    public static final int NUM_EV_IDX = 4;         // Para 4 Number of supported events as a HEX numeric
-    public static final int EV_PER_EN_IDX = 5;      // Para 5 Number of Event Variables per event as a HEX numeric
-    public static final int NUM_NV_IDX = 6;         // Para 6 Number of supported Node Variables as a HEX numeric
-    public static final int MAJOR_VER_IDX = 7;      // Para 7 Major version
-    public static final int FLAGS_IDX = 8;          // Para 8 Node flags
-    public static final int PROC_TYPE_IDX = 9;      // Para 9 Processor type
-    public static final int BUS_TYPE_IDX = 10;      // Para 10 Bus type
-    public static final int LOAD_ADDR_IDX = 11;     // Para 11 load address, 4 bytes
-    public static final int CPU_ID_IDX = 15;        // Para 15 CPU manufacturer's id as read from the chip config space, 4 bytes, only firs two used for PIC18
-    public static final int CPU_CODE_IDX = 19;      // Para 19 CPU manufacturer code
-    public static final int BETA_REV_IDX = 20;      // Para 20 Beta revision (numeric), or 0 if release
+    public static final int MAX_PARAMS = 32;
 
     protected int [] paramData = null;
     protected boolean valid = false;
-//    protected boolean newVersion = false;
 
     
     /**
      * Create blank parameters
      */
     public CbusParameters() {
-        paramData = new int[33];
+        paramData = new int[MAX_PARAMS + 1];
         Arrays.fill(paramData, -1);
     }
     
     
     /**
-     * Create parameters from int []
+     * Create parameters from byte []
      * 
-     * @param d int [] array 
+     * @param d byte [] array 
      */
     public CbusParameters(byte [] d) {
         this();
         
-        paramData[0] = d.length;
-        
-        for (int i = 0; i < paramData[0]; i++) {
-            paramData[i+1] = d[i] & 0xFF;
+        if (d.length > MAX_PARAMS) {
+            log.error("Too many parameters");
+            valid = false;
+        } else {
+            paramData[0] = d.length;
+            for (int i = 0; i < paramData[0]; i++) {
+                paramData[i+1] = d[i] & 0xFF;
+            }
+            valid = true;
         }
-        
     }
 
 
@@ -87,8 +63,8 @@ public class CbusParameters {
     public int getParam(int i) {
         return paramData[i];
     }
-    
-    
+
+
     /**
      * Set a parameter
      * @param i index of the parameter to set
@@ -97,52 +73,58 @@ public class CbusParameters {
     public void setParam(int i, int v) {
         paramData[i] = v;
     }
-    
-    
-    /**
-     * Look for a valid parameter block in a hex file by comparing against one
-     * read from hardware (or some other source)
-     * 
-     * @param f hex file to search
-     * @param hp parameters to validate against
-     * @return parameters found in hex file with valid and newVersion flags
-     */
-    public CbusParameters validate(HexFile f, CbusParameters hp) {
-        byte [] d;
-        CbusParameters fp;
 
-        if (hp.paramData[NUM_PARAM_IDX] == 7) {
-            // Old style
-            d = f.getData(0x810, 7);
-            fp = new CbusParameters(d);
-        } else {
-            // New style
-            d = f.getData(0x820, 32);
-            fp = new CbusParameters(d);
+
+    /**
+     * Check if a parameter index can be used with getParam or setParam
+     *
+     * @param i index of the parameter
+     * @return true if the index is within the parameter array
+     */
+    public boolean isValidIndex(int i) {
+        return (i >= 0) && (i < paramData.length);
+    }
+
+
+    /**
+     * Valid parameter block in a hex file by comparing against one
+     * read from hardware (or some other source)
+     *
+     * @param fp Parameters from hex file
+     * @param hp parameters to validate against
+     * @return true if parameter blocks match
+     */
+    public boolean validate(CbusParameters fp, CbusParameters hp) {
+
+        if ((fp == null) || (hp == null) || !fp.valid || !hp.valid) {
+            return false;
         }
-        
+
         // As a minimum, check manufacturer ID, module ID and processor type
-        if (fp.paramData[MANU_ID_IDX] == hp.paramData[MANU_ID_IDX]) {
-            if (fp.paramData[MODULE_ID_IDX] == hp.paramData[MODULE_ID_IDX]) {
-//                checkVersion(fp, hp);
-                fp.valid = true;
-                if (hp.paramData[NUM_PARAM_IDX] > 7) {
-                    if (fp.paramData[PROC_TYPE_IDX] == hp.paramData[PROC_TYPE_IDX]) {
-                        fp.valid = true;
-                    } else {
-                        log.error("Processor type mismatch {} {}", fp.paramData[PROC_TYPE_IDX], hp.paramData[PROC_TYPE_IDX]);
-                    }
-                }
-                return fp;
-            } else {
-                log.error("Module ID mismatch {} {}", fp.paramData[MODULE_ID_IDX], hp.paramData[MODULE_ID_IDX]);
-            }
-        } else {
+        if (fp.paramData[MANU_ID_IDX] != hp.paramData[MANU_ID_IDX]) {
             log.error("Manufacturer ID mismatch {} {}", fp.paramData[MANU_ID_IDX], hp.paramData[MANU_ID_IDX]);
+            return false;
         }
         
-        fp.valid = false;
-        return fp;
+        if (fp.paramData[MODULE_ID_IDX] != hp.paramData[MODULE_ID_IDX]) {
+            log.error("Module ID mismatch {} {}", fp.paramData[MODULE_ID_IDX], hp.paramData[MODULE_ID_IDX]);
+            return false;
+        }
+        
+//        if (!checkVersion(fp, hp)) {
+//            log.error("Version mismatch {}.{} {}.{}", , fp.paramData[MAJOR_VER_IDX], fp.paramData[MINOR_VER_IDX],
+//                                hp.paramData[MAJOR_VER_IDX], hp.paramData[MINOR_VER_IDX]);
+//            return false;
+//        }
+
+        if (hp.paramData[NUM_PARAM_IDX] > 7) {
+            if (fp.paramData[PROC_TYPE_IDX] != hp.paramData[PROC_TYPE_IDX]) {
+                log.error("Processor type mismatch {} {}", fp.paramData[PROC_TYPE_IDX], hp.paramData[PROC_TYPE_IDX]);
+                return false;
+            }
+        }
+        
+        return true;
     }
     
     
@@ -170,12 +152,16 @@ public class CbusParameters {
      * @return the load address
      */
     public int getLoadAddress() {
-        int la = (paramData[LOAD_ADDR_IDX]
-                + paramData[LOAD_ADDR_IDX+1]*256
-                + paramData[LOAD_ADDR_IDX+2]*256*256
-                + paramData[LOAD_ADDR_IDX+3]*256*256*256);
-        log.debug("Load address is {}", la);
-        return la;
+        if (paramData[NUM_PARAM_IDX] == 7) {
+            return 0x800;
+        } else {
+            int la = (paramData[LOAD_ADDR_IDX]
+                    + paramData[LOAD_ADDR_IDX+1]*256
+                    + paramData[LOAD_ADDR_IDX+2]*256*256
+                    + paramData[LOAD_ADDR_IDX+3]*256*256*256);
+            log.debug("Load address is {}", la);
+            return la;
+        }
     }
     
     
@@ -189,7 +175,13 @@ public class CbusParameters {
         if (valid == false) {
             return Bundle.getMessage("ParamsInvalid");
         } else {
-            return super.toString();
+            StringBuilder sb = new StringBuilder();
+            // Parameter 0 is the number of parameters that follow
+            int n = Math.min(paramData[0], paramData.length - 1);
+            for (int i = 1; i <= n; i++) {
+                sb.append(paramData[i] + " ");
+            }
+            return sb.toString();
         }
     }
     
@@ -213,6 +205,6 @@ public class CbusParameters {
         valid = s;
     }
     
-    private final static Logger log = LoggerFactory.getLogger(CbusParameters.class);
+    private static final Logger log = LoggerFactory.getLogger(CbusParameters.class);
     
 }

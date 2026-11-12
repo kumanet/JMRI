@@ -1,26 +1,26 @@
 package jmri.jmrit.display.controlPanelEditor;
 
-import java.awt.GraphicsEnvironment;
 
 import jmri.jmrit.logix.OBlock;
 import jmri.jmrit.logix.OBlockManager;
 import jmri.util.JUnitUtil;
 
-import org.junit.jupiter.api.*;
 import org.junit.Assert;
-import org.junit.Assume;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 /**
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")
 public class EditCircuitFrameTest {
 
     OBlockManager blkMgr;
 
     @Test
     public void testCTor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+
         ControlPanelEditor fr = new ControlPanelEditor("EditCircuitFrameTest");
         fr.makeCircuitMenu(true);
         CircuitBuilder cb = fr.getCircuitBuilder();
@@ -38,7 +38,7 @@ public class EditCircuitFrameTest {
         JUnitUtil.setUp();
         JUnitUtil.resetProfileManager();
         blkMgr = new OBlockManager();
-        new org.netbeans.jemmy.QueueTool().waitEmpty(100);
+        new org.netbeans.jemmy.QueueTool().waitEmpty();
     }
 
 
@@ -46,10 +46,9 @@ public class EditCircuitFrameTest {
     public void tearDown() {
         blkMgr.dispose();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EditCircuitFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EditCircuitFrameTest.class);
 
 }

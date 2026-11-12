@@ -145,27 +145,27 @@ public class NceSystemConnectionMemo extends DefaultSystemConnectionMemo impleme
     }
 
     public NcePowerManager getPowerManager() {
-        return get(PowerManager.class);
+        return (NcePowerManager)get(PowerManager.class);
     }
 
     public NceTurnoutManager getTurnoutManager() {
-        return get(TurnoutManager.class);
+        return (NceTurnoutManager)get(TurnoutManager.class);
     }
 
     public NceLightManager getLightManager() {
-        return get(LightManager.class);
+        return (NceLightManager)get(LightManager.class);
     }
 
     public NceSensorManager getSensorManager() {
-        return get(SensorManager.class);
+        return (NceSensorManager)get(SensorManager.class);
     }
 
     public NceThrottleManager getThrottleManager() {
-        return get(ThrottleManager.class);
+        return (NceThrottleManager)get(ThrottleManager.class);
     }
 
     public NceClockControl getClockControl() {
-        return get(ClockControl.class);
+        return (NceClockControl)get(ClockControl.class);
     }
 
     /**
@@ -194,5 +194,5 @@ public class NceSystemConnectionMemo extends DefaultSystemConnectionMemo impleme
         super.dispose();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceSystemConnectionMemo.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceSystemConnectionMemo.class);
 }

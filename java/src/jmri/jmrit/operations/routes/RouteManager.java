@@ -1,9 +1,6 @@
 package jmri.jmrit.operations.routes;
 
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
 
 import javax.swing.JComboBox;
 
@@ -11,12 +8,12 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jmri.InstanceManager;
-import jmri.InstanceManagerAutoDefault;
-import jmri.InstanceManagerAutoInitialize;
+import jmri.*;
 import jmri.beans.PropertyChangeSupport;
+import jmri.jmrit.operations.OperationsPanel;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.locations.LocationManager;
+import jmri.jmrit.operations.setup.Control;
 import jmri.jmrit.operations.setup.OperationsSetupXml;
 
 /**
@@ -67,8 +64,6 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
      * name creates a unique id for this route
      *
      * @param name The string name of the new Route.
-     *
-     *
      * @return new route or existing route
      */
     public Route newRoute(String name) {
@@ -76,10 +71,9 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
         if (route == null) {
             _id++;
             route = new Route(Integer.toString(_id), name);
-            Integer oldSize = Integer.valueOf(_routeHashTable.size());
+            int oldSize = _routeHashTable.size();
             _routeHashTable.put(route.getId(), route);
-            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize,
-                    Integer.valueOf(_routeHashTable.size()));
+            setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _routeHashTable.size());
         }
         return route;
     }
@@ -90,14 +84,14 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
      * @param route The Route to add.
      */
     public void register(Route route) {
-        Integer oldSize = Integer.valueOf(_routeHashTable.size());
+        int oldSize = _routeHashTable.size();
         _routeHashTable.put(route.getId(), route);
         // find last id created
         int id = Integer.parseInt(route.getId());
         if (id > _id) {
             _id = id;
         }
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_routeHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _routeHashTable.size());
         // listen for name and state changes to forward
     }
 
@@ -111,9 +105,9 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
             return;
         }
         route.dispose();
-        Integer oldSize = Integer.valueOf(_routeHashTable.size());
+        int oldSize = _routeHashTable.size();
         _routeHashTable.remove(route.getId());
-        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, Integer.valueOf(_routeHashTable.size()));
+        setDirtyAndFirePropertyChange(LISTLENGTH_CHANGED_PROPERTY, oldSize, _routeHashTable.size());
     }
 
     /**
@@ -176,6 +170,34 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
         return out;
     }
 
+    public RouteLocation getRouteLocationById(String id) {
+        for (Route route : getList()) {
+            for (RouteLocation rl : route.getLocationsBySequenceList()) {
+                if (rl.getId().equals(id)) {
+                    return rl;
+                }
+            }
+        }
+        return null; // not found
+    }
+
+    /**
+     * Used to determine if a location is part of any route.
+     * 
+     * @param loc The location being checked.
+     * @return null if location isn't used, otherwise a route using the
+     *         location.
+     */
+    public Route isLocationInUse(Location loc) {
+        for (Route route : getList()) {
+            RouteLocation rl = route.getLastLocationByName(loc.getName());
+            if (rl != null) {
+                return route;
+            }
+        }
+        return null;
+    }
+
     public JComboBox<Route> getComboBox() {
         JComboBox<Route> box = new JComboBox<>();
         box.addItem(null);
@@ -183,6 +205,7 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
         for (Route route : routes) {
             box.addItem(route);
         }
+        OperationsPanel.padComboBox(box, Control.max_len_string_route_name);
         return box;
     }
 
@@ -229,10 +252,12 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
         Location loc = InstanceManager.getDefault(LocationManager.class).getLocationByName(rl.getName());
         RouteLocation rlNew = newRoute.addLocation(loc);
         // now copy the route location objects we want
+        rlNew.setLocalMovesAllowed(rl.isLocalMovesAllowed());
         rlNew.setMaxCarMoves(rl.getMaxCarMoves());
         rlNew.setRandomControl(rl.getRandomControl());
         rlNew.setWait(rl.getWait());
-        rlNew.setDepartureTime(rl.getDepartureTime());
+        rlNew.setDepartureTimeHourMinutes(rl.getDepartureTimeHourMinutes());
+        rlNew.setDepartureTimeDay(rl.getDepartureTimeDay());
         rlNew.setComment(rl.getComment());
         rlNew.setCommentColor(rl.getCommentColor());
         if (!invert) {
@@ -298,7 +323,7 @@ public class RouteManager extends PropertyChangeSupport implements InstanceManag
         firePropertyChange(p, old, n);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RouteManager.class);
+    private static final Logger log = LoggerFactory.getLogger(RouteManager.class);
 
     @Override
     public void initialize() {

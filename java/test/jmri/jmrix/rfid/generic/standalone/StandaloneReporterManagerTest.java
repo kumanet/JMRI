@@ -34,20 +34,20 @@ public class StandaloneReporterManagerTest extends jmri.managers.AbstractReporte
             }
 
             @Override
-            public void reply(jmri.jmrix.rfid.RfidReply m) {
+            public synchronized void reply(jmri.jmrix.rfid.RfidReply m) {
             }
 
         };
     }
-    
-    // No test for manager-specific system name validation at present
+
     @Test
     @Override
+    @Disabled("No test for manager-specific system name validation at present")
     public void testMakeSystemNameWithNoPrefixNotASystemName() {}
-    
-    // No test for manager-specific system name validation at present
+
     @Test
     @Override
+    @Disabled("No test for manager-specific system name validation at present")
     public void testMakeSystemNameWithPrefixNotASystemName() {}
 
     @AfterEach

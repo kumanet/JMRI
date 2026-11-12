@@ -4,15 +4,19 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.beans.PropertyChangeListener;
+
+import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
 import jmri.InstanceManager;
 import jmri.Memory;
 import jmri.NamedBeanHandle;
 import jmri.NamedBean.DisplayOptions;
+import jmri.util.swing.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +36,11 @@ public class MemorySpinnerIcon extends PositionableJPanel implements ChangeListe
     int _max = 100;
     JSpinner spinner = new JSpinner(new SpinnerNumberModel(0, _min, _max, 1));
     // the associated Memory object
-    //Memory memory = null;    
+    //Memory memory = null;
     private NamedBeanHandle<Memory> namedMemory;
+
+    private final java.awt.event.MouseListener _mouseListener = JmriMouseListener.adapt(this);
+    private final java.awt.event.MouseMotionListener _mouseMotionListener = JmriMouseMotionListener.adapt(this);
 
     public MemorySpinnerIcon(Editor editor) {
         super(editor);
@@ -43,8 +50,8 @@ public class MemorySpinnerIcon extends PositionableJPanel implements ChangeListe
         add(spinner, new java.awt.GridBagConstraints());
         spinner.addChangeListener(this);
         javax.swing.JTextField textBox = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
-        textBox.addMouseMotionListener(this);
-        textBox.addMouseListener(this);
+        textBox.addMouseMotionListener(_mouseMotionListener);
+        textBox.addMouseListener(_mouseListener);
         setPopupUtility(new PositionablePopupUtil(this, textBox));
     }
 
@@ -135,8 +142,19 @@ public class MemorySpinnerIcon extends PositionableJPanel implements ChangeListe
     }
 
     @Override
+    public jmri.NamedBean getNamedBean() {
+        return getMemory();
+    }
+
+    @Override
     public void stateChanged(ChangeEvent e) {
         spinnerUpdated();
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_MemorySpinnerIcon");
     }
 
     @Override
@@ -222,7 +240,7 @@ public class MemorySpinnerIcon extends PositionableJPanel implements ChangeListe
     }
 
     @Override
-    public void mouseExited(java.awt.event.MouseEvent e) {
+    public void mouseExited(JmriMouseEvent e) {
         spinnerUpdated();
         super.mouseExited(e);
     }
@@ -257,11 +275,11 @@ public class MemorySpinnerIcon extends PositionableJPanel implements ChangeListe
         }
         if (spinner != null) {
             spinner.removeChangeListener(this);
-            ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().removeMouseMotionListener(this);
-            ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().removeMouseListener(this);
+            ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().removeMouseMotionListener(_mouseMotionListener);
+            ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().removeMouseListener(_mouseListener);
         }
         namedMemory = null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MemorySpinnerIcon.class);
+    private static final Logger log = LoggerFactory.getLogger(MemorySpinnerIcon.class);
 }

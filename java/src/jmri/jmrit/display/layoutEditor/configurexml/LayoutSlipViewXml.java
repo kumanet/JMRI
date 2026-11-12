@@ -1,13 +1,10 @@
 package jmri.jmrit.display.layoutEditor.configurexml;
 
 import java.awt.geom.Point2D;
-import jmri.configurexml.AbstractXmlAdapter;
 import jmri.jmrit.display.layoutEditor.*;
 import org.jdom2.Attribute;
 import org.jdom2.DataConversionException;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This module handles configuration for display.LayoutSlipView objects for a
@@ -17,12 +14,12 @@ import org.slf4j.LoggerFactory;
  * @author George Warner Copyright (c) 2017-2018
  * @author Bob Jacobsen Copyright (c) 2020
  */
-public class LayoutSlipViewXml extends AbstractXmlAdapter {
+public class LayoutSlipViewXml extends LayoutTrackViewXml {
 
     public LayoutSlipViewXml() {
     }
 
-    final static EnumIO<LayoutSlip.TurnoutType> tTypeEnumMap = new EnumIoNamesNumbers<>(LayoutSlip.TurnoutType.class);
+    static final EnumIO<LayoutSlip.TurnoutType> tTypeEnumMap = new EnumIoNamesNumbers<>(LayoutSlip.TurnoutType.class);
 
     protected void addClass(Element element) {
         element.setAttribute("class", "jmri.jmrit.display.layoutEditor.configurexml.LayoutSlipXml");
@@ -49,6 +46,10 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
         element.setAttribute("hidden", "" + (pv.isHidden() ? "yes" : "no"));
         element.setAttribute("disabled", "" + (p.isDisabled() ? "yes" : "no"));
         element.setAttribute("disableWhenOccupied", "" + (p.isDisabledWhenOccupied() ? "yes" : "no"));
+
+        if (p.showToolTip()) {
+            element.setAttribute("showtooltip", "yes");
+        }
 
         Point2D coords = pv.getCoordsCenter();
         element.setAttribute("xcen", "" + coords.getX());
@@ -83,16 +84,16 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
         }
 
         if (p.getConnectA() != null) {
-            element.setAttribute("connectaname", ((TrackSegment) p.getConnectA()).getId());
+            element.setAttribute("connectaname", p.getConnectA().getId());
         }
         if (p.getConnectB() != null) {
-            element.setAttribute("connectbname", ((TrackSegment) p.getConnectB()).getId());
+            element.setAttribute("connectbname", p.getConnectB().getId());
         }
         if (p.getConnectC() != null) {
-            element.setAttribute("connectcname", ((TrackSegment) p.getConnectC()).getId());
+            element.setAttribute("connectcname", p.getConnectC().getId());
         }
         if (p.getConnectD() != null) {
-            element.setAttribute("connectdname", ((TrackSegment) p.getConnectD()).getId());
+            element.setAttribute("connectdname", p.getConnectD().getId());
         }
 
         if (!p.getSignalA1Name().isEmpty()) {
@@ -171,6 +172,7 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
             states.addContent(state);
         }
         element.addContent(states);
+        storeLogixNG_Data(pv, element);
         addClass(element);
         return element;
     }
@@ -207,9 +209,9 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
                 tTypeEnumMap.inputFromAttribute(element.getAttribute("slipType"));
 
         // create the new LayoutSlip
-        LayoutSlip l; 
-        LayoutSlipView lv; 
-        
+        LayoutSlip l;
+        LayoutSlipView lv;
+
         switch(type) {
             case DOUBLE_SLIP :
                 LayoutDoubleSlip lds = new LayoutDoubleSlip(name, p);
@@ -295,6 +297,14 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
         } catch (NullPointerException e) {  // considered normal if the attribute is not present
         }
 
+        l.setShowToolTip(false);
+        a = element.getAttribute("showtooltip");
+        if (a != null) {
+            if ("yes".equals(a.getValue())) {
+                l.setShowToolTip(true);
+            }
+        }
+
         try {
             x = element.getAttribute("xa").getFloatValue();
             y = element.getAttribute("ya").getFloatValue();
@@ -347,6 +357,8 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
                         bc.getChild("turnoutB").getText());
             }
         }
+
+        loadLogixNG_Data(lv, element);
     }
 
     String getElement(Element el, String child) {
@@ -356,5 +368,5 @@ public class LayoutSlipViewXml extends AbstractXmlAdapter {
         return "";
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutSlipViewXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutSlipViewXml.class);
 }

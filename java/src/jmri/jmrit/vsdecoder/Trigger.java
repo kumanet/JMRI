@@ -10,35 +10,35 @@ import org.jdom2.Element;
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  *
  * @author Mark Underwood Copyright (C) 2011
  */
 abstract public class Trigger implements PropertyChangeListener {
 
-    static public enum TriggerType {
+    public static enum TriggerType {
 
         BUTTON, BOOLEAN, STRING, NONE, NOTCH, INT, FLOAT, THROTTLE
     }
 
-    static public enum TargetAction {
+    public static enum TargetAction {
 
         PLAY, LOOP, STOP, FADEIN, FADEOUT, NOTCH, CHANGE, NOTHING, STOP_AT_ZERO
     }
 
-    static public enum CompareType {
+    public static enum CompareType {
 
         EQ, GT, LT, GTE, LTE
     }
 
-    static public enum CompareValueType {
+    public static enum CompareValueType {
 
         INT, FLOAT
     }
@@ -133,15 +133,13 @@ abstract public class Trigger implements PropertyChangeListener {
         trigger_name = e.getAttributeValue("name");
         event_name = e.getChild("event-name").getValue();
         target_name = e.getChild("target-name").getValue();
-        try {
-            this.setTargetAction(Trigger.TargetAction.valueOf(e.getChild("action").getValue()));
-        } catch (IllegalArgumentException iea) {
-            this.setTargetAction(Trigger.TargetAction.NOTHING);
-        } catch (NullPointerException npe) {
-            this.setTargetAction(Trigger.TargetAction.NOTHING);
+        if (e.getChild("action") != null) {
+            try {
+                this.setTargetAction(Trigger.TargetAction.valueOf(e.getChild("action").getValue()));
+            } catch (IllegalArgumentException iea) {
+                this.setTargetAction(Trigger.TargetAction.NOTHING);
+            }
         }
     }
-
-    //private static final Logger log = LoggerFactory.getLogger(Trigger.class);
 
 }

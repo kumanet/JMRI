@@ -2,8 +2,6 @@ package jmri.jmrix.loconet.configurexml;
 
 import jmri.configurexml.JmriConfigureXmlException;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring LnSensorManagers.
@@ -31,5 +29,5 @@ public class LnSensorManagerXml extends jmri.managers.configurexml.AbstractSenso
         return true;
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(LnSensorManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(LnSensorManagerXml.class);
 }

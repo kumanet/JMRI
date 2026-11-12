@@ -1,9 +1,16 @@
 package jmri.web.servlet.roster;
 
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  *
@@ -11,10 +18,15 @@ import org.junit.jupiter.api.*;
  */
 public class MultipartRequestHandlerTest {
 
+    // no testCtor as tested class only supplies static methods
+
     @Test
-    public void testCTor() {
-        MultipartRequestHandler t = new MultipartRequestHandler();
-        Assert.assertNotNull("exists",t);
+    public void testHandlerUpload() throws IOException, ServletException {
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getParameter("fileReplace")).thenReturn("false");
+        Assertions.assertNotNull(MultipartRequestHandler.uploadByJavaServletAPI(request));
+
     }
 
     @BeforeEach
@@ -27,6 +39,6 @@ public class MultipartRequestHandlerTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(MultipartRequestHandlerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(MultipartRequestHandlerTest.class);
 
 }

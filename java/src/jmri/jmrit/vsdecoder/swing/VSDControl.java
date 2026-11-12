@@ -24,22 +24,21 @@ import javax.swing.border.Border;
 import jmri.jmrit.vsdecoder.EngineSoundEvent;
 import jmri.jmrit.vsdecoder.SoundEvent;
 import jmri.jmrit.vsdecoder.VSDConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * New GUI pane for a Virtual Sound Decoder (VSDecoder).
+ *
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2011
@@ -48,6 +47,8 @@ public class VSDControl extends JPanel {
 
     public static final String OPTION_CHANGE = "OptionChange"; // NOI18N
     public static final String DELETE = "DeleteDecoder"; // NOI18N
+
+    private static final int NUMBER_SOUNDS = 8;
 
     // Map of Mnemonic KeyEvent values to GUI Components
     private static final Map<String, Integer> Mnemonics = new HashMap<>();
@@ -97,7 +98,7 @@ public class VSDControl extends JPanel {
         initComponents(address);
     }
 
-    static public JPanel generateBlank() {
+    public static JPanel generateBlank() {
         VSDControl temp = new VSDControl("");
         JLabel jl = new JLabel(Bundle.getMessage("BlankVSDControlLabel"));
         jl.setMinimumSize(temp.getPreferredSize());
@@ -204,8 +205,9 @@ public class VSDControl extends JPanel {
      * Add buttons for the selected Profile's defined sounds
      * @param elist list of sounds to make buttons from.
      */
-    public void addSoundButtons(ArrayList<SoundEvent> elist) {
+    void addSoundButtons(ArrayList<SoundEvent> elist) {
         soundsPanel.removeAll();
+        int i = 0;
         for (SoundEvent e : elist) {
             if (e.getButton() != null) {
                 log.debug("adding button {}", e.getButton());
@@ -214,12 +216,19 @@ public class VSDControl extends JPanel {
                 // Force the EngineSoundEvent to the second row.
                 if (e instanceof EngineSoundEvent) {
                     gbc.gridy = 1;
+                    if (elist.size() > NUMBER_SOUNDS) {
+                        gbc.gridy = 2; // third row
+                    }
                     gbc.gridwidth = elist.size() - 1;
                     gbc.fill = GridBagConstraints.NONE;
                     gbc.anchor = GridBagConstraints.LINE_START;
                     soundsPanel.add(jc, gbc);
                 } else {
+                    i++;
                     gbc.gridy = 0;
+                    if (i > NUMBER_SOUNDS) {
+                        gbc.gridy = 1;
+                    }
                     soundsPanel.add(jc, gbc);
                 }
             }
@@ -260,6 +269,6 @@ public class VSDControl extends JPanel {
         firePropertyChange(OPTION_CHANGE, null, event.getNewValue());
     }
 
-    private static final Logger log = LoggerFactory.getLogger(VSDControl.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(VSDControl.class);
 
 }

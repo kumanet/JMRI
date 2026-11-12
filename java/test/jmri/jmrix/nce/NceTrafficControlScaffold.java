@@ -1,6 +1,7 @@
 package jmri.jmrix.nce;
 
 import java.util.Vector;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,8 @@ public class NceTrafficControlScaffold extends NceTrafficController {
     // test control member functions
     /**
      * forward a message to the listeners, e.g. test receipt
+     * @param m NceMessage
+     * @param l NceListener
      */
     protected void sendTestMessage(NceMessage m, NceListener l) {
         // forward a test message to NceListeners
@@ -73,6 +76,6 @@ public class NceTrafficControlScaffold extends NceTrafficController {
         return jmri.jmrix.JmrixConfigPane.NONE_SELECTED; 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NceTrafficControlScaffold.class);
+    private static final Logger log = LoggerFactory.getLogger(NceTrafficControlScaffold.class);
 
 }

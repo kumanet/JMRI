@@ -1,17 +1,11 @@
 package jmri.jmrix.can.cbus;
 
-import jmri.InstanceManager;
 import jmri.jmrix.can.CanSystemConnectionMemo;
-import jmri.jmrix.can.cbus.simulator.CbusSimulator;
 import jmri.jmrix.can.TrafficControllerScaffold;
-import jmri.jmrix.can.TrafficControllerScaffoldLoopback;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-// import org.slf4j.Logger;
-// import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -21,40 +15,32 @@ import org.junit.jupiter.api.*;
  */
 public class CbusCommandStationTest {
 
-    private CbusCommandStation t;
-    private CanSystemConnectionMemo memo;
-    private TrafficControllerScaffold lnis;
+    private CbusCommandStation t = null;
+    private CanSystemConnectionMemo memo = null;
+    private TrafficControllerScaffold lnis = null;
 
     @Test
-    public void testCTor() {
+    public void testCtor() {
         Assert.assertNotNull("exists",t);
     }
 
     @Test
-    public void testgetSystemPrefix() {
+    public void testgetCanSystemPrefix() {
+        Assert.assertNotNull(t);
         Assert.assertEquals("sys prefix", "M", t.getSystemPrefix());
     }
 
     @Test
-    public void testgetUserName() {
+    public void testgetCanUserName() {
+        Assert.assertNotNull(t);
         Assert.assertEquals("user name obtainable", "CAN", t.getUserName());
     }
     
-    @Test
-    public void testgetSimLoopbacktc() {
-        TrafficControllerScaffoldLoopback tc = new TrafficControllerScaffoldLoopback();
-        memo.setTrafficController(tc);
-        CbusCommandStation ta = new CbusCommandStation(memo);
-        Assert.assertNotNull("exists",ta);
-        Assert.assertNotNull(InstanceManager.getDefault(CbusSimulator.class));
-        
-        tc.terminateThreads();
-    }
-
     // test originates from loconet
     @Test
     public void testSendPacket() {
-        
+        Assert.assertNotNull(t);
+        Assert.assertNotNull(lnis);
         byte msg[] = jmri.NmraPacket.accDecPktOpsMode(1, 4, 53);
         t.sendPacket(msg, 1);
         Assert.assertEquals("nmra packet 1",
@@ -187,6 +173,66 @@ public class CbusCommandStationTest {
     }
     
     
+    // the sent listener given with a speed and direction goes with that DSPD,
+    // and only with it; keep-alives carry none
+    @Test
+    public void testSetSpeedDirSentListener() {
+        Assert.assertNotNull(t);
+        Assert.assertNotNull(lnis);
+        jmri.jmrix.AbstractMRMessage.SentListener l = (message, timeNanos) -> {
+        };
+
+        t.setSpeedDir(5, 0x80, l);
+        Assert.assertEquals("DSPD sent", "[78] 47 05 80", lnis.outbound.lastElement().toString());
+        Assert.assertSame("DSPD carries the listener", l, lnis.outbound.lastElement().getSentListener());
+
+        t.setSpeedDir(5, 0x81);
+        Assert.assertNull("no listener given, none carried", lnis.outbound.lastElement().getSentListener());
+
+        t.sendKeepAlive(5);
+        Assert.assertEquals("DKEEP sent", "[78] 23 05", lnis.outbound.lastElement().toString());
+        Assert.assertNull("keep-alive carries none", lnis.outbound.lastElement().getSentListener());
+
+        int sent = lnis.outbound.size();
+        t.setSpeedDir(-1, 0x80, l);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for DSPD, not sent to layout");
+        Assert.assertEquals("nothing sent for handle -1", sent, lnis.outbound.size());
+    }
+
+    // a negative session handle ( disposed or stolen throttle ) must never reach the CAN bus
+    @Test
+    public void testNegativeSessionHandleNotSent() {
+        Assert.assertNotNull(t);
+        Assert.assertNotNull(lnis);
+        int sent = lnis.outbound.size();
+
+        t.setSpeedDir(-1, 0x80);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for DSPD, not sent to layout");
+        t.setFunctions(1, -1, 0x10);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for DFUN, not sent to layout");
+        t.setSpeedSteps(-1, CbusConstants.CBUS_SS_28);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for STMOD, not sent to layout");
+        t.sendKeepAlive(-1);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for DKEEP, not sent to layout");
+        t.releaseSession(-1);
+        jmri.util.JUnitAppender.assertWarnMessage("Invalid session handle -1 for KLOC, not sent to layout");
+
+        Assert.assertEquals("nothing sent for handle -1", sent, lnis.outbound.size());
+
+        // valid handles are still sent
+        t.setSpeedDir(5, 0x80);
+        Assert.assertEquals("DSPD sent", "[78] 47 05 80", lnis.outbound.lastElement().toString());
+        t.setFunctions(1, 5, 0x10);
+        Assert.assertEquals("DFUN sent", "[78] 60 05 01 10", lnis.outbound.lastElement().toString());
+        t.setSpeedSteps(5, CbusConstants.CBUS_SS_28);
+        Assert.assertEquals("STMOD sent", "[78] 44 05 03", lnis.outbound.lastElement().toString());
+        t.sendKeepAlive(5);
+        Assert.assertEquals("DKEEP sent", "[78] 23 05", lnis.outbound.lastElement().toString());
+        t.releaseSession(5);
+        Assert.assertEquals("KLOC sent", "[78] 21 05", lnis.outbound.lastElement().toString());
+        Assert.assertEquals("5 frames sent", sent + 5, lnis.outbound.size());
+    }
+
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
@@ -198,14 +244,16 @@ public class CbusCommandStationTest {
 
     @AfterEach
     public void tearDown() {
-        memo.dispose();
+        Assertions.assertNotNull(lnis);
         lnis.terminateThreads();
+        lnis = null;
+        Assertions.assertNotNull(memo);
+        memo.dispose();
         memo = null;
         t = null;
-        lnis = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusCommandStationTest.class);
+    // private static final org.slf4j.Logger.Logger log = org.slf4j.Logger.LoggerFactory.getLogger(CbusCommandStationTest.class);
 
 }

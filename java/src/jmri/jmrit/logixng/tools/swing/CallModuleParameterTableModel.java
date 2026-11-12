@@ -10,6 +10,7 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellEditor;
 
+import jmri.JmriUncheckedException;
 import jmri.jmrit.logixng.Module;
 import jmri.jmrit.logixng.Module.Parameter;
 import jmri.jmrit.logixng.Module.ParameterData;
@@ -28,10 +29,10 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
     public static final int COLUMN_INPUT_DATA = 2;
     public static final int COLUMN_OUTPUT_TYPE = 3;
     public static final int COLUMN_OUTPUT_DATA = 4;
-    
+
     private final List<ParameterData> _parameterData = new ArrayList<>();
-    
-    
+
+
     public CallModuleParameterTableModel(Module module, List<ParameterData> parameterData) {
         if (module != null) {
             Map<String, ParameterData> parameterDataMap = new HashMap<>();
@@ -49,7 +50,7 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
             }
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public int getRowCount() {
@@ -108,13 +109,17 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
     @Override
     public void setValueAt(Object value, int rowIndex, int columnIndex) {
         ParameterData variable = _parameterData.get(rowIndex);
-        
+
         switch (columnIndex) {
             case COLUMN_NAME:
                 variable._name = (String) value;
                 break;
             case COLUMN_INPUT_TYPE:
-                variable._initalValueType = (InitialValueType) value;
+                if (value != null) {
+                    variable._initialValueType = (InitialValueType) value;
+                } else {
+                    variable._initialValueType = InitialValueType.None;
+                }
                 break;
             case COLUMN_INPUT_DATA:
                 variable._initialValueData = (String) value;
@@ -127,19 +132,19 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
                 break;
             default:
                 throw new IllegalArgumentException("Invalid column");
-        }      
+        }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
         if (rowIndex >= _parameterData.size()) throw new IllegalArgumentException("Invalid row");
-        
+
         switch (columnIndex) {
             case COLUMN_NAME:
                 return _parameterData.get(rowIndex).getName();
             case COLUMN_INPUT_TYPE:
-                return _parameterData.get(rowIndex).getInitalValueType();
+                return _parameterData.get(rowIndex).getInitialValueType();
             case COLUMN_INPUT_DATA:
                 return _parameterData.get(rowIndex).getInitialValueData();
             case COLUMN_OUTPUT_TYPE:
@@ -150,7 +155,7 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
                 throw new IllegalArgumentException("Invalid column");
         }
     }
-    
+
     public void setColumnsForComboBoxes(JTable table) {
         JComboBox<InitialValueType> initValueComboBox = new JComboBox<>();
         JComboBox<ReturnValueType> returnValueComboBox = new JComboBox<>();
@@ -160,24 +165,24 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
         table.getColumnModel().getColumn(COLUMN_OUTPUT_TYPE)
                 .setPreferredWidth((returnValueComboBox.getPreferredSize().width) + 4);
     }
-    
+
     public void add() {
         int row = _parameterData.size();
         _parameterData.add(new ParameterData("", InitialValueType.None, "", ReturnValueType.None, ""));
         fireTableRowsInserted(row, row);
     }
-    
+
     public List<ParameterData> getParameters() {
         return _parameterData;
     }
-    
-    
+
+
     public static class TypeCellRenderer extends DefaultTableCellRenderer {
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
                 boolean isSelected, boolean hasFocus, int row, int column) {
-            
+
             if (column == COLUMN_INPUT_TYPE) {
                 if (value == null) value = InitialValueType.None;
 
@@ -194,106 +199,108 @@ public class CallModuleParameterTableModel extends AbstractTableModel {
                 }
                 setText(((ReturnValueType) value).getDescr());
             } else {
-                throw new RuntimeException("Unknown column: "+Integer.toString(column));
+                throw new JmriUncheckedException("Unknown column: "+Integer.toString(column));
             }
             return this;
         }
     }
-    
-    
+
+
     public static class InitialValueCellEditor extends AbstractCellEditor
             implements TableCellEditor, ActionListener {
 
         private InitialValueType _initialValueType;
-        
+
         @Override
         public Object getCellEditorValue() {
             return this._initialValueType;
         }
-        
+
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value,
                 boolean isSelected, int row, int column) {
-            
+
             if (value == null) value = InitialValueType.None;
-            
+
             if (! (value instanceof InitialValueType)) {
                 throw new IllegalArgumentException("value is not an InitialValueType: " + value.getClass().getName());
             }
-            
+
             JComboBox<InitialValueType> initialValueTypeComboBox = new JComboBox<>();
-            
+
             for (InitialValueType type : InitialValueType.values()) {
-                initialValueTypeComboBox.addItem(type);
+                if (type.isValidAsParameter() && type.isVisible()) {
+                    initialValueTypeComboBox.addItem(type);
+                }
             }
             JComboBoxUtil.setupComboBoxMaxRows(initialValueTypeComboBox);
-            
+
             initialValueTypeComboBox.setSelectedItem(value);
             initialValueTypeComboBox.addActionListener(this);
-            
+
             return initialValueTypeComboBox;
         }
-        
+
         @Override
         @SuppressWarnings("unchecked")  // Not possible to check that event.getSource() is instanceof JComboBox<InitialValueType>
         public void actionPerformed(ActionEvent event) {
-            if (! (event.getSource() instanceof JComboBox)) {
+            if (! (event.getSource() instanceof JComboBox<?>)) {
                 throw new IllegalArgumentException("value is not an JComboBox: " + event.getSource().getClass().getName());
             }
             JComboBox<InitialValueType> initialValueTypeComboBox =
                     (JComboBox<InitialValueType>) event.getSource();
             _initialValueType = initialValueTypeComboBox.getItemAt(initialValueTypeComboBox.getSelectedIndex());
-            
+
         }
-        
+
     }
-    
-    
+
+
     public static class ReturnValueCellEditor extends AbstractCellEditor
             implements TableCellEditor, ActionListener {
-        
+
         private ReturnValueType _returnValueType;
-        
+
         @Override
         public Object getCellEditorValue() {
             return this._returnValueType;
         }
-        
+
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value,
                 boolean isSelected, int row, int column) {
-            
+
             if (value == null) value = ReturnValueType.None;
-            
+
             if (! (value instanceof ReturnValueType)) {
                 throw new IllegalArgumentException("value is not an ReturnValueType: " + value.getClass().getName());
             }
-            
+
             JComboBox<ReturnValueType> returnValueTypeComboBox = new JComboBox<>();
-            
+
             for (ReturnValueType type : ReturnValueType.values()) {
                 returnValueTypeComboBox.addItem(type);
             }
             JComboBoxUtil.setupComboBoxMaxRows(returnValueTypeComboBox);
-            
+
             returnValueTypeComboBox.setSelectedItem(value);
             returnValueTypeComboBox.addActionListener(this);
-            
+
             return returnValueTypeComboBox;
         }
-        
+
         @Override
         @SuppressWarnings("unchecked")  // Not possible to check that event.getSource() is instanceof JComboBox<ReturnValueType>
         public void actionPerformed(ActionEvent event) {
-            if (! (event.getSource() instanceof JComboBox)) {
+            if (! (event.getSource() instanceof JComboBox<?>)) {
                 throw new IllegalArgumentException("value is not an JComboBox: " + event.getSource().getClass().getName());
             }
             JComboBox<ReturnValueType> returnValueTypeComboBox =
                     (JComboBox<ReturnValueType>) event.getSource();
             _returnValueType = returnValueTypeComboBox.getItemAt(returnValueTypeComboBox.getSelectedIndex());
-            
+
         }
-        
+
     }
-    
+
 }

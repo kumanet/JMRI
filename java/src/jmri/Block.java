@@ -7,17 +7,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import jmri.implementation.AbstractNamedBean;
 import jmri.implementation.SignalSpeedMap;
 import jmri.util.PhysicalLocation;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents a particular piece of track, more informally a "Block".
@@ -50,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * have listeners, etc.
  * <p>
  * The type letter used in the System Name is 'B' for 'Block'.
- * The default implementation is not system-specific, so a system letter 
+ * The default implementation is not system-specific, so a system letter
  * of 'I' is appropriate. This leads to system names like "IB201".
  * <p>
  * Issues:
@@ -77,6 +76,13 @@ import org.slf4j.LoggerFactory;
  * but the direction of this block (b2 in the example) is not updated.
  * In other words,
  * we're not noticing that the train must have reversed to go back out.
+ * <li> When a Block can't tell which of its occupied neighbours' trains
+ * entered it, a neighbour becoming unoccupied is taken as its train entering
+ * this Block, unless that train is known to have gone elsewhere: a Block
+ * beyond the neighbour became occupied after this one, or holds that train.
+ * If detection drops out as the train passes between the neighbour and the
+ * Block beyond, so that the neighbour reads empty before the Block beyond
+ * reads occupied, its train leaving is still taken as entering this Block.
  * </ul>
  * <p>
  * Do not assume that a Block object uniquely represents a piece of track.
@@ -113,9 +119,48 @@ import org.slf4j.LoggerFactory;
  * It is always stored here in millimeter units.
  * A length of 0.0 indicates no entry of length by the user.
  *
- * @author Bob Jacobsen Copyright (C) 2006, 2008, 2014
+ * <p><a href="doc-files/Block.png"><img src="doc-files/Block.png" alt="State diagram for train tracking" height="33%" width="33%"></a>
+ *
+ * @author Bob Jacobsen Copyright (C) 2006, 2008, 2014, 2026
  * @author Dave Duchamp Copywright (C) 2009
  */
+
+/*
+ * @startuml jmri/doc-files/Block.png
+ * hide empty description
+ * note as N1 #E0E0FF
+ *     State diagram for tracking through sequential blocks with train
+ *     direction information. "Left" and "Right" refer to blocks on either
+ *     side. There's one state machine associated with each block.
+ *     Assumes never more than one train in a block, e.g. due to signals.
+ * end note
+ *
+ * state Empty
+ *
+ * state "Train >>>" as TR
+ *
+ * state "<<< Train" as TL
+ *
+ * [*] --> Empty
+ *
+ * TR -up-> Empty : Goes Unoccupied
+ * Empty -down-> TR : Goes Occupied & Left >>>
+ * note on link #FFAAAA: Copy Train From Left
+ *
+ * Empty -down-> TL : Goes Occupied & Right <<<
+ * note on link #FFAAAA: Copy Train From Right
+ * TL -up-> Empty : Goes Unoccupied
+
+ * TL -right-> TR : Tracked train changes direction to >>>
+ * TR -left-> TL : Tracked train changes direction to <<<
+ *
+ * state "Intervention Required" as IR
+ * note bottom of IR #FFAAAA : Something else needs to set Train ID and Direction in Block
+ *
+ * Empty -right-> IR : Goes Occupied & ! (Left >>> | Right <<<)
+ * @enduml
+ */
+
 public class Block extends AbstractNamedBean implements PhysicalLocationReporter {
 
     /**
@@ -135,9 +180,9 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         super(systemName, userName);
     }
 
-    static final public int OCCUPIED = Sensor.ACTIVE;
-    static final public int UNOCCUPIED = Sensor.INACTIVE;
-    
+    public static final int OCCUPIED = Sensor.ACTIVE;
+    public static final int UNOCCUPIED = Sensor.INACTIVE;
+
     /**
      * Undetected status, i.e a "Dark" block.
      * A Block with unknown status could be waiting on feedback from a Sensor,
@@ -146,29 +191,29 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * OBlocks use this constant in combination with other OBlock status flags.
      * Block uses this constant as initial status, also when a Sensor is unset
      * from the block.
-     * 
+     *
      */
-    static final public int UNDETECTED = 0x100;  // bit coded, just in case; really should be enum
+    public static final int UNDETECTED = 0x100;  // bit coded, just in case; really should be enum
 
     /**
      * No Curvature.
      */
-    static final public int NONE = 0x00;
-    
+    public static final int NONE = 0x00;
+
     /**
      * Gradual Curvature.
      */
-    static final public int GRADUAL = 0x01;
-    
+    public static final int GRADUAL = 0x01;
+
     /**
      * Tight Curvature.
      */
-    static final public int TIGHT = 0x02;
-    
+    public static final int TIGHT = 0x02;
+
     /**
      * Severe Curvature.
      */
-    static final public int SEVERE = 0x04;
+    public static final int SEVERE = 0x04;
 
     /**
      * Create a Debug String,
@@ -176,35 +221,93 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @return Block User name, System name, current state as string value.
      */
     public String toDebugString() {
-        String result = getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME) + " ";
-        switch (getState()) {
-            case UNDETECTED: {
-                result += "UNDETECTED";
-                break;
-            }
-            case UNOCCUPIED: {
-                result += "UNOCCUPIED";
-                break;
-            }
-            case OCCUPIED: {
-                result += "OCCUPIED";
-                break;
-            }
-            default: {
-                result += "unknown " + getState();
-                break;
-            }
-        }
-        return result;
+        return getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME)
+            + " " + describeState(getState());
     }
-    
+
     /**
      * Property name change fired when a Sensor is set to / removed from a Block.
      * The fired event includes
      * old value: Sensor Bean Object if previously set, else null
      * new value: Sensor Bean Object if being set, may be null if Sensor removed.
      */
-    public final static String OCC_SENSOR_CHANGE = "OccupancySensorChange"; // NOI18N
+    public static final String OCC_SENSOR_CHANGE = "OccupancySensorChange"; // NOI18N
+
+    /**
+     * Property name change fired when a Sensor is set to / removed from a Block.
+     * The fired event includes
+     * old value: Sensor Bean Object if previously set, else null
+     * new value: Sensor Bean Object if being set, may be null if Sensor removed.
+     */
+    public static final String BLOCK_REPORTER_CHANGE = "BlockReporterChange"; // NOI18N
+
+    /**
+     * Property name change fired when the Block reporting Current flag changes.
+     * The fired event includes
+     * old value: previous value, Boolean.
+     * new value: new value, Boolean.
+     */
+    public static final String BLOCK_REPORTING_CURRENT = "BlockReportingCurrent"; // NOI18N
+
+    /**
+     * Property name change fired when the Block Permissive Status changes.
+     * The fired event includes
+     * old value: previous permissive status.
+     * new value: new permissive status.
+     */
+    public static final String BLOCK_PERMISSIVE_CHANGE = "BlockPermissiveWorking"; // NOI18N
+
+    /**
+     * Property name change fired when the Block ghost Status changes.
+     * The fired event includes
+     * old value: previous ghost status.
+     * new value: new ghost status.
+     */
+    public static final String GHOST_CHANGE = "BlockGhost"; // NOI18N
+
+    /**
+     * Property name change fired when the Block Speed changes.
+     * The fired event includes
+     * old value: previous speed String.
+     * new value: new speed String.
+     */
+    public static final String BLOCK_SPEED_CHANGE = "BlockSpeedChange"; // NOI18N
+
+    /**
+     * Property name change fired when the Block Curvature changes.
+     * The fired event includes
+     * old value: previous Block Curvature Constant.
+     * new value: new Block Curvature Constant.
+     */
+    public static final String BLOCK_CURVATURE_CHANGE = "BlockCurvatureChange"; // NOI18N
+
+    /**
+     * Property name change fired when the Block Length changes.
+     * The fired event includes
+     * old value: previous float length (mm).
+     * new value: new float length (mm).
+     */
+    public static final String BLOCK_LENGTH_CHANGE = "BlockLengthChange"; // NOI18N
+
+    /**
+     * String constant for property changes to value.
+     */
+    public static final String PROPERTY_VALUE = "value";
+
+    /**
+     * String constant for property changes to direction.
+     */
+    public static final String PROPERTY_DIRECTION = "direction";
+
+    /**
+     * String constant for property changes to allocated.
+     */
+    public static final String PROPERTY_ALLOCATED = "allocated";
+
+    /**
+     * String constant for property changes to the allocated value.
+     */
+    public static final String PROPERTY_ALLOCATED_VALUE = "allocatedValue";
 
     /**
      * Set the sensor by name.
@@ -214,7 +317,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      */
     public boolean setSensor(String pName) {
         Sensor oldSensor = getSensor();
-        if ((pName == null || pName.isEmpty())) {
+        if (pName == null || pName.isEmpty()) {
                 if (oldSensor!=null) {
                     setNamedSensor(null);
                     firePropertyChange(OCC_SENSOR_CHANGE, oldSensor, null);
@@ -227,7 +330,8 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                 if (sensor.equals(oldSensor)) {
                     return false;
                 }
-                setNamedSensor(InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle(pName, sensor));
+                setNamedSensor(InstanceManager.getDefault(
+                    NamedBeanHandleManager.class).getNamedBeanHandle(pName, sensor));
                 firePropertyChange(OCC_SENSOR_CHANGE, oldSensor, sensor);
                 return true;
             } catch (IllegalArgumentException ex) {
@@ -244,26 +348,25 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     /**
      * Set Block Occupancy Sensor.
      * If Sensor set, Adds PCL, sets Block Occupancy Status to Sensor.
-     * Block State PropertyChange Event will fire. 
+     * Block State PropertyChange Event will fire.
      * Does NOT route initial Sensor Status via goingUnknown() / goingActive() etc.
      * <p>
      * If Sensor null, removes PCL on previous Sensor, sets Block status to UNDETECTED.
      * @param s Handle for Sensor.
      */
-    public void setNamedSensor(NamedBeanHandle<Sensor> s) {
-        if (_namedSensor != null) {
-            if (_sensorListener != null) {
-                _namedSensor.getBean().removePropertyChangeListener(_sensorListener);
-                _sensorListener = null;
-            }
+    public void setNamedSensor(@CheckForNull NamedBeanHandle<Sensor> s) {
+        if ( _namedSensor != null && _sensorListener != null) {
+            _namedSensor.getBean().removePropertyChangeListener(_sensorListener);
+            _sensorListener = null;
         }
         _namedSensor = s;
 
         if (_namedSensor != null) {
-            _namedSensor.getBean().addPropertyChangeListener(_sensorListener = (PropertyChangeEvent e) -> {
-                handleSensorChange(e);
-            }, s.getName(), "Block Sensor " + getDisplayName());
-            setState(_namedSensor.getBean().getState()); // At present does NOT route via goingUnknown() / goingActive() etc.
+            _sensorListener = this::handleSensorChange;
+            _namedSensor.getBean().addPropertyChangeListener(_sensorListener,
+                _namedSensor.getName(), "Block Sensor " + getDisplayName());
+            setState(_namedSensor.getBean().getState());
+            // At present does NOT route via goingUnknown() / goingActive() etc.
         } else {
             setState(UNDETECTED); // Does NOT route via goingUnknown() / goingActive() etc.
         }
@@ -273,6 +376,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * Get the Block Occupancy Sensor.
      * @return Sensor if one attached to Block, may be null.
      */
+    @CheckForNull
     public Sensor getSensor() {
         if (_namedSensor != null) {
             return _namedSensor.getBean();
@@ -280,42 +384,30 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         return null;
     }
 
+    @CheckForNull
     public NamedBeanHandle<Sensor> getNamedSensor() {
         return _namedSensor;
     }
 
-    /**
-     * Property name change fired when a Sensor is set to / removed from a Block.
-     * The fired event includes
-     * old value: Sensor Bean Object if previously set, else null
-     * new value: Sensor Bean Object if being set, may be null if Sensor removed.
-     */
-    public final static String BLOCK_REPORTER_CHANGE = "BlockReporterChange"; // NOI18N
-    
     /**
      * Set the Reporter that should provide the data value for this block.
      * Fires propertyChange "BlockReporterChange" when changed.
      * @see Reporter
      * @param reporter Reporter object to link, or null to clear
      */
-    public void setReporter(Reporter reporter) {
+    public void setReporter(@CheckForNull Reporter reporter) {
         if (Objects.equals(reporter,_reporter)) {
             return;
         }
-        if (_reporter != null) {
-            // remove reporter listener
-            if (_reporterListener != null) {
-                _reporter.removePropertyChangeListener(_reporterListener);
-                _reporterListener = null;
-            }
+        if (_reporter != null && _reporterListener != null) {
+            _reporter.removePropertyChangeListener(_reporterListener);
+            _reporterListener = null;
         }
         Reporter oldReporter = _reporter;
         _reporter = reporter;
         if (_reporter != null) {
-            // attach listener
-            _reporter.addPropertyChangeListener(_reporterListener = (PropertyChangeEvent e) -> {
-                handleReporterChange(e);
-            });
+            _reporterListener = this::handleReporterChange;
+            _reporter.addPropertyChangeListener( _reporterListener );
         }
         firePropertyChange(BLOCK_REPORTER_CHANGE, oldReporter, reporter);
     }
@@ -326,17 +418,10 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @see Reporter
      * @return linked Reporter object, or null if not linked
      */
+    @CheckForNull
     public Reporter getReporter() {
         return _reporter;
     }
-    
-    /**
-     * Property name change fired when the Block reporting Current flag changes.
-     * The fired event includes
-     * old value: previous value, Boolean.
-     * new value: new value, Boolean.
-     */
-    public final static String BLOCK_REPORTING_CURRENT = "BlockReportingCurrent"; // NOI18N
 
     /**
      * Define if the Block's value should be populated from the
@@ -414,7 +499,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @return true if Block has the Path, else false.
      */
     public boolean hasPath(Path p) {
-        return paths.stream().anyMatch((t) -> (t.equals(p)));
+        return paths.stream().anyMatch( t -> t.equals(p) );
     }
 
     /**
@@ -433,6 +518,8 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      *
      * @param v the new state
      */
+    @SuppressWarnings("deprecation")    // The method getId() from the type Thread is deprecated since version 19
+                                        // The replacement Thread.threadId() isn't available before version 19
     @Override
     public void setState(int v) {
         int old = _current;
@@ -441,10 +528,11 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
 
         // It is rather unpleasant that the following needs to be done in a try-catch, but exceptions have been observed
         try {
-            firePropertyChange("state", old, _current);
+            firePropertyChange(PROPERTY_STATE, old, _current);
         } catch (Exception e) {
-            log.error("{} got exception during firePropertyChange({},{}) in thread {} {}: {}", getDisplayName(), old, _current,
-                    Thread.currentThread().getName(), Thread.currentThread().getId(), e);
+            log.error("{} got exception during firePropertyChange({},{}) in thread {} {}",
+                getDisplayName(), old, _current,
+                Thread.currentThread().getName(), Thread.currentThread().getId(), e);
         }
     }
 
@@ -464,7 +552,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
             log.debug("Block {} value changed from '{}' to '{}'", getDisplayName(), _value, value);
             _previousValue = _value;
             _value = value;
-            firePropertyChange("value", _previousValue, _value); // NOI18N
+            firePropertyChange(PROPERTY_VALUE, _previousValue, _value); // NOI18N
         }
     }
 
@@ -472,8 +560,56 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * Get the Block Contents Value.
      * @return object with current value, could be null.
      */
+    @CheckForNull
     public Object getValue() {
         return _value;
+    }
+
+    private Object _allocatedValue = null;
+
+    /**
+     * Set the value that identifies the train this Block is allocated to, for
+     * example by Dispatcher. Unlike {@link #setValue(Object)}, which records
+     * the train in this Block, this records the train the Block is held for,
+     * which may not have reached it yet or may have left it. Block tracking
+     * does not use it.
+     * <p>
+     * Fires propertyChange "allocatedValue" when changed.
+     *
+     * @param value the train name, roster entry or other value; null when the
+     *              Block is no longer allocated
+     */
+    public void setAllocatedValue(@CheckForNull Object value) {
+        Object old = _allocatedValue;
+        if (Objects.equals(old, value)) {
+            return;
+        }
+        _allocatedValue = value;
+        firePropertyChange(PROPERTY_ALLOCATED_VALUE, old, value);
+    }
+
+    /**
+     * Get the value that identifies the train this Block is allocated to.
+     *
+     * @return the value, or null if the Block is not allocated or no value was
+     *         given
+     * @see #setAllocatedValue(Object)
+     */
+    @CheckForNull
+    public Object getAllocatedValue() {
+        return _allocatedValue;
+    }
+
+    /**
+     * Get the value to show for this Block on a panel: the train in it if
+     * known, otherwise the train it is allocated to.
+     *
+     * @return {@link #getValue()} if not null, else
+     *         {@link #getAllocatedValue()}
+     */
+    @CheckForNull
+    public Object getDisplayValue() {
+        return _value != null ? _value : _allocatedValue;
     }
 
     /**
@@ -484,11 +620,12 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     public void setDirection(int direction) {
         //ignore if unchanged
         if (direction != _direction) {
-            log.debug("Block {} direction changed from {} to {}", getDisplayName(), Path.decodeDirection(_direction), Path.decodeDirection(direction));
+            log.debug("Block {} direction changed from {} to {}", getDisplayName(),
+                Path.decodeDirection(_direction), Path.decodeDirection(direction));
             int oldDirection = _direction;
             _direction = direction;
             // this is a bound parameter
-            firePropertyChange("direction", oldDirection, direction); // NOI18N
+            firePropertyChange(PROPERTY_DIRECTION, oldDirection, direction); // NOI18N
         }
     }
 
@@ -505,7 +642,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
 
     /**
      * Add to the Block Deny List.
-     * 
+     *
      * The block deny list, is used by higher level code, to determine if
      * traffic/trains should be allowed to enter from an attached block, the
      * list only deals with blocks that access should be denied from.
@@ -520,14 +657,16 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         if (blk == null) {
             throw new IllegalArgumentException("addBlockDenyList requests block \"" + pName + "\" exists");
         }
-        NamedBeanHandle<Block> namedBlock = InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle(pName, blk);
+        NamedBeanHandle<Block> namedBlock = InstanceManager.getDefault(
+            NamedBeanHandleManager.class).getNamedBeanHandle(pName, blk);
         if (!blockDenyList.contains(namedBlock)) {
             blockDenyList.add(namedBlock);
         }
     }
 
-    public void addBlockDenyList(Block blk) {
-        NamedBeanHandle<Block> namedBlock = InstanceManager.getDefault(NamedBeanHandleManager.class).getNamedBeanHandle(blk.getDisplayName(), blk);
+    public void addBlockDenyList(@Nonnull Block blk) {
+        NamedBeanHandle<Block> namedBlock = InstanceManager.getDefault(
+            NamedBeanHandleManager.class).getNamedBeanHandle(blk.getDisplayName(), blk);
         if (!blockDenyList.contains(namedBlock)) {
             blockDenyList.add(namedBlock);
         }
@@ -559,18 +698,16 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
 
     public List<String> getDeniedBlocks() {
         List<String> list = new ArrayList<>(blockDenyList.size());
-        blockDenyList.forEach((bean) -> {
-            list.add(bean.getName());
-        });
+        blockDenyList.forEach( bean -> list.add(bean.getName()) );
         return list;
     }
 
     public boolean isBlockDenied(String deny) {
-        return blockDenyList.stream().anyMatch((bean) -> (bean.getName().equals(deny)));
+        return blockDenyList.stream().anyMatch( bean -> bean.getName().equals(deny));
     }
 
     public boolean isBlockDenied(Block deny) {
-        return blockDenyList.stream().anyMatch((bean) -> (bean.getBean() == deny));
+        return blockDenyList.stream().anyMatch( bean -> bean.getBean() == deny);
     }
 
     /**
@@ -583,14 +720,6 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     }
 
     /**
-     * Property name change fired when the Block Permissive Status changes.
-     * The fired event includes
-     * old value: previous permissive status.
-     * new value: new permissive status.
-     */
-    public final static String BLOCK_PERMISSIVE_CHANGE = "BlockPermissiveWorking"; // NOI18N
-    
-    /**
      * Set Block as permissive.
      * Fires propertyChange "BlockPermissiveWorking" when changed.
      * @param w true permissive, false NOT permissive
@@ -601,15 +730,38 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
             firePropertyChange(BLOCK_PERMISSIVE_CHANGE, !w, w); // NOI18N
         }
     }
-    
+
     private boolean _permissiveWorking = false;
+
+    /**
+     * Get if Block is a ghost.
+     * Blocks default to non-ghost, i.e. false.
+     * @return true if ghost, else false.
+     */
+    public boolean getIsGhost() {
+        return _ghost;
+    }
+
+    /**
+     * Set if the block is a ghost
+     * Fires propertyChange "BlockGhost" when changed.
+     * @param w true ghost, false NOT ghost
+     */
+    public void setIsGhost(boolean w) {
+        if (_ghost != w) {
+            _ghost = w;
+            firePropertyChange(GHOST_CHANGE, !w, w); // NOI18N
+        }
+    }
+
+    private boolean _ghost = false;
 
     public float getSpeedLimit() {
         if ((_blockSpeed == null) || (_blockSpeed.isEmpty())) {
             return -1;
         }
         String speed = _blockSpeed;
-        if (_blockSpeed.equals("Global")) {
+        if ( "Global".equals( _blockSpeed)) {
             speed = InstanceManager.getDefault(BlockManager.class).getDefaultSpeed();
         }
 
@@ -628,21 +780,14 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     private String _blockSpeed = "";
 
     public String getBlockSpeed() {
-        if (_blockSpeed.equals("Global")) {
-            return (Bundle.getMessage("UseGlobal", "Global") + " " + InstanceManager.getDefault(BlockManager.class).getDefaultSpeed());
+        if ( "Global".equals( _blockSpeed)) {
+            return (Bundle.getMessage("UseGlobal", "Global") + " "
+                + InstanceManager.getDefault(BlockManager.class).getDefaultSpeed());
             // Ensure the word "Global" is always in the speed name for later comparison
         }
         return _blockSpeed;
     }
 
-    /**
-     * Property name change fired when the Block Speed changes.
-     * The fired event includes
-     * old value: previous speed String.
-     * new value: new speed String.
-     */
-    public final static String BLOCK_SPEED_CHANGE = "BlockSpeedChange"; // NOI18N
-    
     /**
      * Set the Block Speed Name.
      * <p>
@@ -665,36 +810,30 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @param s Speed String
      * @throws JmriException if Value of requested block speed is not valid.
      */
-    public void setBlockSpeed(String s) throws JmriException {
+    public void setBlockSpeed(final String s) throws JmriException {
         if ((s == null) || (_blockSpeed.equals(s))) {
             return;
         }
+        String newSpeed = s;
         if (s.contains("Global")) {
-            s = "Global";
+            newSpeed = "Global";
         } else {
             try {
-                Float.parseFloat(s);
+                Float.valueOf(s);
             } catch (NumberFormatException nx) {
                 try {
                     InstanceManager.getDefault(SignalSpeedMap.class).getSpeed(s);
                 } catch (IllegalArgumentException ex) {
-                    throw new JmriException("Value of requested block speed is not valid");
+                    throw new JmriException("Block \"" + getDisplayName()
+                        + "\" requested speed value \"" + s + "\" invalid.");
                 }
             }
         }
         String oldSpeed = _blockSpeed;
-        _blockSpeed = s;
+        _blockSpeed = newSpeed;
         firePropertyChange(BLOCK_SPEED_CHANGE, oldSpeed, s);
     }
 
-    /**
-     * Property name change fired when the Block Curvature changes.
-     * The fired event includes
-     * old value: previous Block Curvature Constant.
-     * new value: new Block Curvature Constant.
-     */
-    public final static String BLOCK_CURVATURE_CHANGE = "BlockCurvatureChange"; // NOI18N
-    
     /**
      * Set Block Curvature Constant.
      * Valid values :
@@ -718,14 +857,6 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     public int getCurvature() {
         return _curvature;
     }
-    
-    /**
-     * Property name change fired when the Block Length changes.
-     * The fired event includes
-     * old value: previous float length (mm).
-     * new value: new float length (mm).
-     */
-    public final static String BLOCK_LENGTH_CHANGE = "BlockLengthChange"; // NOI18N
 
     /**
      * Set length in millimeters.
@@ -777,6 +908,308 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     }
 
     /**
+     * The name of the property change fired when a route length through this
+     * Block is set or cleared. Each length is stored as a bean property whose
+     * key starts with {@link #ROUTE_LENGTH_KEY}, so it is saved in the panel
+     * file with the Block's other properties, and kept by versions of JMRI
+     * that don't know it.
+     *
+     * @since 5.19.1
+     */
+    public static final String PROPERTY_ROUTE_LENGTHS = "RouteLengths"; // NOI18N
+
+    /**
+     * The start of the key of the bean property that stores the length of one
+     * way through this Block; the rest names its two neighbours.
+     *
+     * @since 5.19.1
+     */
+    public static final String ROUTE_LENGTH_KEY = "RouteLength:"; // NOI18N
+
+    /**
+     * The name of the property change fired when this Block is made, or is no
+     * longer, a braking section for trains leaving towards a neighbour. Each
+     * is stored as a bean property whose key starts with
+     * {@link #BRAKING_KEY}.
+     *
+     * @since 5.19.1
+     */
+    public static final String PROPERTY_BRAKING = "BrakingSection"; // NOI18N
+
+    /**
+     * The start of the key of the bean property that marks this Block as a
+     * braking section for trains leaving towards one neighbour; the rest names
+     * the neighbour.
+     *
+     * @since 5.19.1
+     */
+    public static final String BRAKING_KEY = "BrakingTowards:"; // NOI18N
+
+    /**
+     * A way through a Block, between two of its neighbouring Blocks. A way is
+     * the same whichever way it is travelled, so the way from A to B equals
+     * the way from B to A.
+     *
+     * @since 5.19.1
+     */
+    @javax.annotation.concurrent.Immutable
+    public static final class WayThrough {
+
+        private final Block one;
+        private final Block other;
+
+        /**
+         * @param one   a neighbouring Block at one end
+         * @param other a neighbouring Block at the other end
+         * @throws IllegalArgumentException if they are the same Block
+         */
+        public WayThrough(@Nonnull Block one, @Nonnull Block other) {
+            if (one == other) {
+                throw new IllegalArgumentException("a way through joins two different Blocks");
+            }
+            // in system name order, so that equal ways are built alike
+            boolean inOrder = one.getSystemName().compareTo(other.getSystemName()) <= 0;
+            this.one = inOrder ? one : other;
+            this.other = inOrder ? other : one;
+        }
+
+        /**
+         * @return the neighbour at one end, the first of the two by system
+         *         name
+         */
+        @Nonnull
+        public Block getOneEnd() {
+            return one;
+        }
+
+        /**
+         * @return the neighbour at the other end
+         */
+        @Nonnull
+        public Block getOtherEnd() {
+            return other;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof WayThrough)) {
+                return false;
+            }
+            WayThrough w = (WayThrough) o;
+            return one == w.one && other == w.other;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(one.getSystemName(), other.getSystemName());
+        }
+
+        @Override
+        public String toString() {
+            return one.getDisplayName() + " - " + other.getDisplayName();
+        }
+    }
+
+    /**
+     * The ways through this Block, from its paths: each pair of neighbouring
+     * Blocks whose paths can be set at once. Two neighbours reached only by
+     * setting one turnout both ways, as the two legs of a turnout are, are
+     * not a way through.
+     *
+     * @return the ways, in system name order of their ends; empty if the
+     *         Block has fewer than two neighbours
+     * @since 5.19.1
+     */
+    @Nonnull
+    public List<WayThrough> getWaysThrough() {
+        List<Path> list = getPaths();
+        java.util.Set<WayThrough> ways = new java.util.TreeSet<>(
+                java.util.Comparator.comparing((WayThrough w) -> w.getOneEnd().getSystemName())
+                        .thenComparing(w -> w.getOtherEnd().getSystemName()));
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                Block a = list.get(i).getBlock();
+                Block b = list.get(j).getBlock();
+                if (a != null && b != null && a != b && a != this && b != this
+                        && settable(list.get(i), list.get(j))) {
+                    ways.add(new WayThrough(a, b));
+                }
+            }
+        }
+        return new ArrayList<>(ways);
+    }
+
+    /**
+     * @return true if no bean is set one way for one path and another way
+     *         for the other
+     */
+    private static boolean settable(Path p, Path q) {
+        for (BeanSetting s : p.getSettings()) {
+            for (BeanSetting t : q.getSettings()) {
+                if (s.getBean() == t.getBean() && s.getSetting() != t.getSetting()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get the length of a way through this Block.
+     *
+     * @param from the neighbour at one end
+     * @param to   the neighbour at the other end
+     * @return the length set for the way, mm, or this Block's length if none
+     *         has been set
+     * @since 5.19.1
+     */
+    public float getRouteLengthMm(@Nonnull Block from, @Nonnull Block to) {
+        Float set = routeLengthSet(new WayThrough(from, to));
+        return set == null ? getLengthMm() : set;
+    }
+
+    /**
+     * @param from the neighbour at one end
+     * @param to   the neighbour at the other end
+     * @return true if a length has been set for the way through this Block
+     *         between them
+     * @since 5.19.1
+     */
+    public boolean hasRouteLength(@Nonnull Block from, @Nonnull Block to) {
+        return routeLengthSet(new WayThrough(from, to)) != null;
+    }
+
+    /**
+     * Set the length of a way through this Block, for a way whose length
+     * differs from the Block's own. Fires a property change named
+     * {@link #PROPERTY_ROUTE_LENGTHS}, with the way as its old value and the
+     * new length (or null) as its new value, when the length changes.
+     *
+     * @param from the neighbour at one end
+     * @param to   the neighbour at the other end
+     * @param mm   the length, mm, more than 0
+     * @throws IllegalArgumentException if the length isn't more than 0
+     * @see #clearRouteLength(Block, Block)
+     * @since 5.19.1
+     */
+    public void setRouteLengthMm(@Nonnull Block from, @Nonnull Block to, float mm) {
+        if (!(mm > 0) || Float.isInfinite(mm)) {
+            throw new IllegalArgumentException("a route length must be more than 0: " + mm);
+        }
+        changeRouteLength(new WayThrough(from, to), mm);
+    }
+
+    /**
+     * Clear the length of a way through this Block, so that the Block's own
+     * length is used for it. Fires a property change named
+     * {@link #PROPERTY_ROUTE_LENGTHS}, with the way as its old value and null
+     * as its new value, if a length was set.
+     *
+     * @param from the neighbour at one end
+     * @param to   the neighbour at the other end
+     * @since 5.19.1
+     */
+    public void clearRouteLength(@Nonnull Block from, @Nonnull Block to) {
+        changeRouteLength(new WayThrough(from, to), null);
+    }
+
+    private void changeRouteLength(WayThrough way, @CheckForNull Float now) {
+        Float old = routeLengthSet(way);
+        if (Objects.equals(old, now)) {
+            return;
+        }
+        if (now == null) {
+            removeProperty(routeLengthKey(way));
+        } else {
+            setProperty(routeLengthKey(way), now);
+        }
+        firePropertyChange(PROPERTY_ROUTE_LENGTHS, way, now);
+    }
+
+    private static String routeLengthKey(WayThrough way) {
+        return ROUTE_LENGTH_KEY + keyName(way.getOneEnd()) + "|" + keyName(way.getOtherEnd());
+    }
+
+    /**
+     * @return the length set for a way, mm, or null if none
+     */
+    @CheckForNull
+    private Float routeLengthSet(WayThrough way) {
+        Object v = getProperty(routeLengthKey(way));
+        if (v == null) {
+            return null;
+        }
+        try {
+            float f = Float.parseFloat(v.toString());
+            return f > 0 ? f : null;
+        } catch (NumberFormatException e) {
+            return null; // not a length: as if none were set
+        }
+    }
+
+    /**
+     * Get whether this Block is a braking section for trains leaving it
+     * towards a neighbour: a stretch, such as one with Automatic Brake
+     * Control or a cut-out, where the track itself brings trains to a stand
+     * before the Block beyond. Nothing in JMRI acts on it by itself; features
+     * that work out where a train will stop can use it.
+     *
+     * @param towards the neighbour trains leave towards
+     * @return true if it is a braking section for trains leaving towards it
+     * @since 5.19.1
+     */
+    public boolean isBrakingTowards(@Nonnull Block towards) {
+        return getProperty(BRAKING_KEY + keyName(towards)) != null;
+    }
+
+    /**
+     * Make this Block a braking section for trains leaving it towards a
+     * neighbour, or not. Fires a property change named
+     * {@link #PROPERTY_BRAKING}, with the neighbour as its old value and the
+     * setting as its new value, when the setting changes.
+     *
+     * @param towards the neighbour trains leave towards
+     * @param braking true if it is a braking section for them
+     * @since 5.19.1
+     */
+    public void setBrakingTowards(@Nonnull Block towards, boolean braking) {
+        if (isBrakingTowards(towards) == braking) {
+            return;
+        }
+        if (braking) {
+            setProperty(BRAKING_KEY + keyName(towards), Boolean.TRUE);
+        } else {
+            removeProperty(BRAKING_KEY + keyName(towards));
+        }
+        firePropertyChange(PROPERTY_BRAKING, towards, braking);
+    }
+
+    /**
+     * @return the neighbouring Blocks, by this Block's paths, towards which
+     *         it is a braking section
+     * @since 5.19.1
+     */
+    @Nonnull
+    public List<Block> getBrakingTowards() {
+        List<Block> list = new ArrayList<>();
+        for (Path p : getPaths()) {
+            Block b = p.getBlock();
+            if (b != null && !list.contains(b) && isBrakingTowards(b)) {
+                list.add(b);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * A Block's system name as part of a property key: encoded, so that no
+     * character in it can be taken for the key's separators.
+     */
+    private static String keyName(Block b) {
+        return java.net.URLEncoder.encode(b.getSystemName(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /**
      * Note: this has to make choices about identity values (always the same)
      * and operation values (can change as the block works). Might be missing
      * some identity values.
@@ -790,7 +1223,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
             return false;
         }
 
-        if (!(getClass() == obj.getClass())) {
+        if ( getClass() != obj.getClass() ) {
             return false;
         } else {
             Block b = (Block) obj;
@@ -806,7 +1239,6 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
 
     // internal data members
     private int _current = UNDETECTED; // state until sensor is set
-    //private Sensor _sensor = null;
     private NamedBeanHandle<Sensor> _namedSensor = null;
     private PropertyChangeListener _sensorListener = null;
     private Object _value;
@@ -826,19 +1258,210 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         cntOfPossibleEntrancePaths = 0;
     }
 
+    /**
+     * Get the paths through which a train could have entered this Block: those
+     * to an occupied neighbour along a set path. If Block directions are used,
+     * only neighbours whose direction leads into this Block are taken.
+     *
+     * @param pList    the paths of this Block
+     * @param isSet    whether each path is set
+     * @param isActive whether the Block at the end of each path is occupied
+     * @param pDir     the direction of the Block at the end of each path
+     * @param pFromDir the direction from the Block at the end of each path
+     * @return the paths a train could have entered by
+     */
+    private List<Path> possibleEntrancePaths(Path[] pList, boolean[] isSet, boolean[] isActive,
+            int[] pDir, int[] pFromDir) {
+        List<Path> entrants = new ArrayList<>();
+        List<Path> occupied = new ArrayList<>();
+        for (int i = 0; i < pList.length; i++) {
+            if (isSet[i] && isActive[i]) {
+                occupied.add(pList[i]);
+                // bitwise comparison supports combination directions such as "North, West"
+                if ((pDir[i] & pFromDir[i]) > 0) {
+                    entrants.add(pList[i]);
+                }
+            }
+        }
+        // without matching directions, for example when directions are not used, any occupied neighbour
+        return entrants.isEmpty() ? occupied : entrants;
+    }
+
+    /**
+     * Set the value of this Block when a train may have entered from more than
+     * one neighbour.
+     * <p>
+     * If only one neighbour could have entered, its value is taken. Otherwise
+     * every possible entrant is remembered until a later event shows which
+     * train entered, see {@link #setAsEntryBlockIfPossible(Block)}. Until
+     * then, if all the entrants holding a value hold the same one, this Block
+     * takes it, since it is the only train known to be there. If none of them
+     * holds a value, this Block's value is cleared, and if they hold different
+     * values it is left as it is.
+     *
+     * @param entrants the paths a train could have entered by
+     */
+    private void takeValueFromPossibleEntrants(List<Path> entrants) {
+        if (entrants.size() == 1) {
+            takeValueFrom(entrants.get(0));
+            return;
+        }
+        if (!takeAgreedValue(entrants)) {
+            log.warn("count of {} ACTIVE neighbors with proper direction can't be handled for"
+                + " block {} but maybe it can be determined when another block becomes free",
+                entrants.size(), getDisplayName());
+        }
+        rememberPossibleEntrants(entrants);
+    }
+
+    /**
+     * Take the value that all the possible entrants holding a value agree on.
+     * If none of them holds a value, this Block's value is cleared.
+     *
+     * @param entrants the paths a train could have entered by
+     * @return false if the entrants hold different values, so that this
+     *         Block's value was left as it is
+     */
+    private boolean takeAgreedValue(List<Path> entrants) {
+        Path identified = null;
+        for (Path p : entrants) {
+            Object value = p.getBlock().getValue();
+            if (value == null) {
+                continue;
+            }
+            if (identified == null) {
+                identified = p;
+            } else if (!value.equals(identified.getBlock().getValue())) {
+                return false;
+            }
+        }
+        if (identified == null) {
+            // no train is known to be there
+            setValue(null);
+        } else {
+            takeValueFrom(identified);
+        }
+        return true;
+    }
+
+    private void rememberPossibleEntrants(List<Path> entrants) {
+        pListOfPossibleEntrancePaths = entrants.toArray(new Path[0]);
+        cntOfPossibleEntrancePaths = pListOfPossibleEntrancePaths.length;
+    }
+
+    private void takeValueFrom(Path from) {
+        setValue(from.getBlock().getValue());
+        setDirection(from.getFromBlockDirection());
+        log.debug("Block {} gets new value '{}' from {}, direction {}",
+                getDisplayName(), getValue(), from.getBlock().getDisplayName(), Path.decodeDirection(getDirection()));
+    }
+
+    /**
+     * Settle which train entered this Block, now that a neighbour has become
+     * unoccupied, if this Block could not decide between its occupied
+     * neighbours when it became occupied and that neighbour was one of them.
+     * <p>
+     * A neighbour becoming unoccupied is either its train arriving here or its
+     * train leaving the other way. If its train is known to have gone
+     * elsewhere (see {@code trainLeftAwayFrom(Block)}), it did not enter this
+     * Block and is no longer a possible entrant; if only one possible entrant
+     * is then left, that is the train that entered. Otherwise its train is
+     * taken to have entered this Block, and this Block takes its value.
+     * <p>
+     * Nothing is taken unless this Block is still occupied.
+     *
+     * @param b the neighbour Block that has become unoccupied
+     * @return true if the value of b was taken
+     */
     boolean setAsEntryBlockIfPossible(Block b) {
+        if (getState() != OCCUPIED) {
+            // this Block has been emptied since, the train that entered it has gone
+            resetCandidateEntrancePaths();
+            return false;
+        }
         for (int i = 0; i < cntOfPossibleEntrancePaths; i++) {
-            Block CandidateBlock = pListOfPossibleEntrancePaths[i].getBlock();
-            if (CandidateBlock == b) {
-                setValue(CandidateBlock.getValue());
-                setDirection(pListOfPossibleEntrancePaths[i].getFromBlockDirection());
-                log.info("Block {} gets LATE new value from {}, direction= {}", getDisplayName(), CandidateBlock.getDisplayName(), Path.decodeDirection(getDirection()));
-                resetCandidateEntrancePaths();
+            Path entrant = pListOfPossibleEntrancePaths[i];
+            if (entrant.getBlock() != b) {
+                continue;
+            }
+            if (b.trainLeftAwayFrom(this)) {
+                log.debug("Block {}: the train in {} left the other way, so it did not enter",
+                    getDisplayName(), b.getDisplayName());
+                rulePossibleEntrantOut(i);
+                return false;
+            }
+            takeLateValueFrom(entrant);
+            resetCandidateEntrancePaths();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Whether the train in this Block, which is becoming unoccupied, is known
+     * to have gone somewhere other than the given Block. That is so when a
+     * Block reached from this one along a set path is occupied and either
+     * became occupied after the given Block did, or holds this Block's train.
+     *
+     * @param entered the Block the train may instead have entered
+     * @return true if the train is known to have gone elsewhere
+     */
+    private boolean trainLeftAwayFrom(Block entered) {
+        Object train = getValue();
+        for (Path p : paths) {
+            Block other = p.getBlock();
+            if (other == null || other == entered || other.getState() != OCCUPIED || !p.checkPathSet()) {
+                continue;
+            }
+            if (other.occupiedOrder > entered.occupiedOrder
+                    || (train != null && train.equals(other.getValue()))) {
                 return true;
             }
         }
         return false;
     }
+
+    /**
+     * Rule out a possible entrant whose train is known not to have entered.
+     * If only one is left, it is the train that entered; otherwise the others
+     * are kept, and this Block takes the value they agree on, if any.
+     *
+     * @param index the index of the entrant in the list of possible entrants
+     */
+    private void rulePossibleEntrantOut(int index) {
+        List<Path> remaining = new ArrayList<>();
+        for (int i = 0; i < cntOfPossibleEntrancePaths; i++) {
+            if (i != index) {
+                remaining.add(pListOfPossibleEntrancePaths[i]);
+            }
+        }
+        if (remaining.size() == 1) {
+            takeLateValueFrom(remaining.get(0));
+            resetCandidateEntrancePaths();
+        } else {
+            takeAgreedValue(remaining);
+            rememberPossibleEntrants(remaining);
+        }
+    }
+
+    private void takeLateValueFrom(Path entrant) {
+        if (!Objects.equals(entrant.getBlock().getValue(), getValue())) {
+            log.info("Block {} gets LATE new value from {}, direction= {}",
+                getDisplayName(), entrant.getBlock().getDisplayName(),
+                Path.decodeDirection(entrant.getFromBlockDirection()));
+        }
+        setValue(entrant.getBlock().getValue());
+        setDirection(entrant.getFromBlockDirection());
+    }
+
+    /**
+     * Counts Blocks becoming occupied, so that the order in which two Blocks
+     * became occupied can be told without comparing times.
+     */
+    private static final AtomicLong OCCUPIED_COUNT = new AtomicLong();
+
+    /** The value of {@link #OCCUPIED_COUNT} when this Block last became occupied. */
+    private long occupiedOrder;
 
     /**
      * Handle change in sensor state.
@@ -849,7 +1472,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      */
     void handleSensorChange(PropertyChangeEvent e) {
         Sensor s = getSensor();
-        if (e.getPropertyName().equals("KnownState") && s!=null) {
+        if ( Sensor.PROPERTY_KNOWN_STATE.equals( e.getPropertyName()) && s != null ) {
             int state = s.getState();
             switch (state) {
                 case Sensor.ACTIVE:
@@ -868,14 +1491,29 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         }
     }
 
+    /**
+     * Handles Block sensor going UNKNOWN: the value is cleared.
+     * <p>
+     * The time is recorded as for a Block going unoccupied, so that the value
+     * is restored if the sensor goes active again within a short time, for
+     * example after a brief loss of the connection.
+     */
     public void goingUnknown() {
         setValue(null);
         setState(UNKNOWN);
+        _timeLastInactive = Instant.now();
     }
 
+    /**
+     * Handles Block sensor going INCONSISTENT: the value is cleared.
+     * <p>
+     * The time is recorded as for a Block going unoccupied, so that the value
+     * is restored if the sensor goes active again within a short time.
+     */
     public void goingInconsistent() {
         setValue(null);
         setState(INCONSISTENT);
+        _timeLastInactive = Instant.now();
     }
 
     /**
@@ -884,14 +1522,14 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @param e PropertyChangeEvent
      */
     void handleReporterChange(PropertyChangeEvent e) {
-        if ((_reportingCurrent && e.getPropertyName().equals("currentReport"))
-                || (!_reportingCurrent && e.getPropertyName().equals("lastReport"))) {
+        if ((_reportingCurrent && Reporter.PROPERTY_CURRENT_REPORT.equals(e.getPropertyName()))
+            || (!_reportingCurrent && Reporter.PROPERTY_LAST_REPORT.equals(e.getPropertyName()))) {
             setValue(e.getNewValue());
         }
     }
 
     private Instant _timeLastInactive;
-    
+
     /**
      * Handles Block sensor going INACTIVE: this block is empty
      */
@@ -903,13 +1541,15 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                 b.setAsEntryBlockIfPossible(this);
             }
         }
+        // the train that could not be identified when it entered has left
+        resetCandidateEntrancePaths();
         setValue(null);
         setDirection(Path.NONE);
         setState(UNOCCUPIED);
         _timeLastInactive = Instant.now();
     }
 
-    private final int maxInfoMessages = 5;
+    private static final int MAXINFOMESSAGES = 5;
     private int infoMessageCount = 0;
 
     /**
@@ -921,6 +1561,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
             return;
         }
         log.debug("Block {} goes OCCUPIED", getDisplayName());
+        occupiedOrder = OCCUPIED_COUNT.incrementAndGet();
         resetCandidateEntrancePaths();
         // index through the paths, counting
         int count = 0;
@@ -957,23 +1598,31 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                     // 1. the block has been 'unoccupied' only very briefly
                     // 2. power has just come back on
                     Instant tn = Instant.now();
-                    BlockManager bm = jmri.InstanceManager.getDefault(jmri.BlockManager.class);
-                    if (bm.timeSinceLastLayoutPowerOn() < 5000 || (_timeLastInactive != null && tn.toEpochMilli() - _timeLastInactive.toEpochMilli() < 2000)) {
+                    BlockManager bm = InstanceManager.getDefault(BlockManager.class);
+                    if ( bm.timeSinceLastLayoutPowerOn() < 5000 ||
+                        (_timeLastInactive != null && tn.toEpochMilli() - _timeLastInactive.toEpochMilli() < 2000)) {
                         setValue(_previousValue);
-                        if (infoMessageCount < maxInfoMessages) {
-                            log.debug("Sensor ACTIVE came out of nowhere, no neighbors active for block {}. Restoring previous value.", getDisplayName());
+                        if (infoMessageCount < MAXINFOMESSAGES) {
+                            log.debug("Sensor ACTIVE came out of nowhere, no neighbors active for block {}."
+                                +" Restoring previous value.", getDisplayName());
                             infoMessageCount++;
                         }
                     } else if (log.isDebugEnabled()) {
                         if (null != _timeLastInactive) {
-                            log.debug("not restoring previous value, block {} has been inactive for too long ({}ms) and layout power has not just been restored ({}ms ago)", getDisplayName(), tn.toEpochMilli() - _timeLastInactive.toEpochMilli(), bm.timeSinceLastLayoutPowerOn());
+                            log.debug("not restoring previous value, block {} has been inactive for too long ({}ms)"
+                                + " and layout power has not just been restored ({}ms ago)",
+                                getDisplayName(), tn.toEpochMilli() - _timeLastInactive.toEpochMilli(),
+                                bm.timeSinceLastLayoutPowerOn());
                         } else {
-                            log.debug("not restoring previous value, block {} has been inactive since the start of this session and layout power has not just been restored ({}ms ago)", getDisplayName(), bm.timeSinceLastLayoutPowerOn());
+                            log.debug("not restoring previous value, block {} has been inactive since the "
+                                + "start of this session and layout power has not just been restored ({}ms ago)",
+                                getDisplayName(), bm.timeSinceLastLayoutPowerOn());
                         }
                     }
                 } else {
-                    if (infoMessageCount < maxInfoMessages) {
-                        log.debug("Sensor ACTIVE came out of nowhere, no neighbors active for block {}. Value not set.", getDisplayName());
+                    if (infoMessageCount < MAXINFOMESSAGES) {
+                        log.debug("Sensor ACTIVE came out of nowhere, no neighbors active for block {}. Value not set.",
+                            getDisplayName());
                         infoMessageCount++;
                     }
                 }
@@ -996,49 +1645,9 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                 }
                 break;
             default:
-                // count > 1, check for one with proper direction
-                // this time, count ones with proper direction
+                // More than one occupied neighbour could hold the train that entered
                 log.debug("Block {} has {} active linked blocks, comparing directions", getDisplayName(), count);
-                next = null;
-                count = 0;
-                for (int i = 0; i < currPathCnt; i++) {
-                    if (isSet[i] && isActive[i]) {  //only consider active reachable blocks
-                        log.debug("comparing {} ({}) to {} ({})",
-                                pList[i].getBlock().getDisplayName(), Path.decodeDirection(pDir[i]),
-                                getDisplayName(), Path.decodeDirection(pFromDir[i]));
-                        if ((pDir[i] & pFromDir[i]) > 0) { //use bitwise comparison to support combination directions such as "North, West"
-                            count++;
-                            next = pList[i];
-                        }
-                    }
-                }
-                if (next == null) {
-                    for (int i = 0; i < currPathCnt; i++) {
-                        if (isSet[i] && isActive[i]) {
-                            count++;
-                            next = pList[i];
-                        }
-                    }
-                }
-                if (next != null && count == 1) {
-                    // found one block with proper direction, use it
-                    setValue(next.getBlock().getValue());
-                    setDirection(next.getFromBlockDirection());
-                    log.debug("Block {} gets new value '{}' from {}, direction {}",
-                            getDisplayName(), next.getBlock().getValue(),
-                            next.getBlock().getDisplayName(), Path.decodeDirection(getDirection()));
-                } else {
-                    // no unique path with correct direction - this happens frequently from noise in block detectors!!
-                    log.warn("count of {} ACTIVE neightbors with proper direction can't be handled for block {} but maybe it can be determined when another block becomes free", count, getDisplayName());
-                    pListOfPossibleEntrancePaths = new Path[currPathCnt];
-                    cntOfPossibleEntrancePaths = 0;
-                    for (int i = 0; i < currPathCnt; i++) {
-                        if (isSet[i] && isActive[i]) {
-                            pListOfPossibleEntrancePaths[cntOfPossibleEntrancePaths] = pList[i];
-                            cntOfPossibleEntrancePaths++;
-                        }
-                    }
-                }
+                takeValueFromPossibleEntrants(possibleEntrancePaths(pList, isSet, isActive, pDir, pFromDir));
                 break;
         }
         setState(OCCUPIED);
@@ -1053,6 +1662,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      *
      * @return the next path
      */
+    @CheckForNull
     public Path findFromPath() {
         // index through the paths, counting
         int count = 0;
@@ -1095,7 +1705,8 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                     log.debug("comparing {} ({}) to {} ({})",
                             pList[i].getBlock().getDisplayName(), Path.decodeDirection(pDir[i]),
                             getDisplayName(), Path.decodeDirection(pFromDir[i]));
-                    if ((pDir[i] & pFromDir[i]) > 0) { //use bitwise comparison to support combination directions such as "North, West"
+                    // Use bitwise comparison to support combination directions such as "North, West"
+                    if ((pDir[i] & pFromDir[i]) > 0) {
                         count++;
                         next = pList[i];
                     }
@@ -1108,18 +1719,21 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                 // found one block with proper direction, assume that
             } else {
                 // no unique path with correct direction - this happens frequently from noise in block detectors!!
-                log.warn("count of {} ACTIVE neighbors with proper direction can't be handled for block {}", count, getDisplayName());
+                log.warn("count of {} ACTIVE neighbors with proper direction can't be handled for block {}",
+                    count, getDisplayName());
             }
         }
         // in any case, go OCCUPIED
         if (log.isDebugEnabled()) { // avoid potentially expensive non-logging
-            log.debug("Block {} with direction {} gets new value from {} + (informational. No state change)", getDisplayName(), Path.decodeDirection(getDirection()), (next != null ? next.getBlock().getDisplayName() : "(no next block)"));
+            log.debug("Block {} with direction {} gets new value from {} + (informational. No state change)",
+                getDisplayName(), Path.decodeDirection(getDirection()),
+                (next != null ? next.getBlock().getDisplayName() : "(no next block)"));
         }
-        return (next);
+        return next;
     }
 
     /**
-     * This allows the layout block to inform any listeners to the block 
+     * This allows the layout block to inform any listeners to the block
      * that the higher level layout block has been set to "useExtraColor" which is an
      * indication that it has been allocated to a section by the AutoDispatcher.
      * The value set is not retained in any form by the block,
@@ -1127,7 +1741,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      * @param boo Allocation status
      */
     public void setAllocated(Boolean boo) {
-        firePropertyChange("allocated", !boo, boo);
+        firePropertyChange(PROPERTY_ALLOCATED, !boo, boo);
     }
 
     // Methods to implmement PhysicalLocationReporter Interface
@@ -1135,7 +1749,7 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
     // If we have a Reporter that is also a PhysicalLocationReporter,
     // we will defer to that Reporter's methods.
     // Else we will assume a LocoNet style message to be parsed.
-    
+
     /**
      * Parse a given string and return the LocoAddress value that is presumed
      * stored within it based on this object's protocol. The Class Block
@@ -1151,22 +1765,24 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         // Defer parsing to our associated Reporter if we can.
         if (rep == null) {
             log.warn("String input is null!");
-            return (null);
+            return null;
         }
-        if ((this.getReporter() != null) && (this.getReporter() instanceof PhysicalLocationReporter)) {
-            return (((PhysicalLocationReporter) this.getReporter()).getLocoAddress(rep));
+        Reporter testReporter = this.getReporter();
+        if ( testReporter instanceof PhysicalLocationReporter ) {
+            return ((PhysicalLocationReporter)testReporter).getLocoAddress(rep);
         } else {
             // Assume a LocoNet-style report.  This is (nascent) support for handling of Faller cars
             // for Dave Merrill's project.
             log.debug("report string: {}", rep);
             // NOTE: This pattern is based on the one defined in LocoNet-specific LnReporter
-            Pattern ln_p = Pattern.compile("(\\d+) (enter|exits|seen)\\s*(northbound|southbound)?");  // Match a number followed by the word "enter".  This is the LocoNet pattern.
-            Matcher m = ln_p.matcher(rep);
+            // Match a number followed by the word "enter".  This is the LocoNet pattern.
+            Pattern lnp = Pattern.compile("(\\d+) (enter|exits|seen)\\s*(northbound|southbound)?");
+            Matcher m = lnp.matcher(rep);
             if (m.find()) {
                 log.debug("Parsed address: {}", m.group(1));
-                return (new DccLocoAddress(Integer.parseInt(m.group(1)), LocoAddress.Protocol.DCC));
+                return new DccLocoAddress(Integer.parseInt(m.group(1)), LocoAddress.Protocol.DCC);
             } else {
-                return (null);
+                return null;
             }
         }
     }
@@ -1189,27 +1805,29 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
             return (null);
         }
         // Defer parsing to our associated Reporter if we can.
-        if ((this.getReporter() != null) && (this.getReporter() instanceof PhysicalLocationReporter)) {
-            return (((PhysicalLocationReporter) this.getReporter()).getDirection(rep));
+        Reporter testReporter = this.getReporter();
+        if ( testReporter instanceof PhysicalLocationReporter ) {
+            return ((PhysicalLocationReporter)testReporter).getDirection(rep);
         } else {
             log.debug("report string: {}", rep);
             // NOTE: This pattern is based on the one defined in LocoNet-specific LnReporter
-            Pattern ln_p = Pattern.compile("(\\d+) (enter|exits|seen)\\s*(northbound|southbound)?");  // Match a number followed by the word "enter".  This is the LocoNet pattern.
-            Matcher m = ln_p.matcher(rep);
+            // Match a number followed by the word "enter".  This is the LocoNet pattern.
+            Pattern lnp = Pattern.compile("(\\d+) (enter|exits|seen)\\s*(northbound|southbound)?");
+            Matcher m = lnp.matcher(rep);
             if (m.find()) {
                 log.debug("Parsed direction: {}", m.group(2));
                 switch (m.group(2)) {
                     case "enter":
                         // LocoNet Enter message
-                        return (PhysicalLocationReporter.Direction.ENTER);
+                        return PhysicalLocationReporter.Direction.ENTER;
                     case "seen":
                         // Lissy message.  Treat them all as "entry" messages.
-                        return (PhysicalLocationReporter.Direction.ENTER);
+                        return PhysicalLocationReporter.Direction.ENTER;
                     default:
-                        return (PhysicalLocationReporter.Direction.EXIT);
+                        return PhysicalLocationReporter.Direction.EXIT;
                 }
             } else {
-                return (PhysicalLocationReporter.Direction.UNKNOWN);
+                return PhysicalLocationReporter.Direction.UNKNOWN;
             }
         }
     }
@@ -1222,8 +1840,8 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      */
     @Override
     public PhysicalLocation getPhysicalLocation() {
-        // We have our won PhysicalLocation. That's the point.  No need to defer to the Reporter.
-        return (PhysicalLocation.getBeanPhysicalLocation(this));
+        // We have our own PhysicalLocation. That's the point.  No need to defer to the Reporter.
+        return PhysicalLocation.getBeanPhysicalLocation(this);
     }
 
     /**
@@ -1236,34 +1854,30 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
      */
     @Override
     public PhysicalLocation getPhysicalLocation(String s) {
-        // We have our won PhysicalLocation. That's the point.  No need to defer to the Reporter.
+        // We have our own PhysicalLocation. That's the point.  No need to defer to the Reporter.
         // Intentionally ignore the String s
-        return (PhysicalLocation.getBeanPhysicalLocation(this));
+        return PhysicalLocation.getBeanPhysicalLocation(this);
     }
 
     @Override
     public void vetoableChange(PropertyChangeEvent evt) throws PropertyVetoException {
-        if ("CanDelete".equals(evt.getPropertyName())) { // No I18N
-            if (evt.getOldValue() instanceof Sensor) {
-                if (evt.getOldValue().equals(getSensor())) {
-                    throw new PropertyVetoException(getDisplayName(), evt);
-                }
+        if (Manager.PROPERTY_CAN_DELETE.equals(evt.getPropertyName())) {
+            if (evt.getOldValue() instanceof Sensor
+                && evt.getOldValue().equals(getSensor())) {
+                throw new PropertyVetoException(getDisplayName(), evt);
             }
-            if (evt.getOldValue() instanceof Reporter) {
-                if (evt.getOldValue().equals(getReporter())) {
-                    throw new PropertyVetoException(getDisplayName(), evt);
-                }
+            if (evt.getOldValue() instanceof Reporter
+                && evt.getOldValue().equals(getReporter())) {
+                throw new PropertyVetoException(getDisplayName(), evt);
             }
-        } else if ("DoDelete".equals(evt.getPropertyName())) { // No I18N
-            if (evt.getOldValue() instanceof Sensor) {
-                if (evt.getOldValue().equals(getSensor())) {
-                    setSensor(null);
-                }
+        } else if (Manager.PROPERTY_DO_DELETE.equals(evt.getPropertyName())) {
+            if (evt.getOldValue() instanceof Sensor
+                && evt.getOldValue().equals(getSensor())) {
+                setSensor(null);
             }
-            if (evt.getOldValue() instanceof Reporter) {
-                if (evt.getOldValue().equals(getReporter())) {
-                    setReporter(null);
-                }
+            if (evt.getOldValue() instanceof Reporter
+                && evt.getOldValue().equals(getReporter())) {
+                setReporter(null);
             }
         }
     }
@@ -1279,11 +1893,11 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
                 report.add(new NamedBeanUsageReport("BlockReporter"));  // NOI18N
             }
             // Block paths
-            getPaths().forEach((path) -> {
+            getPaths().forEach( path -> {
                 if (bean.equals(path.getBlock())) {
                     report.add(new NamedBeanUsageReport("BlockPathNeighbor"));  // NOI18N
                 }
-                path.getSettings().forEach((setting) -> {
+                path.getSettings().forEach( setting -> {
                     if (bean.equals(setting.getBean())) {
                         report.add(new NamedBeanUsageReport("BlockPathTurnout"));  // NOI18N
                     }
@@ -1298,5 +1912,21 @@ public class Block extends AbstractNamedBean implements PhysicalLocationReporter
         return Bundle.getMessage("BeanNameBlock");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Block.class);
+    /** {@inheritDoc} */
+    @Override
+    @Nonnull
+    public String describeState(int state) {
+        switch (state) {
+            case Block.OCCUPIED:
+                return Bundle.getMessage("BlockOccupied");
+            case Block.UNOCCUPIED:
+                return Bundle.getMessage("BlockUnOccupied");
+            case Block.UNDETECTED:
+                return Bundle.getMessage("BlockUndetected");
+            default:  // state unknown, state inconsistent, state unexpected
+                return super.describeState(state);
+        }
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Block.class);
 }

@@ -3,21 +3,21 @@ package jmri.jmrit.display;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
-import javax.swing.JTextField;
+
 import jmri.Block;
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.NamedBean.DisplayOptions;
 import jmri.jmrit.catalog.NamedIcon;
-import jmri.jmrit.throttle.ThrottleFrame;
 import jmri.jmrit.throttle.ThrottleFrameManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.jmrit.throttle.interfaces.ThrottleControllerUI;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * An icon to display the value contained within a Block.
@@ -27,12 +27,11 @@ import org.slf4j.LoggerFactory;
 public class BlockContentsIcon extends MemoryIcon {
 
     private NamedIcon defaultIcon = null;
-    java.util.HashMap<String, NamedIcon> map = null;
     private NamedBeanHandle<Block> namedBlock;
 
     public BlockContentsIcon(String s, Editor editor) {
         super(s, editor);
-        resetDefaultIcon();
+        BlockContentsIcon.this.resetDefaultIcon();
         _namedIcon = defaultIcon;
         //By default all text objects are left justified
         _popupUtil.setJustification(LEFT);
@@ -129,6 +128,12 @@ public class BlockContentsIcon extends MemoryIcon {
 
     @Override
     @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_BlockContentsIcon");
+    }
+
+    @Override
+    @Nonnull
     public String getNameString() {
         String name;
         if (namedBlock == null) {
@@ -139,8 +144,33 @@ public class BlockContentsIcon extends MemoryIcon {
         return name;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * In operating mode, after the Dispatcher items for the train the icon
+     * shows, a last item opens the Block dialog: the trains the Block holds,
+     * why, and what has happened there.
+     */
     @Override
     public boolean showPopUp(JPopupMenu popup) {
+        boolean added = showTrainPopUp(popup);
+        Block block = getBlock();
+        if (!isEditable() && block != null) {
+            if (popup.getComponentCount() > 0) {
+                popup.addSeparator();
+            }
+            popup.add(new AbstractAction(jmri.jmrit.trainrecord.swing.BlockDialog.menuItemText(block)) {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    jmri.jmrit.trainrecord.swing.BlockDialog.open(block, !isValueEditDisabled());
+                }
+            });
+            return true;
+        }
+        return added;
+    }
+
+    private boolean showTrainPopUp(JPopupMenu popup) {
         if (isEditable() && selectable) {
             popup.add(new JSeparator());
 
@@ -155,57 +185,106 @@ public class BlockContentsIcon extends MemoryIcon {
                 });
             }
             return true;
-        }  // end of selectable
-        if (re != null) {
+        } // end of selectable
+        // This is a little different
+        // jmri.jmrit.dispatcher.DispatcherFrame.class is AutoCreate so getNullableDefault creates it 
+        // if it doesnt exist. So we look at the count of instances.
+        final jmri.jmrit.dispatcher.DispatcherFrame df;
+        if (jmri.InstanceManager.getList(jmri.jmrit.dispatcher.DispatcherFrame.class).isEmpty()) {
+            df = null;
+        } else {
+            df = jmri.InstanceManager.getNullableDefault(jmri.jmrit.dispatcher.DispatcherFrame.class);
+        }
+        // the train the menu is for, as the Block shows it
+        final Object train = trainForMenu();
+        final jmri.jmrit.roster.RosterEntry entry =
+                train instanceof jmri.jmrit.roster.RosterEntry ? (jmri.jmrit.roster.RosterEntry) train : null;
+        final jmri.jmrit.dispatcher.ActiveTrain at;
+        if (df != null) {
+            if (entry != null) {
+                at = df.getActiveTrainForRoster(entry);
+            } else {
+                at = df.getActiveTrainForName(train == null ? null : train.toString());
+            }
+        } else {
+            at = null;
+        }
+        if (at != null && df != null) {
+            // we have active train, with or without auto train with or without roster entry
+            if (at.getAutoActiveTrain() != null ) {
+                if( re == null ) {
+                    popup.add(new AbstractAction("Open Throttle") {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            ThrottleControllerUI tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
+                            tf.toFront();
+                            tf.setAddress(at.getAutoActiveTrain().getDccAddress());
+                        }
+                    });
+                } else {
+                    popup.add(new AbstractAction("Open Throttle") {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            ThrottleControllerUI tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
+                            tf.toFront();
+                            tf.setAddress(at.getAutoActiveTrain().getDccAddress());
+                        }
+                    });
+                }
+            }
+            popup.add(new AbstractAction(Bundle.getMessage("MenuTerminateTrain")) {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    df.terminateActiveTrain(at, true, false);
+                }
+            });
+            popup.add(new AbstractAction(Bundle.getMessage("MenuAllocateExtra")) {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    //Just brings up the standard allocate extra frame, this could be expanded in the future
+                    //As a point and click operation.
+                    df.allocateExtraSection(e, at);
+                }
+            });
+            if (at.getStatus() == jmri.jmrit.dispatcher.ActiveTrain.DONE) {
+                popup.add(new AbstractAction("Restart") {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        at.allocateAFresh();
+                    }
+                });
+            }
+            if (isEditable()) {
+                popup.add(new JSeparator());
+            }
+            return true;
+        } else if (entry != null) {
+            // No active train, but have a roster, therefore a throttle can be created
             popup.add(new AbstractAction("Open Throttle") {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    ThrottleFrame tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
+                    ThrottleControllerUI tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
                     tf.toFront();
-                    tf.getAddressPanel().setRosterEntry(re);
+                    tf.setRosterEntry(entry);
                 }
             });
-
-            final jmri.jmrit.dispatcher.DispatcherFrame df = jmri.InstanceManager.getNullableDefault(jmri.jmrit.dispatcher.DispatcherFrame.class);
+            // if dispatcher exists we can create a new train.
             if (df != null) {
-                final jmri.jmrit.dispatcher.ActiveTrain at = df.getActiveTrainForRoster(re);
-                if (at != null) {
-                    popup.add(new AbstractAction(Bundle.getMessage("MenuTerminateTrain")) {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            df.terminateActiveTrain(at);
+                popup.add(new AbstractAction(Bundle.getMessage("MenuNewTrain")) {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (!df.getNewTrainActive()) {
+                            df.getActiveTrainFrame().initiateTrain(e, entry, getBlock());
+                            df.setNewTrainActive(true);
+                        } else {
+                            df.getActiveTrainFrame().showActivateFrame(entry);
                         }
-                    });
-                    popup.add(new AbstractAction(Bundle.getMessage("MenuAllocateExtra")) {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            //Just brings up the standard allocate extra frame, this could be expanded in the future
-                            //As a point and click operation.
-                            df.allocateExtraSection(e, at);
-                        }
-                    });
-                    if (at.getStatus() == jmri.jmrit.dispatcher.ActiveTrain.DONE) {
-                        popup.add(new AbstractAction("Restart") {
-                            @Override
-                            public void actionPerformed(ActionEvent e) {
-                                at.allocateAFresh();
-                            }
-                        });
                     }
-                } else {
-                    popup.add(new AbstractAction(Bundle.getMessage("MenuNewTrain")) {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            if (!df.getNewTrainActive()) {
-                                df.getActiveTrainFrame().initiateTrain(e, re, getBlock());
-                                df.setNewTrainActive(true);
-                            } else {
-                                df.getActiveTrainFrame().showActivateFrame(re);
-                            }
-                        }
 
-                    });
-                }
+                });
+            }
+            if (isEditable()) {
+                popup.add(new JSeparator());
             }
             return true;
         }
@@ -241,8 +320,70 @@ public class BlockContentsIcon extends MemoryIcon {
             jmri.InstanceManager.throttleManagerInstance().removeListener(re.getDccLocoAddress(), this);
             re = null;
         }
-        Object key = getBlock().getValue();
-        displayState(key);
+        Object value = getBlock().getValue();
+        Object allocatedValue = getBlock().getAllocatedValue();
+        if (value == null && allocatedValue != null && getMap() == null) {
+            // the train the Block is allocated to, not yet in it
+            displayState(allocatedText(allocatedValue));
+        } else {
+            // the train in the Block or, shown by an icon map, the train it is allocated to
+            displayState(getBlock().getDisplayValue());
+        }
+    }
+
+    /**
+     * Get the text that shows the train a Block is allocated to, so that it
+     * can be told apart from a train in the Block: its name in italics, after
+     * an arrow. As HTML, so that the label's own font, which the panel file
+     * keeps, is left alone.
+     *
+     * @param allocatedValue the Block's allocated value
+     * @return the text to show
+     */
+    @Nonnull
+    static String allocatedText(@Nonnull Object allocatedValue) {
+        String name;
+        if (allocatedValue instanceof jmri.jmrit.roster.RosterEntry) {
+            name = ((jmri.jmrit.roster.RosterEntry) allocatedValue).titleString();
+        } else if (allocatedValue instanceof jmri.IdTag) {
+            name = ((jmri.IdTag) allocatedValue).getDisplayName();
+        } else if (allocatedValue instanceof jmri.Reportable) {
+            name = ((jmri.Reportable) allocatedValue).toReportString();
+        } else {
+            name = allocatedValue.toString();
+        }
+        // escape only what HTML needs, so names with accents show as they are
+        String escaped = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return "<html><i>" + Bundle.getMessage("AllocatedValueShown", escaped) + "</i></html>";
+    }
+
+    /**
+     * Get the train the popup menu's Dispatcher items are for: the train the
+     * icon shows. In a Block the train is allocated to but hasn't reached,
+     * that is the Block's allocated value, as Dispatcher set it (the train's
+     * name or its roster entry), not the marked text the icon shows for it.
+     *
+     * @return the roster entry, the train's name, or null if the icon shows
+     *         no train
+     */
+    Object trainForMenu() {
+        Block b = getBlock();
+        Object allocated = b == null ? null : b.getAllocatedValue();
+        if (b != null && allocated != null && b.getValue() == null && getMap() == null) {
+            return allocated instanceof jmri.jmrit.roster.RosterEntry ? allocated : allocated.toString();
+        }
+        if (re != null) {
+            return re;
+        }
+        return getText();
+    }
+
+    @Override
+    public void propertyChange(java.beans.PropertyChangeEvent e) {
+        super.propertyChange(e);
+        if (Block.PROPERTY_ALLOCATED_VALUE.equals(e.getPropertyName())) {
+            displayState();
+        }
     }
 
     @Override
@@ -289,27 +430,23 @@ public class BlockContentsIcon extends MemoryIcon {
     }
 
     @Override
-    public void doMouseClicked(java.awt.event.MouseEvent e) {
+    public void doMouseClicked(JmriMouseEvent e) {
         if (e.getClickCount() == 2) { // double click?
+            if (!getEditor().isEditable() && isValueEditDisabled()) {
+                log.debug("Double click block value edit disabled");
+                return;
+            }
             editBlockValue();
         }
     }
 
     protected void editBlockValue() {
-        JTextField newBlock = new JTextField(20);
-        if (getBlock().getValue() != null) {
-            newBlock.setText(getBlock().getValue().toString());
-        }
-        Object[] options = {Bundle.getMessage("ButtonCancel"), Bundle.getMessage("ButtonOK"), newBlock};
-        int retval = JOptionPane.showOptionDialog(this,
-                Bundle.getMessage("EditCurrentBlockValue"), namedBlock.getName(),
-                0, JOptionPane.INFORMATION_MESSAGE, null,
-                options, options[1]);
 
-        if (retval != 1) {
-            return;
-        }
-        setValue(newBlock.getText());
+        String reval = (String)JmriJOptionPane.showInputDialog(this,
+                                     Bundle.getMessage("EditCurrentBlockValue", namedBlock.getName()),
+                                     getBlock().getValue());
+
+        setValue(reval);
         updateSize();
     }
 
@@ -326,6 +463,6 @@ public class BlockContentsIcon extends MemoryIcon {
         getBlock().setValue(val);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(BlockContentsIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BlockContentsIcon.class);
 
 }

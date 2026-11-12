@@ -94,14 +94,11 @@ public class AcelaNode extends AbstractNode {
     protected int sensorbitsPerCard = MAXSENSORBITS;    // See above
     protected int transmissionDelay = 0;                // Delay between bytes on Receive (units of 10 microsec.)
 
-    // operational instance variables  (should not be preserved between runs)
-    protected boolean needInit = false;          // 'true' if this module needs to be initialized
     //    used for sensors
     protected byte[] outputArray = new byte[MAXOUTPUTBITS]; // current values of the output bits for this node
     protected int[] outputSpecial = new int[MAXOUTPUTBITS]; // does the output circuit require special handling
     protected int[] outputSignalHeadType = new int[MAXOUTPUTBITS]; // type of SignalHead
     protected boolean hasActiveSensors = false; // 'true' if there are active Sensors for this node
-    protected int lastUsedSensor = -1;           // grows as sensors defined
     protected Sensor[] sensorArray = new Sensor[MAXSENSORBITS];
     protected boolean[] sensorNeedInit = new boolean[MAXSENSORBITS];    // used to indicate if sensor needs to be configured
     protected boolean[] sensorHasBeenInit = new boolean[MAXSENSORBITS]; // used to indicate if sensor has been configured
@@ -192,7 +189,6 @@ public class AcelaNode extends AbstractNode {
 
         // initialize other operational instance variables
         resetMustSend();
-        needInit = false;
         hasActiveSensors = false;
 
         // register this node
@@ -768,7 +764,7 @@ public class AcelaNode extends AbstractNode {
                         if (outputType[c] == AcelaNode.ONOFF) {
                             // outputArray[c] tells us to to turn the output on
                             // or off.
-                            // outputWired[c] tells us whether the relay is 
+                            // outputWired[c] tells us whether the relay is
                             // wired backwards.
                             // command 0x01 is activate
                             // command 0x02 is deactivate
@@ -1028,7 +1024,6 @@ public class AcelaNode extends AbstractNode {
         m.setBinary(true);
         return m;
     }
-    boolean warned = false;
 
     /**
      * Use the contents of the poll reply to mark changes.
@@ -1055,7 +1050,7 @@ public class AcelaNode extends AbstractNode {
         log.debug("Sensor Parsing has firstByteNum: {}", firstByteNum);
         log.debug("Sensor Parsing has firstBitAt: {}", firstBitAt);
 
-        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement 
+        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement
         int rawvalue = l.getElement(firstByteNum);
         log.debug("Sensor Parsing has first rawvalue: {}", Integer.toHexString(rawvalue));
 
@@ -1072,10 +1067,10 @@ public class AcelaNode extends AbstractNode {
 
                 int relvalue = rawvalue;
 
-                //  Need a temporary counter within the byte so we can shift 
+                //  Need a temporary counter within the byte so we can shift
                 int tempi = i;
 
-                //  If necessary, shift by four before we start  
+                //  If necessary, shift by four before we start
                 if (usingByteNum == 0) {
                     if (firstBitAt == 4) {
                         for (int j = 0; j < firstBitAt; j++) {
@@ -1085,11 +1080,11 @@ public class AcelaNode extends AbstractNode {
                     }
                 }
 
-                //  If necessary, get next byte  
+                //  If necessary, get next byte
                 if (firstBitAt == 4) {
                     if (i >= 12) {  // Will only get here if there are 16 sensors
                         usingByteNum = 2;
-                        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement 
+                        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement
                         rawvalue = l.getElement(usingByteNum + firstByteNum);
                         log.debug("Sensor Parsing (1stat4) has third rawvalue: {}", Integer.toHexString(rawvalue));
                         relvalue = rawvalue;
@@ -1097,7 +1092,7 @@ public class AcelaNode extends AbstractNode {
                     } else {
                         if (i >= 4) {
                             usingByteNum = 1;
-                            //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement 
+                            //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement
                             rawvalue = l.getElement(usingByteNum + firstByteNum);
                             log.debug("Sensor Parsing (1stat4) has second rawvalue: {}", Integer.toHexString(rawvalue));
                             relvalue = rawvalue;
@@ -1107,7 +1102,7 @@ public class AcelaNode extends AbstractNode {
                 } else {
                     if (i >= 8) {  // Will only get here if there are 16 sensors
                         usingByteNum = 1;
-                        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement 
+                        //  Using rawvalue may be unnecessary, but trying to minimize reads to getElement
                         rawvalue = l.getElement(usingByteNum + firstByteNum);
                         log.debug("Sensor Parsing has second rawvalue: {}", Integer.toHexString(rawvalue));
                         relvalue = rawvalue;
@@ -1156,7 +1151,7 @@ public class AcelaNode extends AbstractNode {
                 }
             }
         } catch (JmriException e) {
-            log.error("exception in markChanges: {}", e);
+            log.error("exception in markChanges", e);
         }
     }
 
@@ -1224,6 +1219,6 @@ public class AcelaNode extends AbstractNode {
         timeout = 0;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AcelaNode.class);
+    private static final Logger log = LoggerFactory.getLogger(AcelaNode.class);
 
 }

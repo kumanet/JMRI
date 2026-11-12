@@ -45,8 +45,9 @@ public class RailComTableActionTest extends AbstractTableActionBase<IdTag> {
     @Override
     @AfterEach
     public void tearDown() {
+        jmri.InstanceManager.getDefault(jmri.IdTagManager.class).dispose();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(RailComTableActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(RailComTableActionTest.class);
 }

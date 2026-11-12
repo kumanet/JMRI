@@ -1,6 +1,5 @@
 package jmri.jmrix.tams;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.LinkedList;
 import java.util.Queue;
 import jmri.DccLocoAddress;
@@ -24,7 +23,7 @@ public class TamsThrottle extends AbstractThrottle implements TamsListener {
     private final Queue<TamsMessage> tmq = new LinkedList<>();
 
     //This dummy message is used in case we expect a reply from polling
-    static private TamsMessage myDummy() {
+    private static TamsMessage myDummy() {
         log.trace("*** myDummy ***");
         TamsMessage m = new TamsMessage(2);
         m.setElement(0, TamsConstants.POLLMSG & TamsConstants.MASKFF);
@@ -165,13 +164,15 @@ public class TamsThrottle extends AbstractThrottle implements TamsListener {
      *
      * @param speed Number from 0 to 1; less than zero is emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point, notify on any change
     @Override
     public synchronized void setSpeedSetting(float speed) {
         float oldSpeed = this.speedSetting;
         this.speedSetting = speed;
 
-        int value = (int) ((127 - 1) * this.speedSetting);     // -1 for rescale to avoid estop
+        int value = Math.round((127 - 1) * this.speedSetting);     // -1 for rescale to avoid estop
+        if (this.speedSetting > 0 && value == 0) {
+            value = 1;          // ensure non-zero input results in non-zero output
+        }
         if (value > 0) {
             value = value + 1;  // skip estop
         }
@@ -250,6 +251,7 @@ public class TamsThrottle extends AbstractThrottle implements TamsListener {
         } else if (super.speedStepMode == jmri.SpeedStepMode.NMRA_DCC_128) {
             return ((lSpeed - 1) / 126.f);
         } else {
+            // pretty sure this is wrong, it's definitely never going to be < 1.
             return (int) (lSpeed * 27.f + 0.5) + 1;
         }
     }
@@ -311,7 +313,7 @@ public class TamsThrottle extends AbstractThrottle implements TamsListener {
                     appendFuncString(7,sb,((tr.getElement(1) & 0x40) == 0x40));
                     appendFuncString(8,sb,((tr.getElement(1) & 0x80) == 0x80));
                     
-                    log.trace(sb.toString());
+                    log.trace("Functions: {}", sb );
                 } catch (RuntimeException ex) {
                     log.error("Error handling reply from MC", ex);
                 }
@@ -392,6 +394,6 @@ public class TamsThrottle extends AbstractThrottle implements TamsListener {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(TamsThrottle.class);
+    private static final Logger log = LoggerFactory.getLogger(TamsThrottle.class);
 
 }

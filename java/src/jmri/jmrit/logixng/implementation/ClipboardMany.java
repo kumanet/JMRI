@@ -33,7 +33,7 @@ public class ClipboardMany extends AbstractBase
     
     private void setItemSystemNames(List<ItemData> systemNamesAndClasses) {
         if (!_itemEntries.isEmpty()) {
-            throw new RuntimeException("action system names cannot be set more than once");
+            throw new JmriUncheckedException("action system names cannot be set more than once");
         }
         
         for (ItemData itemData : systemNamesAndClasses) {
@@ -73,10 +73,10 @@ public class ClipboardMany extends AbstractBase
                                 ae._socket.connect(maleSocket);
                                 maleSocket.setup();
                             } else {
-                                log.error("item " + socketSystemName + " is not a male socket");
+                                log.error("item {} is not a male socket", socketSystemName);
                             }
                         } else {
-                            log.error("cannot load item " + socketSystemName);
+                            log.error("cannot load item {}", socketSystemName);
                         }
                     }
                 } else {
@@ -84,7 +84,7 @@ public class ClipboardMany extends AbstractBase
                 }
             } catch (SocketAlreadyConnectedException ex) {
                 // This shouldn't happen and is a runtime error if it does.
-                throw new RuntimeException("socket is already connected");
+                throw new JmriUncheckedException("socket is already connected");
             }
         }
         
@@ -93,16 +93,10 @@ public class ClipboardMany extends AbstractBase
     
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.COMMON;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.COMMON;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return false;
-    }
-    
     @Override
     public FemaleSocket getChild(int index) throws IllegalArgumentException, UnsupportedOperationException {
         return _itemEntries.get(index)._socket;
@@ -249,7 +243,7 @@ public class ClipboardMany extends AbstractBase
             }
             x++;
         }
-        throw new RuntimeException("Unable to find a new socket name");
+        throw new JmriUncheckedException("Unable to find a new socket name");
     }
 
     /** {@inheritDoc} */
@@ -273,6 +267,6 @@ public class ClipboardMany extends AbstractBase
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ClipboardMany.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ClipboardMany.class);
 
 }

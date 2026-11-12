@@ -7,8 +7,8 @@ import java.util.List;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
 
-import jmri.progdebugger.ProgDebugger;
 import jmri.util.CvUtil;
+import jmri.util.junit.annotations.NotApplicable;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
@@ -19,6 +19,8 @@ import org.junit.jupiter.api.*;
  * @author Bob Jacobsen Copyright 2001, 2002, 2015
  * @author Dave Heap Copyright 2019
  */
+@edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "NP_LOAD_OF_KNOWN_NULL_VALUE",
+    justification = "passing known null variables for clarity in constructors")
 public class SplitHexVariableValueTest extends AbstractVariableValueTestBase {
 
     // Local tests version of makeVar with extra parameters and cvList support.
@@ -28,9 +30,8 @@ public class SplitHexVariableValueTest extends AbstractVariableValueTestBase {
             HashMap<String, CvValue> v, JLabel status, String item,
             String highCV, int pFactor, int pOffset, String uppermask,
             String extra1, String extra2, String extra3, String extra4) {
-        ProgDebugger p = new ProgDebugger();
 
-        if (!cvNum.equals("")) { // some variables have no CV per se
+        if (!cvNum.isEmpty()) { // some variables have no CV per se
             List<String> cvList = CvUtil.expandCvList(cvNum);
             if (cvList.isEmpty()) {
                 CvValue cvNext = new CvValue(cvNum, p);
@@ -44,7 +45,7 @@ public class SplitHexVariableValueTest extends AbstractVariableValueTestBase {
                 }
             }
         }
-        if (highCV != null && !highCV.equals("")) {
+        if (highCV != null && !highCV.isEmpty()) {
             CvValue cvNext = new CvValue(highCV, p);
             cvNext.setValue(0);
             v.put(highCV, cvNext);
@@ -99,85 +100,101 @@ public class SplitHexVariableValueTest extends AbstractVariableValueTestBase {
     // some of the premade tests don't quite make sense; override them here.
     @Override
     @Test
+    @NotApplicable("mask is ignored by splitAddress tests")
     public void testVariableValueCreate() {
-    } // mask is ignored by splitAddress tests
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueTwinMask() {
-    } // mask is ignored
+    }
 
     @Override
     @Test
+    @NotApplicable("low CV is upper part of address")
     public void testVariableFromCV() {
-    } // low CV is upper part of address
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of splitAddress tests")
     public void testVariableValueRead() {
-    } // due to multi-cv nature of splitAddress tests
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of splitAddress tests")
     public void testVariableValueWrite() {
-    } // due to multi-cv nature of splitAddress tests
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of splitAddress tests")
     public void testVariableCvWrite() {
-    } // due to multi-cv nature of splitAddress tests
+    }
 
     @Override
     @Test
+    @NotApplicable("programmer synch is different")
     public void testWriteSynch2() {
-    } // programmer synch is different
+    }
 
     // at some point, these should pass, but have to think hard about
     // how to define the split/shift/mask operations for long CVs
     @Override
     @Test
+    @Disabled("mask is ignored, test requires further development")
     public void testVariableValueCreateLargeValue() {
-    } // mask is ignored
+    }
 
     @Override
     @Test
+    @Disabled("test requires further development")
     public void testVariableSynch() {
     }
 
     @Override
     @Test
+    @Disabled("test requires further development")
     public void testVariableReadOnly() {
     }
 
     @Override
     @Test
+    @Disabled("test requires further development")
     public void testVariableValueStates() {
     }
 
     @Override
     @Test
+    @Disabled("test requires further development")
     public void testVariableRepStateColor() {
     }
 
     @Override
     @Test
+    @Disabled("test requires further development")
     public void testVariableVarChangeColorRep() {
     }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue() {
-    } // mask is ignored
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue256() {
-    } // mask is ignored
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue2up16() {
-    } // mask is ignored
+    }
 
     // Local tests
     @Test
@@ -856,5 +873,5 @@ public class SplitHexVariableValueTest extends AbstractVariableValueTestBase {
         super.tearDown();
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(SplitHexVariableValueTest.class);
+//    private static final Logger log = LoggerFactory.getLogger(SplitHexVariableValueTest.class);
 }

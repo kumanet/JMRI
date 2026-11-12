@@ -1,10 +1,9 @@
 package jmri.jmrit.display.layoutEditor;
 
 import java.awt.geom.Point2D;
-import java.awt.GraphicsEnvironment;
 
-import org.junit.Assert;
-import org.junit.Assume;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -12,30 +11,30 @@ import org.junit.jupiter.api.*;
  *
  * @author Bob Jacobsen Copyright (C) 2020
  */
+@DisabledIfHeadless
 public class LayoutWyeViewTest extends LayoutTurnoutViewTest {
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         Point2D point = new Point2D.Double(150.0, 100.0);
         
-        new LayoutWyeView(wye, point, 99.0, 1.5, 1.6, layoutEditor);
+        var lwv = new LayoutWyeView(wye, point, 99.0, 1.5, 1.6, layoutEditor);
+        Assertions.assertNotNull(lwv);
     }
 
-    LayoutWye wye;
-    
+    private LayoutWye wye;
+
+    @Override
     @BeforeEach
     @javax.annotation.OverridingMethodsMustInvokeSuper
     public void setUp() {
         super.setUp();
-        if (!GraphicsEnvironment.isHeadless()) {
-             
-            wye = new LayoutWye("Wye", layoutEditor);
+        wye = new LayoutWye("Wye", layoutEditor);
 
-        }
     }
 
+    @Override
     @AfterEach
     @javax.annotation.OverridingMethodsMustInvokeSuper
     public void tearDown() {

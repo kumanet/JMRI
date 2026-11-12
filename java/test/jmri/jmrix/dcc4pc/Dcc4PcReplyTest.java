@@ -17,12 +17,13 @@ public class Dcc4PcReplyTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new Dcc4PcReply();
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(Dcc4PcReplyTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(Dcc4PcReplyTest.class);
 
 }

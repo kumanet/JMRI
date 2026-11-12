@@ -1,11 +1,14 @@
 package jmri.jmrix.openlcb;
 
 import java.util.List;
+
 import jmri.AddressedProgrammer;
 import jmri.GlobalProgrammerManager;
 import jmri.InstanceManager;
 import jmri.Programmer;
 import jmri.ProgrammingMode;
+import jmri.SystemConnectionMemo;
+import org.openlcb.OlcbInterface;
 
 import javax.annotation.Nonnull;
 
@@ -43,17 +46,15 @@ import javax.annotation.Nonnull;
  */
 public class OlcbProgrammerManager extends jmri.managers.DefaultProgrammerManager {
 
-    public OlcbProgrammerManager(Programmer pProgrammer) {
-        super(pProgrammer);
-    }
+    private final SystemConnectionMemo system;
 
-    public OlcbProgrammerManager(Programmer pProgrammer, jmri.SystemConnectionMemo memo) {
-        super(pProgrammer, memo);
+    public OlcbProgrammerManager(SystemConnectionMemo system) {
+        super(new OlcbProgrammer(system.get(OlcbInterface.class), null));
+        this.system = system;
     }
-
 
     public static final ProgrammingMode OPENLCBMODE = new ProgrammingMode("OPENLCBMODE", Bundle.getMessage("OPENLCBMODE"));
-    
+
     /**
      * Gain access to a Addressed Mode Programmer without reservation.
      *
@@ -62,7 +63,9 @@ public class OlcbProgrammerManager extends jmri.managers.DefaultProgrammerManage
      * @return null only if there isn't an Ops Mode Programmer in the system
      */
     @Override
-    public AddressedProgrammer getAddressedProgrammer(boolean pLongAddress, int pAddress) { return null; }
+    protected AddressedProgrammer getConcreteAddressedProgrammer(boolean pLongAddress, int pAddress) {
+        return new OlcbProgrammer(system.get(OlcbInterface.class), pLongAddress, pAddress);
+    }
 
     /**
      * Gain access to a (the) Addressed Mode Programmer, in the process
@@ -73,7 +76,7 @@ public class OlcbProgrammerManager extends jmri.managers.DefaultProgrammerManage
      * @return null if the address is in use by a reserved programmer
      */
     @Override
-    public AddressedProgrammer reserveAddressedProgrammer(boolean pLongAddress, int pAddress) { return null; }
+    protected AddressedProgrammer reserveConcreteAddressedProgrammer(boolean pLongAddress, int pAddress) { return null; }
 
     /**
      * Return access to an Addressed Mode Programmer, so that it can be used
@@ -89,7 +92,7 @@ public class OlcbProgrammerManager extends jmri.managers.DefaultProgrammerManage
      * @return false if there's no chance of getting one
      */
     @Override
-    public boolean isAddressedModePossible() { return false; }
+    public boolean isAddressedModePossible() { return true; }
 
     /**
      * Get the list of {@link ProgrammingMode} (generally) supported by

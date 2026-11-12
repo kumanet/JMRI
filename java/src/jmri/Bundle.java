@@ -4,6 +4,7 @@ import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.CheckForNull;
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -41,7 +42,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <p>
  *
  * @author Bob Jacobsen Copyright (C) 2012
  * @since 3.3.1
@@ -49,10 +49,12 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @ParametersAreNonnullByDefault
 @CheckReturnValue
 @javax.annotation.concurrent.Immutable
+// @SuppressFBWarnings(value = {"HSM_HIDING_METHOD"},
+//    justification = "Desired pattern is repeated class names with package-level access to members")
 public class Bundle {
 
     @CheckForNull
-    private final static String name = "jmri.NamedBeanBundle";  // NOI18N
+    private static final String name = "jmri.NamedBeanBundle";  // NOI18N
 
     /**
      * Provides a translated string for a given key from the package resource
@@ -190,7 +192,7 @@ public class Bundle {
      * Formats a message string with parameters.
      * <p>
      * It's used when a message is fetched from a foreign bundle.
-     * 
+     *
      * @param message The message to be formatted
      * @param subs    Array of objects to be inserted into the message
      * @return The formatted message
@@ -205,7 +207,7 @@ public class Bundle {
         throw new MissingResourceException("Resource '" + key + "' not found", this.getClass().toString(), key); // NOI18N
     }
 
-    private final static Bundle b = new Bundle();
+    private static final Bundle b = new Bundle();
 
     @CheckForNull
     protected String bundleName() {
@@ -225,7 +227,7 @@ public class Bundle {
     //           log.error("Failed to load defaults because of missing bundle");
     //           return;
     //        }
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Bundle.class);
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Bundle.class);
 
 }

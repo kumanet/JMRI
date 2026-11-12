@@ -14,13 +14,13 @@ import javax.swing.JMenuItem;
 import javax.swing.SwingUtilities;
 
 import jmri.*;
+import jmri.jmrit.throttle.ThrottleFrameManager;
 import jmri.jmrit.roster.swing.RosterEntryComboBox;
 import jmri.jmrit.roster.swing.RosterEntrySelectorPanel;
-import jmri.jmrit.throttle.AddressPanel;
 import jmri.jmrit.throttle.LoadXmlThrottlesLayoutAction;
-import jmri.jmrit.throttle.ThrottleFrame;
-import jmri.jmrit.throttle.ThrottleFrameManager;
 import jmri.jmrit.throttle.ThrottleWindow;
+import jmri.jmrit.throttle.implementation.ThrottleFrame;
+import jmri.jmrit.throttle.implementation.ThrottleUICore;
 import jmri.util.MathUtil;
 
 import org.hid4java.*;
@@ -41,14 +41,14 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
 
     private HidServices hidServices = null;
     private HidDevice hidDevice = null;
-    
+
 
     //TODO: Remove this if/when the RailDriver script is removed
     //private final boolean invokeOnMenuOnly = true;
 
     private Thread thread = null;
     private ThrottleWindow throttleWindow = null;
-    private ThrottleFrame activeThrottleFrame = null;    
+    private ThrottleFrame activeThrottleFrame = null;
 
     public RailDriverMenuItem(String name) {
         super();
@@ -57,14 +57,14 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
     }
 
     public RailDriverMenuItem() {
-        // TODO: remove "(built in)" if/when this replaces Raildriver script        
+        // TODO: remove "(built in)" if/when this replaces Raildriver script
         this(Bundle.getMessage("RdBuiltIn"));
     }
-    
+
     private void initGUI(String name) {
         setText(name);
     }
-    
+
     private void setupListeners() {
         addPropertyChangeListener(this);
 
@@ -124,7 +124,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                 }
             }*/
         } catch (HidException ex) {
-            log.error("HidException: {}", ex);
+            log.error("HidException", ex);
         }
     }
 
@@ -142,7 +142,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                 // we're going to try to open the default throttles layout
                 try {
                     LoadXmlThrottlesLayoutAction lxta = new LoadXmlThrottlesLayoutAction();
-                    if (!lxta.loadThrottlesLayout(new File(ThrottleFrame.getDefaultThrottleFilename()))) {
+                    if (!lxta.loadThrottlesLayout(new File(ThrottleUICore.getDefaultThrottleFilename()))) {
                         // if there's no default throttle layout...
                         // throw this exception so we'll create a new throttle window
                         throw new IOException();
@@ -151,7 +151,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                     //log.debug("No default throttle layout, creating an empty throttle window");
                     // open a new throttle window and get its components
                     throttleWindow = tfManager.createThrottleWindow();
-                    activeThrottleFrame = throttleWindow.addThrottleFrame();
+                    activeThrottleFrame = (ThrottleFrame) throttleWindow.newThrottleController();
                 }
                 // move throttle on screen so multiple throttles don't overlay each other
                 //throttleWindow.setLocation(400 * numThrottles, 50 * numThrottles);
@@ -162,9 +162,9 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
             // actions here until after that one is done.
             SwingUtilities.invokeLater(() -> {
                 if (activeThrottleFrame == null) {
-                    throttleWindow = tfManager.getCurrentThrottleFrame();
+                    throttleWindow = (ThrottleWindow)tfManager.getCurentThrottleController();
                     if (throttleWindow != null) {
-                        activeThrottleFrame = throttleWindow.getCurrentThrottleFrame();
+                        activeThrottleFrame = throttleWindow.getCurentThrottleController();
                     }
                 }
                 if (activeThrottleFrame != null) {
@@ -183,7 +183,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                     // wait (500 mSec) for it to die
                     thread.join(500);
                 } catch (InterruptedException ex) {
-                    log.debug("InterruptedException : {}", ex);
+                    log.debug("InterruptedException", ex);
                 }
             }
             // start a new thread
@@ -264,16 +264,16 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                         sleep(0.25);
                     }
                 }
-                
+
                 sendString("The quick brown fox jumps over the lazy dog.", 0.250);
                 sleep(2.0);
-                
+
                 setLEDs("8.8.8.");
                 sleep(2.0);
-                
+
                 setLEDs("???");
                 sleep(3.0);
-                
+
                 setLEDs("Pro");
             }).start();
         }
@@ -321,7 +321,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
         try {
             TimeUnit.MILLISECONDS.sleep((long) (delay * 1000.0));
         } catch (InterruptedException ex) {
-            log.debug("TimeUnit.sleep InterruptedException: {}", ex);
+            log.debug("TimeUnit.sleep InterruptedException", ex);
         }
     }
 
@@ -439,7 +439,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                 log.error("hidDevice.write error: {}", hidDevice.getLastErrorMessage());
             }
         } catch (IllegalStateException ex) {
-            log.error("hidDevice.write Exception : {}", ex);
+            log.error("hidDevice.write Exception", ex);
         }
     }
 
@@ -452,7 +452,7 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
 /*        HidDevice tHidDevice = event.getHidDevice();
         if ((tHidDevice.getVendorId() == VENDOR_ID) && (tHidDevice.getProductId() == PRODUCT_ID) && (!invokeOnMenuOnly) ) {
 //                && ((SERIAL_NUMBER == null) || (tHidDevice.getSerialNumber().equals(SERIAL_NUMBER))) {
-            setupRailDriver();                             
+            setupRailDriver();
         }*/
     }
 
@@ -507,7 +507,6 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                         activeThrottleFrame = null;
                     }
                 } else if (object instanceof ThrottleFrame) {
-                    
                     if (throttleWindow != null) {
                         throttleWindow.removePropertyChangeListener(this);
                         throttleWindow = null;
@@ -516,29 +515,25 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                         activeThrottleFrame.removePropertyChangeListener(this);
                         activeThrottleFrame = null;
                     }
-                    
                     activeThrottleFrame = (ThrottleFrame) object;
-                    throttleWindow = activeThrottleFrame.getThrottleWindow();
-                    
+                    throttleWindow = activeThrottleFrame.getThrottleControllersContainer();
                     throttleWindow.addPropertyChangeListener(this);
-                    activeThrottleFrame.addPropertyChangeListener(this);
-                    
-                }   
+                    activeThrottleFrame.addPropertyChangeListener(this);                   
+                }
                 break;
             case "Value":
                 String oldValue = event.getOldValue().toString();
                 String newValue = event.getNewValue().toString();
-                DccThrottle throttle = activeThrottleFrame.getAddressPanel().getThrottle();
-                AddressPanel addressPanel = activeThrottleFrame.getAddressPanel();
-                //log.info("propertyChange \"Value\" old: {}, new: {}", oldValue, newValue);
-                
+                DccThrottle throttle = activeThrottleFrame.getThrottle();
+                log.debug("propertyChange \"Value\" old: {}, new: {}", oldValue, newValue);
+
                 double value;
                 try {
                     value = Double.parseDouble(newValue);
                 } catch (NumberFormatException ex) {
                     log.error("RailDriver parse property new value ('{}')", newValue, ex);
                     return;
-                }  
+                }
                 switch (oldValue) {
                     case "Axis 0":
                         // REVERSER is the state of the reverser lever, values greater
@@ -622,26 +617,26 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                         String ledString = String.format("F%d", fNum + 1);
                         switch (fNum) {
                             case 28: {  // zoom/rocker button up
-                                if ((addressPanel != null) && isDown) {
-                                    addressPanel.selectRosterEntry();
-                                    DccLocoAddress a = addressPanel.getCurrentAddress();
+                                if (isDown)  {
+                                    activeThrottleFrame.getRosterEntrySelector().setSelectedRosterEntry();                                    
+                                    DccLocoAddress a = activeThrottleFrame.getAddress();
                                     ledString = "sel " + ((a != null) ? a.toString() : "null");
                                 }
                                 break;
                             }
                             case 29: {  // zoom/rocker button down
-                                if ((addressPanel != null) && isDown) {
-                                    addressPanel.dispatchAddress();
-                                    DccLocoAddress a = addressPanel.getCurrentAddress();
+                                if (isDown) {
+                                    activeThrottleFrame.dispatchAddress();
+                                    DccLocoAddress a = activeThrottleFrame.getAddress();
                                     ledString = "dis " + ((a != null) ? a.toString() : "null");
                                 }
                                 break;
                             }
                             case 30: {  // four way panning up
-                                if ((addressPanel != null) && isDown) {
-                                    int selectedIndex = addressPanel.getRosterSelectedIndex();
+                                if (isDown)  {
+                                    int selectedIndex = activeThrottleFrame.getRosterEntrySelector().getRosterListSelectedIndex();
                                     if (selectedIndex > 1) {
-                                        addressPanel.setRosterSelectedIndex(selectedIndex - 1);
+                                        activeThrottleFrame.getRosterEntrySelector().setRosterListSelectedIndex(selectedIndex - 1);
                                         ledString = String.format("Prev %d", selectedIndex - 1);
                                     }
                                 }
@@ -657,16 +652,16 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                                 break;
                             }
                             case 32: {  // four way panning down
-                                if ((addressPanel != null) && isDown) {
-                                    RosterEntrySelectorPanel resp = addressPanel.getRosterEntrySelector();
+                                if (isDown) {
+                                    RosterEntrySelectorPanel resp = activeThrottleFrame.getRosterEntrySelector();
                                     if (resp != null) {
                                         RosterEntryComboBox recb = resp.getRosterEntryComboBox();
                                         if (recb != null) {
                                             int cnt = recb.getItemCount();
-                                            int selectedIndex = addressPanel.getRosterSelectedIndex();
+                                            int selectedIndex = resp.getRosterListSelectedIndex();
                                             if (selectedIndex + 1 < cnt) {
                                                 try {
-                                                    addressPanel.setRosterSelectedIndex(selectedIndex + 1);
+                                                    activeThrottleFrame.getRosterEntrySelector().setRosterListSelectedIndex(selectedIndex + 1);
                                                     ledString = String.format("Next %d", selectedIndex + 1);
                                                 } catch (ArrayIndexOutOfBoundsException ex) {
                                                     // ignore this
@@ -689,14 +684,14 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
                             case 34: {  // Gear Shift Up
                                 if ((throttle != null) && isDown) {
                                     // shuntFn
-                                    throttle.setF3(false);
+                                    throttle.setFunction(3, false);
                                 }
                                 break;
                             }
                             case 35: {  // Gear Shift Down
                                 if ((throttle != null) && isDown) {
                                     // shuntFn
-                                    throttle.setF3(true);
+                                    throttle.setFunction(3, true);
                                 }
                                 break;
                             }
@@ -766,6 +761,6 @@ public class RailDriverMenuItem extends JMenuItem implements HidServicesListener
     }   // propertyChange
 
     //initialize logging
-    private transient final static Logger log = LoggerFactory.getLogger(RailDriverMenuItem.class);
+    private transient static final Logger log = LoggerFactory.getLogger(RailDriverMenuItem.class);
 
 }

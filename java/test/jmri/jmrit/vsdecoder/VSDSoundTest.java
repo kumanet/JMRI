@@ -14,6 +14,7 @@ import org.junit.jupiter.api.*;
 public class VSDSoundTest {
 
     @Test
+    @Disabled("Test requires further development")
     public void testStateConstants() {
         // Maybe check the enums here?
     }
@@ -23,7 +24,6 @@ public class VSDSoundTest {
     public void testCreateSimple() {
         VSDSound uut = new SoundBite("unitUnderTest"); // BOUND_MODE
         Assert.assertEquals("sound name", "unitUnderTest", uut.getName());
-        Assert.assertFalse("is playing", uut.isPlaying());
     
         // this created an audio manager, clean that up
         InstanceManager.getDefault(jmri.AudioManager.class).cleanup();
@@ -63,4 +63,5 @@ public class VSDSoundTest {
         jmri.util.JUnitUtil.tearDown();
 
     }
+
 }

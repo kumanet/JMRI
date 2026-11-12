@@ -1,16 +1,16 @@
 package jmri.util.table;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import java.awt.Color;
+
 import javax.swing.JProgressBar;
 import javax.swing.JTable;
+
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.junit.jupiter.api.Test;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
+import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test simple functioning of ProgressCellRender
@@ -21,17 +21,17 @@ import org.junit.jupiter.api.Test;
 public class ProgressCellRenderTest  {
 
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
-    public void testInitComponents() throws Exception{
-        assertThat(t).isNotNull();
+    @DisabledIfHeadless
+    public void testInitComponents() {
+        assertNotNull(t);
     }
     
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
+    @DisabledIfHeadless
     public void testValues() {
-        
+
         JTable table = new JTable(new Object[][]{}, new String[]{});
-        
+        assertNotNull(t);
         assertEquals("0%",(( JProgressBar )
             t.getTableCellRendererComponent(table, 0f, true, true, 0, 0)).getString());
 
@@ -50,7 +50,7 @@ public class ProgressCellRenderTest  {
         
     }
     
-    private ProgressCellRender t;
+    private ProgressCellRender t = null;
 
     @BeforeEach
     public void setUp() {

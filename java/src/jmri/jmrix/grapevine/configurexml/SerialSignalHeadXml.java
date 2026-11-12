@@ -7,8 +7,6 @@ import jmri.jmrix.grapevine.GrapevineSystemConnectionMemo;
 import jmri.managers.configurexml.AbstractNamedBeanManagerConfigXML;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handle XML configuration for Grapevine SerialSignalHead objects.
@@ -62,5 +60,5 @@ public class SerialSignalHeadXml extends AbstractNamedBeanManagerConfigXML {
         return true;
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(SerialSignalHeadXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(SerialSignalHeadXml.class);
 }

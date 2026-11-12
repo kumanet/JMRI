@@ -2,18 +2,13 @@ package jmri.jmrit.operations.rollingstock;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
+
 import jmri.InstanceManager;
 import jmri.InstanceManagerAutoDefault;
 import jmri.jmrit.XmlFile;
@@ -22,9 +17,8 @@ import jmri.jmrit.operations.rollingstock.cars.Car;
 import jmri.jmrit.operations.rollingstock.cars.CarManager;
 import jmri.jmrit.operations.rollingstock.engines.Engine;
 import jmri.jmrit.operations.rollingstock.engines.EngineManager;
-import jmri.jmrit.operations.setup.Control;
-import jmri.jmrit.operations.setup.OperationsSetupXml;
-import jmri.jmrit.operations.setup.Setup;
+import jmri.jmrit.operations.setup.*;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -68,10 +62,10 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
             return;
         }
 
-        String carLoad = " ";
-        String carFinalDest = " ";
-        String carFinalDestTrack = " ";
-        if (rs.getClass().equals(Car.class)) {
+        String carLoad = "";
+        String carFinalDest = "";
+        String carFinalDestTrack = "";
+        if (Car.class.isInstance(rs)) {
             Car car = (Car) rs;
             carLoad = car.getLoadName();
             carFinalDest = car.getFinalDestinationName();
@@ -114,10 +108,8 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
                     StandardCharsets.UTF_8)), CSVFormat.DEFAULT)) {
             log.debug("Log: {}", line);
             fileOut.printRecord(line);
-            fileOut.flush();
-            fileOut.close();
         } catch (IOException e) {
-            log.error("Exception while opening log file: {}", e.getMessage());
+            log.error("Exception while opening log file: {}", e.getLocalizedMessage());
         }
     }
 
@@ -146,7 +138,7 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
                     fileLogger = new java.io.File(getFullLoggerFileName());
                 }
             } catch (IOException e) {
-                log.error("Exception while making logging directory: {}", e.getMessage());
+                log.error("Exception while making logging directory: {}", e.getLocalizedMessage());
             }
         }
         return fileLogger;
@@ -192,7 +184,7 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
                     file = new java.io.File(getFullLoggerFileName(rs));
                 }
             } catch (IOException e) {
-                log.error("Exception while making logging directory: {}", e.getMessage());
+                log.error("Exception while making logging directory: {}", e.getLocalizedMessage());
             }
         }
         return file;
@@ -237,13 +229,18 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
             log.error("Rolling stock name ({}) must not contain reserved characters", rs);
             return loggingDirectory + File.separator + "rollingStock" + File.separator + "ERROR" + ".csv"; // NOI18N
         }
-        return loggingDirectory + File.separator + "rollingStock" + File.separator + rs.toString() + ".csv"; // NOI18N
+        String rsName = rs.toString();
+        // put clones in the same file as original car
+        if (rs.isClone()) {
+            rsName = rs.getRoadName() + " " + rs.getNumber().split(Car.CLONE_REGEX)[0];
+        }
+        return loggingDirectory + File.separator + "rollingStock" + File.separator + rsName + ".csv"; // NOI18N
     }
 
     private String getDate() {
-        Date date = Calendar.getInstance().getTime();
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy_MM_dd"); // NOI18N
-        return simpleDateFormat.format(date);
+        LocalDateTime date = LocalDateTime.now();
+        DateTimeFormatter simpleDateFormat = DateTimeFormatter.ofPattern("yyyy_MM_dd"); // NOI18N
+        return date.format(simpleDateFormat);
     }
 
     /**
@@ -252,14 +249,9 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
      *
      */
     private String getTime() {
-        String time = Calendar.getInstance().getTime().toString();
-        SimpleDateFormat dt = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy"); // NOI18N
-        SimpleDateFormat dtout = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss"); // NOI18N
-        try {
-            return dtout.format(dt.parse(time));
-        } catch (ParseException e) {
-            return time; // there was an issue, use the old format
-        }
+        LocalDateTime date = LocalDateTime.now();
+        DateTimeFormatter simpleDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"); // NOI18N
+        return date.format(simpleDateFormat);
     }
 
     private void addCarListeners() {
@@ -331,5 +323,5 @@ public class RollingStockLogger extends XmlFile implements InstanceManagerAutoDe
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RollingStockLogger.class);
+    private static final Logger log = LoggerFactory.getLogger(RollingStockLogger.class);
 }

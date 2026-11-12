@@ -2,7 +2,6 @@ package jmri.jmrit.logix.configurexml;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +29,6 @@ public class OBlockManagerXmlTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(OBlockManagerXmlTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(OBlockManagerXmlTest.class);
 
 }

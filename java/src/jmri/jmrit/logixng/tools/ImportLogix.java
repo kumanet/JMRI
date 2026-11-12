@@ -46,7 +46,10 @@ public class ImportLogix {
                 counter++;
             }
 
-            if (logixNG == null) throw new RuntimeException("Cannot create new LogixNG with name: \"Logix: " + logix.getDisplayName()+"\"");
+            if (logixNG == null) throw new JmriUncheckedException("Cannot create new LogixNG with name: \"Logix: " + logix.getDisplayName()+"\"");
+
+            logixNG.activate();
+            logixNG.clearStartup();
 
             log.debug("Import Logix {} to LogixNG {}", logix.getSystemName(), logixNG.getSystemName());
         }
@@ -85,6 +88,6 @@ public class ImportLogix {
         return _logixNG;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ImportLogix.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ImportLogix.class);
 
 }

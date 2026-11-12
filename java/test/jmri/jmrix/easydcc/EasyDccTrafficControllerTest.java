@@ -1,15 +1,17 @@
 package jmri.jmrix.easydcc;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.util.Vector;
+
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import jmri.util.junit.rules.RetryRule;
 
 /**
  * JUnit tests for the EasyDccTrafficController class
@@ -19,10 +21,8 @@ import jmri.util.junit.rules.RetryRule;
 @Timeout(90)
 public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficControllerTest {
 
-    public RetryRule retryRule = new RetryRule(3);  // allow 3 retries
-
     @Test
-    public void testSendThenRcvReply() throws Exception {
+    public void testSendThenRcvReply() throws IOException {
         EasyDccTrafficController c = new EasyDccTrafficController(new EasyDccSystemConnectionMemo("E", "EasyDCC Test")){
             @Override
             protected void terminate(){
@@ -36,7 +36,8 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
         c.connectPort(p);
 
         // object to receive reply
-        EasyDccListener l = new EasyDccListenerScaffold();
+        EasyDccListenerScaffold l = new EasyDccListenerScaffold();
+        assertNull(l.rcvdMsg);
         c.addEasyDccListener(l);
 
         // send a message
@@ -50,11 +51,11 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
         JUnitUtil.waitFor(()->{return tostream.available() == 4;}, "total length");
         
         // test the result of sending
-        Assert.assertEquals("total length ", 4, tostream.available());
-        Assert.assertEquals("Char 0", '0', tostream.readByte());
-        Assert.assertEquals("Char 1", '1', tostream.readByte());
-        Assert.assertEquals("Char 2", '2', tostream.readByte());
-        Assert.assertEquals("EOM", 0x0d, tostream.readByte());
+        assertEquals( 4, tostream.available(), "total length ");
+        assertEquals( (byte)'0', tostream.readByte(), "Char 0");
+        assertEquals( (byte)'1', tostream.readByte(), "Char 1");
+        assertEquals( (byte)'2', tostream.readByte(), "Char 2");
+        assertEquals( 0x0d, tostream.readByte(), "EOM");
 
         // now send reply
         tistream.write('P');
@@ -62,36 +63,28 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
 
         // threading causes the traffic controller to handle the reply,
         // so wait until that happens.
-        JUnitUtil.waitFor(()->{return rcvdReply != null;}, "reply received");
+        JUnitUtil.waitFor(()->{return l.rcvdReply != null;}, "reply received");
 
-        Assert.assertTrue("reply received ", rcvdReply != null);
-        Assert.assertEquals("first char of reply ", 'P', rcvdReply.getOpCode());
+        assertNotNull( l.rcvdReply, "reply received ");
+        assertEquals( 'P', l.rcvdReply.getOpCode(), "first char of reply ");
         c.terminateThreads(); // stop any threads we might have created.
     }
 
-    // internal class to simulate an EasyDccListener
-    class EasyDccListenerScaffold implements EasyDccListener {
-
-        public EasyDccListenerScaffold() {
-            rcvdReply = null;
-            rcvdMsg = null;
-        }
-
-        @Override
-        public void message(EasyDccMessage m) {
-            rcvdMsg = m;
-        }
-
-        @Override
-        public void reply(EasyDccReply r) {
-            rcvdReply = r;
-        }
-    }
-    EasyDccReply rcvdReply;
-    EasyDccMessage rcvdMsg;
-
     // internal class to simulate an EasyDccPortController
-    class EasyDccPortControllerScaffold extends EasyDccPortController {
+    private class EasyDccPortControllerScaffold extends EasyDccPortController {
+
+        EasyDccPortControllerScaffold() {
+            super(new EasyDccSystemConnectionMemo());
+            assertDoesNotThrow( () -> {
+                PipedInputStream tempPipe;
+                tempPipe = new PipedInputStream();
+                tostream = new DataInputStream(tempPipe);
+                ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
+                tempPipe = new PipedInputStream();
+                istream = new DataInputStream(tempPipe);
+                tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
+            });
+        }
 
         @Override
         public Vector<String> getPortNames() {
@@ -118,17 +111,6 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
             return new int[] {};
         }
 
-        protected EasyDccPortControllerScaffold() throws Exception {
-            super(new EasyDccSystemConnectionMemo());
-            PipedInputStream tempPipe;
-            tempPipe = new PipedInputStream();
-            tostream = new DataInputStream(tempPipe);
-            ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
-            tempPipe = new PipedInputStream();
-            istream = new DataInputStream(tempPipe);
-            tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
-        }
-
         // returns the InputStream from the port
         @Override
         public DataInputStream getInputStream() {
@@ -147,17 +129,21 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
             return true;
         }
     }
-    DataOutputStream ostream;  // Traffic controller writes to this
-    DataInputStream tostream;  // so we can read it from this
 
-    DataOutputStream tistream; // tests write to this
-    DataInputStream istream;   // so the traffic controller can read from this
+    private DataOutputStream ostream;  // Traffic controller writes to this
+    private DataInputStream tostream;  // so we can read it from this
+
+    private DataOutputStream tistream; // tests write to this
+    private DataInputStream istream;   // so the traffic controller can read from this
+
+    private EasyDccSystemConnectionMemo memo;
 
     @Override
     @BeforeEach
     public void setUp() {
-        jmri.util.JUnitUtil.setUp();
-        tc = new EasyDccTrafficController(new EasyDccSystemConnectionMemo("E", "EasyDCC Test"));
+        JUnitUtil.setUp();
+        memo = new EasyDccSystemConnectionMemo("E", "EasyDCC Test");
+        tc = new EasyDccTrafficController(memo);
     }
 
     @Override
@@ -166,7 +152,11 @@ public class EasyDccTrafficControllerTest extends jmri.jmrix.AbstractMRTrafficCo
         if (tc!=null) {
             tc.terminateThreads();
         }
-        jmri.util.JUnitUtil.tearDown();
+        if ( memo != null ) {
+            memo.dispose();
+            memo = null;
+        }
+        JUnitUtil.tearDown();
     }
 
 }

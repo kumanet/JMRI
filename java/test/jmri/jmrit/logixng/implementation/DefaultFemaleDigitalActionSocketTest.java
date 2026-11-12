@@ -1,5 +1,10 @@
 package jmri.jmrit.logixng.implementation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,14 +16,10 @@ import jmri.*;
 import jmri.jmrit.display.logixng.CategoryDisplay;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.actions.ActionTurnout;
+import jmri.jmrit.operations.logixng.CategoryOperations;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.*;
 
 /**
  * Test ExpressionTimer
@@ -29,9 +30,6 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
 
     private MyActionTurnout _action;
 
-    @Rule
-    public final ExpectedException thrown = ExpectedException.none();
-
     @Override
     protected Manager<? extends NamedBean> getManager() {
         return InstanceManager.getDefault(DigitalActionManager.class);
@@ -39,20 +37,20 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
 
     @Test
     public void testBundleClass() {
-        Assert.assertEquals("bundle is correct", "Test Bundle bb aa cc", Bundle.getMessage("TestBundle", "aa", "bb", "cc"));
-        Assert.assertEquals("bundle is correct", "Generic", Bundle.getMessage(Locale.US, "SocketTypeGeneric"));
-        Assert.assertEquals("bundle is correct", "Test Bundle bb aa cc", Bundle.getMessage(Locale.US, "TestBundle", "aa", "bb", "cc"));
+        assertEquals( "Test Bundle bb aa cc", Bundle.getMessage("TestBundle", "aa", "bb", "cc"), "bundle is correct");
+        assertEquals( "Generic", Bundle.getMessage(Locale.US, "SocketTypeGeneric"), "bundle is correct 2");
+        assertEquals( "Test Bundle bb aa cc", Bundle.getMessage(Locale.US, "TestBundle", "aa", "bb", "cc"), "bundle is correct 3");
     }
 
     @Test
     public void testGetName() {
-        Assert.assertTrue("String matches", "A1".equals(_femaleSocket.getName()));
+        assertTrue( "A1".equals(_femaleSocket.getName()), "String matches");
     }
 
     @Test
     public void testGetDescription() {
-        Assert.assertTrue("String matches", "!".equals(_femaleSocket.getShortDescription()));
-        Assert.assertTrue("String matches", "! A1".equals(_femaleSocket.getLongDescription()));
+        assertTrue( "!".equals(_femaleSocket.getShortDescription()), "String matches");
+        assertTrue( "! A1".equals(_femaleSocket.getLongDescription()), "String matches 2");
     }
 
     @Override
@@ -74,10 +72,10 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
     }
 
     @Test
-    public void testSetValue() throws Exception {
+    public void testSetValue() throws JmriException {
         // Every test method should have an assertion
-        Assert.assertNotNull("femaleSocket is not null", _femaleSocket);
-        Assert.assertFalse("femaleSocket is not connected", _femaleSocket.isConnected());
+        assertNotNull( _femaleSocket, "femaleSocket is not null");
+        assertFalse( _femaleSocket.isConnected(), "femaleSocket is not connected");
         // Test execute() when not connected
         ((DefaultFemaleDigitalActionSocket)_femaleSocket).execute();
     }
@@ -90,6 +88,8 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
         classes.add(jmri.jmrit.logixng.actions.ActionAudio.class);
         classes.add(jmri.jmrit.logixng.actions.ActionBlock.class);
         classes.add(jmri.jmrit.logixng.actions.ActionClock.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionClockRate.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionDispatcher.class);
         classes.add(jmri.jmrit.logixng.actions.ActionEntryExit.class);
         classes.add(jmri.jmrit.logixng.actions.ActionLight.class);
         classes.add(jmri.jmrit.logixng.actions.ActionLightIntensity.class);
@@ -97,52 +97,93 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
         classes.add(jmri.jmrit.logixng.actions.ActionMemory.class);
         classes.add(jmri.jmrit.logixng.actions.ActionOBlock.class);
         classes.add(jmri.jmrit.logixng.actions.ActionPower.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionRequestUpdateAllSensors.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionRequestUpdateOfSensor.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionRequestUpdateOfTurnout.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionReporter.class);
         classes.add(jmri.jmrit.logixng.actions.ActionScript.class);
         classes.add(jmri.jmrit.logixng.actions.ActionSensor.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionSetReporter.class);
         classes.add(jmri.jmrit.logixng.actions.ActionSignalHead.class);
         classes.add(jmri.jmrit.logixng.actions.ActionSignalMast.class);
         classes.add(jmri.jmrit.logixng.actions.ActionSound.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionTable.class);
         classes.add(jmri.jmrit.logixng.actions.ActionThrottle.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionThrottleFunction.class);
         classes.add(jmri.jmrit.logixng.actions.ActionTurnout.class);
         classes.add(jmri.jmrit.logixng.actions.ActionTurnoutLock.class);
         classes.add(jmri.jmrit.logixng.actions.ActionWarrant.class);
         classes.add(jmri.jmrit.logixng.actions.EnableLogix.class);
+        classes.add(jmri.jmrit.logixng.actions.EnableLogixNG.class);
+        classes.add(jmri.jmrit.logixng.actions.ProgramOnMain.class);
         classes.add(jmri.jmrit.logixng.actions.TriggerRoute.class);
-        map.put(Category.ITEM, classes);
+        map.put(LogixNG_Category.ITEM, classes);
 
         classes = new ArrayList<>();
         classes.add(jmri.jmrit.logixng.actions.ActionTimer.class);
+        classes.add(jmri.jmrit.logixng.actions.DigitalFormula.class);
         classes.add(jmri.jmrit.logixng.actions.DoAnalogAction.class);
         classes.add(jmri.jmrit.logixng.actions.DoStringAction.class);
         classes.add(jmri.jmrit.logixng.actions.ExecuteDelayed.class);
-        classes.add(jmri.jmrit.logixng.actions.For.class);
-        classes.add(jmri.jmrit.logixng.actions.IfThenElse.class);
         classes.add(jmri.jmrit.logixng.actions.DigitalMany.class);
-        classes.add(jmri.jmrit.logixng.actions.Sequence.class);
-        classes.add(jmri.jmrit.logixng.actions.TableForEach.class);
-        map.put(Category.COMMON, classes);
+        map.put(LogixNG_Category.COMMON, classes);
 
         classes = new ArrayList<>();
+        classes.add(jmri.jmrit.logixng.actions.Break.class);
+        classes.add(jmri.jmrit.logixng.actions.Continue.class);
+        classes.add(jmri.jmrit.logixng.actions.DigitalCallModule.class);
+        classes.add(jmri.jmrit.logixng.actions.Error.class);
+        classes.add(jmri.jmrit.logixng.actions.Exit.class);
+        classes.add(jmri.jmrit.logixng.actions.For.class);
+        classes.add(jmri.jmrit.logixng.actions.ForEach.class);
+        classes.add(jmri.jmrit.logixng.actions.ForEachRoster.class);
+        classes.add(jmri.jmrit.logixng.actions.ForEachWithDelay.class);
+        classes.add(jmri.jmrit.logixng.actions.IfThenElse.class);
+        classes.add(jmri.jmrit.logixng.actions.Return.class);
+        classes.add(jmri.jmrit.logixng.actions.RunOnce.class);
+        classes.add(jmri.jmrit.logixng.actions.Sequence.class);
+        classes.add(jmri.jmrit.logixng.actions.TableForEach.class);
+        classes.add(jmri.jmrit.logixng.actions.ValidationError.class);
+        map.put(LogixNG_Category.FLOW_CONTROL, classes);
+
+        classes = new ArrayList<>();
+        classes.add(jmri.jmrit.display.logixng.ActionAudioIcon.class);
+        classes.add(jmri.jmrit.display.logixng.ActionLayoutTurnout.class);
         classes.add(jmri.jmrit.display.logixng.ActionPositionable.class);
+        classes.add(jmri.jmrit.display.logixng.ActionPositionableByClass.class);
+        classes.add(jmri.jmrit.display.logixng.WindowManagement.class);
         map.put(CategoryDisplay.DISPLAY, classes);
 
         classes = new ArrayList<>();
+        classes.add(jmri.jmrit.operations.logixng.OperationsProStartAutomation.class);
+        map.put(CategoryOperations.OPERATIONS, classes);
+
+        classes = new ArrayList<>();
+        classes.add(jmri.jmrit.logixng.actions.ActionCreateBeansFromTable.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionFindTableRowOrColumn.class);
         classes.add(jmri.jmrit.logixng.actions.ActionListenOnBeans.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionListenOnBeansLocalVariable.class);
         classes.add(jmri.jmrit.logixng.actions.ActionListenOnBeansTable.class);
-        classes.add(jmri.jmrit.logixng.actions.DigitalCallModule.class);
+        classes.add(jmri.jmrit.logixng.actions.ActionShutDownTask.class);
+        classes.add(jmri.jmrit.logixng.actions.ExecuteAction.class);
+        classes.add(jmri.jmrit.logixng.actions.ExecuteProgram.class);
+        classes.add(jmri.jmrit.logixng.actions.JsonDecode.class);
         classes.add(jmri.jmrit.logixng.actions.Logix.class);
         classes.add(jmri.jmrit.logixng.actions.LogData.class);
         classes.add(jmri.jmrit.logixng.actions.LogLocalVariables.class);
+        classes.add(jmri.jmrit.logixng.actions.Timeout.class);
+        classes.add(jmri.jmrit.logixng.actions.ShowDialog.class);
         classes.add(jmri.jmrit.logixng.actions.ShutdownComputer.class);
+        classes.add(jmri.jmrit.logixng.actions.SimulateTurnoutFeedback.class);
         classes.add(jmri.jmrit.logixng.actions.WebBrowser.class);
-        map.put(Category.OTHER, classes);
+        classes.add(jmri.jmrit.logixng.actions.WebRequest.class);
+        map.put(LogixNG_Category.OTHER, classes);
 
-        Assert.assertTrue("maps are equal",
-                isConnectionClassesEquals(map, _femaleSocket.getConnectableClasses()));
+        assertTrue( isConnectionClassesEquals(map, _femaleSocket.getConnectableClasses()),
+            "maps are equal");
     }
 
-    // The minimal setup for log4J
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -150,6 +191,7 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
         JUnitUtil.initConfigureManager();
         JUnitUtil.initInternalSensorManager();
         JUnitUtil.initInternalTurnoutManager();
+        JUnitUtil.initDebugThrottleManager();
         JUnitUtil.initLogixNGManager();
 
         LogixNG logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
@@ -177,21 +219,20 @@ public class DefaultFemaleDigitalActionSocketTest extends FemaleSocketTestBase {
         }, "A1");
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
 
 
-    private class MyActionTurnout extends ActionTurnout {
+    private static class MyActionTurnout extends ActionTurnout {
 
-        private boolean _hasBeenSetup = false;
+        boolean _hasBeenSetup = false;
 
-        public MyActionTurnout(String systemName) {
+        MyActionTurnout(String systemName) {
             super(systemName, null);
         }
 

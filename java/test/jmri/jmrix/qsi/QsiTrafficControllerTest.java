@@ -1,16 +1,16 @@
 package jmri.jmrix.qsi;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.*;
+
 import java.util.Vector;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.*;
+import jmri.util.JUnitUtil;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.*;
 
 /**
  * JUnit tests for the QsiTrafficController class.
@@ -22,11 +22,11 @@ public class QsiTrafficControllerTest {
     @Test
     public void testCreate() {
         QsiTrafficController m = new QsiTrafficController();
-        Assert.assertNotNull("exists", m);
+        assertNotNull( m, "exists");
     }
 
     @Test
-    public void testSendAscii() throws Exception {
+    public void testSendAscii() throws IOException {
         QsiTrafficController c = new QsiTrafficController() {
             // skip timeout message
             //protected void handleTimeout(jmri.jmrix.AbstractMRMessage msg,jmri.jmrix.AbstractMRListener l) {};
@@ -44,20 +44,20 @@ public class QsiTrafficControllerTest {
         m.setElement(1, 0);
         m.setElement(2, 0);
         c.sendQsiMessage(m, new QsiListenerScaffold());
-        wait(2); // relinquish control
+        JUnitUtil.waitFor(2); // relinquish control
 
-        Assert.assertEquals("total length ", 6, tostream.available());
-        Assert.assertEquals("Lead S", 'S', tostream.readByte());
-        Assert.assertEquals("Byte 0", 11, tostream.readByte());
-        Assert.assertEquals("Byte 1", 0, tostream.readByte());
-        Assert.assertEquals("Byte 2", 0, tostream.readByte());
-        Assert.assertEquals("Check", 11, tostream.readByte());
-        Assert.assertEquals("E", 'E', tostream.readByte());
-        Assert.assertEquals("remaining ", 0, tostream.available());
+        assertEquals( 6, tostream.available(), "total length ");
+        assertEquals( (byte)'S', tostream.readByte(), "Lead S");
+        assertEquals( 11, tostream.readByte(), "Byte 0");
+        assertEquals( 0, tostream.readByte(), "Byte 1");
+        assertEquals( 0, tostream.readByte(), "Byte 2");
+        assertEquals( 11, tostream.readByte(), "Check");
+        assertEquals( (byte)'E', tostream.readByte(), "E");
+        assertEquals( 0, tostream.available(), "remaining");
     }
 
     @Test
-    public void testMonitor() throws Exception {
+    public void testMonitor() throws IOException {
         QsiTrafficController c = new QsiTrafficController() {
             // skip timeout message
             //protected void handleTimeout(jmri.jmrix.AbstractMRMessage msg,jmri.jmrix.AbstractMRListener l) {};
@@ -70,7 +70,6 @@ public class QsiTrafficControllerTest {
         c.connectPort(p);
 
         // start monitor
-        rcvdMsg = null;
         QsiListenerScaffold s = new QsiListenerScaffold();
         c.addQsiListener(s);
 
@@ -80,24 +79,22 @@ public class QsiTrafficControllerTest {
         m.setElement(1, 0);
         m.setElement(2, 0);
         c.sendQsiMessage(m, new QsiListenerScaffold());
-        synchronized (this) {
-            wait(100);
-        }
+        JUnitUtil.waitFor(100);
 
         // check it arrived at monitor
-        Assert.assertTrue("message not null", rcvdMsg != null);
-        Assert.assertEquals("total length ", 6, tostream.available());
-        Assert.assertEquals("Lead S", 'S', tostream.readByte());
-        Assert.assertEquals("Byte 0", 11, tostream.readByte());
-        Assert.assertEquals("Byte 1", 0, tostream.readByte());
-        Assert.assertEquals("Byte 2", 0, tostream.readByte());
-        Assert.assertEquals("Check", 11, tostream.readByte());
-        Assert.assertEquals("E", 'E', tostream.readByte());
-        Assert.assertEquals("remaining ", 0, tostream.available());
+        assertNotNull( s.rcvdMsg, "message not null");
+        assertEquals( 6, tostream.available(), "total length ");
+        assertEquals( (byte)'S', tostream.readByte(), "Lead S");
+        assertEquals( 11, tostream.readByte(), "Byte 0");
+        assertEquals( 0, tostream.readByte(), "Byte 1");
+        assertEquals( 0, tostream.readByte(), "Byte 2");
+        assertEquals( 11, tostream.readByte(), "Check");
+        assertEquals( (byte)'E', tostream.readByte(), "E");
+        assertEquals( 0, tostream.available(), "remaining");
     }
 
     @Test
-    public void testRcvReply() throws Exception {
+    public void testRcvReply() throws IOException {
         QsiTrafficController c = new QsiTrafficController() {
             // skip timeout message
             //protected void handleTimeout(jmri.jmrix.AbstractMRMessage msg,jmri.jmrix.AbstractMRListener l) {};
@@ -110,7 +107,7 @@ public class QsiTrafficControllerTest {
         c.connectPort(p);
 
         // object to receive reply
-        QsiListener l = new QsiListenerScaffold();
+        QsiListenerScaffold l = new QsiListenerScaffold();
         c.addQsiListener(l);
 
         // send a message
@@ -129,49 +126,25 @@ public class QsiTrafficControllerTest {
 
         // drive the mechanism
         c.handleOneIncomingReply();
-        Assert.assertTrue("reply received ", waitForReply());
-        Assert.assertEquals("first char of reply ", 'S', rcvdReply.getOpCode());
+
+        JUnitUtil.waitFor(() -> { return l.rcvdReply != null; }, "reply received");
+        assertEquals( 'S', l.rcvdReply.getOpCode(), "first char of reply ");
     }
-
-    private boolean waitForReply() {
-        // wait for reply (normally, done by callback; will check that later)
-        int i = 0;
-        while (rcvdReply == null && i++ < 100) {
-            try {
-                Thread.sleep(10);
-            }
-            catch (Exception e) {
-            }
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("past loop, i={} reply={}", i, rcvdReply);
-        }
-        return i < 100;
-    }
-
-    // internal class to simulate a QsiListener
-    class QsiListenerScaffold implements QsiListener {
-
-        public QsiListenerScaffold() {
-            rcvdReply = null;
-            rcvdMsg = null;
-        }
-
-        @Override
-        public void message(QsiMessage m) {
-            rcvdMsg = m;
-        }
-
-        @Override
-        public void reply(QsiReply r) {
-            rcvdReply = r;
-        }
-    }
-    QsiReply rcvdReply;
-    QsiMessage rcvdMsg;
 
     // internal class to simulate a QsiPortController
-    class QsiPortControllerScaffold extends QsiPortController {
+    private class QsiPortControllerScaffold extends QsiPortController {
+
+        QsiPortControllerScaffold() {
+            super(new QsiSystemConnectionMemo());
+            assertDoesNotThrow( () -> {
+                PipedInputStream tempPipe = new PipedInputStream();
+                tostream = new DataInputStream(tempPipe);
+                ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
+                tempPipe = new PipedInputStream();
+                istream = new DataInputStream(tempPipe);
+                tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
+            });
+        }
 
         @Override
         public Vector<String> getPortNames() {
@@ -197,17 +170,6 @@ public class QsiTrafficControllerTest {
             return new int[]{};
         }
 
-        protected QsiPortControllerScaffold() throws Exception {
-            super(new QsiSystemConnectionMemo());
-            PipedInputStream tempPipe;
-            tempPipe = new PipedInputStream();
-            tostream = new DataInputStream(tempPipe);
-            ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
-            tempPipe = new PipedInputStream();
-            istream = new DataInputStream(tempPipe);
-            tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
-        }
-
         // returns the InputStream from the port
         @Override
         public DataInputStream getInputStream() {
@@ -226,20 +188,14 @@ public class QsiTrafficControllerTest {
             return true;
         }
     }
-    static DataOutputStream ostream;  // Traffic controller writes to this
-    static DataInputStream tostream; // so we can read it from this
 
-    static DataOutputStream tistream; // tests write to this
-    static DataInputStream istream;  // so the traffic controller can read from this
+    private DataOutputStream ostream;  // Traffic controller writes to this
+    private DataInputStream tostream; // so we can read it from this
+
+    private DataOutputStream tistream; // tests write to this
+    private DataInputStream istream;  // so the traffic controller can read from this
 
     // from here down is testing infrastructure
-    void wait(int msec) {
-        try {
-            super.wait(msec);
-        }
-        catch (Exception e) {
-        }
-    }
 
     @BeforeEach
     public void setUp() {
@@ -251,6 +207,6 @@ public class QsiTrafficControllerTest {
         jmri.util.JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(QsiTrafficControllerTest.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QsiTrafficControllerTest.class);
 
 }

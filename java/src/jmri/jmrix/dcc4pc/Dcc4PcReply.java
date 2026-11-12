@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Dcc4PcReply extends AbstractMRReply {
 
-    static public final int maxSize = 2048;
+    public static final int maxSize = 2048;
 
     // create a new one
     public Dcc4PcReply() {
@@ -137,6 +137,20 @@ public class Dcc4PcReply extends AbstractMRReply {
         return _dataChars.clone();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        StringBuilder buf = new StringBuilder();
+        buf.append("0x");
+        buf.append(Integer.toHexString(0xFF & _dataChars[0]));
+        for (int i = 1; i < _nDataChars; i++) {
+            buf.append(".0x");
+            buf.append(Integer.toHexString(0xff & _dataChars[i]));
+            //buf.append(", 0x" + Integer.toHexString(0xFF & _dataChars[i]));
+        }
+        return buf.toString();
+    }
+
     public byte[] getFormattedReply() {
         int len = this.getNumDataElements();
         int cr = 0;
@@ -178,6 +192,6 @@ public class Dcc4PcReply extends AbstractMRReply {
         }
         return -1;
     }
-    private final static Logger log = LoggerFactory.getLogger(Dcc4PcReply.class);
+    private static final Logger log = LoggerFactory.getLogger(Dcc4PcReply.class);
 
 }

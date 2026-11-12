@@ -22,7 +22,7 @@ public class ErrorHandler {
         if (e.systemName != null) {
             m.append(" System name \"").append(e.systemName).append("\"");
         }
-        if (e.userName != null && !e.userName.equals("")) {
+        if (e.userName != null && !e.userName.isEmpty()) {
             m.append(" User name \"").append(e.userName).append("\"");
         }
         if (e.operation != null) {
@@ -36,9 +36,9 @@ public class ErrorHandler {
         }
         m.append("\nSee http://jmri.org/help/en/package/jmri/configurexml/ErrorHandler.shtml for possibly more information.");
         if (e.exception != null) {
-            log.error(m.toString(), e.exception);
+            log.error("Load Error: {}", m.toString(), e.exception);
         } else {
-            log.error(m.toString());
+            log.error("Load Error: {}", m.toString());
         }
     }
 
@@ -54,5 +54,5 @@ public class ErrorHandler {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(ErrorHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(ErrorHandler.class);
 }

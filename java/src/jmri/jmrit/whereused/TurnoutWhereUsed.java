@@ -17,7 +17,7 @@ public class TurnoutWhereUsed {
      * @param turnout The turnout bean.
      * @return a populated textarea.
      */
-    static public JTextArea getWhereUsed(NamedBean turnout) {
+    public static JTextArea getWhereUsed(NamedBean turnout) {
         JTextArea textArea = new JTextArea();
         String label = Bundle.getMessage("MakeLabel", Bundle.getMessage("BeanNameTurnout"));  // NOI18N
         textArea.append(Bundle.getMessage("ReferenceTitle", label, turnout.getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME)));  // NOI18N
@@ -29,6 +29,8 @@ public class TurnoutWhereUsed {
         textArea.append(WhereUsedCollectors.checkSignalHeadLogic(turnout));
         textArea.append(WhereUsedCollectors.checkSignalMastLogic(turnout));
         textArea.append(WhereUsedCollectors.checkSignalGroups(turnout));
+        textArea.append(WhereUsedCollectors.checkSignalHeads(turnout));
+        textArea.append(WhereUsedCollectors.checkSignalMasts(turnout));
         textArea.append(WhereUsedCollectors.checkOBlocks(turnout));
         textArea.append(WhereUsedCollectors.checkLogixConditionals(turnout));
         textArea.append(WhereUsedCollectors.checkLogixNGConditionals(turnout));

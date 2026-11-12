@@ -1,10 +1,20 @@
 package jmri.jmrit.display.layoutEditor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.IOException;
+
 import jmri.Block;
+import jmri.InstanceManager;
 import jmri.Memory;
+import jmri.SensorManager;
+import jmri.jmrix.internal.InternalSensorManager;
+import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
+import org.jdom2.JDOMException;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -18,8 +28,8 @@ public class LayoutBlockTest {
 
     @Test
     public void testCtor() {
-        Assert.assertNotNull("exists", layoutBlock);
-        Assert.assertEquals("Test Block", layoutBlock.getUserName());
+        assertNotNull( layoutBlock, "exists");
+        assertEquals("Test Block", layoutBlock.getUserName());
     }
 
     @Test
@@ -29,11 +39,29 @@ public class LayoutBlockTest {
 
         // Get the referenced block and change its user name
         Block block = jmri.InstanceManager.getDefault(jmri.BlockManager.class).getByUserName("Test Block");
-        Assert.assertNotNull(block);
+        assertNotNull(block);
         block.setUserName("New Test Block");
 
         // Verify that the block user name change propagated to the layout block
-        Assert.assertEquals("New Test Block", layoutBlock.getUserName());
+        assertEquals("New Test Block", layoutBlock.getUserName());
+    }
+
+    @Test
+    public void testBlockSensor() {
+        // initialize the layout block and the related automatic block
+        layoutBlock.initializeLayoutBlock();
+
+        // Create an occupancy sensor
+        SensorManager sm = new InternalSensorManager(InstanceManager.getDefault(InternalSystemConnectionMemo.class));
+        sm.provideSensor("IS123");
+
+        // Get the referenced block and set its occupancy sensor
+        Block block = jmri.InstanceManager.getDefault(jmri.BlockManager.class).getByUserName("Test Block");
+        assertNotNull(block);
+        block.setSensor("IS123");
+
+        // Verify that the block sensor change propagated to the layout block
+        assertEquals("IS123", layoutBlock.getOccupancySensorName());
     }
 
     @Test
@@ -47,21 +75,22 @@ public class LayoutBlockTest {
         layoutBlock.setMemory(mem,"IM1");
 
         // verify the memory is associated
-        Assert.assertEquals("memory saved",mem,layoutBlock.getMemory());
+        assertEquals( mem, layoutBlock.getMemory(), "memory saved");
 
         // Get the referenced block
         Block block = jmri.InstanceManager.getDefault(jmri.BlockManager.class).getByUserName("Test Block");
+        Assertions.assertNotNull(block);
 
         // change the value of the block.
         block.setValue("hello world");
 
         // and verify the value is in the memory
-        Assert.assertEquals("memory content same as block value",block.getValue(),mem.getValue());
+        assertEquals( block.getValue(), mem.getValue(), "memory content same as block value");
 
     }
 
     @Test
-    public void testSetMemoryFromRosterEntryBlockValue() throws Exception {
+    public void testSetMemoryFromRosterEntryBlockValue() throws IOException, JDOMException {
         // initialize the layout block and the related automatic block
         layoutBlock.initializeLayoutBlock();
 
@@ -71,10 +100,11 @@ public class LayoutBlockTest {
         layoutBlock.setMemory(mem,"IM1");
 
         // verify the memory is associated
-        Assert.assertEquals("memory saved",mem,layoutBlock.getMemory());
+        assertEquals( mem, layoutBlock.getMemory(), "memory saved");
 
         // Get the referenced block
         Block block = jmri.InstanceManager.getDefault(jmri.BlockManager.class).getByUserName("Test Block");
+        Assertions.assertNotNull(block);
 
         // add a roster entry as the block value
         jmri.jmrit.roster.RosterEntry re = jmri.jmrit.roster.RosterEntry.fromFile(new java.io.File("java/test/jmri/jmrit/roster/ACL1012-Schema.xml"));
@@ -83,7 +113,7 @@ public class LayoutBlockTest {
         block.setValue(re);
 
         // and verify the value is in the memory
-        Assert.assertEquals("memory content same as block value",block.getValue(),mem.getValue());
+        assertEquals( block.getValue(), mem.getValue(), "memory content same as block value");
     }
 
     @Test
@@ -97,10 +127,11 @@ public class LayoutBlockTest {
         layoutBlock.setMemory(mem,"IM1");
 
         // verify the memory is associated
-        Assert.assertEquals("memory saved",mem,layoutBlock.getMemory());
+        assertEquals( mem, layoutBlock.getMemory(), "memory saved");
 
         // Get the referenced block
         Block block = jmri.InstanceManager.getDefault(jmri.BlockManager.class).getByUserName("Test Block");
+        Assertions.assertNotNull(block);
 
         jmri.IdTag tag = new jmri.implementation.DefaultIdTag("1234");
 
@@ -108,25 +139,27 @@ public class LayoutBlockTest {
         block.setValue(tag);
 
         // and verify the value is in the memory
-        Assert.assertEquals("memory content same as block value",block.getValue(),mem.getValue());
+        assertEquals( block.getValue(), mem.getValue(), "memory content same as block value");
     }
 
 
 
     // from here down is testing infrastructure
     @BeforeEach
-    public void setUp() throws Exception {
+    public void setUp() {
         JUnitUtil.setUp();
+        JUnitUtil.resetInstanceManager();
+        JUnitUtil.initInternalSensorManager();
         // Create layout block and the related automatic block
         layoutBlock = new LayoutBlock("ILB999", "Test Block");
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
+    public void tearDown() {
+        layoutBlock.dispose();
         layoutBlock = null;
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutBlockTest.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutBlockTest.class);
 }

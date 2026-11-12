@@ -1,12 +1,11 @@
 package jmri.jmrit.operations.setup;
 
-import org.jdom2.Attribute;
-import org.jdom2.DataConversionException;
-import org.jdom2.Element;
+import org.jdom2.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import jmri.InstanceManager;
 
 /**
  * Controls for operations developers. Debug Property changes and instance
@@ -39,16 +38,14 @@ public class Control {
     public static final int panelHeight100 = 100;
 
     // Train build parameters
-    @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL") // allow access for testing
-    public static boolean fullTrainOnly = false;
 
-    // Car and Engine attribute maximum string length 
+    // Car and Engine attribute maximum string length
     public static int max_len_string_attibute = 12;
 
-    // Car and Engine number maximum string length 
+    // Car and Engine number maximum string length
     public static int max_len_string_road_number = 10;
-    
-    // Car and Engine number maximum string length when printing  
+
+    // Car and Engine number maximum string length when printing
     public static int max_len_string_print_road_number = 6;
 
     // Location name maximum string length
@@ -74,16 +71,28 @@ public class Control {
 
     // Route name maximum string length
     public static int max_len_string_route_name = 25;
-    
+
     // Automation name maximum string length
     public static int max_len_string_automation_name = 25;
-    
+
     public static int reportFontSize = 10;
+    @SuppressFBWarnings(value = "MS_PKGPROTECT") // allow access for testing
     public static String reportFontName = ""; // use default
-    
+
     public static int excelWaitTime = 120; // in seconds
-    
+
     public static boolean disablePrintingIfCustom = false;
+
+    public static int speedHpt = 36;
+    
+    public static boolean showCloneCars = true;
+    
+    public static int numberOfDays = 31; // one month
+    
+    public static void setMaxCharLength(int length) {
+        max_len_string_attibute = length;
+        InstanceManager.getDefault(OperationsSetupXml.class).setDirty(true);
+    }
 
     // must synchronize changes with operation-config.dtd
     public static Element store() {
@@ -126,7 +135,15 @@ public class Control {
         // print control
         e.addContent(values = new Element(Xml.PRINT_OPTIONS));
         values.setAttribute(Xml.DISABLE_PRINT_IF_CUSTOM, disablePrintingIfCustom ? Xml.TRUE : Xml.FALSE);
-        
+        // HPT speed for calculations
+        e.addContent(values = new Element(Xml.SPEED_HPT));
+        values.setAttribute(Xml.MPH, Integer.toString(speedHpt));
+        // show clones?
+        e.addContent(values = new Element(Xml.DISPLAY));
+        values.setAttribute(Xml.SHOW_CLONES, showCloneCars ? Xml.TRUE : Xml.FALSE);
+        // days
+        e.addContent(values = new Element(Xml.DAYS));
+        values.setAttribute(Xml.LENGTH, Integer.toString(numberOfDays));
         return e;
     }
 
@@ -200,7 +217,7 @@ public class Control {
             if ((a = eReports.getAttribute(Xml.FONT_NAME)) != null) {
                 reportFontName = a.getValue();
             }
-        }   
+        }
         Element eActions = eControl.getChild(Xml.ACTIONS);
         if (eActions != null) {
             Attribute a;
@@ -219,7 +236,36 @@ public class Control {
                 disablePrintingIfCustom = format.getValue().equals(Xml.TRUE);
             }
         }
+        Element eSpeedHtp = eControl.getChild(Xml.SPEED_HPT);
+        if (eSpeedHtp != null) {
+            Attribute a;
+            if ((a = eSpeedHtp.getAttribute(Xml.MPH)) != null) {
+                try {
+                    speedHpt = a.getIntValue();
+                } catch (DataConversionException e1) {
+                    log.error("HPT speed in MPH ({}) isn't a number", a.getValue());
+                }
+            }
+        }
+        Element eDisplay = eControl.getChild(Xml.DISPLAY);
+        if (eDisplay != null) {
+            Attribute a;
+            if ((a = eDisplay.getAttribute(Xml.SHOW_CLONES)) != null) {
+                showCloneCars = a.getValue().equals(Xml.TRUE);
+            }
+        }
+        Element eDays = eControl.getChild(Xml.DAYS);
+        if (eDays != null) {
+            Attribute a;
+            if ((a = eDays.getAttribute(Xml.LENGTH)) != null) {
+                try {
+                    numberOfDays = a.getIntValue();
+                } catch (DataConversionException e1) {
+                    log.error("Number of days ({}) isn't a number", a.getValue());
+                }
+            }
+        }
     }
-    
-    private final static Logger log = LoggerFactory.getLogger(Control.class);
+
+    private static final Logger log = LoggerFactory.getLogger(Control.class);
 }

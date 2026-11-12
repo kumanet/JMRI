@@ -13,10 +13,10 @@ import java.util.ResourceBundle;
  * with time, perhaps followed by a couple of modifier characters. As a special
  * case, this is omitted for Production Releases.
  * <li>m, called the modifier, is a string that further describes the build. A
- * common modifier is "ish" which denotes an unofficial build.
+ * common modifier is "plus" which denotes an unofficial build.
  * </ul>
  * Hence you expect to see JMRI versions called things like "4.7.2", "4.6",
- * "4.7.3ish", "4.7.2-pjc", "4.7.2ish-pjc".
+ * "4.7.3plus", "4.7.2-pjc", "4.7.2plus-pjc".
  * <p>
  * The version string shown by a JMRI program or used to label a download comes
  * in two forms, depending on whether it was built by an "official" process or
@@ -30,11 +30,11 @@ import java.util.ResourceBundle;
  * property.
  * </ul>
  * <dt>Unofficial<dd>
- * Unofficial releases are marked by "ish" after the version number, and
+ * Unofficial releases are marked by "plus" after the version number, and
  * inclusion of the building user's ID.
  * <ul>
  * <li>If the revision number e.g. 123abc (git hash) is available in
- * release.revision_id, then "4.1.1ish+(user)+(date)+R123abc". Note the "R".
+ * release.revision_id, then "4.1.1plus+(user)+(date)+R123abc". Note the "R".
  * <li>Else "4.1.1+(user)+(date)", where the date comes from the
  * release.build_date property.
  * </ul>
@@ -44,7 +44,7 @@ import java.util.ResourceBundle;
  * <p>
  * Generally, JMRI updates its version string in the code repository right
  * <b>after</b> a release. Between formal release 1.2.3 and 1.2.4, the string
- * will be 1.2.4ish.
+ * will be 1.2.4plus.
  * <hr>
  * This file is part of JMRI.
  * <p>
@@ -56,64 +56,64 @@ import java.util.ResourceBundle;
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
  *
- * @author Bob Jacobsen Copyright 1997-2016
+ * @author Bob Jacobsen Copyright 1997-2022
  */
 public class Version {
 
-    static final private ResourceBundle VERSION_BUNDLE = ResourceBundle.getBundle("jmri.Version"); // NOI18N
+    private static final ResourceBundle VERSION_BUNDLE = ResourceBundle.getBundle("jmri.Version"); // NOI18N
 
     /**
      * Major number changes with large incompatible changes in requirements or
      * API.
      */
-    static final public int major = Integer.parseInt(VERSION_BUNDLE.getString("release.major")); // NOI18N
+    public static final int major = Integer.parseInt(VERSION_BUNDLE.getString("release.major")); // NOI18N
 
     /**
      * Minor number changes with each production versionBundle. Odd is
      * development, even is production.
      */
-    static final public int minor = Integer.parseInt(VERSION_BUNDLE.getString("release.minor")); // NOI18N
+    public static final int minor = Integer.parseInt(VERSION_BUNDLE.getString("release.minor")); // NOI18N
 
     /**
      * Test number changes with individual releases, generally fastest for test
      * releases. In production releases, if non-zero, indicates a bug fix only
      * release.
      */
-    static final public int test = Integer.parseInt(VERSION_BUNDLE.getString("release.build")); // NOI18N
+    public static final int test = Integer.parseInt(VERSION_BUNDLE.getString("release.build")); // NOI18N
 
     /**
      * The additional MODIFIER for the release. Used to indicate a parallel
      * release of a feature that has not been accepted into main stream
      * development.
      */
-    static final public String MODIFIER = VERSION_BUNDLE.getString("release.modifier"); // NOI18N
+    public static final String MODIFIER = VERSION_BUNDLE.getString("release.modifier"); // NOI18N
 
     /**
      * Descriptor for non-official build. Included in {@link #name()}, but not
      * in {@link #getCanonicalVersion()}.
      */
-    static final public String NON_OFFICIAL = "ish"; // NOI18N
+    public static final String NON_OFFICIAL = "plus"; // NOI18N
 
     /**
      * The user who built this versionBundle, as determined by the build
      * machine.
      */
-    static final public String buildUser = VERSION_BUNDLE.getString("release.build_user"); // NOI18N
+    public static final String buildUser = VERSION_BUNDLE.getString("release.build_user"); // NOI18N
 
     /**
      * The Git revision ID for this versionBundle (if known).
      */
-    static final public String revisionId = VERSION_BUNDLE.getString("release.revision_id"); // NOI18N
+    public static final String revisionId = VERSION_BUNDLE.getString("release.revision_id"); // NOI18N
 
     /**
      * The date/time of this build.
      */
-    static final public String buildDate = VERSION_BUNDLE.getString("release.build_date"); // NOI18N
+    public static final String buildDate = VERSION_BUNDLE.getString("release.build_date"); // NOI18N
 
     /**
      * Has this build been created as a possible "official" versionBundle?
      */
-    static final public boolean official = Boolean.parseBoolean(VERSION_BUNDLE.getString("release.official")); // NOI18N
+    public static final boolean official = Boolean.parseBoolean(VERSION_BUNDLE.getString("release.official")); // NOI18N
 
     /**
      * Get the MODIFIER in the 1.2.3-MODIFIER version name. Non-official
@@ -141,7 +141,7 @@ public class Version {
      *
      * @return The current version string
      */
-    static public String name() {
+    public static String name() {
         String version = major + "." + minor;
         if (test != 0) {
             version = version + "." + test;
@@ -176,7 +176,7 @@ public class Version {
      * @param version version string to check
      * @return true if version is a canonical version string
      */
-    static public boolean isCanonicalVersion(String version) {
+    public static boolean isCanonicalVersion(String version) {
         String[] parts = version.split("\\+");
         if (parts.length > 1) {
             return false;
@@ -210,7 +210,7 @@ public class Version {
      *                                  string
      * @see java.lang.Comparable#compareTo(java.lang.Object)
      */
-    static public int compareCanonicalVersions(String version) throws IllegalArgumentException {
+    public static int compareCanonicalVersions(String version) throws IllegalArgumentException {
         return compareCanonicalVersions(version, getCanonicalVersion());
     }
 
@@ -227,7 +227,7 @@ public class Version {
      *                                  canonical version string
      * @see java.lang.Comparable#compareTo(java.lang.Object)
      */
-    static public int compareCanonicalVersions(String version1, String version2) throws IllegalArgumentException {
+    public static int compareCanonicalVersions(String version1, String version2) throws IllegalArgumentException {
         int result = 0;
         if (!isCanonicalVersion(version1)) {
             throw new IllegalArgumentException("Parameter version1 (" + version1 + ") is not a canonical version string.");
@@ -255,7 +255,7 @@ public class Version {
      *
      * @return the canonical version
      */
-    static public String getCanonicalVersion() {
+    public static String getCanonicalVersion() {
         String version = major + "." + minor + "." + test;
         String modifiers = getModifier().replace(NON_OFFICIAL, ""); // remove "ish"
         if (!modifiers.isEmpty()) {
@@ -272,7 +272,7 @@ public class Version {
      *
      * @return the copyright
      */
-    static public String getCopyright() {
+    public static String getCopyright() {
         return Bundle.getMessage("Copyright", VERSION_BUNDLE.getString("jmri.copyright.year"));
     }
 
@@ -285,7 +285,7 @@ public class Version {
      *
      * @param args command-line arguments
      */
-    static public void main(String[] args) {
+    public static void main(String[] args) {
         System.out.println(name());
     }
 

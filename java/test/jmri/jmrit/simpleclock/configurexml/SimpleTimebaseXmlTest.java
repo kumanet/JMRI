@@ -61,7 +61,9 @@ public class SimpleTimebaseXmlTest {
         assertEquals(Timebase.ClockInitialRunState.DO_STOP, tb.getClockInitialRunState());
         assertEquals(13.0d, tb.getStartRate(), 0.01);
         assertEquals(true, tb.getSetRateAtStart());
+
+        tb.dispose();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SimpleTimebaseXmlTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SimpleTimebaseXmlTest.class);
 }

@@ -1,9 +1,10 @@
 package apps.gui3.tabbedpreferences;
 
 import java.awt.event.ActionEvent;
+
 import javax.swing.Icon;
 
-import jmri.InstanceManager;
+import jmri.*;
 import jmri.util.swing.JmriPanel;
 import jmri.util.swing.WindowInterface;
 
@@ -69,11 +70,16 @@ public class TabbedPreferencesAction extends jmri.util.swing.JmriAbstractAction 
         preferencesItem = category;
     }
 
-    final public void actionPerformed() {
+    public final void actionPerformed() {
+        if (! InstanceManager.getDefault(PermissionManager.class)
+                .ensureAtLeastPermission(PermissionsSystemAdmin.PERMISSION_EDIT_PREFERENCES,
+                        BooleanPermission.BooleanValue.TRUE)) {
+            return;
+        }
         TabbedPreferencesFrame f = InstanceManager.getOptionalDefault(TabbedPreferencesFrame.class).orElseGet(() -> {
             return InstanceManager.setDefault(TabbedPreferencesFrame.class, new TabbedPreferencesFrame());
         });
-            
+
         showPreferences(f);
 
     }
@@ -82,10 +88,10 @@ public class TabbedPreferencesAction extends jmri.util.swing.JmriAbstractAction 
         // Update the GUI Look and Feel
         // This is needed as certain controls are instantiated
         // prior to the setup of the Look and Feel
-        
+
         // might not be a preferences item set yet
         if (preferencesItem != null) f.gotoPreferenceItem(preferencesItem, preferenceSubCat);
-        
+
         f.pack();
 
         f.setVisible(true);
@@ -109,6 +115,6 @@ public class TabbedPreferencesAction extends jmri.util.swing.JmriAbstractAction 
         throw new IllegalArgumentException("Should not be invoked");
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TabbedPreferencesAction.class);
+    // private static final Logger log = LoggerFactory.getLogger(TabbedPreferencesAction.class);
 
 }

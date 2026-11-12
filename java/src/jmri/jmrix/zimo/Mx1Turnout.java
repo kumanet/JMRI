@@ -14,8 +14,7 @@ public class Mx1Turnout extends AbstractTurnout /*implements Mx1TrafficListener*
 
     // Private data member to keep track of what turnout we control.
     int _number;
-    Mx1TrafficController tc = null;
-    String prefix = "";
+    private final Mx1TrafficController tc;
 
     /**
      * Mx1 turnouts use any address allowed as an accessory decoder address on
@@ -28,7 +27,7 @@ public class Mx1Turnout extends AbstractTurnout /*implements Mx1TrafficListener*
     public Mx1Turnout(int number, Mx1TrafficController tc, String p) {
         super(p + "T" + number);
         _number = number;
-        this.prefix = p + "T";
+        this.tc = tc;
         //tc.addMx1Listener(Mx1Interface.TURNOUTS, null);
     }
 
@@ -67,6 +66,6 @@ public class Mx1Turnout extends AbstractTurnout /*implements Mx1TrafficListener*
     protected void turnoutPushbuttonLockout(boolean pushButtonLockout) {
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Mx1Turnout.class);
+    private static final Logger log = LoggerFactory.getLogger(Mx1Turnout.class);
 
 }

@@ -3,6 +3,7 @@ package jmri.jmrit.logixng.tools.swing;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
+import java.awt.event.KeyEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
 import java.text.MessageFormat;
@@ -19,11 +20,10 @@ import javax.swing.table.TableColumnModel;
 
 import jmri.*;
 import jmri.jmrit.beantable.BeanTableDataModel;
-import jmri.jmrit.beantable.BeanTableFrame;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.util.LogixNG_Thread;
-import jmri.swing.NamedBeanComboBox;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
 
@@ -39,12 +39,12 @@ import jmri.util.table.ButtonRenderer;
  */
 public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
 
-    BeanTableFrame<LogixNG> beanTableFrame;
     BeanTableDataModel<LogixNG> beanTableDataModel;
 
     LogixNG_Manager _logixNG_Manager = null;
     LogixNG _curLogixNG = null;
 
+    ConditionalNG_Manager _conditionalNG_Manager = null;
     ConditionalNGEditor _treeEdit = null;
     ConditionalNGDebugger _debugger = null;
 
@@ -54,6 +54,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
     boolean _showReminder = false;
     boolean _suppressReminder = false;
     boolean _suppressIndirectRef = false;
+    private boolean _checkEnabled = jmri.InstanceManager.getDefault(jmri.configurexml.ShutdownPreferences.class).isStoreCheckEnabled();
 
     private final JCheckBox _autoSystemName = new JCheckBox(Bundle.getMessage("LabelAutoSysName"));   // NOI18N
     private final JLabel _sysNameLabel = new JLabel(Bundle.getMessage("SystemName") + ":");  // NOI18N
@@ -66,20 +67,19 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
     /**
      * Create a new ConditionalNG List View editor.
      *
-     * @param f the bean table frame
      * @param m the bean table model
      * @param sName name of the LogixNG being edited
      */
-    public LogixNGEditor(BeanTableFrame<LogixNG> f, BeanTableDataModel<LogixNG> m, String sName) {
-        this.beanTableFrame = f;
+    public LogixNGEditor(BeanTableDataModel<LogixNG> m, String sName) {
         this.beanTableDataModel = m;
         _logixNG_Manager = InstanceManager.getDefault(jmri.jmrit.logixng.LogixNG_Manager.class);
         _curLogixNG = _logixNG_Manager.getBySystemName(sName);
+        _conditionalNG_Manager = InstanceManager.getDefault(jmri.jmrit.logixng.ConditionalNG_Manager.class);
         makeEditLogixNGWindow();
     }
 
     // ------------ LogixNG Variables ------------
-    JmriJFrame _editLogixNGFrame = null;
+    private JmriJFrame _editLogixNGFrame = null;
     JTextField editUserName = new JTextField(20);
     JLabel status = new JLabel(" ");
 
@@ -102,8 +102,8 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
     ArrayList<String> _selectConditionalNGList = new ArrayList<>();
 
     // ------------ Edit ConditionalNG Variables ------------
-    boolean _inEditConditionalNGMode = false;
-    JmriJFrame _editConditionalNGFrame = null;
+    private boolean _inEditConditionalNGMode = false;
+    private JmriJFrame _editConditionalNGFrame = null;
     JRadioButton _triggerOnChangeButton;
 
     // ------------ Methods for Edit LogixNG Pane ------------
@@ -212,7 +212,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
             conditionalTableScrollPane.getViewport().setPreferredSize(dim);
             contentPane.add(conditionalTableScrollPane);
 
-            _showStartupThreadsCheckBox = new JCheckBox("Show startup thread");
+            _showStartupThreadsCheckBox = new JCheckBox(Bundle.getMessage("ShowStartupThreadCheckBox"));
             contentPane.add(_showStartupThreadsCheckBox);
             _showStartupThreadsCheckBox.addActionListener((evt) -> {
                 _conditionalNGTableModel.setShowStartupThreads(
@@ -298,7 +298,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
      * Display reminder to save.
      */
     void showSaveReminder() {
-        if (_showReminder) {
+        if (_showReminder && !_checkEnabled) {
             if (InstanceManager.getNullableDefault(jmri.UserPreferencesManager.class) != null) {
                 InstanceManager.getDefault(jmri.UserPreferencesManager.class).
                         showInfoMessage(Bundle.getMessage("ReminderTitle"), // NOI18N
@@ -389,12 +389,11 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                 LogixNG p = _logixNG_Manager.getByUserName(uName);
                 if (p != null) {
                     // LogixNG with this user name already exists
-                    log.error("Failure to update LogixNG with Duplicate User Name: " // NOI18N
-                            + uName);
-                    JOptionPane.showMessageDialog(_editLogixNGFrame,
-                            Bundle.getMessage("Error6"),
+                    log.error("Failure to update LogixNG with Duplicate User Name: {}", uName); // NOI18N
+                    JmriJOptionPane.showMessageDialog(_editLogixNGFrame,
+                            Bundle.getMessage("Error_UserNameInUse"),
                             Bundle.getMessage("ErrorTitle"), // NOI18N
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return;
                 }
             }
@@ -448,14 +447,16 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
 
         // make an Add Item Frame
         if (showAddLogixNGFrame()) {
+            if (!checkConditionalNGSysName()) {
+                return;
+            }
             if (_systemName.getText().isEmpty() && _autoSystemName.isSelected()) {
                 _systemName.setText(InstanceManager.getDefault(ConditionalNG_Manager.class).getAutoSystemName());
             }
 
             // Create ConditionalNG
             _curConditionalNG =
-                    InstanceManager.getDefault(ConditionalNG_Manager.class)
-                            .createConditionalNG(_curLogixNG, _systemName.getText(), _addUserName.getText());
+                    _conditionalNG_Manager.createConditionalNG(_curLogixNG, _systemName.getText(), _addUserName.getText());
 
             if (_curConditionalNG == null) {
                 // should never get here unless there is an assignment conflict
@@ -469,6 +470,44 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
             _showReminder = true;
             makeEditConditionalNGWindow();
         }
+    }
+
+    /**
+     * Check validity of ConditionalNG system name.
+     * <p>
+     * Fixes name if it doesn't start with "IQC" or is missing the $ for alpha suffixes.
+     *
+     * @return false if the name fails the NameValidity check
+     */
+    boolean checkConditionalNGSysName() {
+        if (_autoSystemName.isSelected()) {
+            return true;
+        }
+
+        var sName = _systemName.getText().trim();
+        var prefix = _conditionalNG_Manager.getSubSystemNamePrefix();
+
+        if (!sName.isEmpty() && !sName.startsWith(prefix)) {
+            var isNumber = sName.matches("^\\d+$");
+            var hasDollar = sName.startsWith("$");
+
+            var newName = new StringBuilder(prefix);
+            if (!isNumber && !hasDollar) {
+                newName.append("$");
+            }
+            newName.append(sName);
+            sName = newName.toString();
+        }
+
+        if (_conditionalNG_Manager.validSystemNameFormat(sName) != jmri.Manager.NameValidity.VALID) {
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("Error_SystemName_Format", sName), Bundle.getMessage("ErrorTitle"), // NOI18N
+                    JmriJOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        _systemName.setText(sName);
+        return true;
     }
 
     /**
@@ -551,9 +590,9 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
         cancel.addActionListener((ActionEvent e) -> {
             dialog.dispose();
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("CancelEditLogixNGButtonHint"));      // NOI18N
 
+        // Create
         JButton create = new JButton(Bundle.getMessage("ButtonCreate"));  // NOI18N
         create.addActionListener((ActionEvent e2) -> {
             InstanceManager.getOptionalDefault(UserPreferencesManager.class).ifPresent((prefMgr) -> {
@@ -697,12 +736,13 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
      */
     private boolean checkEditConditionalNG() {
         if (_inEditConditionalNGMode) {
+            // set window visible first so that Dialog appears on top of window
+            _editConditionalNGFrame.setVisible(true);
             // Already editing a ConditionalNG, ask for completion of that edit
-            JOptionPane.showMessageDialog(_editConditionalNGFrame,
+            JmriJOptionPane.showMessageDialog(_editConditionalNGFrame,
                     Bundle.getMessage("Error_ConditionalNGInEditMode", _curConditionalNG.getSystemName()), // NOI18N
                     Bundle.getMessage("ErrorTitle"), // NOI18N
-                    JOptionPane.ERROR_MESSAGE);
-            _editConditionalNGFrame.setVisible(true);
+                    JmriJOptionPane.ERROR_MESSAGE);
             return true;
         }
         return false;
@@ -714,12 +754,11 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                 ConditionalNG p = logixNG.getConditionalNG(i);
                 if (uName.equals(p.getUserName())) {
                     // ConditionalNG with this user name already exists
-                    log.error("Failure to update ConditionalNG with Duplicate User Name: " // NOI18N
-                            + uName);
-                    JOptionPane.showMessageDialog(_editConditionalNGFrame,
+                    log.error("Failure to update ConditionalNG with Duplicate User Name: {}", uName); // NOI18N
+                    JmriJOptionPane.showMessageDialog(_editConditionalNGFrame,
                             Bundle.getMessage("Error10"),    // NOI18N
                             Bundle.getMessage("ErrorTitle"), // NOI18N
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return false;
                 }
             }
@@ -756,7 +795,9 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
         public static final int SNAME_COLUMN = 0;
         public static final int UNAME_COLUMN = SNAME_COLUMN + 1;
         public static final int THREAD_COLUMN = UNAME_COLUMN + 1;
-        public static final int BUTTON_COLUMN = THREAD_COLUMN + 1;
+        public static final int ENABLED_COLUMN = THREAD_COLUMN + 1;
+        public static final int STARTUP_COLUMN = ENABLED_COLUMN + 1;
+        public static final int BUTTON_COLUMN = STARTUP_COLUMN + 1;
         public static final int BUTTON_DEBUG_COLUMN = BUTTON_COLUMN + 1;
         public static final int BUTTON_DELETE_COLUMN = BUTTON_DEBUG_COLUMN + 1;
         public static final int BUTTON_EDIT_THREADS_COLUMN = BUTTON_DELETE_COLUMN + 1;
@@ -830,6 +871,10 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     || (c == BUTTON_EDIT_THREADS_COLUMN)) {
                 return JButton.class;
             }
+            if (c == STARTUP_COLUMN
+                    || c == ENABLED_COLUMN) {
+                return Boolean.class;
+            }
             return String.class;
         }
 
@@ -847,6 +892,8 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
         public boolean isCellEditable(int r, int c) {
             if (!_inReorderMode) {
                 return ((c == UNAME_COLUMN)
+                        || (c == ENABLED_COLUMN)
+                        || (c == STARTUP_COLUMN)
                         || (c == BUTTON_COLUMN)
                         || ((c == BUTTON_DEBUG_COLUMN) && InstanceManager.getDefault(LogixNGPreferences.class).getInstallDebugger())
                         || (c == BUTTON_DELETE_COLUMN)
@@ -866,8 +913,12 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     return Bundle.getMessage("ColumnSystemName");  // NOI18N
                 case UNAME_COLUMN:
                     return Bundle.getMessage("ColumnUserName");  // NOI18N
+                case ENABLED_COLUMN:
+                    return Bundle.getMessage("ColumnHeadEnabled");  // NOI18N
                 case THREAD_COLUMN:
                     return Bundle.getMessage("ConditionalNG_Table_ColumnThreadName");  // NOI18N
+                case STARTUP_COLUMN:
+                    return Bundle.getMessage("ConditionalNG_Table_ColumnStartup");  // NOI18N
                 case BUTTON_COLUMN:
                     return ""; // no label
                 case BUTTON_DEBUG_COLUMN:
@@ -889,8 +940,12 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     return new JTextField(6).getPreferredSize().width;
                 case UNAME_COLUMN:
                     return new JTextField(17).getPreferredSize().width;
+                case ENABLED_COLUMN:
+                    return new JTextField(5).getPreferredSize().width;
                 case THREAD_COLUMN:
                     return new JTextField(10).getPreferredSize().width;
+                case STARTUP_COLUMN:
+                    return new JTextField(6).getPreferredSize().width;
                 case BUTTON_COLUMN:
                     return new JTextField(6).getPreferredSize().width;
                 case BUTTON_DEBUG_COLUMN:
@@ -906,6 +961,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
 
         @Override
         public Object getValueAt(int r, int col) {
+            ConditionalNG c;
             int rx = r;
             if ((rx > _numConditionalNGs) || (_curLogixNG == null)) {
                 return null;
@@ -929,14 +985,19 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     return Bundle.getMessage("ConditionalNG_Table_ButtonEditThreads");  // NOI18N
                 case SNAME_COLUMN:
                     return _curLogixNG.getConditionalNG(rx);
-                case UNAME_COLUMN: {
+                case UNAME_COLUMN:
                     //log.debug("ConditionalNGTableModel: {}", _curLogixNG.getConditionalNGByNumberOrder(rx));  // NOI18N
-                    ConditionalNG c = _curLogixNG.getConditionalNG(rx);
+                    c = _curLogixNG.getConditionalNG(rx);
                     if (c != null) {
                         return c.getUserName();
                     }
                     return "";
-                }
+                case ENABLED_COLUMN:
+                    c = _curLogixNG.getConditionalNG(rx);
+                    if (c != null) {
+                        return c.isEnabled();
+                    }
+                    return null;
                 case THREAD_COLUMN:
                     if (_showStartupThreads) {
                         return LogixNG_Thread.getThread(
@@ -945,27 +1006,45 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     } else {
                         return _curLogixNG.getConditionalNG(r).getCurrentThread().getThreadName();
                     }
+                case STARTUP_COLUMN:
+                    c = _curLogixNG.getConditionalNG(rx);
+                    if (c != null) {
+                        return c.isExecuteAtStartup();
+                    }
+                    return false;
                 default:
                     throw new IllegalArgumentException("Unknown column");
             }
         }
 
-        private void buttomColumnClicked(int row, int col) {
+        private void buttonStartupClicked(int row, Object value) {
+            _curConditionalNG = _curLogixNG.getConditionalNG(row);
+            if (_curConditionalNG == null) {
+                log.error("Attempted edit of non-existant conditional.");  // NOI18N
+                return;
+            }
+            if (!(value instanceof Boolean)) {
+                throw new IllegalArgumentException("value is not a Boolean");
+            }
+            _curConditionalNG.setExecuteAtStartup((boolean)value);
+        }
+
+        private void buttonColumnClicked(int row, int col) {
             if (_inReorderMode) {
                 swapConditionalNG(row);
             } else {
                 // Use separate Runnable so window is created on top
                 class WindowMaker implements Runnable {
 
-                    int row;
+                    int theRow;
 
                     WindowMaker(int r) {
-                        row = r;
+                        theRow = r;
                     }
 
                     @Override
                     public void run() {
-                        editConditionalNGPressed(row);
+                        editConditionalNGPressed(theRow);
                     }
                 }
                 WindowMaker t = new WindowMaker(row);
@@ -973,22 +1052,22 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
             }
         }
 
-        private void buttomDebugClicked(int row, int col) {
+        private void buttonDebugClicked(int row, int col) {
             if (_inReorderMode) {
                 swapConditionalNG(row);
             } else {
                 // Use separate Runnable so window is created on top
                 class WindowMaker implements Runnable {
 
-                    int row;
+                    int theRow;
 
                     WindowMaker(int r) {
-                        row = r;
+                        theRow = r;
                     }
 
                     @Override
                     public void run() {
-                        debugConditionalNGPressed(row);
+                        debugConditionalNGPressed(theRow);
                     }
                 }
                 WindowMaker t = new WindowMaker(row);
@@ -1022,11 +1101,14 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                 return;
             }
             switch (col) {
+                case STARTUP_COLUMN:
+                    buttonStartupClicked(row, value);
+                    break;
                 case BUTTON_COLUMN:
-                    buttomColumnClicked(row, col);
+                    buttonColumnClicked(row, col);
                     break;
                 case BUTTON_DEBUG_COLUMN:
-                    buttomDebugClicked(row, col);
+                    buttonDebugClicked(row, col);
                     break;
                 case BUTTON_DELETE_COLUMN:
                     deleteConditionalNG(row);
@@ -1037,10 +1119,16 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     break;
                 case SNAME_COLUMN:
                     throw new IllegalArgumentException("System name cannot be changed");
-                case UNAME_COLUMN: {
+                case UNAME_COLUMN:
                     changeUserName(value, row);
                     break;
-                }
+                case ENABLED_COLUMN:
+                    ConditionalNG c = _curLogixNG.getConditionalNG(row);
+                    if (c != null) {
+                        boolean v = c.isEnabled();
+                        c.setEnabled(!v);
+                    }
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown column");
             }
@@ -1053,14 +1141,16 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
      * @param svName proposed name that duplicates an existing name
      */
     void messageDuplicateConditionalNGUserName(String svName) {
-        JOptionPane.showMessageDialog(null,
+        JmriJOptionPane.showMessageDialog(null,
                 Bundle.getMessage("Error30", svName),
                 Bundle.getMessage("ErrorTitle"), // NOI18N
-                JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.ERROR_MESSAGE);
     }
 
-    protected String getClassName() {
-        return LogixNGEditor.class.getName();
+    private String getClassName() {
+        // The class that is returned must have a default constructor,
+        // a constructor with no parameters.
+        return jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName();
     }
 
 
@@ -1147,7 +1237,10 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                         return;
                     }
                     x.setUserName(value);
-                    beanTableDataModel.fireTableDataChanged();
+
+                    if (beanTableDataModel != null) {
+                        beanTableDataModel.fireTableDataChanged();
+                    }
                 }
             });
         }
@@ -1180,7 +1273,10 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                         return;
                     }
                     x.setUserName(value);
-                    beanTableDataModel.fireTableDataChanged();
+
+                    if (beanTableDataModel != null) {
+                        beanTableDataModel.fireTableDataChanged();
+                    }
                 }
             });
         }
@@ -1192,13 +1288,11 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
 
         private final ConditionalNG _conditionalNG;
         private final int _row;
-        MaleSocket _maleSocket;
         boolean _hasDeleted = false;
 
         public DeleteBeanWorker(ConditionalNG conditionalNG, int row) {
             _conditionalNG = conditionalNG;
             _row = row;
-            _maleSocket = _conditionalNG.getFemaleSocket().getConnectedSocket();
         }
 
         public int getDisplayDeleteMsg() {
@@ -1209,25 +1303,8 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
             InstanceManager.getDefault(UserPreferencesManager.class).setMultipleChoiceOption(TreeEditor.class.getName(), "deleteInUse", boo);
         }
 
-        private void findAllChilds(FemaleSocket femaleSocket, List<Map.Entry<FemaleSocket, MaleSocket>> sockets) {
-            if (!femaleSocket.isConnected()) return;
-            MaleSocket maleSocket = femaleSocket.getConnectedSocket();
-            sockets.add(new HashMap.SimpleEntry<>(femaleSocket, maleSocket));
-            for (int i=0; i < maleSocket.getChildCount(); i++) {
-                findAllChilds(maleSocket.getChild(i), sockets);
-            }
-        }
-
-        public void doDelete(List<Map.Entry<FemaleSocket, MaleSocket>> sockets) {
+        public void doDelete() {
             try {
-                for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                    FemaleSocket femaleSocket = entry.getKey();
-                    femaleSocket.disconnect();
-
-                    MaleSocket maleSocket = entry.getValue();
-                    maleSocket.getManager().deleteBean(maleSocket, "DoDelete");
-                }
-                _curLogixNG.deleteConditionalNG(_curLogixNG.getConditionalNG(_row));
                 InstanceManager.getDefault(ConditionalNG_Manager.class).deleteBean(_conditionalNG, "DoDelete");  // NOI18N
                 _conditionalNGTableModel.fireTableRowsDeleted(_row, _row);
                 _numConditionalNGs--;
@@ -1235,7 +1312,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                 _hasDeleted = true;
             } catch (PropertyVetoException e) {
                 //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
-                log.error(e.getMessage());
+                log.error("Unexpected doDelete failure for {}, {}", _conditionalNG, e.getMessage() );
             }
         }
 
@@ -1246,98 +1323,80 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
         public Void doInBackground() {
             _conditionalNG.getFemaleSocket().unregisterListeners();
 
-            List<Map.Entry<FemaleSocket, MaleSocket>> sockets = new ArrayList<>();
-
-            findAllChilds(_conditionalNG.getFemaleSocket(), sockets);
-
             StringBuilder message = new StringBuilder();
             try {
                 InstanceManager.getDefault(ConditionalNG_Manager.class).deleteBean(_conditionalNG, "CanDelete");  // NOI18N
-                for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                    entry.getValue().getManager().deleteBean(_maleSocket, "CanDelete");  // NOI18N
-                }
             } catch (PropertyVetoException e) {
                 if (e.getPropertyChangeEvent().getPropertyName().equals("DoNotDelete")) { // NOI18N
-                    log.warn(e.getMessage());
-                    message.append(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("VetoDeleteBean", ((NamedBean)_maleSocket.getObject()).getBeanType(), ((NamedBean)_maleSocket.getObject()).getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME), e.getMessage()));
-                    JOptionPane.showMessageDialog(null, message.toString(),
-                            jmri.jmrit.logixng.tools.swing.Bundle.getMessage("WarningTitle"),
-                            JOptionPane.ERROR_MESSAGE);
+                    log.warn("Do not Delete {}, {}", _conditionalNG, e.getMessage());
+                    message.append(Bundle.getMessage("VetoDeleteBean", _conditionalNG.getBeanType(), _conditionalNG.getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME), e.getMessage()));
+                    JmriJOptionPane.showMessageDialog(null, message.toString(),
+                            Bundle.getMessage("WarningTitle"),
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return null;
                 }
                 message.append(e.getMessage());
             }
-            int count = _maleSocket == null ? 0 : _maleSocket.getListenerRefs().size();
-            log.debug("Delete with {}", count);
+            List<String> listenerRefs = new ArrayList<>();
+            _conditionalNG.getListenerRefsIncludingChildren(listenerRefs);
+            int listenerRefsCount = listenerRefs.size();
+            log.debug("Delete with {}", listenerRefsCount);
             if (getDisplayDeleteMsg() == 0x02 && message.toString().isEmpty()) {
-                doDelete(sockets);
+                doDelete();
             } else {
                 final JDialog dialog = new JDialog();
-                dialog.setTitle(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("WarningTitle"));
+                dialog.setTitle(Bundle.getMessage("WarningTitle"));
                 dialog.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
                 JPanel container = new JPanel();
                 container.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-                if (count > 0) { // warn of listeners attached before delete
 
-                    String prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
-                    JLabel question = new JLabel(jmri.jmrit.logixng.tools.swing.Bundle.getMessage(prompt, ((NamedBean)_maleSocket.getObject()).getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME)));
+                if (listenerRefsCount > 0) { // warn of listeners attached before delete
+                    String prompt = _conditionalNG.getFemaleSocket().isConnected()
+                            ? "DeleteWithChildrenPrompt" : "DeletePrompt";
+                    JLabel question = new JLabel(Bundle.getMessage(prompt, _conditionalNG.getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME)));
                     question.setAlignmentX(Component.CENTER_ALIGNMENT);
                     container.add(question);
 
-                    ArrayList<String> listenerRefs = new ArrayList<>();
-
-                    for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                        listenerRefs.addAll(entry.getValue().getListenerRefs());
+                    ArrayList<String> listeners = new ArrayList<>();
+                    for (String listenerRef : listenerRefs) {
+                        if (!listeners.contains(listenerRef)) {
+                            listeners.add(listenerRef);
+                        }
                     }
 
-                    if (listenerRefs.size() > 0) {
-                        ArrayList<String> listeners = new ArrayList<>();
-                        for (int i = 0; i < listenerRefs.size(); i++) {
-                            if (!listeners.contains(listenerRefs.get(i))) {
-                                listeners.add(listenerRefs.get(i));
-                            }
-                        }
-
-                        message.append("<br>");
-                        message.append(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("ReminderInUse", count));
-                        message.append("<ul>");
-                        for (int i = 0; i < listeners.size(); i++) {
-                            message.append("<li>");
-                            message.append(listeners.get(i));
-                            message.append("</li>");
-                        }
-                        message.append("</ul>");
-
-                        JEditorPane pane = new JEditorPane();
-                        pane.setContentType("text/html");
-                        pane.setText("<html>" + message.toString() + "</html>");
-                        pane.setEditable(false);
-                        JScrollPane jScrollPane = new JScrollPane(pane);
-                        container.add(jScrollPane);
+                    message.append("<br>");
+                    message.append(Bundle.getMessage("ReminderInUse", listenerRefsCount));
+                    message.append("<ul>");
+                    for (String listener : listeners) {
+                        message.append("<li>");
+                        message.append(listener);
+                        message.append("</li>");
                     }
+                    message.append("</ul>");
+
+                    JEditorPane pane = new JEditorPane();
+                    pane.setContentType("text/html");
+                    pane.setText("<html>" + message.toString() + "</html>");
+                    pane.setEditable(false);
+                    JScrollPane jScrollPane = new JScrollPane(pane);
+                    container.add(jScrollPane);
                 } else {
-                    String prompt;
-                    String msg;
-                    if (_maleSocket == null) {
-                        prompt = "DeletePrompt";
-                        msg = jmri.jmrit.logixng.tools.swing.Bundle.getMessage(prompt, _conditionalNG.getDisplayName());
-                    } else {
-                        prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
-                        msg = MessageFormat.format(jmri.jmrit.logixng.tools.swing.Bundle.getMessage(prompt),
-                                new Object[]{_maleSocket.getSystemName()});
-                    }
+                    String prompt = _conditionalNG.getFemaleSocket().isConnected()
+                            ? "DeleteWithChildrenPrompt" : "DeletePrompt";
+                    String msg = MessageFormat.format(
+                            Bundle.getMessage(prompt), _conditionalNG.getSystemName());
                     JLabel question = new JLabel(msg);
                     question.setAlignmentX(Component.CENTER_ALIGNMENT);
                     container.add(question);
                 }
 
-                final JCheckBox remember = new JCheckBox(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("MessageRememberSetting"));
+                final JCheckBox remember = new JCheckBox(Bundle.getMessage("MessageRememberSetting"));
                 remember.setFont(remember.getFont().deriveFont(10f));
                 remember.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-                JButton yesButton = new JButton(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("ButtonYes"));
-                JButton noButton = new JButton(jmri.jmrit.logixng.tools.swing.Bundle.getMessage("ButtonNo"));
+                JButton yesButton = new JButton(Bundle.getMessage("ButtonYes"));
+                JButton noButton = new JButton(Bundle.getMessage("ButtonNo"));
                 JPanel button = new JPanel();
                 button.setAlignmentX(Component.CENTER_ALIGNMENT);
                 button.add(yesButton);
@@ -1354,7 +1413,7 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                     if (remember.isSelected()) {
                         setDisplayDeleteMsg(0x02);
                     }
-                    doDelete(sockets);
+                    doDelete();
                     dialog.dispose();
                 });
                 container.add(remember);
@@ -1362,6 +1421,14 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
                 container.setAlignmentY(Component.CENTER_ALIGNMENT);
                 dialog.getContentPane().add(container);
                 dialog.pack();
+
+                dialog.getRootPane().setDefaultButton(noButton);
+                noButton.requestFocusInWindow(); // set default keyboard focus, after pack() before setVisible(true)
+                dialog.getRootPane().registerKeyboardAction(e -> { // escape to exit
+                        dialog.setVisible(false);
+                        dialog.dispose(); },
+                    KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
+
                 dialog.setLocation((Toolkit.getDefaultToolkit().getScreenSize().width) / 2 - dialog.getWidth() / 2, (Toolkit.getDefaultToolkit().getScreenSize().height) / 2 - dialog.getHeight() / 2);
                 dialog.setModal(true);
                 dialog.setVisible(true);
@@ -1384,6 +1451,6 @@ public final class LogixNGEditor implements AbstractLogixNGEditor<LogixNG> {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGEditor.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGEditor.class);
 
 }

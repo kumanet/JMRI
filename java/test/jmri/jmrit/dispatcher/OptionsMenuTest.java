@@ -47,11 +47,10 @@ public class OptionsMenuTest {
 
     @AfterEach
     public void tearDown() {
-        JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
+        JUnitUtil.clearShutDownManager();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(OptionsMenuTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(OptionsMenuTest.class);
 
 }

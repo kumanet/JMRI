@@ -1,17 +1,18 @@
 package jmri.managers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import jmri.*;
 
 import java.beans.PropertyVetoException;
 import java.lang.reflect.Field;
 import jmri.util.JUnitAppender;
-import org.apache.log4j.Level;
+import org.slf4j.event.Level;
 
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Extension of AbstractManagerTestBase base for ProvidingManager test classes.
@@ -27,14 +28,17 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractProvidingManagerTestBase<T extends ProvidingManager<E>, E extends NamedBean> extends AbstractManagerTestBase<T, E> {
 
     @Test
-    public void testProvideEmpty() throws IllegalArgumentException {
+    public void testProvideEmpty() {
         ProvidingManager<E> m = l;
-        Assert.assertThrows(IllegalArgumentException.class, () ->  m.provide(""));
+        Exception ex = assertThrows(IllegalArgumentException.class, () ->  m.provide(""));
+        assertNotNull(ex);
         JUnitAppender.suppressErrorMessageStartsWith("Invalid system name for");
     }
 
+    @jmri.util.junit.annotations.ToDo("Managers which cannot provide SystemName 1 or 2 "
+        + "should override so provide try / catch on IllegalArgumentException in called method can be removed")
     @Test
-    public void testRegisterDuplicateSystemName() throws PropertyVetoException, NoSuchFieldException,
+    public void testRegisterDuplicateSystemName() throws PropertyVetoException,
             NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
         ProvidingManager<E> m = l;
         String s1 = l.makeSystemName("1");
@@ -44,11 +48,11 @@ public abstract class AbstractProvidingManagerTestBase<T extends ProvidingManage
 
     public void testRegisterDuplicateSystemName(ProvidingManager<E> m, String s1, String s2)
             throws PropertyVetoException, NoSuchFieldException,
-            NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
-        Assert.assertNotNull(s1);
-        Assert.assertFalse(s1.isEmpty());
-        Assert.assertNotNull(s2);
-        Assert.assertFalse(s2.isEmpty());
+            IllegalArgumentException, IllegalAccessException {
+        assertNotNull(s1);
+        assertFalse(s1.isEmpty());
+        assertNotNull(s2);
+        assertFalse(s2.isEmpty());
 
         E e1;
         E e2;
@@ -57,19 +61,12 @@ public abstract class AbstractProvidingManagerTestBase<T extends ProvidingManage
             e1 = m.provide(s1);
             e2 = m.provide(s2);
         } catch (
-                IllegalArgumentException |
-                com.pi4j.io.gpio.exception.GpioPinExistsException |
-                NullPointerException |
-                ArrayIndexOutOfBoundsException ex) {
-            // jmri.jmrix.pi.RaspberryPiTurnout(Providing)ManagerTest gives a GpioPinExistsException here.
-            // jmri.jmrix.openlcb.OlcbLightProvidingManagerTest gives a NullPointerException here.
-            // jmri.jmrix.openlcb.OlcbSensorProvidingManagerTest gives a ArrayIndexOutOfBoundsException here.
+                IllegalArgumentException  ex) {
             // Some other tests give an IllegalArgumentException here.
-
             // If the test is unable to provide a named bean, abort this test.
-            JUnitAppender.clearBacklog(Level.WARN);
-            log.debug("Cannot provide a named bean", ex);
-            Assume.assumeTrue("We got no exception", false);
+            int numWarnings = JUnitAppender.clearBacklog(Level.WARN);
+            // log.debug("Cannot provide a named bean, {} warnings", numWarnings, ex);
+            Assumptions.abort( "We got " + numWarnings + " warnings and exception: " + ex.getMessage());
             return;
         }
 
@@ -94,32 +91,31 @@ public abstract class AbstractProvidingManagerTestBase<T extends ProvidingManage
         // Register bean twice. This gives only a debug message.
         l.register(e1);
 
+        // Register different bean with existing systemName.
+        // This should fail with an DuplicateSystemNameException.
         String expectedMessage = "systemName is already registered: " + e1.getSystemName();
-        try {
-            // Register different bean with existing systemName.
-            // This should fail with an DuplicateSystemNameException.
-            l.register(e2);
-            Assert.fail("Expected exception not thrown");
-        } catch (NamedBean.DuplicateSystemNameException ex) {
-            Assert.assertEquals("exception message is correct", expectedMessage, ex.getMessage());
+        NamedBean.DuplicateSystemNameException e = assertThrows( NamedBean.DuplicateSystemNameException.class,
+            () -> l.register(e2),
+            "Expected exception not thrown");
+        assertEquals( expectedMessage, e.getMessage(), "exception message is correct");
             JUnitAppender.assertErrorMessage(expectedMessage);
-        }
 
         l.deregister(e1);
     }
 
-    protected Field getField(Class c, String fieldName) {
+    protected Field getField(Class<?> c, String fieldName) {
         try {
             return c.getDeclaredField(fieldName);
         } catch (NoSuchFieldException ex) {
-            if (c.getSuperclass() != null)
+            if (c.getSuperclass() != null) {
                 return getField(c.getSuperclass(), fieldName);
+            }
         }
 
         // Field not found
         return null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractProvidingManagerTestBase.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractProvidingManagerTestBase.class);
 
 }

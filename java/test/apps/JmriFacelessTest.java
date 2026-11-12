@@ -3,7 +3,6 @@ package apps;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
 
 /**
  *
@@ -43,15 +42,13 @@ public class JmriFacelessTest {
                 JUnitUtil.initMemoryManager();
                 JUnitUtil.initDebugThrottleManager();
             }
-
-            @Override
-            protected void installShutDownManager() {
-                // done automatically now as part of InstanceManager default handling
-            }
         };
-        Assert.assertNotNull(a);
+        Assertions.assertNotNull(a);
         // shutdown the application
         AppsBase.handleQuit();
+        JUnitUtil.waitFor( () ->
+           ((jmri.managers.DefaultShutDownManager)jmri.InstanceManager.getDefault(jmri.ShutDownManager.class)).
+            isShutDownComplete(),"Shutdown complete");
     }
 
     @BeforeEach

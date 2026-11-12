@@ -14,7 +14,6 @@ import java.util.Set;
 
 /**
  * Abstract base for the NamedBean Decorators.
- * <p>
  *
  * @author Bob Jacobsen Copyright (C) 2001
  * @author Paul Bender Copyright (C) 2020
@@ -31,7 +30,7 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
      * {@inheritDoc}
      */
     @Override
-    final public String getComment() {
+    public final String getComment() {
         return decorated.getComment();
     }
 
@@ -39,7 +38,7 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
      * {@inheritDoc}
      */
     @Override
-    final public void setComment(String comment) {
+    public final void setComment(String comment) {
         decorated.setComment(comment);
     }
 
@@ -49,7 +48,7 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
     @Override
     @CheckReturnValue
     @Nonnull
-    final public String getDisplayName() {
+    public final String getDisplayName() {
         return decorated.getDisplayName();
     }
 
@@ -59,7 +58,7 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
     @Override
     @CheckReturnValue
     @Nonnull
-    final public String getDisplayName(DisplayOptions displayOptions) {
+    public final String getDisplayName(DisplayOptions displayOptions) {
         return decorated.getDisplayName(displayOptions);
     }
 
@@ -194,7 +193,7 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
     /** {@inheritDoc} */
     @Override
     @Nonnull
-    final public String getSystemName() {
+    public final String getSystemName() {
         return decorated.getSystemName();
     }
 
@@ -202,12 +201,12 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
     */
     @Nonnull
     @Override
-    final public String toString() {
+    public final String toString() {
         return decorated.getSystemName();
     }
 
     @Override
-    final public String getUserName() {
+    public final String getUserName() {
         return decorated.getUserName();
     }
 
@@ -298,6 +297,12 @@ public abstract class AbstractNamedBeanDecorator implements NamedBean {
             AbstractNamedBeanDecorator b = (AbstractNamedBeanDecorator) obj;
             return this.getSystemName().equals(b.getSystemName());
         }
+
+        if(this.decorated.equals(obj)){
+            // this isn't the same object, but it is decorating the object
+            return true;
+        }
+
         return false;
     }
 

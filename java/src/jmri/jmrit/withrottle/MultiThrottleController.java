@@ -4,8 +4,7 @@ import java.beans.PropertyChangeEvent;
 
 import jmri.*;
 import jmri.jmrit.roster.RosterEntry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.jmrit.throttle.preferences.ThrottlesPreferences;
 
 /**
  * @author Brett Hoffman Copyright (C) 2011
@@ -105,7 +104,12 @@ public class MultiThrottleController extends ThrottleController {
     }
 
     /**
-     * {@inheritDoc}
+     * This replaces the previous method of sending a string of function labels.
+     * 
+     * Checks for labels across all possible functions of this roster entry.
+     * 
+     * Example:
+     * {@code MTLL1234<;>]\[Light]\[Bell]\[Horn]\[]\[]\[]\[]\[]\[Mute]\[]\[]\[]\[} etc.
      */
     @Override
     public void sendFunctionLabels(RosterEntry re) {
@@ -114,7 +118,7 @@ public class MultiThrottleController extends ThrottleController {
             StringBuilder functionString = new StringBuilder(buildPacketWithChar('L'));
 
             int i;
-            for (i = 0; i < 29; i++) {
+            for (i = 0; i < (re.getMaxFnNumAsInt()+1); i++) {
                 functionString.append("]\\[");
                 if ((re.getFunctionLabel(i) != null)) {
                     functionString.append(re.getFunctionLabel(i));
@@ -135,7 +139,7 @@ public class MultiThrottleController extends ThrottleController {
     @Override
     public void sendAllFunctionStates(DccThrottle t) {
         log.debug("Sending state of all functions");
-        for (int cnt = 0; cnt < 29; cnt++) {
+        for (int cnt = 0; cnt < t.getFunctions().length; cnt++) {
             StringBuilder message = new StringBuilder(buildPacketWithChar('A'));
             message.append( t.getFunction(cnt) ? "F1" : "F0" );
             message.append(cnt);
@@ -153,7 +157,15 @@ public class MultiThrottleController extends ThrottleController {
         float currentSpeed = t.getSpeedSetting();
         StringBuilder message = new StringBuilder(buildPacketWithChar('A'));
         message.append("V");
-        message.append(Math.round(currentSpeed / speedMultiplier));
+        int outSpeed = Math.round(currentSpeed / speedMultiplier);
+        if(currentSpeed < 0) {
+            outSpeed = -126;        // ensure estop is not rounded to zero
+        }
+        if(currentSpeed > 0 && outSpeed == 0) {
+            outSpeed = 1;           // ensure non-zero throttle speed is sent
+                                    // as non-zero speed to wiThrottle
+        }
+        message.append(outSpeed);
         for (ControllerInterface listener : controllerListeners) {
             listener.sendPacketToDevice(message.toString());
         }
@@ -191,7 +203,7 @@ public class MultiThrottleController extends ThrottleController {
     @Override
     protected void sendAllMomentaryStates(DccThrottle t) {
         log.debug("Sending momentary state of all functions");
-        for (int cnt = 0; cnt < 29; cnt++) {
+        for (int cnt = 0; cnt < t.getFunctionsMomentary().length; cnt++) {
             StringBuilder message = new StringBuilder(buildPacketWithChar('A'));
             message.append( t.getFunctionMomentary(cnt) ? "m1" : "m0" );
             message.append(cnt);
@@ -241,6 +253,7 @@ public class MultiThrottleController extends ThrottleController {
      */
     @Override
     public void notifyDecisionRequired(LocoAddress address, DecisionType question) {
+        log.debug("Hardware needs a {} decision for {}", question, address);
         if ( question == DecisionType.STEAL ){
             if (isStealAddress) {
                 //  Address is now staged in ThrottleManager and has been requested as a steal
@@ -253,9 +266,18 @@ public class MultiThrottleController extends ThrottleController {
                 notifyFailedThrottleRequest(address, "Steal Required");
             }
         }
-        else if ( question == DecisionType.STEAL_OR_SHARE ){ // using the same process as a Steal
+        else if ( question == DecisionType.STEAL_OR_SHARE ){ 
+            if ( InstanceManager.getDefault(ThrottlesPreferences.class).isSilentShare() ){
+                InstanceManager.throttleManagerInstance().responseThrottleDecision(address, this, DecisionType.SHARE );
+                return;
+            }
+            if ( InstanceManager.getDefault(ThrottlesPreferences.class).isSilentSteal()){
+                InstanceManager.throttleManagerInstance().responseThrottleDecision(address, this, DecisionType.STEAL );
+                return;
+            }
+            // using the same process as a Steal as we cannot ask a Share question
             if (isStealAddress) {
-                //  Address is now staged in ThrottleManager and has been requested as a steal
+                //  Address is now staged in ThrottleManager and has been requested as a steal OR share.
                 //  Complete the process
                 InstanceManager.throttleManagerInstance().responseThrottleDecision(address, this, DecisionType.STEAL);
                 isStealAddress = false;
@@ -265,11 +287,35 @@ public class MultiThrottleController extends ThrottleController {
                 notifyFailedThrottleRequest(address, "Steal Required");
             }
         }
-        else { // if encountered likely to be DecisionType.SHARE
-            log.info("{} question not supported by WiThrottle.",question );
+        else if ( question == DecisionType.SHARE ){
+            if ( InstanceManager.getDefault(ThrottlesPreferences.class).isSilentShare() ){
+                InstanceManager.throttleManagerInstance().responseThrottleDecision(address, this, DecisionType.SHARE );
+                return;
+            }
+            log.info("Share? question not supported by WiThrottle.");
+            log.info("Enable silent sharing in main Throttle preferences to auto-share sessions.");
         }
-        
-        
+
+    }
+    
+    /**
+     * Add option to not silently share ("steal") the requested address
+     * 
+     * {@inheritDoc}
+     */
+    @Override
+    protected void setAddress(int number, boolean isLong) {
+        if(isStealAddress
+                || InstanceManager.throttleManagerInstance().getThrottleUsageCount(number, isLong) == 0 
+                || ! InstanceManager.getDefault(WiThrottlePreferences.class).isExclusiveUseOfAddress()) {
+            super.setAddress(number, isLong);
+        }
+        else {
+            log.debug("Loco address {} already controlled by another JMRI throttle.", number);
+            sendStealAddress();
+            notifyFailedThrottleRequest(new DccLocoAddress(number, isLong), "Steal from other WiThrottle or JMRI throttle Required");
+        }
+
     }
 
     // Encode a SpeedStepMode to a string.
@@ -293,6 +339,6 @@ public class MultiThrottleController extends ThrottleController {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MultiThrottleController.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MultiThrottleController.class);
 
 }

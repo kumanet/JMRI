@@ -57,8 +57,8 @@ public class DccLocoAddressSelector extends JPanel {
         configureBox(protocols);
     }
 
-    void configureBox(String[] protocols) {
-        box = new JComboBox<String>(protocols);
+    private void configureBox(String[] protocols) {
+        box = new JComboBox<>(protocols);
         box.setSelectedIndex(0);
         text = new JTextField();
         text.setColumns(4);
@@ -80,7 +80,7 @@ public class DccLocoAddressSelector extends JPanel {
     private boolean textUsed = false;
     private boolean panelUsed = false;
 
-    /*
+    /**
      * Get the currently selected DCC address.
      * <p>
      * This is the primary output of this class.
@@ -88,7 +88,7 @@ public class DccLocoAddressSelector extends JPanel {
      */
     public DccLocoAddress getAddress() {
         // no object if no address
-        if (text.getText().equals("")) {
+        if (text.getText().isEmpty()) {
             return null;
         }
 
@@ -111,13 +111,19 @@ public class DccLocoAddressSelector extends JPanel {
                 // now special case, should be refactored
                 jmri.jmrix.openlcb.OpenLcbLocoAddress oa = (jmri.jmrix.openlcb.OpenLcbLocoAddress) a;
                 text.setText(oa.getNode().toString());
-                box.setSelectedItem(jmri.LocoAddress.Protocol.OPENLCB.getPeopleName());
+                if (!followingAnotherSelector) {
+                    box.setSelectedItem(jmri.LocoAddress.Protocol.OPENLCB.getPeopleName());
+                }
             } else {
                 text.setText("" + a.getNumber());
                 if (InstanceManager.getNullableDefault(jmri.ThrottleManager.class) != null) {
-                    box.setSelectedItem(InstanceManager.throttleManagerInstance().getAddressTypeString(a.getProtocol()));
+                    if (!followingAnotherSelector) {
+                        box.setSelectedItem(InstanceManager.throttleManagerInstance().getAddressTypeString(a.getProtocol()));
+                    }
                 } else {
-                    box.setSelectedItem(a.getProtocol().getPeopleName());
+                    if (!followingAnotherSelector) {
+                        box.setSelectedItem(a.getProtocol().getPeopleName());
+                    }
                 }
             }
         }
@@ -128,15 +134,17 @@ public class DccLocoAddressSelector extends JPanel {
     }
     boolean varFontSize = false;
 
-    /*
+    /**
      * Put back to original state, clearing GUI
      */
     public void reset() {
-        box.setSelectedIndex(0);
+        if (!followingAnotherSelector) {
+            box.setSelectedIndex(0);
+        }
         text.setText("");
     }
 
-    /* Get a JPanel containing the combined selector.
+    /** Get a JPanel containing the combined selector.
      * <p>
      * Because Swing only allows a component to be inserted in one
      * container, this can only be done once
@@ -193,7 +201,7 @@ public class DccLocoAddressSelector extends JPanel {
         if (!varFontSize) {
             return;
         }
-        double fieldWidth = text.getSize().width;
+        int fieldWidth = text.getSize().width;
         int stringWidth = text.getFontMetrics(text.getFont()).stringWidth(LONGEST_STRING) + 8;
         int fontSize = text.getFont().getSize();
         if (stringWidth > fieldWidth) { // component has shrunk horizontally
@@ -212,7 +220,7 @@ public class DccLocoAddressSelector extends JPanel {
             }
         }
         // also fit vertically
-        double fieldHeight = text.getSize().height;
+        int fieldHeight = text.getSize().height;
         int stringHeight = text.getFontMetrics(text.getFont()).getHeight();
         while ((stringHeight > fieldHeight) && (fontSize >= FONT_SIZE_MIN + FONT_INCREMENT)) {  // component has shrunk vertically
             fontSize -= FONT_INCREMENT;
@@ -222,7 +230,7 @@ public class DccLocoAddressSelector extends JPanel {
         }        
     }
 
-    /*
+    /**
      * Provide a common setEnable call for the GUI components in the
      * selector
      */
@@ -230,13 +238,21 @@ public class DccLocoAddressSelector extends JPanel {
     public void setEnabled(boolean e) {
         text.setEditable(e);
         text.setEnabled(e);
-        box.setEnabled(e);
+        text.setFocusable(e); // to not conflict with the throttle keyboad controls
         if (e) {
             text.setToolTipText(rb.getString("TooltipTextFieldEnabled"));
-            box.setToolTipText(rb.getString("TooltipComboBoxEnabled"));
         } else {
             text.setToolTipText(rb.getString("TooltipTextFieldDisabled"));
-            box.setToolTipText(rb.getString("TooltipComboBoxDisabled"));
+        }
+
+        // only change selection box state if not following
+        if (!followingAnotherSelector) {
+            box.setEnabled(e);
+            if (e) {
+                box.setToolTipText(rb.getString("TooltipComboBoxEnabled"));
+            } else {
+                box.setToolTipText(rb.getString("TooltipComboBoxDisabled"));
+            }
         }
     }
 
@@ -249,7 +265,7 @@ public class DccLocoAddressSelector extends JPanel {
         }
     }
 
-    /*
+    /**
      * Get the text field for entering the number as a separate
      * component.  
      * <p>
@@ -265,11 +281,13 @@ public class DccLocoAddressSelector extends JPanel {
         return text;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification="Error String needs to be evaluated unchanged.")
     void reportError(String msg) {
         log.error(msg, new Exception("traceback"));
     }
 
-    /*
+    /**
      * Get the selector box for picking long/short as a separate
      * component.
      * Because Swing only allows a component to be inserted in one
@@ -284,6 +302,29 @@ public class DccLocoAddressSelector extends JPanel {
         return box;
     }
 
+    boolean followingAnotherSelector = false;
+    
+    /**
+     * This Selector's protocol box will follow another DccLocoAddressSelector's
+     * selected protocol, so this one's protocol choice is constrained to match.
+     * At present, this can't be undone.
+     * Meant for use in e.g. the consist tool for protocols that require only
+     * one type of protocol in a consist
+     */
+     public void followAnotherSelector(DccLocoAddressSelector selector) {
+        // add a listener to the other selector
+        selector.box.addItemListener(event -> {
+            var selection = selector.box.getSelectedItem();
+            this.box.setSelectedItem(selection);
+            this.box.setEnabled(false);
+        });
+        var selection = selector.box.getSelectedItem();
+        this.box.setSelectedItem(selection);
+        this.box.setEnabled(false);
+        box.setToolTipText(rb.getString("TooltipComboBoxDisabled"));
+        followingAnotherSelector = true;
+        
+     }
     /*
      * Override the addKeyListener method in JPanel so that we can set the
      * text box as the object listening for keystrokes
@@ -294,7 +335,7 @@ public class DccLocoAddressSelector extends JPanel {
        text.addKeyListener(l);
     }
 
-    final static ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.DccLocoAddressSelectorBundle");
+    static final ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.DccLocoAddressSelectorBundle");
 
-    private final static Logger log = LoggerFactory.getLogger(DccLocoAddressSelector.class);
+    private static final Logger log = LoggerFactory.getLogger(DccLocoAddressSelector.class);
 }

@@ -1,23 +1,26 @@
 package jmri.jmrit.beantable;
 
-import java.awt.Container;
-import java.awt.FlowLayout;
+import java.awt.*;
 import java.awt.event.ItemEvent;
+import java.beans.PropertyVetoException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 
+import javax.annotation.Nonnull;
 import javax.swing.*;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableColumn;
+import javax.swing.tree.TreeCellEditor;
 
-import jmri.InstanceManager;
-import jmri.Manager;
-import jmri.util.JmriJFrame;
-
-
-import jmri.jmrit.logixng.Base;
-import jmri.jmrit.logixng.LogixNG;
-import jmri.jmrit.logixng.LogixNG_Manager;
+import jmri.*;
+import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.tools.swing.AbstractLogixNGEditor;
 import jmri.jmrit.logixng.tools.swing.LogixNGEditor;
+import jmri.util.JmriJFrame;
+import jmri.util.swing.TriStateJCheckBox;
+import jmri.util.swing.XTableColumnModel;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
@@ -28,7 +31,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
  <p>
  * Most of the text used in this GUI is in BeanTableBundle.properties, accessed
  * via Bundle.getMessage().
- * <p>
  *
  * @author Dave Duchamp Copyright (C) 2007 (LogixTableAction)
  * @author Pete Cressman Copyright (C) 2009, 2010, 2011 (LogixTableAction)
@@ -57,8 +59,14 @@ public class LogixNGTableAction extends AbstractLogixNGTableAction<LogixNG> {
     }
 
     @Override
-    protected AbstractLogixNGEditor<LogixNG> getEditor(BeanTableFrame<LogixNG> f, BeanTableDataModel<LogixNG> m, String sName) {
-        return new LogixNGEditor(f, m, sName);
+    protected void createModel() {
+        m = new TableModel();
+        m.setFilter((LogixNG t) -> !t.isInline());
+    }
+
+    @Override
+    protected AbstractLogixNGEditor<LogixNG> getEditor(BeanTableDataModel<LogixNG> m, String sName) {
+        return new LogixNGEditor(m, sName);
     }
 
     @Override
@@ -89,7 +97,9 @@ public class LogixNGTableAction extends AbstractLogixNGTableAction<LogixNG> {
         LogixNG logixNG =
                 InstanceManager.getDefault(LogixNG_Manager.class)
                         .createLogixNG(userName);
+        logixNG.activate();
         logixNG.setEnabled(true);
+        logixNG.clearStartup();
         return logixNG;
     }
 
@@ -98,21 +108,93 @@ public class LogixNGTableAction extends AbstractLogixNGTableAction<LogixNG> {
         LogixNG logixNG =
                 InstanceManager.getDefault(LogixNG_Manager.class)
                         .createLogixNG(systemName, userName);
+        logixNG.activate();
         logixNG.setEnabled(true);
+        logixNG.clearStartup();
         return logixNG;
     }
 
     @Override
     public void deleteBean(LogixNG logixNG) {
         logixNG.setEnabled(false);
-        InstanceManager.getDefault(LogixNG_Manager.class).deleteLogixNG(logixNG);
+        try {
+            InstanceManager.getDefault(LogixNG_Manager.class).deleteBean(logixNG, "DoDelete");
+        } catch (PropertyVetoException e) {
+            //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+            log.error("{} : Could not Delete.", e.getMessage());
+        }
+    }
+
+    private void copyConditionalNGToLogixNG(
+            @Nonnull ConditionalNG sourceConditionalNG,
+            @Nonnull LogixNG targetBean) {
+
+            // Create ConditionalNG
+            String sysName = InstanceManager.getDefault(ConditionalNG_Manager.class).getAutoSystemName();
+            String oldUserName = sourceConditionalNG.getUserName();
+            String userName = oldUserName != null ? Bundle.getMessage("CopyOfConditionalNG", oldUserName) : null;
+            ConditionalNG targetConditionalNG =
+                    InstanceManager.getDefault(ConditionalNG_Manager.class)
+                            .createConditionalNG(targetBean, sysName, userName);
+
+            sourceConditionalNG.getFemaleSocket().unregisterListeners();
+            targetConditionalNG.getFemaleSocket().unregisterListeners();
+            Map<String, String> systemNames = new HashMap<>();
+            Map<String, String> userNames = new HashMap<>();
+            try {
+                FemaleSocket femaleSourceSocket = sourceConditionalNG.getFemaleSocket();
+                if (femaleSourceSocket.isConnected()) {
+                    targetConditionalNG.getFemaleSocket().connect(
+                            (MaleSocket) femaleSourceSocket.getConnectedSocket()
+                                    .getDeepCopy(systemNames, userNames));
+                }
+            } catch (JmriException ex) {
+                log.error("Could not Copy ConditionalNG.", ex);
+            }
+            sourceConditionalNG.getFemaleSocket().registerListeners();
+            targetConditionalNG.getFemaleSocket().registerListeners();
     }
 
     @Override
-    protected String getBeanText(LogixNG e) {
+    protected void copyBean(@Nonnull LogixNG sourceBean, @Nonnull LogixNG targetBean) {
+        for (int i = 0; i < sourceBean.getNumConditionalNGs(); i++) {
+            copyConditionalNGToLogixNG(sourceBean.getConditionalNG(i), targetBean);
+        }
+    }
+
+    @Override
+    protected boolean isCopyBeanSupported() {
+        return true;
+    }
+
+    @Override
+    protected boolean isExecuteSupported() {
+        return true;
+    }
+
+    @Override
+    protected void execute(@Nonnull LogixNG logixNG) {
+        if (!logixNG.isActivated() && !logixNG.isEnabled()) {
+            JOptionPane.showMessageDialog(f, Bundle.getMessage("LogixNG_CantExecuteLogixNG_InactiveAndNotEnabled"), Bundle.getMessage("LogixNG_Error"), JOptionPane.ERROR_MESSAGE);
+        } else if (!logixNG.isActivated()) {
+            JOptionPane.showMessageDialog(f, Bundle.getMessage("LogixNG_CantExecuteLogixNG_Inactive"), Bundle.getMessage("LogixNG_Error"), JOptionPane.ERROR_MESSAGE);
+        } else if (!logixNG.isEnabled()) {
+            JOptionPane.showMessageDialog(f, Bundle.getMessage("LogixNG_CantExecuteLogixNG_NotEnabled"), Bundle.getMessage("LogixNG_Error"), JOptionPane.ERROR_MESSAGE);
+        } else {
+            logixNG.execute();
+        }
+    }
+
+    @Override
+    protected String getBeanText(LogixNG e, Base.PrintTreeSettings printTreeSettings) {
         StringWriter writer = new StringWriter();
-        _curNamedBean.printTree(_printTreeSettings, new PrintWriter(writer), "    ", new MutableInt(0));
+        _curNamedBean.printTree(printTreeSettings, new PrintWriter(writer), "    ", new MutableInt(0));
         return writer.toString();
+    }
+
+    @Override
+    protected String getBrowserTitle() {
+        return Bundle.getMessage("LogixNG_Browse_Title");
     }
 
     @Override
@@ -211,5 +293,150 @@ public class LogixNGTableAction extends AbstractLogixNGTableAction<LogixNG> {
         });
         return panel5;
     }
+
+    @Override
+    protected void getListenerRefsIncludingChildren(LogixNG logixNG, java.util.List<String> list) {
+        logixNG.getListenerRefsIncludingChildren(list);
+    }
+
+    @Override
+    protected boolean hasChildren(LogixNG logixNG) {
+        return logixNG.getNumConditionalNGs() > 0;
+    }
+
+
+    protected class TableModel extends AbstractLogixNGTableAction<LogixNG>.TableModel {
+
+        // overlay the state column with the edit column
+        public static final int STARTUP_COL = NUMCOLUMN;
+
+        /** {@inheritDoc} */
+        @Override
+        public void configureTable(JTable table) {
+            super.configureTable(table);
+
+            table.setDefaultRenderer(TriStateJCheckBox.State.class, new EnablingTriStateCheckboxRenderer());
+
+            TriStateJCheckBox startupCheckBox = new TriStateJCheckBox();
+            TableColumn col = ((XTableColumnModel)table.getColumnModel())
+                    .getColumnByModelIndex(TableModel.STARTUP_COL);
+            col.setCellEditor(new CellEditor(startupCheckBox));
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public int getColumnCount() {
+            return STARTUP_COL + 1;
+        }
+
+        @Override
+        public String getColumnName(int col) {
+            if (col == STARTUP_COL) {
+                return Bundle.getMessage("ColumnLogixNGStartup");
+            }
+            return super.getColumnName(col);
+        }
+
+        @Override
+        public Class<?> getColumnClass(int col) {
+            if (col == STARTUP_COL) {
+                return TriStateJCheckBox.State.class;
+            }
+            return super.getColumnClass(col);
+        }
+
+        @Override
+        public int getPreferredWidth(int col) {
+            // override default value for SystemName and UserName columns
+            if (col == STARTUP_COL) {
+                return new JTextField(5).getPreferredSize().width;
+            }
+            return super.getPreferredWidth(col);
+        }
+
+        @Override
+        public boolean isCellEditable(int row, int col) {
+            if (col == STARTUP_COL) {
+                return true;
+            }
+            return super.isCellEditable(row, col);
+        }
+
+        @SuppressWarnings("unchecked")  // Unchecked cast from Object to E
+        @Override
+        public Object getValueAt(int row, int col) {
+            if (col == STARTUP_COL) {
+                LogixNG x = (LogixNG) getValueAt(row, SYSNAMECOL);
+                if (x == null) {
+                    return null;
+                }
+                boolean anyTrue = false;
+                boolean anyFalse = false;
+                for (int i=0; i < x.getNumConditionalNGs(); i++) {
+                    ConditionalNG cng = x.getConditionalNG(i);
+                    if (cng.isExecuteAtStartup()) anyTrue = true;
+                    else anyFalse = true;
+                }
+                if (anyTrue && anyFalse) {
+                    return TriStateJCheckBox.State.PARTIAL;
+                } else if (anyTrue) {
+                    return TriStateJCheckBox.State.CHECKED;
+                } else {
+                    return TriStateJCheckBox.State.UNCHECKED;
+                }
+            } else {
+                return super.getValueAt(row, col);
+            }
+        }
+
+        @SuppressWarnings("unchecked")  // Unchecked cast from Object to E
+        @Override
+        public void setValueAt(Object value, int row, int col) {
+            if (col == STARTUP_COL) {
+                // alternate
+                LogixNG x = (LogixNG) getValueAt(row, SYSNAMECOL);
+
+                for (int i=0; i < x.getNumConditionalNGs(); i++) {
+                    ConditionalNG cng = x.getConditionalNG(i);
+                    cng.setExecuteAtStartup(value == TriStateJCheckBox.State.CHECKED);
+                }
+            } else {
+                super.setValueAt(value, row, col);
+            }
+        }
+
+        @Override
+        public String getValue(String s) {
+            return "";
+        }
+    }
+
+    private static class CellEditor extends AbstractCellEditor
+            implements TableCellEditor, TreeCellEditor {
+
+        TriStateJCheckBox _tristateCheckBox;
+
+        public CellEditor(TriStateJCheckBox tristateCheckBox) {
+            this._tristateCheckBox = tristateCheckBox;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return _tristateCheckBox.getState();
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+            return _tristateCheckBox;
+        }
+
+        @Override
+        public Component getTreeCellEditorComponent(JTree tree, Object value, boolean isSelected, boolean expanded, boolean leaf, int row) {
+            return _tristateCheckBox;
+        }
+
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGTableAction.class);
 
 }

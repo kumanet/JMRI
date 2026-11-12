@@ -1,5 +1,6 @@
 package jmri.jmrix.can.cbus.node;
 
+import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
@@ -14,7 +15,9 @@ public class CbusBasicNodeTableFetchTest {
 
     @Test
     public void testCTor() {
-        Assert.assertNotNull("exists",new CbusBasicNodeTableFetch(null,1,2));
+        CanSystemConnectionMemo memo = new CanSystemConnectionMemo();
+        Assert.assertNotNull("exists",new CbusBasicNodeTableFetch(memo,1,2));
+        memo.dispose();
     }
     
     @BeforeEach
@@ -27,6 +30,6 @@ public class CbusBasicNodeTableFetchTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusBasicNodeTableFetch.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusBasicNodeTableFetch.class);
 
 }

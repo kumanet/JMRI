@@ -1,20 +1,24 @@
 package jmri.jmrit.display;
 
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
 import javax.swing.JPopupMenu;
+
 import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
 import jmri.Sensor;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.palette.MultiSensorItemPanel;
 import jmri.jmrit.picker.PickListModel;
+import jmri.util.swing.JmriMouseEvent;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,6 +113,11 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
         return list;
     }
 
+    @Override
+    public jmri.NamedBean getNamedBean() {
+        return entries.isEmpty() ? null : entries.get(0).namedSensor.getBean();
+    }
+
     public String getSensorName(int i) {
         return entries.get(i).namedSensor.getName();
     }
@@ -169,9 +178,17 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
                     prop, sen.getKnownState(), e.getOldValue(), e.getNewValue());
         }
         if (e.getPropertyName().equals("KnownState")) {
+            Rectangle dirty = getBounds();
             displayState();
-            _editor.repaint();
+            dirty.add(getBounds()); // union with the new bounds, in case displayState resized this icon
+            _editor.repaintTargetPanel(dirty);
         }
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_MultiSensorIcon");
     }
 
     @Override
@@ -397,7 +414,7 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
         }
     }
 
-    // Use largest size. If icons are not same size, 
+    // Use largest size. If icons are not same size,
     // this can result in drawing artifacts.
     @Override
     public int maxHeight() {
@@ -414,7 +431,7 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
         return size;
     }
 
-    // Use largest size. If icons are not same size, 
+    // Use largest size. If icons are not same size,
     // this can result in drawing artifacts.
     @Override
     public int maxWidth() {
@@ -431,7 +448,7 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
         return size;
     }
 
-    public void performMouseClicked(java.awt.event.MouseEvent e, int xx, int yy) {
+    public void performMouseClicked(JmriMouseEvent e, int xx, int yy) {
         if (log.isDebugEnabled()) {
             log.debug("performMouseClicked: location ({}, {}), click from ({}, {}) displaying={}",
                     getX(), getY(), xx, yy, displaying);
@@ -491,7 +508,7 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
     }
 
     @Override
-    public void doMouseClicked(MouseEvent e) {
+    public void doMouseClicked(JmriMouseEvent e) {
         if (!e.isAltDown() && !e.isMetaDown()) {
             performMouseClicked(e, e.getX(), e.getY());
         }
@@ -512,6 +529,6 @@ public class MultiSensorIcon extends PositionableLabel implements java.beans.Pro
         NamedIcon icon;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MultiSensorIcon.class);
+    private static final Logger log = LoggerFactory.getLogger(MultiSensorIcon.class);
 
 }

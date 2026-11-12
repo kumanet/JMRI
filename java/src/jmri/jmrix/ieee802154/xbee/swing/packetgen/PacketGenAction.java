@@ -25,7 +25,7 @@ public class PacketGenAction extends XBeeSystemConnectionAction {
     }
 
     public PacketGenAction(String s) {
-        this(InstanceManager.getNullableDefault(XBeeConnectionMemo.class));
+        this(s,InstanceManager.getNullableDefault(XBeeConnectionMemo.class));
     }
 
     public PacketGenAction() {
@@ -52,6 +52,6 @@ public class PacketGenAction extends XBeeSystemConnectionAction {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PacketGenAction.class);
+    private static final Logger log = LoggerFactory.getLogger(PacketGenAction.class);
 
 }

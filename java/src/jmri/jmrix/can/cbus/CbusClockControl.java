@@ -5,6 +5,10 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+
+import javax.annotation.Nonnull;
+
+import jmri.Disposable;
 import jmri.TimebaseRateException;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.CanListener;
@@ -19,7 +23,7 @@ import org.slf4j.LoggerFactory;
  * @since 4.19.6
  * @author Steve Young (C) 2020
  */
-public class CbusClockControl extends jmri.implementation.DefaultClockControl implements CanListener {
+public class CbusClockControl extends jmri.implementation.DefaultClockControl implements CanListener, Disposable {
 
     private boolean isRunning;
     private int _cbusTemp = 0;
@@ -32,25 +36,29 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
     private final SimpleDateFormat dayInMonth;
     private final SimpleDateFormat monthFormat;
     private final SimpleDateFormat yearFormat;
-    
+
     private final CanSystemConnectionMemo _memo;
-    
-    public CbusClockControl(CanSystemConnectionMemo memo) {
+
+    // Timebase listener for Minute change events from the internal clock.
+    // Held as a field so that the same instance can be removed on dispose.
+    private final java.beans.PropertyChangeListener minuteListener = this::newMinute;
+
+    public CbusClockControl(@Nonnull CanSystemConnectionMemo memo) {
         super();
-        
+
         minuteFormat = new java.text.SimpleDateFormat("mm");
-        hourFormat = new java.text.SimpleDateFormat("H");        
+        hourFormat = new java.text.SimpleDateFormat("H");
         dayofWeek = new java.text.SimpleDateFormat("u");
         dayInMonth = new java.text.SimpleDateFormat("d");
         monthFormat = new java.text.SimpleDateFormat("MM");
-        yearFormat = new java.text.SimpleDateFormat("YYYY");
-        
+        yearFormat = new java.text.SimpleDateFormat("yyyy"); // calendar year, "YYYY" is week-year
+
         _memo = memo;
         this.addTc(memo);
         // Get internal timebase
         clock = jmri.InstanceManager.getDefault(jmri.Timebase.class);
-        // Create a Timebase listener for Minute change events from the internal clock
-        clock.addMinuteChangeListener(this::newMinute);
+        // Listen for Minute change events from the internal clock
+        clock.addMinuteChangeListener(minuteListener);
     }
     
     private void newMinute(java.beans.PropertyChangeEvent e){
@@ -73,7 +81,7 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
      * @param newTemp -128 to 127
      */
     public void setTemp(int newTemp) {
-        if (newTemp>-128 && newTemp<127) {
+        if (newTemp>=-128 && newTemp<=127) {
             _cbusTemp = newTemp;
         }
         else {
@@ -175,7 +183,7 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
         send.setElement(3, bstot);
         send.setElement(4,  ( isRunning ? (int) getRate() : 0)); // time divider, 0 is stpeed, 1 is real time, 2 twice real, 3 thrice real
         send.setElement(5, Integer.parseInt(dayInMonth.format(clock.getTime()))); // day of month, 0-31
-        send.setElement(6, _cbusTemp); // Temperature as twos complement -127 to +127
+        send.setElement(6, _cbusTemp & 0xff); // Temperature as twos complement -128 to +127
         CbusMessage.setPri(send, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
         
         return send;
@@ -231,8 +239,7 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
             }
         }
         if (specificDate!=null) {
-            Date newnewdate = Date.from( specificDate.atZone( ZoneId.systemDefault()).toInstant());
-            clock.setTime(newnewdate);
+            clock.setTime(specificDate.atZone( ZoneId.systemDefault()).toInstant());
         }
     }
     
@@ -280,6 +287,11 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
         int month = (r.getElement(3) >>> 4);
         int weekday = r.getElement(3) - ( month << 4);
         
+        // DateFormatSymbols.getInstance().getWeekdays()[] uses 1-7, not 0-6
+        if (weekday == 0){
+            weekday =7;
+        }
+        
         log.debug("bs tot   {}",Integer.toBinaryString(r.getElement(3)));
         log.debug("bs day       {} {}",Integer.toBinaryString(weekday),weekday);
         log.debug("bs month {} {}",Integer.toBinaryString(month),month);
@@ -312,11 +324,12 @@ public class CbusClockControl extends jmri.implementation.DefaultClockControl im
      * Stops listening for updates from network and main time base.
      *
      */
+    @Override
     public void dispose() {
-        clock.removeMinuteChangeListener(this::newMinute);
+        clock.removeMinuteChangeListener(minuteListener);
         this.removeTc(_memo);
     }
     
-    private final static Logger log = LoggerFactory.getLogger(CbusClockControl.class);
+    private static final Logger log = LoggerFactory.getLogger(CbusClockControl.class);
 
 }

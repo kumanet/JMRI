@@ -1,6 +1,5 @@
 package jmri.jmrix.loconet;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.DccLocoAddress;
 import jmri.LocoAddress;
 import jmri.SpeedStepMode;
@@ -69,20 +68,39 @@ public class Pr2Throttle extends AbstractThrottle {
      * This implementation does not support 128 speed steps.
      */
     @Override
-    // This is a specific implementation for the PR2 that seems to 
-    // return different values from the super class.  Not sure whether
-    // that's required by the hardware or not.  If so, please edit this comment
-    // to confirm.  If not, this should use the superclass implementation after
-    // checking for available modes.
+    // This is a specific implementation for the PR2 that seems to
+    // return different values from the super class.  This is an attempt at only
+    // outputting those speeds to the Pr2 that generate discrete DCC speeds
+    // 14/28 speed steps are the same as LocoNetThrottle.intSpeed
     protected int intSpeed(float fSpeed) {
-        if (fSpeed< 0.) return 1;  // what the parent class does
+        int speed;
+        if (fSpeed < 0.) {
+            return 1;
+        }  // emergency stop
+        if (fSpeed == 0.) {
+            return 0;
+        } // idle (zero speed)
+        
         switch (this.getSpeedStepMode()) {
             case NMRA_DCC_28:
             case MOTOROLA_28:
-                return (int) ((fSpeed * 28) * 4) + 12;
+                speed = (int) ((fSpeed * 28) * 4) + 12;
+                // ensure we never send a non-zero speed to loconet 
+                // that we reinterpret as 0 in floatSpeed() later
+                if (speed < 16) {
+                    speed = 16;
+                }
+                return speed;
+
             case NMRA_DCC_14:
-                return (int) ((fSpeed * 14) * 8) + 8;
-                
+                speed = (int) ((fSpeed * 14) * 8) + 8;
+                // ensure we never send a non-zero speed to loconet 
+                // that we reinterpret as 0 in floatSpeed() later
+                if (speed < 16) {
+                    speed = 16;
+                }
+                return speed;
+
             default:
                 // includes the 128 case
                 log.warn("Unhandled speed step mode: {}", this.getSpeedStepMode());
@@ -98,19 +116,19 @@ public class Pr2Throttle extends AbstractThrottle {
             speed = intSpeed(speedSetting);
         }
         int dirf = 0; // contains dir, f0, f4-1
-        if (getF0()) {
+        if (getFunction(0)) {
             dirf |= (1 << 4);
         }
-        if (getF1()) {
+        if (getFunction(1)) {
             dirf |= (1 << 0);
         }
-        if (getF2()) {
+        if (getFunction(2)) {
             dirf |= (1 << 1);
         }
-        if (getF3()) {
+        if (getFunction(3)) {
             dirf |= (1 << 2);
         }
-        if (getF4()) {
+        if (getFunction(4)) {
             dirf |= (1 << 3);
         }
         if (!getIsForward()) {
@@ -118,25 +136,25 @@ public class Pr2Throttle extends AbstractThrottle {
         }
         // contains f11-5
         int f11 = 0;
-        if (getF5()) {
+        if (getFunction(5)) {
             f11 |= (1 << 0);
         }
-        if (getF6()) {
+        if (getFunction(6)) {
             f11 |= (1 << 1);
         }
-        if (getF7()) {
+        if (getFunction(7)) {
             f11 |= (1 << 2);
         }
-        if (getF8()) {
+        if (getFunction(8)) {
             f11 |= (1 << 3);
         }
-        if (getF9()) {
+        if (getFunction(9)) {
             f11 |= (1 << 4);
         }
-        if (getF10()) {
+        if (getFunction(10)) {
             f11 |= (1 << 5);
         }
-        if (getF11()) {
+        if (getFunction(11)) {
             f11 |= (1 << 6);
         }
 
@@ -148,7 +166,7 @@ public class Pr2Throttle extends AbstractThrottle {
 
         // contains F28, F20, F12
         int f28 = 0;
-        if (getF12()) {
+        if (getFunction(12)) {
             f28 |= (1 << 4);
         }
 
@@ -206,7 +224,6 @@ public class Pr2Throttle extends AbstractThrottle {
      *
      * @param speed Number from 0 to 1; less than zero is emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point, notify on any change
     @Override
     public synchronized void setSpeedSetting(float speed) {
         float oldSpeed = this.speedSetting;
@@ -257,6 +274,6 @@ public class Pr2Throttle extends AbstractThrottle {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(Pr2Throttle.class);
+    private static final Logger log = LoggerFactory.getLogger(Pr2Throttle.class);
 
 }

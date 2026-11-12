@@ -78,7 +78,8 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
         delayField.setText("200");
         delayField.setVisible(true);
         delayField.setToolTipText(Bundle.getMessage("DelayTooltip"));
-
+        delayField.addPropertyChangeListener(this::delayFieldActionPerformed);
+        
         jLabel1.setText(Bundle.getMessage("FieldDelay"));
         jLabel1.setVisible(true);
 
@@ -115,7 +116,6 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
         openHexFileButton.addActionListener(this::openHexFileButtonActionPerformed);
         filePauseButton.addActionListener(this::filePauseButtonActionPerformed);
         jButton1.addActionListener(this::jButton1ActionPerformed);
-        delayField.addActionListener(this::delayFieldActionPerformed);
         simReplyBox.addActionListener(this::simReplyActionPerformed);
 
         pack();
@@ -145,8 +145,16 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
             return;  // give up if no file selected
         }
         // call load to process the file
+        Integer delayValue = null;
         port.load(inputFileChooser.getSelectedFile());
+        try {
+            delayValue = Integer.parseInt(delayField.getText());
 
+        } catch (NumberFormatException exception) {
+            log.error("invalid number in delay field - {}", delayField.getText());
+        }
+        if (delayValue != null && delayValue > 1 )
+           port.setDelay(delayValue);
         // wake copy
         sourceThread.interrupt();  // really should be using notifyAll instead....
 
@@ -170,7 +178,7 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
 
         // do the common manager config
         port.getSystemConnectionMemo().configureCommandStation(LnCommandStationType.COMMAND_STATION_DCS100, // full featured by default
-                false, false, false);
+                false, false, false, false, false);
         port.getSystemConnectionMemo().configureManagers();
         jmri.SensorManager sm = port.getSystemConnectionMemo().getSensorManager();
         if (sm != null) {
@@ -205,7 +213,7 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
         jmri.InstanceManager.deregister(ep, jmri.AddressedProgrammerManager.class);
         jmri.InstanceManager.deregister(ep, jmri.GlobalProgrammerManager.class);
 
-        // Install a debug throttle manager and override 
+        // Install a debug throttle manager and override
         DebugThrottleManager tm = new DebugThrottleManager(port.getSystemConnectionMemo() ) {
             /**
              * Only address 128 and above can be a long address
@@ -237,11 +245,11 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
             }
 
             @Override
-            public boolean disposeThrottle(DccThrottle t, jmri.ThrottleListener l) {                
+            public boolean disposeThrottle(DccThrottle t, jmri.ThrottleListener l) {
                 if (slotsInUse > 0) slotsInUse--;
                 log.debug("Throttle {} disposed. slotsInUse={}, maxSlots={}", t, slotsInUse, maxSlots);
                 return super.disposeThrottle(t, l);
-            }    
+            }
         };
 
         port.getSystemConnectionMemo().setThrottleManager(tm);
@@ -253,21 +261,19 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
 
         // start operation of packetizer
         packets.startThreads();
-        sourceThread = new Thread(port, "LocoNet HexFileFrame");
+        sourceThread = jmri.util.ThreadingUtil.newThread(port, "LocoNet HexFileFrame");
         sourceThread.start();
     }
 
-    @SuppressWarnings("deprecation")  // Thread.suspend() not being removed
     public void filePauseButtonActionPerformed(java.awt.event.ActionEvent e) {
-        sourceThread.suspend();
+        port.suspendReading(true);
     }
 
-    @SuppressWarnings("deprecation")  // Thread.resume() not being removed
     public void jButton1ActionPerformed(java.awt.event.ActionEvent e) {  // resume button
-        sourceThread.resume();
+        port.suspendReading(false);
     }
 
-    public void delayFieldActionPerformed(java.awt.event.ActionEvent e) {
+    public void delayFieldActionPerformed(java.beans.PropertyChangeEvent e) {
         // if the hex file has been started, change its delay
         if (port != null) {
             port.setDelay(Integer.parseInt(delayField.getText()));
@@ -276,7 +282,7 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
 
     @Override
     public synchronized void message(LocoNetMessage m) {
-        //log.debug("HexFileFrame heard message {}", m.toMonitorString());
+        // log.debug("HexFileFrame heard message {}", m.toMonitorString());
         if (port.simReply()) {
             LocoNetMessage reply = LnHexFilePort.generateReply(m);
             if (reply != null) {
@@ -304,6 +310,6 @@ public class HexFileFrame extends JmriJFrame implements LocoNetListener {
         });
     }
 
-    private final static Logger log = LoggerFactory.getLogger(HexFileFrame.class);
+    private static final Logger log = LoggerFactory.getLogger(HexFileFrame.class);
 
 }

@@ -1,7 +1,5 @@
 package jmri.jmrix.loconet;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,15 +15,10 @@ public abstract class LnPortController extends jmri.jmrix.AbstractSerialPortCont
     protected LnPortController(LocoNetSystemConnectionMemo connectionMemo) {
         super(connectionMemo);
         setManufacturer(LnConnectionTypeList.DIGITRAX);
+
+        allowConnectionRecovery = true;
+        reconnectMaxAttempts = -1; // retry indefinitely
     }
-
-    // returns the InputStream from the port
-    @Override
-    public abstract DataInputStream getInputStream();
-
-    // returns the outputStream to the port
-    @Override
-    public abstract DataOutputStream getOutputStream();
 
     /**
      * Check that this object is ready to operate. This is a question of
@@ -46,17 +39,24 @@ public abstract class LnPortController extends jmri.jmrix.AbstractSerialPortCont
         return true;
     }
 
+    private final java.util.concurrent.locks.Lock lockRecover =
+            new java.util.concurrent.locks.ReentrantLock();
+
     protected LnCommandStationType commandStationType = null;
 
     protected boolean mTurnoutNoRetry = false;
     protected boolean mTurnoutExtraSpace = false;
-
+    protected boolean mInterrogateAtStart = true;
     protected boolean mTranspondingAvailable = false;
+
+    protected boolean mLoconetProtocolAutoDetect = true;
 
     protected LnCommandStationType[] commandStationTypes = {
         LnCommandStationType.COMMAND_STATION_DCS100,
         LnCommandStationType.COMMAND_STATION_DCS240,
+        LnCommandStationType.COMMAND_STATION_DCS240PLUS,
         LnCommandStationType.COMMAND_STATION_DCS210,
+        LnCommandStationType.COMMAND_STATION_DCS210PLUS,
         LnCommandStationType.COMMAND_STATION_DCS200,
         LnCommandStationType.COMMAND_STATION_DCS050,
         LnCommandStationType.COMMAND_STATION_DCS051,
@@ -117,12 +117,54 @@ public abstract class LnPortController extends jmri.jmrix.AbstractSerialPortCont
         mTranspondingAvailable = (value.equals("Yes") || value.equals(Bundle.getMessage("ButtonYes")));
         log.debug("transponding available: {}", mTranspondingAvailable); // NOI18N
     }
-    
+
+    public void setLoconetProtocolAutoDetect(String value) {
+        // default (most common state) is off, so just check for Yes
+        mLoconetProtocolAutoDetect = (value.equals("Yes") || value.equals(Bundle.getMessage("LoconetProtocolAutoDetect")));
+        log.debug("Loconet XPSlots: {}", mLoconetProtocolAutoDetect); // NOI18N
+    }
+
+    public void setInterrogateOnStart(String value) {
+        // default (most common state) is on, so just check for No
+        mInterrogateAtStart = !(value.equals("No") || value.equals(Bundle.getMessage("ButtonNo")));
+        log.debug("tInterrogate on Start: {}", mInterrogateAtStart); // NOI18N
+    }
+
     @Override
     public LocoNetSystemConnectionMemo getSystemConnectionMemo() {
         return (LocoNetSystemConnectionMemo) super.getSystemConnectionMemo();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnPortController.class);
+    @Override
+    public final void recover() {
+        if (allowConnectionRecovery && opened) {
+            log.info("Connection lost. Attempting to recover...");
+        }
+
+        // This method is sometimes called reentrant so to protect from that,
+        // we have a lock.
+        if (lockRecover.tryLock()) {
+            try {
+                super.recover();
+            } finally {
+                lockRecover.unlock();
+            }
+        } else {
+            log.warn("Reconnect already running");
+        }
+    }
+
+    // after reconnect, reattach the packetizer's streams and restart the receive thread
+    @Override
+    protected final void resetupConnection() {
+        LnTrafficController tc = getSystemConnectionMemo().getLnTrafficController();
+        if (tc instanceof LnPacketizer) {
+            LnPacketizer packets = (LnPacketizer) tc;
+            packets.connectPort(this);
+            packets.restartRcvThread();
+        }
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(LnPortController.class);
 
 }

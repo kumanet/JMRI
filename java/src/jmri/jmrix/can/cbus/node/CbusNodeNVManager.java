@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class to represent a Processing of CAN Frames for a CbusNode.
+ * Class to manage Node Variables for a CbusNode.
  *
  * @author Steve Young Copyright (C) 2019,2020
  */
@@ -56,8 +56,10 @@ public class CbusNodeNVManager {
         
         _nvArray = new int [(newnvs.length)]; // no need to compensate for index 0 being total
         for (int i = 0; i < newnvs.length; i++) {
-            setNV(i,newnvs[i]);
+            setNV(i,newnvs[i]);     // will notify SINGLENVUPDATE
         }
+        
+        // Now ensure anyone only listening for ALLNVUPDATE sees the change
         _node.notifyPropertyChangeListener("ALLNVUPDATE", null, null);
     }
     
@@ -95,7 +97,10 @@ public class CbusNodeNVManager {
             return;
         }
         _nvArray[index]=newnv;
-        _node.notifyPropertyChangeListener("SINGLENVUPDATE",null,( index -1));
+        if (index > 0) {
+            // Ignore index 0 (number of NVs) as this would pass a negative value in the property change
+            _node.notifyPropertyChangeListener("SINGLENVUPDATE",null,( index -1));
+        }
         
     }
     
@@ -179,11 +184,15 @@ public class CbusNodeNVManager {
      * Expected response from node NVANS
      */
     protected void sendNextNVToFetch(){
-        
+
         if ( _node.getNodeTimerManager().hasActiveTimers() ) {
             return;
         }
-        
+        if ( _nvArray == null ) {
+            log.debug("Node {} NV Array unset, unable to fetch NVs", _node);
+            return;
+        }
+
         for (int i = 0; i < _nvArray.length; i++) {
             if ( _nvArray[i] < 0 ) {
                 // start NV request timer
@@ -219,12 +228,16 @@ public class CbusNodeNVManager {
      * Loop for NV teaching
      */
     protected void sendNextNvToNode() {
-        
+
         if ( _node.getNodeTimerManager().hasActiveTimers() ) {
             return;
         }
-        
-        for (int i = nextNvInLoop; i < _nvArray.length; i++) {
+        if ( _nvArray == null || newNvsToTeach == null ) {
+            log.warn("Node {} NV Array unset, unable to teach NVs", _node);
+            return;
+        }
+
+        for (int i = nextNvInLoop; i < Math.min(_nvArray.length, newNvsToTeach.length); i++) {
             if ( newNvsToTeach[i] != _nvArray[i] ) {
                 _node.getNodeTimerManager().setsendEditNvTimeout();
                 _node.send.nVSET( _node.getNodeNumber() ,i, newNvsToTeach[i] );
@@ -233,7 +246,7 @@ public class CbusNodeNVManager {
             }
         }
         
-        log.info( Bundle.getMessage("NdCompleteNVar", String.valueOf(_node.getNodeTimerManager()._sendNVErrorCount) , _node ) );
+        log.info( "TEACH NV COMPLETE {}", Bundle.getMessage("NdCompleteNVar", String.valueOf(_node.getNodeTimerManager()._sendNVErrorCount) , _node ) );
         TEACH_OUTSTANDING_NVS = false;
         _node.notifyPropertyChangeListener("TEACHNVCOMPLETE", null, _node.getNodeTimerManager()._sendNVErrorCount);
         
@@ -264,6 +277,14 @@ public class CbusNodeNVManager {
         } else {
             return jmri.util.StringUtil.hexStringFromInts(getNvArray()).replaceAll("\\s","").substring(2);
         }
+    }
+    
+    /**
+     * @return descriptive string
+     */
+    @Override
+    public String toString() {
+        return "Node Variables";
     }
     
     private static final Logger log = LoggerFactory.getLogger(CbusNodeNVManager.class);

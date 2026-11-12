@@ -15,9 +15,9 @@ import org.junit.jupiter.api.*;
  */
 public class DCCppPredefinedMetersTest {
 
-    private DCCppInterfaceScaffold tc;
-    private DCCppPredefinedMeters mm;
-    
+    private DCCppInterfaceScaffold tc = null;
+    private DCCppPredefinedMeters mm = null;
+
     @Test
     public void testMeterReplies() {
         mm.message(DCCppReply.parseDCCppReply("a10")); // a syntactically valid current reply
@@ -71,5 +71,5 @@ public class DCCppPredefinedMetersTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(DCCppPredefinedMetersTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(DCCppPredefinedMetersTest.class);
 }

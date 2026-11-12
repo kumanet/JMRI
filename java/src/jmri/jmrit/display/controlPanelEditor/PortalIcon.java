@@ -1,6 +1,5 @@
 package jmri.jmrit.display.controlPanelEditor;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.event.ActionEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -18,6 +17,7 @@ import jmri.jmrit.display.PositionableIcon;
 import jmri.jmrit.display.ToolTip;
 import jmri.jmrit.display.palette.ItemPalette;
 import jmri.jmrit.logix.Portal;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,7 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         setPortal(portal);
     }
 
-    static public HashMap<String, NamedIcon> getPaletteMap() {
+    public static HashMap<String, NamedIcon> getPaletteMap() {
         HashMap<String, HashMap<String, NamedIcon>> families = ItemPalette.getFamilyMaps("Portal");
         if (families.keySet().isEmpty()) {
             log.debug("Adding missing PortalIconMap");
@@ -66,7 +66,7 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         // return a copy, not ItemPalette's map!
         return cloneMap(iconMap, null);
     }
-    
+
     public void makeIconMap() {
         _iconMap = ((ControlPanelEditor)_editor).getPortalIconMap();
         int deg = getDegrees();
@@ -119,16 +119,6 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
     }
 
     /**
-     * Renamed in 4.21.5
-     * @param set true for regular, false for opposite (flipped in edit frame)
-     * @deprecated since 4.21.5 use setArrowOrientation(set)
-     */
-    @Deprecated
-    public void setArrowOrientatuon(boolean set) {
-        setArrowOrientation(set);
-    }
-
-    /**
      * Set direction of portal icon, renamed in 4.21.5
      * @param set true for regular, false for opposite (flipped in edit frame)
      */
@@ -158,7 +148,11 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         return _portal;
     }
 
-    @SuppressFBWarnings(value="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE", justification="Portals always have userNames")
+    @Override
+    public jmri.NamedBean getNamedBean() {
+        return null;
+    }
+
     public void setPortal(Portal portal) {
         if (portal == null) {
             return;
@@ -168,7 +162,7 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         }
         _portal = portal;
         _portal.addPropertyChangeListener(this);
-        setToolTip(new ToolTip(_portal.getDescription(), 0, 0));
+        setToolTip(new ToolTip(_portal.getDescription(), 0, 0, this));
     }
 
     public void setStatus(String status) {
@@ -253,6 +247,12 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
 
     @Override
     @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_PortalIcon");
+    }
+
+    @Override
+    @Nonnull
     public String getNameString() {
         Portal p = getPortal();
         if (p == null) return "No Portal Defined";
@@ -297,7 +297,7 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         return true;
     }
 
-    @Override 
+    @Override
     public void setLocation(int x, int y ) {
         ControlPanelEditor cpe = (ControlPanelEditor)_editor;
         if (cpe.getCircuitBuilder().portalIconMove(this, x, y)) {
@@ -320,6 +320,6 @@ public class PortalIcon extends PositionableIcon implements PropertyChangeListen
         return false;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PortalIcon.class);
+    private static final Logger log = LoggerFactory.getLogger(PortalIcon.class);
 
 }

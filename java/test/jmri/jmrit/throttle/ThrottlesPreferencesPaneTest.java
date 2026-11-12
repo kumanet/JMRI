@@ -1,7 +1,15 @@
 package jmri.jmrit.throttle;
 
-import org.junit.Assert;
+import javax.swing.JFrame;
+
+import jmri.jmrit.throttle.preferences.ThrottlesPreferencesPane;
+import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+import jmri.util.ThreadingUtil;
+
 import org.junit.jupiter.api.*;
+
+import org.netbeans.jemmy.operators.JFrameOperator;
 
 /**
  * Test simple functioning of ThrottlesPreferencesPane
@@ -11,20 +19,32 @@ import org.junit.jupiter.api.*;
 public class ThrottlesPreferencesPaneTest {
 
     @Test
+    @DisabledIfHeadless
     public void testCtor() {
         ThrottlesPreferencesPane panel = new ThrottlesPreferencesPane();
-        Assert.assertNotNull("exists", panel);
+        Assertions.assertNotNull(panel, "exists");
+        JFrame f = new JFrame(panel.getPreferencesItemText());
+        f.add(panel);
+        
+        ThreadingUtil.runOnGUI(() -> {
+            f.pack();
+            f.setVisible(true);
+        });
+        JFrameOperator jfo = new JFrameOperator(panel.getPreferencesItemText());
+        JUnitUtil.dispose(jfo.getWindow());
+        jfo.waitClosed();
+
     }
 
     @BeforeEach
-    public void setUp() throws Exception {
-        jmri.util.JUnitUtil.setUp();
+    public void setUp() {
+        JUnitUtil.setUp();
 
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
-        jmri.util.JUnitUtil.tearDown();
+    public void tearDown() {
+        JUnitUtil.tearDown();
 
     }
 }

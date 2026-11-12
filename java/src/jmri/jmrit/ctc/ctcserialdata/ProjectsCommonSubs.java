@@ -9,7 +9,6 @@ import jmri.jmrit.ctc.*;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVPrinter;
 
 /**
  *
@@ -17,13 +16,15 @@ import org.apache.commons.csv.CSVPrinter;
  */
 
 public class ProjectsCommonSubs {
-    static final public char SSV_SEPARATOR = ';';
+    public static final String SSV_SEPARATOR = ";";
 
-    static public ArrayList<String> getArrayListFromCSV(String csvString) { return helper1(csvString, CSVFormat.DEFAULT.getDelimiter());}
-    static public ArrayList<String> getArrayListFromSSV(String ssvString) { return helper1(ssvString, SSV_SEPARATOR); }
-    static private ArrayList<String> helper1(String ssvString, char separator) {
+    public static ArrayList<String> getArrayListFromCSV(String csvString) { return helper1(csvString, CSVFormat.DEFAULT.getDelimiterString());}
+    public static ArrayList<String> getArrayListFromSSV(String ssvString) { return helper1(ssvString, SSV_SEPARATOR); }
+    private static ArrayList<String> helper1(String ssvString, String separator) {
         ArrayList<String> list = new ArrayList<>();
-        try (CSVParser parser = new CSVParser(new StringReader(ssvString), CSVFormat.DEFAULT.withQuote(null).withDelimiter(separator).withRecordSeparator(null))) {
+        try (CSVParser parser = new CSVParser(new StringReader(ssvString),
+                CSVFormat.Builder.create(CSVFormat.DEFAULT)
+                        .setQuote(null).setDelimiter(separator).setRecordSeparator(null).build())) {
             parser.getRecords().forEach(record -> record.forEach(item -> list.add(item)));
         } catch (IOException ex) {
             log.error("Unable to parse {}", ssvString, ex);
@@ -31,16 +32,16 @@ public class ProjectsCommonSubs {
         return list;
     }
 
-    static public ArrayList<String> getArrayListOfSignalNames(ArrayList<NBHSignal> array) {
+    public static ArrayList<String> getArrayListOfSignalNames(ArrayList<NBHSignal> array) {
         ArrayList<String> stringList = new ArrayList<>();
         array.forEach(row -> {
-            NamedBeanHandle handle = (NamedBeanHandle) row.getBeanHandle();
+            var handle = (NamedBeanHandle<?>) row.getBeanHandle();
             stringList.add(handle.getName());
         });
         return stringList;
     }
 
-    static public ArrayList<NBHSignal> getArrayListOfSignals(ArrayList<String> signalNames) {
+    public static ArrayList<NBHSignal> getArrayListOfSignals(ArrayList<String> signalNames) {
         CtcManager cm = InstanceManager.getDefault(CtcManager.class);
         ArrayList<NBHSignal> newList = new ArrayList<>();
         signalNames.forEach(name -> {
@@ -57,13 +58,13 @@ public class ProjectsCommonSubs {
 
 //  Returns an ArrayList guaranteed to have exactly "returnArrayListSize" entries,
 //  and if the passed "csvString" has too few entries, then those missing end values are set to "":
-    static public ArrayList<String> getFixedArrayListSizeFromCSV(String csvString, int returnArrayListSize) {
+    public static ArrayList<String> getFixedArrayListSizeFromCSV(String csvString, int returnArrayListSize) {
         ArrayList<String> returnArray = getArrayListFromCSV(csvString);
         while (returnArray.size() < returnArrayListSize) returnArray.add("");
         return returnArray;
     }
 
-    static public int getIntFromStringNoThrow(String aString, int defaultValueIfProblem) {
+    public static int getIntFromStringNoThrow(String aString, int defaultValueIfProblem) {
         int returnValue = defaultValueIfProblem;    // Default if error
         try { returnValue = Integer.parseInt(aString); } catch (NumberFormatException e) {}
         return returnValue;

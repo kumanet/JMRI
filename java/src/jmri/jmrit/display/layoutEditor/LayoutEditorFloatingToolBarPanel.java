@@ -1,6 +1,5 @@
 package jmri.jmrit.display.layoutEditor;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.FlowLayout;
 import javax.annotation.Nonnull;
 import javax.swing.*;
@@ -22,32 +21,32 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
      * @param layoutEditor the layout editor that this is for
      */
     public LayoutEditorFloatingToolBarPanel(@Nonnull LayoutEditor layoutEditor) {
-        super(layoutEditor);    
-        localLayoutComponents();    
+        super(layoutEditor);
+        localLayoutComponents();
     }
 
-    // super.setupComponents() used as-is. super.layoutComponents() is 
+    // super.setupComponents() used as-is. super.layoutComponents() is
     // suppressed, as it doesn't need to run. localLayoutComponents()
     // is then invoked by this class's constructor after the initializers
     // are complete. (Putting this into an override of layoutComponents would
     // not be correct, as that is invoked from the superclass constructor before
-    // this classes initializers are run; local reference members will be 
+    // this classes initializers are run; local reference members will be
     // overwritten when that happens.)
-    
+
     /**
      * Deliberately not running the superclass
      * {@link LayoutEditorToolBarPanel#layoutComponents()}
      * method.
      */
     @Override
-    final protected void layoutComponents() {
+    protected final void layoutComponents() {
     }
-    
+
     /**
-     * Local configuration of Swing components run as 
+     * Local configuration of Swing components run as
      * last phase of construction.
      */
-    private void localLayoutComponents() {    
+    private void localLayoutComponents() {
         /*
          *  JPanel - floatEditTabsPanel
          *      JTabbedPane - floatEditTabsPane
@@ -130,6 +129,8 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
         JPanel trackGroup2 = new JPanel(floatContentLayout);
         trackGroup2.add(trackButton);
         trackGroup2.add(levelXingButton);
+        trackGroup2.add(turntableButton);
+        trackGroup2.add(traverserButton);
         floatEditTrack.add(trackGroup2);
 
         JPanel trackGroup3 = new JPanel(floatContentLayout);
@@ -152,6 +153,11 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
         labelGroup2.add(textMemoryComboBox);
         floatEditLabel.add(labelGroup2);
 
+        JPanel labelGroup4 = new JPanel(floatContentLayout);
+        labelGroup4.add(globalVariableButton);
+        labelGroup4.add(textGlobalVariableComboBox);
+        floatEditLabel.add(labelGroup4);
+
         JPanel labelGroup3 = new JPanel(floatContentLayout);
         labelGroup3.add(blockContentsButton);
         labelGroup3.add(blockContentsComboBox);
@@ -173,6 +179,11 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
         iconGroup2.add(sensorComboBox);
         floatEditIcon.add(iconGroup2);
 
+        JPanel iconGroup2t = new JPanel(floatContentLayout);
+        iconGroup2t.add(turnoutButton);
+        iconGroup2t.add(turnoutComboBox);
+        floatEditIcon.add(iconGroup2t);
+
         JPanel iconGroup3 = new JPanel(floatContentLayout);
         iconGroup3.add(signalMastButton);
         iconGroup3.add(signalMastComboBox);
@@ -185,8 +196,14 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
 
         JPanel iconGroup5 = new JPanel(floatContentLayout);
         iconGroup5.add(iconLabelButton);
+        iconGroup5.add(logixngButton);
         iconGroup5.add(shapeButton);
         floatEditIcon.add(iconGroup5);
+
+        JPanel iconGroup6 = new JPanel(floatContentLayout);
+        iconGroup6.add(audioButton);
+        iconGroup6.add(textAudioComboBox);
+        floatEditIcon.add(iconGroup6);
 
         floatEditTabsPane.addTab(Bundle.getMessage("TabIcon"), null, floatEditIcon, null);
         floatEditTabsPanel.add(floatEditTabsPane);
@@ -218,5 +235,5 @@ public class LayoutEditorFloatingToolBarPanel extends LayoutEditorToolBarPanel {
     }
 
     // initialize logging
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorFloatingToolBarPanel.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutEditorFloatingToolBarPanel.class);
 }

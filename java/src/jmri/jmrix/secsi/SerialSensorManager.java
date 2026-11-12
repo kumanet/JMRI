@@ -45,11 +45,6 @@ public class SerialSensorManager extends jmri.managers.AbstractSensorManager
         return (SecsiSystemConnectionMemo) memo;
     }
 
-    // Free resources when no longer used
-    @Override
-    public void dispose() {
-    }
-
     /**
      * {@inheritDoc}
      * <p>
@@ -175,6 +170,6 @@ public class SerialSensorManager extends jmri.managers.AbstractSensorManager
         return Bundle.getMessage("AddInputEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialSensorManager.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialSensorManager.class);
 
 }

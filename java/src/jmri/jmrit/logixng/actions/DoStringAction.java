@@ -5,11 +5,12 @@ import java.util.Map;
 
 import jmri.InstanceManager;
 import jmri.JmriException;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.logixng.*;
 
 /**
  * Executes an string action with the result of an string expression.
- * 
+ *
  * @author Daniel Bergqvist Copyright 2019
  */
 public class DoStringAction
@@ -20,7 +21,7 @@ public class DoStringAction
     private String _stringActionSocketSystemName;
     private final FemaleStringExpressionSocket _stringExpressionSocket;
     private final FemaleStringActionSocket _stringActionSocket;
-    
+
     public DoStringAction(String sys, String user) {
         super(sys, user);
         _stringExpressionSocket = InstanceManager.getDefault(StringExpressionManager.class)
@@ -28,7 +29,7 @@ public class DoStringAction
         _stringActionSocket = InstanceManager.getDefault(StringActionManager.class)
                 .createFemaleSocket(this, this, "A");
     }
-    
+
     @Override
     public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws JmriException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
@@ -39,24 +40,18 @@ public class DoStringAction
         copy.setComment(getComment());
         return manager.registerAction(copy).deepCopyChildren(this, systemNames, userNames);
     }
-    
+
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.COMMON;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.COMMON;
     }
 
     /** {@inheritDoc} */
     @Override
-    public boolean isExternal() {
-        return false;
-    }
-    
-    /** {@inheritDoc} */
-    @Override
     public void execute() throws JmriException {
         String result = _stringExpressionSocket.evaluate();
-        
+
         _stringActionSocket.setValue(result);
     }
 
@@ -65,10 +60,10 @@ public class DoStringAction
         switch (index) {
             case 0:
                 return _stringExpressionSocket;
-                
+
             case 1:
                 return _stringActionSocket;
-                
+
             default:
                 throw new IllegalArgumentException(
                         String.format("index has invalid value: %d", index));
@@ -143,11 +138,11 @@ public class DoStringAction
             if (!_stringExpressionSocket.isConnected()
                     || !_stringExpressionSocket.getConnectedSocket().getSystemName()
                             .equals(_stringExpressionSocketSystemName)) {
-                
+
                 String socketSystemName = _stringExpressionSocketSystemName;
-                
+
                 _stringExpressionSocket.disconnect();
-                
+
                 if (socketSystemName != null) {
                     MaleSocket maleSocket =
                             InstanceManager.getDefault(StringExpressionManager.class)
@@ -156,21 +151,21 @@ public class DoStringAction
                         _stringExpressionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load string expression " + socketSystemName);
+                        log.error("cannot load string expression {}", socketSystemName);
                     }
                 }
             } else {
                 _stringExpressionSocket.getConnectedSocket().setup();
             }
-            
+
             if (!_stringActionSocket.isConnected()
                     || !_stringActionSocket.getConnectedSocket().getSystemName()
                             .equals(_stringActionSocketSystemName)) {
-                
+
                 String socketSystemName = _stringActionSocketSystemName;
-                
+
                 _stringActionSocket.disconnect();
-                
+
                 if (socketSystemName != null) {
                     MaleSocket maleSocket =
                             InstanceManager.getDefault(StringActionManager.class)
@@ -179,7 +174,7 @@ public class DoStringAction
                         _stringActionSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("cannot load string action " + socketSystemName);
+                        log.error("cannot load string action {}", socketSystemName);
                     }
                 }
             } else {
@@ -187,25 +182,25 @@ public class DoStringAction
             }
         } catch (SocketAlreadyConnectedException ex) {
             // This shouldn't happen and is a runtime error if it does.
-            throw new RuntimeException("socket is already connected");
+            throw new JmriUncheckedException("socket is already connected");
         }
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void registerListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void unregisterListenersForThisClass() {
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public void disposeMe() {
     }
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DoStringAction.class);
-    
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DoStringAction.class);
+
 }

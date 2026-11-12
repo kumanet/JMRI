@@ -102,7 +102,7 @@ public class DigitalFormulaXml extends jmri.managers.configurexml.AbstractNamedB
             try {
                 h.setFormula(formula.getTextTrim());
             } catch (ParserException e) {
-                log.error("cannot set formula: " + formula.getTextTrim(), e);
+                log.error("cannot set formula: {}", formula.getTextTrim(), e);
             }
         }
 
@@ -110,5 +110,5 @@ public class DigitalFormulaXml extends jmri.managers.configurexml.AbstractNamedB
         return true;
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DigitalFormulaXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DigitalFormulaXml.class);
 }

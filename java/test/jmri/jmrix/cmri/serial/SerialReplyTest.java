@@ -17,12 +17,13 @@ public class SerialReplyTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new SerialReply();
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SerialReplyTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SerialReplyTest.class);
 
 }

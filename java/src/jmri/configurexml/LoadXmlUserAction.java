@@ -2,10 +2,11 @@ package jmri.configurexml;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
+
 import javax.swing.JFileChooser;
-import javax.swing.JOptionPane;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import jmri.*;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Load configuration information from an XML file.
@@ -21,7 +22,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LoadXmlUserAction extends LoadXmlConfigAction {
 
-    static private File currentFile = null;
+    private static File currentFile = null;
 
     public LoadXmlUserAction() {
         this(Bundle.getMessage("MenuItemLoad"));
@@ -33,23 +34,29 @@ public class LoadXmlUserAction extends LoadXmlConfigAction {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (! InstanceManager.getDefault(PermissionManager.class)
+                .ensureAtLeastPermission(LoadAndStorePermissionOwner.LOAD_XML_FILE_PERMISSION,
+                        BooleanPermission.BooleanValue.TRUE)) {
+            return;
+        }
         JFileChooser userFileChooser = getUserFileChooser();
         userFileChooser.setDialogType(javax.swing.JFileChooser.OPEN_DIALOG);
         userFileChooser.setApproveButtonText(Bundle.getMessage("ButtonOpen"));
         // Cancel button can't be localized like userFileChooser.setCancelButtonText() TODO
         userFileChooser.setDialogTitle(Bundle.getMessage("LoadTitle"));
 
-        boolean results = loadFile(userFileChooser);
+        java.awt.Window window = JmriJOptionPane.findWindowForObject( e == null ? null : e.getSource());
+        boolean results = loadFile(userFileChooser, window);
         if (results) {
             log.debug("load was successful");
             setCurrentFile(userFileChooser.getSelectedFile());
         } else {
             log.debug("load failed");
-            JOptionPane.showMessageDialog(null,
+            JmriJOptionPane.showMessageDialog(window,
                     Bundle.getMessage("LoadHasErrors") + "\n"
                     + Bundle.getMessage("CheckPreferences") + "\n"
                     + Bundle.getMessage("ConsoleWindowHasInfo"),
-                    Bundle.getMessage("LoadError"), JOptionPane.ERROR_MESSAGE);
+                    Bundle.getMessage("LoadError"), JmriJOptionPane.ERROR_MESSAGE);
             setCurrentFile(null);
         }
     }
@@ -69,7 +76,6 @@ public class LoadXmlUserAction extends LoadXmlConfigAction {
         currentFile = arg;
     }
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(LoadXmlUserAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LoadXmlUserAction.class);
 
 }

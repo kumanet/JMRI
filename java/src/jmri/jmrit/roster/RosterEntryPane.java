@@ -7,12 +7,9 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.ResourceBundle;
 
 import javax.swing.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.swing.text.*;
 
 import jmri.DccLocoAddress;
 import jmri.InstanceManager;
@@ -20,9 +17,11 @@ import jmri.LocoAddress;
 import jmri.jmrit.DccLocoAddressSelector;
 import jmri.jmrit.decoderdefn.DecoderFile;
 import jmri.jmrit.decoderdefn.DecoderIndexFile;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
- * Display and edit a RosterEntry.
+ * Display and enable editing a RosterEntry panel to display on first tab "Roster Entry".
+ * Called from {@link jmri.jmrit.symbolicprog.tabbedframe.PaneProgFrame}#makeInfoPane(RosterEntry)
  *
  * @author Bob Jacobsen Copyright (C) 2001
  * @author Dennis Miller Copyright 2004, 2005
@@ -35,6 +34,7 @@ public class RosterEntryPane extends javax.swing.JPanel {
     JTextField roadName = new JTextField(30);
     JTextField maxSpeed = new JTextField(3);
     JSpinner maxSpeedSpinner = new JSpinner(); // percentage stored as fraction
+    JCheckBox locoDataEnabled = new JCheckBox();
 
     JTextField roadNumber = new JTextField(30);
     JTextField mfg = new JTextField(30);
@@ -43,30 +43,32 @@ public class RosterEntryPane extends javax.swing.JPanel {
     DccLocoAddressSelector addrSel = new DccLocoAddressSelector();
 
     JTextArea comment = new JTextArea(3, 50);
-    //JScrollPanes are defined with scroll bars on always to avoid undesirable resizing behavior
-    //Without this the field will shrink to minimum size any time the scroll bars become needed and
-    //the scroll bars are inside, not outside the field area, obscuring their contents.
-    //This way the shrinking does not happen and the scroll bars are outside the field area,
-    //leaving the contents visible
+    public String getComment() {return comment.getText();}
+    public void setComment(String text) {comment.setText(text);}
+    public Document getCommentDocument() {return comment.getDocument();}
+
+    // JScrollPanes are defined with scroll bars on always to avoid undesirable resizing behavior
+    // Without this the field will shrink to minimum size any time the scroll bars become needed and
+    // the scroll bars are inside, not outside the field area, obscuring their contents.
+    // This way the shrinking does not happen and the scroll bars are outside the field area,
+    // leaving the contents visible
     JScrollPane commentScroller = new JScrollPane(comment, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
     JLabel dateUpdated = new JLabel();
     JLabel decoderModel = new JLabel();
     JLabel decoderFamily = new JLabel();
+    JLabel decoderProgModes = new JLabel();
     JTextArea decoderComment = new JTextArea(3, 50);
     JScrollPane decoderCommentScroller = new JScrollPane(decoderComment, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
 
     Component pane;
     RosterEntry re;
-
-    final ResourceBundle rb = ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle");
-
     public RosterEntryPane(RosterEntry r) {
 
         maxSpeedSpinner.setModel(new SpinnerNumberModel(1.00d, 0.00d, 1.00d, 0.01d));
         maxSpeedSpinner.setEditor(new JSpinner.NumberEditor(maxSpeedSpinner, "# %"));
         id.setText(r.getId());
 
-        if (r.getDccAddress().equals("")) {
+        if (r.getDccAddress().isEmpty()) {
             // null address, so clear selector
             addrSel.reset();
         } else {
@@ -83,7 +85,7 @@ public class RosterEntryPane extends javax.swing.JPanel {
         re = r;
 
         // add options
-        id.setToolTipText(rb.getString("ToolTipID"));
+        id.setToolTipText(Bundle.getMessage("ToolTipID"));
 
         addrSel.setEnabled(false);
         addrSel.setLocked(false);
@@ -93,10 +95,10 @@ public class RosterEntryPane extends javax.swing.JPanel {
             // This goes through to find common protocols between the command station and the decoder
             // and will set the selection box list to match those that are common.
             jmri.ThrottleManager tm = InstanceManager.throttleManagerInstance();
-            List<LocoAddress.Protocol> protocoltypes = new ArrayList<>(Arrays.asList(tm.getAddressProtocolTypes()));
+            List<LocoAddress.Protocol> protocolTypes = new ArrayList<>(Arrays.asList(tm.getAddressProtocolTypes()));
 
-            if (!protocoltypes.contains(LocoAddress.Protocol.DCC_LONG) && !protocoltypes.contains(LocoAddress.Protocol.DCC_SHORT)) {
-                //Multi protocol systems so far are not worried about dcc long vs dcc short
+            if (!protocolTypes.contains(LocoAddress.Protocol.DCC_LONG) && !protocolTypes.contains(LocoAddress.Protocol.DCC_SHORT)) {
+                //Multi-protocol systems so far are not worried about dcc long vs dcc short
                 List<DecoderFile> l = InstanceManager.getDefault(DecoderIndexFile.class).matchingDecoderList(null, r.getDecoderFamily(), null, null, null, r.getDecoderModel());
                 if (log.isDebugEnabled()) {
                     log.debug("found {} matched", l.size());
@@ -110,17 +112,17 @@ public class RosterEntryPane extends javax.swing.JPanel {
                     }
                 }
                 DecoderFile d;
-                if (l.size() > 0) {
+                if (!l.isEmpty()) {
                     d = l.get(0);
                     if (d != null && d.getSupportedProtocols().length > 0) {
                         ArrayList<String> protocols = new ArrayList<>(d.getSupportedProtocols().length);
 
                         for (LocoAddress.Protocol i : d.getSupportedProtocols()) {
-                            if (protocoltypes.contains(i)) {
+                            if (protocolTypes.contains(i)) {
                                 protocols.add(tm.getAddressTypeString(i));
                             }
                         }
-                        addrSel = new DccLocoAddressSelector(protocols.toArray(new String[protocols.size()]));
+                        addrSel = new DccLocoAddressSelector(protocols.toArray(new String[0]));
                         DccLocoAddress tempAddr = new DccLocoAddress(
                                 Integer.parseInt(r.getDccAddress()), r.getProtocol());
                         addrSel.setAddress(tempAddr);
@@ -133,10 +135,11 @@ public class RosterEntryPane extends javax.swing.JPanel {
         }
 
         JPanel selPanel = addrSel.getCombinedJPanel();
-        selPanel.setToolTipText(rb.getString("ToolTipDccAddress"));
-        decoderModel.setToolTipText(rb.getString("ToolTipDecoderModel"));
-        decoderFamily.setToolTipText(rb.getString("ToolTipDecoderFamily"));
-        dateUpdated.setToolTipText(rb.getString("ToolTipDateUpdated"));
+        selPanel.setToolTipText(Bundle.getMessage("ToolTipDccAddress"));
+        decoderModel.setToolTipText(Bundle.getMessage("ToolTipDecoderModel"));
+        decoderFamily.setToolTipText(Bundle.getMessage("ToolTipDecoderFamily"));
+        decoderProgModes.setToolTipText(Bundle.getMessage("ToolTipDecoderProgModes"));
+        dateUpdated.setToolTipText(Bundle.getMessage("ToolTipDateUpdated"));
         id.addFocusListener(new FocusListener() {
             @Override
             public void focusGained(FocusEvent e) {
@@ -145,13 +148,13 @@ public class RosterEntryPane extends javax.swing.JPanel {
             @Override
             public void focusLost(FocusEvent e) {
                 if (checkDuplicate()) {
-                    JOptionPane.showMessageDialog(pane, rb.getString("ErrorDuplicateID"));
+                    JmriJOptionPane.showMessageDialog(pane, Bundle.getMessage("ErrorDuplicateID"));
                 }
             }
         });
 
         // New GUI to allow multiline Comment and Decoder Comment fields
-        //Set up constraints objects for convenience in GridBagLayout alignment
+        // Set up constraints objects for convenience in GridBagLayout alignment
         GridBagLayout gbLayout = new GridBagLayout();
         GridBagConstraints cL = new GridBagConstraints();
         GridBagConstraints cR = new GridBagConstraints();
@@ -164,7 +167,9 @@ public class RosterEntryPane extends javax.swing.JPanel {
         cL.ipadx = 3;
         cL.anchor = GridBagConstraints.NORTHWEST;
         cL.insets = new Insets(0, 0, 0, 15);
-        JLabel row0Label = new JLabel(rb.getString("FieldID") + ":");
+
+        JLabel row0Label = new JLabel(Bundle.getMessage("FieldID") + ":");
+        id.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldID"));
         gbLayout.setConstraints(row0Label, cL);
         super.add(row0Label);
 
@@ -176,7 +181,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(id);
 
         cL.gridy++;
-        JLabel row1Label = new JLabel(rb.getString("FieldRoadName") + ":");
+        JLabel row1Label = new JLabel(Bundle.getMessage("FieldRoadName") + ":");
+        roadName.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldRoadName"));
         gbLayout.setConstraints(row1Label, cL);
         super.add(row1Label);
 
@@ -186,7 +192,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(roadName);
 
         cL.gridy++;
-        JLabel row2Label = new JLabel(rb.getString("FieldRoadNumber") + ":");
+        JLabel row2Label = new JLabel(Bundle.getMessage("FieldRoadNumber") + ":");
+        roadNumber.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldRoadNumber"));
         gbLayout.setConstraints(row2Label, cL);
         super.add(row2Label);
 
@@ -196,7 +203,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(roadNumber);
 
         cL.gridy++;
-        JLabel row3Label = new JLabel(rb.getString("FieldManufacturer") + ":");
+        JLabel row3Label = new JLabel(Bundle.getMessage("FieldManufacturer") + ":");
+        mfg.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldManufacturer"));
         gbLayout.setConstraints(row3Label, cL);
         super.add(row3Label);
 
@@ -206,7 +214,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(mfg);
 
         cL.gridy++;
-        JLabel row4Label = new JLabel(rb.getString("FieldOwner") + ":");
+        JLabel row4Label = new JLabel(Bundle.getMessage("FieldOwner") + ":");
+        owner.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldOwner"));
         gbLayout.setConstraints(row4Label, cL);
         super.add(row4Label);
 
@@ -216,7 +225,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(owner);
 
         cL.gridy++;
-        JLabel row5Label = new JLabel(rb.getString("FieldModel") + ":");
+        JLabel row5Label = new JLabel(Bundle.getMessage("FieldModel") + ":");
+        model.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldModel"));
         gbLayout.setConstraints(row5Label, cL);
         super.add(row5Label);
 
@@ -226,7 +236,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(model);
 
         cL.gridy++;
-        JLabel row6Label = new JLabel(rb.getString("FieldDCCAddress") + ":");
+        JLabel row6Label = new JLabel(Bundle.getMessage("FieldDCCAddress") + ":");
+        selPanel.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDCCAddress"));
         gbLayout.setConstraints(row6Label, cL);
         super.add(row6Label);
 
@@ -235,7 +246,8 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(selPanel);
 
         cL.gridy++;
-        JLabel row7Label = new JLabel(rb.getString("FieldSpeedLimit") + ":");
+        JLabel row7Label = new JLabel(Bundle.getMessage("FieldSpeedLimit") + ":");
+        maxSpeedSpinner.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldSpeedLimit"));
         gbLayout.setConstraints(row7Label, cL);
         super.add(row7Label);
 
@@ -243,10 +255,42 @@ public class RosterEntryPane extends javax.swing.JPanel {
         gbLayout.setConstraints(maxSpeedSpinner, cR);
         super.add(maxSpeedSpinner);
 
+
+
+
+        // Combine checkbox with extra text
+        JPanel locoData =  new JPanel();
+        JLabel extraText = new JLabel(Bundle.getMessage("FieldLocoDataText"));
+        extraText.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldLocoDataText"));
+        locoData.add(locoDataEnabled);
+        locoData.add(extraText);
+
         cL.gridy++;
-        JLabel row8Label = new JLabel(rb.getString("FieldComment") + ":");
+        JLabel row8Label = new JLabel(Bundle.getMessage("FieldLocoData") + ":");
+        locoDataEnabled.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldLocoData"));
+
+        // Align row label with checkbox content.  Spacing is affected by JPanel for the extra text.
+        cL.insets = new Insets(8, 0, 0, 15);
         gbLayout.setConstraints(row8Label, cL);
         super.add(row8Label);
+        cL.insets = new Insets(0, 0, 0, 15);    // Reset
+
+        cR.gridy = cL.gridy;
+        gbLayout.setConstraints(locoData, cR);
+        super.add(locoData);
+
+
+
+
+
+        cL.gridy++;
+        JLabel row9Label = new JLabel(Bundle.getMessage("FieldComment") + ":");
+        // ensure same font on textarea as textfield
+        // as this is not true in all GUI types.
+        comment.setFont(owner.getFont());
+        commentScroller.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldComment"));
+        gbLayout.setConstraints(row9Label, cL);
+        super.add(row9Label);
 
         cR.gridy = cL.gridy;
         commentScroller.setMinimumSize(minScrollerDim);
@@ -254,9 +298,10 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(commentScroller);
 
         cL.gridy++;
-        JLabel row9Label = new JLabel(rb.getString("FieldDecoderFamily") + ":");
-        gbLayout.setConstraints(row9Label, cL);
-        super.add(row9Label);
+        JLabel row10Label = new JLabel(Bundle.getMessage("FieldDecoderFamily") + ":");
+        decoderFamily.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDecoderFamily"));
+        gbLayout.setConstraints(row10Label, cL);
+        super.add(row10Label);
 
         cR.gridy = cL.gridy;
         decoderFamily.setMinimumSize(minFieldDim);
@@ -264,9 +309,10 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(decoderFamily);
 
         cL.gridy++;
-        JLabel row10Label = new JLabel(rb.getString("FieldDecoderModel") + ":");
-        gbLayout.setConstraints(row10Label, cL);
-        super.add(row10Label);
+        JLabel row11Label = new JLabel(Bundle.getMessage("FieldDecoderModel") + ":");
+        decoderModel.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDecoderModel"));
+        gbLayout.setConstraints(row11Label, cL);
+        super.add(row11Label);
 
         cR.gridy = cL.gridy;
         decoderModel.setMinimumSize(minFieldDim);
@@ -274,9 +320,24 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(decoderModel);
 
         cL.gridy++;
-        JLabel row11Label = new JLabel(rb.getString("FieldDecoderComment") + ":");
-        gbLayout.setConstraints(row11Label, cL);
-        super.add(row11Label);
+        JLabel row12Label = new JLabel(Bundle.getMessage("FieldDecoderModes") + ":");
+        decoderProgModes.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDecoderModes"));
+        gbLayout.setConstraints(row12Label, cL);
+        super.add(row12Label);
+
+        cR.gridy = cL.gridy;
+        decoderProgModes.setMinimumSize(minFieldDim);
+        gbLayout.setConstraints(decoderProgModes, cR);
+        super.add(decoderProgModes);
+
+        cL.gridy++;
+        JLabel row13Label = new JLabel(Bundle.getMessage("FieldDecoderComment") + ":");
+        // ensure same font on textarea as textfield
+        // as this is not true in all GUI types.
+        decoderComment.setFont(owner.getFont());
+        decoderCommentScroller.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDecoderComment"));
+        gbLayout.setConstraints(row13Label, cL);
+        super.add(row13Label);
 
         cR.gridy = cL.gridy;
         decoderCommentScroller.setMinimumSize(minScrollerDim);
@@ -284,9 +345,10 @@ public class RosterEntryPane extends javax.swing.JPanel {
         super.add(decoderCommentScroller);
 
         cL.gridy++;
-        JLabel row13Label = new JLabel(rb.getString("FieldDateUpdated") + ":");
-        gbLayout.setConstraints(row13Label, cL);
-        super.add(row13Label);
+        JLabel row14Label = new JLabel(Bundle.getMessage("FieldDateUpdated") + ":");
+        dateUpdated.getAccessibleContext().setAccessibleName(Bundle.getMessage("FieldDateUpdated"));
+        gbLayout.setConstraints(row14Label, cL);
+        super.add(row14Label);
 
         cR.gridy = cL.gridy;
         dateUpdated.setMinimumSize(minFieldDim);
@@ -297,12 +359,15 @@ public class RosterEntryPane extends javax.swing.JPanel {
     double maxSet;
 
     /**
-     * Does the GUI contents agree with a RosterEntry?
+     * Do the GUI contents agree with a RosterEntry?
      *
      * @param r the entry to compare
      * @return true if entry in GUI does not match r; false otherwise
      */
     public boolean guiChanged(RosterEntry r) {
+        if (r.isLocoDataEnabled() != locoDataEnabled.isSelected()) {
+            return true;
+        }
         if (!r.getRoadName().equals(roadName.getText())) {
             return true;
         }
@@ -327,6 +392,9 @@ public class RosterEntryPane extends javax.swing.JPanel {
         if (!r.getDecoderModel().equals(decoderModel.getText())) {
             return true;
         }
+        if (!r.getProgrammingModes().equals(decoderProgModes.getText())) {
+            return true;
+        }
         if (!r.getDecoderComment().equals(decoderComment.getText())) {
             return true;
         }
@@ -340,7 +408,7 @@ public class RosterEntryPane extends javax.swing.JPanel {
         }
         DccLocoAddress a = addrSel.getAddress();
         if (a == null) {
-            return !r.getDccAddress().equals("");
+            return !r.getDccAddress().isEmpty();
         } else {
             if (r.getProtocol() != a.getProtocol()) {
                 return true;
@@ -349,11 +417,6 @@ public class RosterEntryPane extends javax.swing.JPanel {
         }
     }
 
-    /**
-     *
-     * @return true if the value in the id JTextField is a duplicate of some
-     *         other RosterEntry in the roster
-     */
     public boolean checkDuplicate() {
         // check it's not a duplicate
         List<RosterEntry> l = Roster.getDefault().matchingList(null, null, null, null, null, null, id.getText());
@@ -393,10 +456,12 @@ public class RosterEntryPane extends javax.swing.JPanel {
         r.setDecoderFamily(decoderFamily.getText());
         r.setDecoderModel(decoderModel.getText());
         r.setDecoderComment(decoderComment.getText());
-    }
+        r.setLocoDataEnabled(locoDataEnabled.isSelected());
+   }
+
 
     /**
-     * File GUI from roster contents.
+     * Fill GUI from roster contents.
      *
      * @param r the roster entry to display
      */
@@ -409,6 +474,7 @@ public class RosterEntryPane extends javax.swing.JPanel {
         comment.setText(r.getComment());
         decoderModel.setText(r.getDecoderModel());
         decoderFamily.setText(r.getDecoderFamily());
+        decoderProgModes.setText(r.getProgrammingModes());
         decoderComment.setText(r.getDecoderComment());
         dateUpdated.setText((r.getDateModified() != null)
                 ? DateFormat.getDateTimeInstance().format(r.getDateModified())
@@ -418,6 +484,7 @@ public class RosterEntryPane extends javax.swing.JPanel {
         log.debug("Max Speed set to: {}", maxSpeedSet);
         maxSpeedSpinner.setValue(maxSpeedSet);
         log.debug("Max Speed in spinner: {}", maxSpeedSpinner.getValue());
+        locoDataEnabled.setSelected(r.isLocoDataEnabled());
     }
 
     public void setDccAddress(String a) {
@@ -449,6 +516,6 @@ public class RosterEntryPane extends javax.swing.JPanel {
         log.debug("dispose");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RosterEntryPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RosterEntryPane.class);
 
 }

@@ -1,70 +1,53 @@
 package jmri.jmrix.can.cbus.swing.bootloader;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Arrays;
+import java.io.*;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class to encapsulate an intel format hex file for a CBUS PIC.
  *
- * @author Andrew Crosland Copyright (C) 2020
+ * Assumes hex record addresses are 8-byte aligned and that addresses increase
+ * monotonically.
+ * 
+ * @author Andrew Crosland Copyright (C) 2020, 2022
  */
 public class HexFile {
 
-    private String name;
-    private final File file;
-    private FileInputStream in;
-    private BufferedInputStream buffIn;
-    protected static final int MAX_PROG_SIZE = 256*1024;
-    protected static final int MAX_CONFIG_SIZE = 1024;
-    protected static final int MAX_EEPROM_SIZE = 1024;
-    protected static final int ID_START = 0x200000;
-    protected static final int CONFIG_START = 0x300000;
-    protected static final int EE_START = 0xf00000;
+    protected String name;
+    protected File file;
+    protected FileInputStream in;
+    protected BufferedInputStream buffIn;
+    // Number of hex records
+    protected static final int MAX_HEX_SIZE = 10000;
 
-    private int address = 0;
-    private boolean read;
-    private int lineNo = 0;
+    protected int address = 0;
+    protected boolean read;
+    protected int lineNo = 0;
+    private int progStart = 99999999;
     private int progEnd = 0;
-    private int configEnd = 0;
-    private int eeEnd = 0;
 
     // Storage for raw program data
-    private byte [] hexDataProg;
-    private byte [] hexDataConfig;
-    private byte [] hexDataEeprom;
+    protected HexRecord [] hexRecords;
+    protected int readIndex = 0;
+    protected int endRecord = 0;
 
-    
+
     /**
      * Create a new HexFile object and initialize data to unprogrammed state.
-     * 
+     *
      * @param fileName file name to use for the hex file
      */
     public HexFile(String fileName) {
         name = fileName;
         file = new File(fileName);
-        
-        hexDataProg = new byte [MAX_PROG_SIZE];
-        hexDataConfig = new byte [MAX_CONFIG_SIZE];
-        hexDataEeprom = new byte [MAX_EEPROM_SIZE];
-        setDataToErasedState();
+
+        hexRecords = new HexRecord[MAX_HEX_SIZE];
     }
 
-    
-    /**
-     * Set data arrays to erased state, usually all FFs
-     */
-    private void setDataToErasedState() {
-        Arrays.fill(hexDataProg, (byte)-1);
-        Arrays.fill(hexDataConfig, (byte)-1);
-        Arrays.fill(hexDataEeprom, (byte)-1);
-    }
-    
+
     /**
      * @return name of the open file
      */
@@ -72,12 +55,12 @@ public class HexFile {
         return name;
     }
 
-    
+
     /**
      * Open hex file for reading.
-     * 
+     *
      * @throws FileNotFoundException if pre-defined file can't be opened
-     */   
+     */
     public void openRd() throws FileNotFoundException {
         read = true;
         // Create an input reader based on the file, so we can read its data.
@@ -86,81 +69,115 @@ public class HexFile {
         address = 0;
     }
 
-    
+
     /**
      * Close the currently open file.
+     * <p>
+     * Safe to call if the file was never opened, or has already been closed.
+     * The records already read remain available in memory.
      */
     public void close() {
         try {
-            if (read) {
+            if (buffIn != null) {
                 buffIn.close();
+            } else if (in != null) {
                 in.close();
             }
-            name = null;
         } catch (IOException e) {
-            log.warn("Exception closing hex file {}", e);
-            name = null;
+            log.warn("Exception closing hex file", e);
         }
+        buffIn = null;
+        in = null;
+        read = false;
+        name = null;
     }
 
-    
+
+    /**
+     * DProcess record if required
+     * @param r hex record
+     */
+    protected void checkRecord(HexRecord r) {
+
+    }
+
+    /**
+     * Read one hex record from the file
+     *
+     * @return the hex record
+     * @throws java.io.IOException on read error.
+     */
+    protected HexRecord readOneRecord() throws IOException {
+        HexRecord r;
+        try {
+            r = new HexRecord(this);
+        } catch (IOException e) {
+            log.error("Exception reading hex record", e);
+            throw new IOException(e);
+        }
+
+        return r;
+    }
+
     /**
      * Read a hex file.
      * <p>
-     * Read into the array of individual records.
-     * Add the actual programming data to the data arrays.
-     * Track the highest used addresses
-     * @throws java.io.IOException on read error.
+     * Read hex records and store TYPE_DATA records in the array.
+     * <p>
+     * Only data, end of file and extended linear address records are
+     * understood. Any other record type causes the file to be rejected.
+     *
+     * @throws IOException on read error, or if the file contains an
+     *                     unsupported record type, or too many records
      */
     public void read() throws IOException {
         HexRecord r;
-        try {
-            do {
-                r = new HexRecord(this);
-                if (r.type == HexRecord.EXT_ADDR) {
-                    // Extended address record so update the address and read
-                    // next record. Cast data from byte to int
-                    address = (r.data[0]& 0xff) * 256 * 65536 + (r.data[1] & 0xff) * 65536;
-                    log.debug("Found extended adress record. Address is now {}", Integer.toHexString(address));
-                    lineNo++;
-                    r = new HexRecord(this);
-                }
-                if (r.type == HexRecord.DATA) {
-                    lineNo++;
-                    r.setLineNo(lineNo);
-                    address = (address & 0xffff0000) + r.getAddress();
-                    log.debug("Hex record for address {}", Integer.toHexString(address));
 
-                    if ((address >= EE_START) && (address < (EE_START  + MAX_EEPROM_SIZE))) {
-                        for (int i = 0; i < r.len; i++) {
-                            hexDataEeprom[address - EE_START + i] = r.getData(i);
-                        }
-                        if ((address + r.len) > eeEnd) {
-                            eeEnd = address + r.len;
-                        }
-                    } else if ((address >= CONFIG_START) && (address < (CONFIG_START  + MAX_CONFIG_SIZE))) {
-                        for (int i = 0; i < r.len; i++) {
-                            hexDataConfig[address - CONFIG_START + i] = r.getData(i);
-                        } 
-                        if ((address + r.len) > configEnd) {
-                            configEnd = address + r.len;
-                        }
-                    } else if (address < ID_START) {
-                        for (int i = 0; i < r.len; i++) {
-                            hexDataProg[address + i] = r.getData(i);
-                        } 
-                        if ((address + r.len) > progEnd) {
-                            progEnd = address + r.len;
-                        }
-                    }
-                } 
-            } while (r.type != HexRecord.END);
-        } catch (IOException e) {
-            log.error("Exception reading hex file {}");
-            setDataToErasedState();
-            throw new IOException(e);
-        }
-        log.debug("End addresses prog: {} config: {} EEPROM: {}", Integer.toHexString(progEnd), Integer.toHexString(configEnd), Integer.toHexString(eeEnd));
+        lineNo = 0;
+        endRecord = 0;
+
+        do {
+            if (lineNo >= hexRecords.length) {
+                log.error("Too many records in hex file, maximum is {}", hexRecords.length);
+                throw new IOException("Too many records in hex file, maximum is " + hexRecords.length);
+            }
+            r = readOneRecord();
+            if ((r.type != HexRecord.TYPE_DATA) && (r.type != HexRecord.END) && (r.type != HexRecord.EXT_ADDR)) {
+                // Segment address, start address or unknown record types are not supported
+                log.error("Unsupported hex record type {} at line {}", r.type, lineNo);
+                throw new IOException("Unsupported hex record type " + r.type + " at line " + lineNo);
+            }
+            r.setLineNo(lineNo);
+            hexRecords[lineNo] = r;
+            if (r.type == HexRecord.EXT_ADDR) {
+                // Extended address record so update the record address.
+                // Not kept in the array (lineNo is not incremented) so the
+                // next record overwrites it, only data and end records are stored.
+                address = (r.data[0]& 0xff) * 256 * 65536 + (r.data[1] & 0xff) * 65536;
+//                hexRecords[lineNo].address = address;
+                log.debug("Found extended adress record for address {}", Integer.toHexString(address));
+                continue;
+            }
+            if (r.type == HexRecord.TYPE_DATA) {
+                address = (address & 0xffff0000) + r.getAddress();
+                hexRecords[lineNo].address = address;
+                log.debug("Hex record for address {}", Integer.toHexString(hexRecords[lineNo].address));
+                // Keep track of start and end addresses that have been read
+                if (address < progStart) {
+                    progStart = address;
+                }
+                if ((address + r.len) > progEnd) {
+                    progEnd = address + r.len;
+                }
+            }
+            if (r.type == HexRecord.END) {
+                endRecord = lineNo;
+            }
+            // Process the record now that its full address is known
+            checkRecord(r);
+            lineNo++;
+        } while (r.type != HexRecord.END);
+        log.debug("Done reading hex file");
     }
 
 
@@ -172,8 +189,8 @@ public class HexFile {
     public int readChar() throws IOException {
             return buffIn.read();
     }
-    
-    
+
+
     /**
      * Read a hex byte.
      *
@@ -186,7 +203,7 @@ public class HexFile {
         return hi * 16 + lo;
     }
 
-    
+
     /**
      * Read a single hex digit.
      *
@@ -194,8 +211,7 @@ public class HexFile {
      * @throws IOException  from the underlying read operation or if there's an invalid hex digit
      */
     private int rdHexDigit() throws IOException {
-        int b = 0;
-        b = buffIn.read();
+        int b = buffIn.read();
         if ((b >= '0') && (b <= '9')) {
             b = b - '0';
         } else if ((b >= 'A') && (b <= 'F')) {
@@ -209,7 +225,7 @@ public class HexFile {
         return (byte) b;
     }
 
-    
+
     /**
      * Get current address.
      *
@@ -219,118 +235,101 @@ public class HexFile {
         return address;
     }
 
-    
+
     /**
      * Get current file line number
-     * 
+     *
      * @return the file number
      */
     public int getLineNo() {
         return lineNo;
     }
-    
+
     
     /**
-     * Get program data bytes from a data array
+     * Return the next TYPE_DATA record from the file
      * <p>
-     * Pad returned data at end with unprogrammed data (-1 or 0xFF)
-     * 
-     * 
-     * @param offset    address of data to retrieve
-     * @param len       number of bytes to retrieve
-     * @param hexData   the array to get the data from
-     * @return          array of bytes 
+     * Once the records read from the file are exhausted, an END record is
+     * returned so that callers stop cleanly.
+     *
+     * @return the next hex record
      */
-    private byte [] getBytes(int offset, int len, byte [] hexData) {
-        byte [] d = new byte[len];
-        Arrays.fill(d, (byte)-1);
-        
-        int end = offset + len;
-        if ((offset + len) > MAX_PROG_SIZE) {
-            end = MAX_PROG_SIZE;
+    public HexRecord getNextRecord() {
+        if ((readIndex >= 0) && (readIndex <= endRecord) && (readIndex < hexRecords.length)
+                && (hexRecords[readIndex] != null)) {
+            return hexRecords[readIndex++];
         }
-        
-        try {
-            System.arraycopy(hexData, offset, d, 0, end - offset);
-        } catch (ArrayIndexOutOfBoundsException e) {
-            log.error("Index out of bounds {}", e);
+        log.warn("No more hex records to read at index {}", readIndex);
+        readIndex = endRecord + 1;
+        return new HexRecord();
+    }
+
+
+    /**
+     * Get the hex record for a given address
+     *
+     * Expected that the address will be the start address of a record but will
+     * return the first record that encompasses the address and increment the
+     * index to point at the next record.
+     * <p>
+     * Only the records actually read from the file are searched.
+     *
+     * @param addr The address
+     * @return the hex record, or empty if no data record contains the address
+     */
+    public Optional<HexRecord> getRecordForAddress(int addr) {
+        readIndex = 0;
+
+        for (int i = 0; (i <= endRecord) && (i < hexRecords.length); i++) {
+            HexRecord r = hexRecords[i];
+            if (r == null) {
+                break;
+            }
+            if ((r.type == HexRecord.TYPE_DATA)
+                    && (addr >= r.address) && (addr < (r.address + r.len))) {
+                readIndex = i + 1;
+                return Optional.of(r);
+            }
         }
-        return d;
+        // Not found, leave the index pointing at the END record
+        readIndex = endRecord;
+        return Optional.empty();
     }
     
     
     /**
-     * Get program data bytes from the data array
+     * Get the file parameters
      * 
-     * @param offset address of data to retrieve
-     * @param len   number of bytes to retrieve
-     * @return      array of bytes 
+     * Create an invalid parameter set of necessary. Override in hardware specific
+     * implementations.
+     * 
+     * @return CBUS parameters from the file
      */
-    public byte [] getData(int offset, int len) {
-        byte [] d;
-        d = getBytes(offset, len, hexDataProg);
-        return d;
+    public CbusParameters getParams() {
+        return new CbusParameters();
     }
     
-    
+
     /**
-     * Get CONFIG bytes from the data array
-     * 
-     * @param offset address of data to retrieve
-     * @param len   number of bytes to retrieve
-     * @return      array of bytes 
+     * Return the lowest address read from the hex file
+     *
+     * @return the highest address
      */
-    public byte [] getConfig(int offset, int len) {
-        byte [] d;
-        d = getBytes(offset, len, hexDataConfig);
-        return d;
+    public int getProgStart() {
+        return progStart;
     }
-    
-    
+
+
     /**
-     * Get EEPROM data bytes from the data array
-     * 
-     * @param offset offset of data to retrieve
-     * @param len   number of bytes to retrieve
-     * @return      array of bytes 
-     */
-    public byte [] getEeprom(int offset, int len) {
-        byte [] d;
-        d = getBytes(offset, len, hexDataEeprom);
-        return d;
-    }
-    
-    
-    /**
-     * Return the highest program memory address
-     * 
-     * @return the highest adress
+     * Return the highest address read from the hex file
+     *
+     * @return the highest address
      */
     public int getProgEnd() {
         return progEnd;
     }
-    
-    
-    /**
-     * Return the highest config memory address
-     * 
-     * @return the highest address
-     */
-    public int getConfigEnd() {
-        return configEnd;
-    }
-    
-    
-    /**
-     * Return the highest eeprom memory address
-     * 
-     * @return the highest address
-     */
-    public int getEeEnd() {
-        return eeEnd;
-    }
-    
-    
+
+
     /**
      * close the open file
      */
@@ -338,7 +337,7 @@ public class HexFile {
         close();
     }
 
-    
-    private final static Logger log = LoggerFactory.getLogger(HexFile.class);
+
+    private static final Logger log = LoggerFactory.getLogger(HexFile.class);
 
 }

@@ -32,7 +32,7 @@ abstract public class AbstractOperationsServer implements PropertyChangeListener
     protected final LocationManager lm;
     protected final HashMap<String, TrainListener> trains;
 
-    @SuppressWarnings("LeakingThisInConstructor")
+//    @SuppressWarnings("LeakingThisInConstructor")
     public AbstractOperationsServer() {
         tm = jmri.InstanceManager.getDefault(TrainManager.class);
         tm.addPropertyChangeListener(this);
@@ -308,7 +308,7 @@ abstract public class AbstractOperationsServer implements PropertyChangeListener
 
     abstract public void parseStatus(String statusString) throws JmriException, IOException;
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractOperationsServer.class);
+    private static final Logger log = LoggerFactory.getLogger(AbstractOperationsServer.class);
 
     /*
      * This isn't currently used for operations

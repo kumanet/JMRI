@@ -1,18 +1,17 @@
 package jmri.jmrix.sprog;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
-import javax.swing.JOptionPane;
+
 import jmri.CommandStation;
 import jmri.DccLocoAddress;
 import jmri.InstanceManager;
 import jmri.JmriException;
 import jmri.PowerManager;
-import jmri.jmrix.sprog.sprogslotmon.SprogSlotMonDataModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Control a collection of slots, acting as a soft command station for SPROG
@@ -34,10 +33,10 @@ import org.slf4j.LoggerFactory;
  * Updated by Andrew Crosland February 2012 to allow slots to hold 28 step speed
  * packets
  * <p>
- * Re-written by Andrew Crosland to send the next packet as soon as a reply is 
- * notified. This removes a race between the old state machine running before 
- * the traffic controller despatches a reply, missing the opportunity to send a 
- * new packet to the layout until the next JVM time slot, which can be 15ms on 
+ * Re-written by Andrew Crosland to send the next packet as soon as a reply is
+ * notified. This removes a race between the old state machine running before
+ * the traffic controller despatches a reply, missing the opportunity to send a
+ * new packet to the layout until the next JVM time slot, which can be 15ms on
  * Windows platforms.
  * <p>
  * May-17 Moved status reply handling to the slot monitor. Monitor messages from
@@ -67,23 +66,18 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
     private SprogTrafficController tc = null;
 
     final Object lock = new Object();
-    
-    // it's not at all clear what the following object does. It's only
-    // set, with a newly created copy of a reply, in notifyReply(SprogReply m);
-    // it's never referenced.
-    @SuppressWarnings("unused") // added april 2018; should be removed?
-    private SprogReply reply;  
-    
+
     private boolean waitingForReply = false;
     private boolean replyAvailable = false;
     private boolean sendSprogAddress = false;
     private long time, timeNow, packetDelay;
     private int lastId;
-    
+    private int timeoutCount = 0;
+
     PowerManager powerMgr = null;
     int powerState = PowerManager.OFF;
     boolean powerChanged = false;
-    
+
     public SprogCommandStation(SprogTrafficController controller) {
         sendNow = new LinkedList<>();
         /**
@@ -123,7 +117,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
      * <p>
      * sendSprogMessage will block until the message can be sent. When it returns
      * we set the reply status for the message just sent.
-     * 
+     *
      * @param m       The message to be sent
      */
     protected void sendMessage(SprogMessage m) {
@@ -131,7 +125,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
         lastId = m.getId();
         tc.sendSprogMessage(m, this);
     }
-    
+
     /**
      * Return contents of Queue slot i.
      *
@@ -145,7 +139,6 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
     /**
      * Clear all slots.
      */
-    @SuppressWarnings("unused")
     @SuppressFBWarnings(value = "UPM_UNCALLED_PRIVATE_METHOD", justification="was previously marked with @SuppressWarnings, reason unknown")
     private void clearAllSlots() {
         slots.stream().forEach((s) -> {
@@ -276,6 +269,66 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
         return (null);
     }
 
+    private SprogSlot findF29to36Packet(DccLocoAddress address) {
+        for (SprogSlot s : slots) {
+            if (s.isActiveAddressMatch(address) && s.isF29to36Packet()) {
+                return s;
+            }
+        }
+        if (getInUseCount() < numSlots) {
+            return findFree();
+        }
+        return (null);
+    }
+
+    private SprogSlot findF37to44Packet(DccLocoAddress address) {
+        for (SprogSlot s : slots) {
+            if (s.isActiveAddressMatch(address) && s.isF37to44Packet()) {
+                return s;
+            }
+        }
+        if (getInUseCount() < numSlots) {
+            return findFree();
+        }
+        return (null);
+    }
+
+    private SprogSlot findF45to52Packet(DccLocoAddress address) {
+        for (SprogSlot s : slots) {
+            if (s.isActiveAddressMatch(address) && s.isF45to52Packet()) {
+                return s;
+            }
+        }
+        if (getInUseCount() < numSlots) {
+            return findFree();
+        }
+        return (null);
+    }
+
+    private SprogSlot findF53to60Packet(DccLocoAddress address) {
+        for (SprogSlot s : slots) {
+            if (s.isActiveAddressMatch(address) && s.isF53to60Packet()) {
+                return s;
+            }
+        }
+        if (getInUseCount() < numSlots) {
+            return findFree();
+        }
+        return (null);
+    }
+
+    private SprogSlot findF61to68Packet(DccLocoAddress address) {
+        for (SprogSlot s : slots) {
+            if (s.isActiveAddressMatch(address) && s.isF61to68Packet()) {
+                return s;
+            }
+        }
+        if (getInUseCount() < numSlots) {
+            return findFree();
+        }
+        return (null);
+    }
+
     public void forwardCommandChangeToLayout(int address, boolean closed) {
 
         SprogSlot s = this.findFree();
@@ -292,12 +345,16 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             boolean f3, boolean f3Momentary,
             boolean f4, boolean f4Momentary) {
         SprogSlot s = this.findF0to4Packet(address);
-        s.f0to4packet(address.getNumber(), address.isLongAddress(), f0, f0Momentary,
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f0to4packet(address.getNumber(), address.isLongAddress(), f0, f0Momentary,
                 f1, f1Momentary,
                 f2, f2Momentary,
                 f3, f3Momentary,
                 f4, f4Momentary);
-        notifySlotListeners(s);
+            notifySlotListeners(s);
+        }
     }
 
     public void function5Through8Packet(DccLocoAddress address,
@@ -306,8 +363,12 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             boolean f7, boolean f7Momentary,
             boolean f8, boolean f8Momentary) {
         SprogSlot s = this.findF5to8Packet(address);
-        s.f5to8packet(address.getNumber(), address.isLongAddress(), f5, f5Momentary, f6, f6Momentary, f7, f7Momentary, f8, f8Momentary);
-        notifySlotListeners(s);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f5to8packet(address.getNumber(), address.isLongAddress(), f5, f5Momentary, f6, f6Momentary, f7, f7Momentary, f8, f8Momentary);
+            notifySlotListeners(s);
+        }
     }
 
     public void function9Through12Packet(DccLocoAddress address,
@@ -316,8 +377,12 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             boolean f11, boolean f11Momentary,
             boolean f12, boolean f12Momentary) {
         SprogSlot s = this.findF9to12Packet(address);
-        s.f9to12packet(address.getNumber(), address.isLongAddress(), f9, f9Momentary, f10, f10Momentary, f11, f11Momentary, f12, f12Momentary);
-        notifySlotListeners(s);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f9to12packet(address.getNumber(), address.isLongAddress(), f9, f9Momentary, f10, f10Momentary, f11, f11Momentary, f12, f12Momentary);
+            notifySlotListeners(s);
+        }
     }
 
     public void function13Through20Packet(DccLocoAddress address,
@@ -330,10 +395,14 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             boolean f19, boolean f19Momentary,
             boolean f20, boolean f20Momentary) {
         SprogSlot s = this.findF13to20Packet(address);
-        s.f13to20packet(address.getNumber(), address.isLongAddress(),
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f13to20packet(address.getNumber(), address.isLongAddress(),
                 f13, f13Momentary, f14, f14Momentary, f15, f15Momentary, f16, f16Momentary,
                 f17, f17Momentary, f18, f18Momentary, f19, f19Momentary, f20, f20Momentary);
-        notifySlotListeners(s);
+            notifySlotListeners(s);
+        }
     }
 
     public void function21Through28Packet(DccLocoAddress address,
@@ -346,10 +415,114 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             boolean f27, boolean f27Momentary,
             boolean f28, boolean f28Momentary) {
         SprogSlot s = this.findF21to28Packet(address);
-        s.f21to28packet(address.getNumber(), address.isLongAddress(),
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f21to28packet(address.getNumber(), address.isLongAddress(),
                 f21, f21Momentary, f22, f22Momentary, f23, f23Momentary, f24, f24Momentary,
                 f25, f25Momentary, f26, f26Momentary, f27, f27Momentary, f28, f28Momentary);
-        notifySlotListeners(s);
+            notifySlotListeners(s);
+        }
+    }
+
+    public void function29Through36Packet(DccLocoAddress address,
+            boolean a, boolean am,
+            boolean b, boolean bm,
+            boolean c, boolean cm,
+            boolean d, boolean dm,
+            boolean e, boolean em,
+            boolean f, boolean fm,
+            boolean g, boolean gm,
+            boolean h, boolean hm) {
+        SprogSlot s = this.findF29to36Packet(address);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f29to36packet(address.getNumber(), address.isLongAddress(),
+                a, am, b, bm, c, cm, d, dm,
+                e, em, f, fm, g, gm, h, hm);
+            notifySlotListeners(s);
+        }
+    }
+
+    public void function37Through44Packet(DccLocoAddress address,
+            boolean a, boolean am,
+            boolean b, boolean bm,
+            boolean c, boolean cm,
+            boolean d, boolean dm,
+            boolean e, boolean em,
+            boolean f, boolean fm,
+            boolean g, boolean gm,
+            boolean h, boolean hm) {
+        SprogSlot s = this.findF37to44Packet(address);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f37to44packet(address.getNumber(), address.isLongAddress(),
+                a, am, b, bm, c, cm, d, dm,
+                e, em, f, fm, g, gm, h, hm);
+            notifySlotListeners(s);
+        }
+    }
+
+    public void function45Through52Packet(DccLocoAddress address,
+            boolean a, boolean am,
+            boolean b, boolean bm,
+            boolean c, boolean cm,
+            boolean d, boolean dm,
+            boolean e, boolean em,
+            boolean f, boolean fm,
+            boolean g, boolean gm,
+            boolean h, boolean hm) {
+        SprogSlot s = this.findF45to52Packet(address);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f45to52packet(address.getNumber(), address.isLongAddress(),
+                a, am, b, bm, c, cm, d, dm,
+                e, em, f, fm, g, gm, h, hm);
+            notifySlotListeners(s);
+        }
+    }
+
+    public void function53Through60Packet(DccLocoAddress address,
+            boolean a, boolean am,
+            boolean b, boolean bm,
+            boolean c, boolean cm,
+            boolean d, boolean dm,
+            boolean e, boolean em,
+            boolean f, boolean fm,
+            boolean g, boolean gm,
+            boolean h, boolean hm) {
+        SprogSlot s = this.findF53to60Packet(address);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f53to60packet(address.getNumber(), address.isLongAddress(),
+                a, am, b, bm, c, cm, d, dm,
+                e, em, f, fm, g, gm, h, hm);
+            notifySlotListeners(s);
+        }
+    }
+
+    public void function61Through68Packet(DccLocoAddress address,
+            boolean a, boolean am,
+            boolean b, boolean bm,
+            boolean c, boolean cm,
+            boolean d, boolean dm,
+            boolean e, boolean em,
+            boolean f, boolean fm,
+            boolean g, boolean gm,
+            boolean h, boolean hm) {
+        SprogSlot s = this.findF61to68Packet(address);
+        if(s==null){
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
+        }else{
+            s.f61to68packet(address.getNumber(), address.isLongAddress(),
+                a, am, b, bm, c, cm, d, dm,
+                e, em, f, fm, g, gm, h, hm);
+            notifySlotListeners(s);
+        }
     }
 
     /**
@@ -374,6 +547,8 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             notifySlotListeners(s);
             log.debug("Registering new speed");
             sendNow.add(s);
+        } else {
+            log.warn("Insufficient Sprogslots available, command not sent - increase number of Sprogslots in preferences");
         }
     }
 
@@ -422,7 +597,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
     }
 
     // data members to hold contact with the slot listeners
-    final private Vector<SprogSlotListener> slotListeners = new Vector<>();
+    private final Vector<SprogSlotListener> slotListeners = new Vector<>();
 
     public synchronized void addSlotListener(SprogSlotListener l) {
         // add only if not already registered
@@ -448,11 +623,27 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
         });
     }
 
+    /**
+     * Set initial power state
+     * 
+     * If connection option is set for track power on the property change is sent
+     * before we are registered with the power manager so force a change in the
+     * slot thread
+     * 
+     * @param powerOption true if power on at startup
+     */
+    public void setPowerState(boolean powerOption) {
+        if (powerOption == true) {
+            powerChanged = true;
+            powerState = PowerManager.ON;
+        }
+    }
+    
     @Override
     /**
      * The run() method will only be called (from SprogSystemConnectionMemo
      * ConfigureCommandStation()) if the connected SPROG is in Command Station mode.
-     * 
+     *
      */
     public void run() {
         log.debug("Command station slot thread starts");
@@ -470,7 +661,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                return;
             }
             log.debug("Slot thread wakes");
-            
+
             if (powerMgr == null) {
                 // Wait until power manager is available
                 powerMgr = InstanceManager.getNullableDefault(jmri.PowerManager.class);
@@ -484,16 +675,19 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                 if (sendSprogAddress) {
                     // If we need to change the SPROGs default address, do that immediately,
                     // regardless of the power state.
+                    log.debug("Set new address");
                     sendMessage(new SprogMessage("A " + currentSprogAddress + " 0"));
                     replyAvailable = false;
                     sendSprogAddress = false;
                 } else if (powerChanged && (powerState == PowerManager.ON) && !waitingForReply) {
                     // Power has been turned on so send an idle packet to start the
                     // message/reply handshake
+                    log.debug("Send idle to start message/reply handshake");
                     sendPacket(jmri.NmraPacket.idlePacket(), SprogConstants.S_REPEATS);
                     powerChanged = false;
                     time = System.currentTimeMillis();
                 } else if (replyAvailable && (powerState == PowerManager.ON)) {
+                    log.debug("Reply available");
                     // Received a reply whilst power is on, so send another packet
                     // Get next packet to send if track power is on
                     byte[] p;
@@ -510,12 +704,14 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                         }
                     }
                     replyAvailable = false;
+                    timeoutCount = 0;
                     if (p != null) {
                         // Send the packet
                         sendPacket(p, SprogConstants.S_REPEATS);
                         log.debug("Packet sent");
                     } else {
                         // Send a decoder idle packet to prompt a reply from hardware and keep things running
+                        log.debug("Idle sent");
                         sendPacket(jmri.NmraPacket.idlePacket(), SprogConstants.S_REPEATS);
                     }
                     timeNow = System.currentTimeMillis();
@@ -527,18 +723,33 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                     }
                 } else {
                     if (powerState == PowerManager.ON) {
-
-                        // Should never get here. Something is wrong so turn power off
-                        // Kill reply wait so send doesn't block
-                        log.warn("Slot thread timeout - removing power");
-                        waitingForReply = false;
-                        try {
-                            powerMgr.setPower(PowerManager.OFF);
-                        } catch (JmriException ex) {
-                            log.error("Exception turning power off {}", ex);
+                        timeoutCount++;
+                        if (timeoutCount < SprogConstants.CS_MAX_TIMEOUT_COUNT) {
+                            // Transient timeout — retry by sending an idle packet
+                            // to re-establish the message/reply handshake
+                            log.warn("Slot thread timeout ({} of {}), retrying",
+                                    timeoutCount, SprogConstants.CS_MAX_TIMEOUT_COUNT);
+                            sendPacket(jmri.NmraPacket.idlePacket(), SprogConstants.S_REPEATS);
+                            time = System.currentTimeMillis();
+                        } else {
+                            // Sustained loss of communication — shut down power
+                            log.warn("Slot thread timeout - removing power after {} consecutive timeouts",
+                                    timeoutCount);
+                            waitingForReply = false;
+                            timeoutCount = 0;
+                            try {
+                                powerMgr.setPower(PowerManager.OFF);
+                            } catch (JmriException ex) {
+                                log.error("Exception turning power off", ex);
+                            }
+                            // Show the error dialog without blocking the slot thread
+                            jmri.util.ThreadingUtil.runOnGUIEventually(() -> {
+                                JmriJOptionPane.showMessageDialog(null,
+                                        Bundle.getMessage("CSErrorFrameDialogString"),
+                                        Bundle.getMessage("SprogCSTitle"),
+                                        JmriJOptionPane.ERROR_MESSAGE);
+                            });
                         }
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("CSErrorFrameDialogString"),
-                            Bundle.getMessage("SprogCSTitle"), JOptionPane.ERROR_MESSAGE);
                     }
                 }
             }
@@ -603,14 +814,11 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             log.debug("Ignore reply with mismatched id {} looking for {}", m.getId(), lastId);
             return;
         } else {
-            // it's not at all clear what the following line does. The "reply"
-            // variable is only set here, and never referenced.
-            reply = new SprogReply(m);
-            
             log.debug("Reply received [{}]", m.toString());
             // Log the reply and wake the slot thread
             synchronized (lock) {
                 replyAvailable = true;
+                timeoutCount = 0;
                 lock.notifyAll();
             }
         }
@@ -630,7 +838,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
 
     /**
      * Provide a count of the slots in use.
-     * 
+     *
      * @return the number of slots in use
      */
     public int getInUseCount() {
@@ -660,7 +868,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
 
     /**
      * Get user name.
-     * 
+     *
      * @return the user name
      */
     @Override
@@ -673,7 +881,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
 
     /**
      * Get system prefix.
-     * 
+     *
      * @return the system prefix
      */
     @Override
@@ -684,7 +892,6 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
         return adaptermemo.getSystemPrefix();
     }
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(SprogCommandStation.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SprogCommandStation.class);
 
 }

@@ -43,12 +43,12 @@ public class SerialNode extends AbstractNode {
     public static final int NODE2002V1 = 1;
     public static final int NODE2000 = 2;
 
-    static private final String[] boardNames = new String[]{
+    private static final String[] boardNames = new String[]{
             Bundle.getMessage("BoardName1"),
             Bundle.getMessage("BoardName2"),
             Bundle.getMessage("BoardName3")};
 
-    static public String[] getBoardNames() {
+    public static String[] getBoardNames() {
         return boardNames.clone();
     }
 
@@ -293,6 +293,8 @@ public class SerialNode extends AbstractNode {
 
     boolean warned = false;
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification = "only logging 1st warning string passed")
     void warn(String s) {
         if (warned) {
             return;
@@ -404,7 +406,7 @@ public class SerialNode extends AbstractNode {
                 }
             }
         } catch (JmriException e) {
-            log.error("exception in markChanges: {}", e);
+            log.error("exception in markChanges", e);
         }
     }
 
@@ -484,6 +486,6 @@ public class SerialNode extends AbstractNode {
         timeout = 0;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialNode.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialNode.class);
 
 }

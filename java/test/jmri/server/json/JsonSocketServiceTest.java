@@ -5,8 +5,9 @@ import java.util.Locale;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  *
@@ -26,16 +27,18 @@ public class JsonSocketServiceTest {
     }
 
     @Test
-    public void testLocale() {
+    public void testLocale() throws java.io.IOException {
         JsonConnection connection = new JsonConnection((DataOutputStream) null);
         JsonSocketService<?> instance = new JsonTestSocketService(connection);
-        Assert.assertEquals("Default locale", Locale.getDefault(), instance.getLocale());
+        assertEquals( Locale.getDefault(), instance.getLocale(), "Default locale");
         connection.setLocale(Locale.ITALY);
-        Assert.assertEquals("Italian locale", Locale.ITALY, instance.getLocale());
+        assertEquals( Locale.ITALY, instance.getLocale(), "Italian locale");
         connection.setLocale(Locale.ENGLISH);
-        Assert.assertEquals("English locale", Locale.ENGLISH, instance.getLocale());
+        assertEquals( Locale.ENGLISH, instance.getLocale(), "English locale");
+
+        connection.close();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(JsonSocketServiceTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(JsonSocketServiceTest.class);
 
 }

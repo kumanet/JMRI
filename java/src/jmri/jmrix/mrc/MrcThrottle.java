@@ -170,11 +170,9 @@ public class MrcThrottle extends AbstractThrottle implements MrcTrafficListener 
 
     /**
      * Set the speed and direction.
-     * <p>
      *
      * @param speed Number from 0 to 1, or less than zero for emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point, notify on any change
     @Override
     public void setSpeedSetting(float speed) {
         float oldSpeed;
@@ -271,6 +269,7 @@ public class MrcThrottle extends AbstractThrottle implements MrcTrafficListener 
                             firePropertyChange(ISFORWARD, !isForward, isForward);
                             //speed = m.getElement(8);
                         }
+                        // does this handle emergency stop in any way?
                         speed = (speed & 0x7f) - 1;
                         if (speed < 0) {
                             speed = 0;
@@ -376,6 +375,6 @@ public class MrcThrottle extends AbstractThrottle implements MrcTrafficListener 
     public void notifyFailedXmit(Date timestamp, MrcMessage m) { /*message(m);*/ }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(MrcThrottle.class);
+    private static final Logger log = LoggerFactory.getLogger(MrcThrottle.class);
 
 }

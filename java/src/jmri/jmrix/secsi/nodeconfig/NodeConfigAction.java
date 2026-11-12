@@ -30,12 +30,12 @@ public class NodeConfigAction extends AbstractAction {
         try {
             f.initComponents();
         } catch (Exception ex) {
-            log.error("Exception: ", ex.toString());
+            log.error("Exception ", ex);
         }
         f.setLocation(100, 30);
         f.setVisible(true);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NodeConfigAction.class);
+    private static final Logger log = LoggerFactory.getLogger(NodeConfigAction.class);
 
 }

@@ -1,29 +1,18 @@
 package jmri.jmrit.beantable;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.Container;
 import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-import java.awt.event.KeyEvent;
-import java.io.File;
-import java.io.IOException;
+import java.beans.PropertyVetoException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.*;
 
 import javax.swing.*;
-import javax.swing.table.TableColumn;
 
 import jmri.InstanceManager;
 import jmri.Manager;
-import jmri.UserPreferencesManager;
-import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
-
 
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.Module;
@@ -41,7 +30,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
  <p>
  * Most of the text used in this GUI is in BeanTableBundle.properties, accessed
  * via Bundle.getMessage().
- * <p>
  *
  * @author Dave Duchamp Copyright (C) 2007 (LogixTableAction)
  * @author Pete Cressman Copyright (C) 2009, 2010, 2011 (LogixTableAction)
@@ -72,6 +60,12 @@ public class LogixNGModuleTableAction extends AbstractLogixNGTableAction<jmri.jm
     }
 
     @Override
+    protected void createModel() {
+        m = new LogixNGModuleTableAction.TableModel();
+        m.setFilter((Module t) -> t.isVisible());
+    }
+
+    @Override
     protected void setTitle() {
         f.setTitle(Bundle.getMessage("TitleLogixNGModuleTable"));
     }
@@ -82,8 +76,8 @@ public class LogixNGModuleTableAction extends AbstractLogixNGTableAction<jmri.jm
     }
 
     @Override
-    protected AbstractLogixNGEditor<Module> getEditor(BeanTableFrame<Module> f, BeanTableDataModel<Module> m, String sName) {
-        ModuleEditor editor = new ModuleEditor(f, m, sName);
+    protected AbstractLogixNGEditor<Module> getEditor(BeanTableDataModel<Module> m, String sName) {
+        ModuleEditor editor = new ModuleEditor(m, sName);
         editor.initComponents();
         return editor;
     }
@@ -125,14 +119,24 @@ public class LogixNGModuleTableAction extends AbstractLogixNGTableAction<jmri.jm
 
     @Override
     protected void deleteBean(Module bean) {
-        InstanceManager.getDefault(ModuleManager.class).deleteModule(bean);
+        try {
+            InstanceManager.getDefault(ModuleManager.class).deleteBean(bean, "DoDelete");
+        } catch (PropertyVetoException e) {
+            //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+            log.error("{} : Could not Delete.", e.getMessage());
+        }
     }
 
     @Override
-    protected String getBeanText(Module bean) {
+    protected String getBeanText(Module bean, Base.PrintTreeSettings printTreeSettings) {
         StringWriter writer = new StringWriter();
-        _curNamedBean.printTree(_printTreeSettings, new PrintWriter(writer), "    ", new MutableInt(0));
+        _curNamedBean.printTree(printTreeSettings, new PrintWriter(writer), "    ", new MutableInt(0));
         return writer.toString();
+    }
+
+    @Override
+    protected String getBrowserTitle() {
+        return Bundle.getMessage("LogixNG_Module_Browse_Title");
     }
 
     @Override
@@ -238,7 +242,7 @@ public class LogixNGModuleTableAction extends AbstractLogixNGTableAction<jmri.jm
         JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
         panel5.add(cancel);
         cancel.addActionListener(this::cancelAddPressed);
-        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("CancelLogixNGModuleButtonHint"));      // NOI18N
 
         addLogixNGFrame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -253,5 +257,17 @@ public class LogixNGModuleTableAction extends AbstractLogixNGTableAction<jmri.jm
         });
         return panel5;
     }
+
+    @Override
+    protected void getListenerRefsIncludingChildren(Module module, java.util.List<String> list) {
+        module.getListenerRefsIncludingChildren(list);
+    }
+
+    @Override
+    protected boolean hasChildren(Module module) {
+        return module.getRootSocket().isConnected();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGModuleTableAction.class);
 
 }

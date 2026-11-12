@@ -11,9 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
-import jmri.jmrit.operations.locations.Location;
-import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.locations.Track;
+import jmri.jmrit.operations.locations.*;
 import jmri.jmrit.operations.rollingstock.cars.CarTypes;
 import jmri.jmrit.operations.setup.Control;
 import jmri.util.davidflanagan.HardcopyWriter;
@@ -31,8 +29,8 @@ import jmri.util.davidflanagan.HardcopyWriter;
  */
 public class PrintLocationsByCarTypesAction extends AbstractAction {
 
-    static final String NEW_LINE = "\n"; // NOI18N
-    static final String TAB = "\t"; // NOI18N
+    protected static final String NEW_LINE = "\n"; // NOI18N
+    protected static final String TAB = "\t"; // NOI18N
 
     public PrintLocationsByCarTypesAction(boolean preview) {
         super(preview ? Bundle.getMessage("MenuItemPreviewByType") : Bundle.getMessage("MenuItemPrintByType"));
@@ -48,25 +46,19 @@ public class PrintLocationsByCarTypesAction extends AbstractAction {
     public void actionPerformed(ActionEvent e) {
         print();
     }
-    
+
     private void print() {
         // obtain a HardcopyWriter
-        HardcopyWriter writer;
-        try {
-            writer = new HardcopyWriter(new Frame(), Bundle.getMessage("TitleLocationsByType"), Control.reportFontSize,
-                    .5, .5, .5, .5, isPreview);
-        } catch (HardcopyWriter.PrintCanceledException ex) {
-            log.debug("Print cancelled");
-            return;
-        }
+        try (HardcopyWriter writer = new HardcopyWriter(new Frame(), Bundle.getMessage("TitleLocationsByType"), null,
+                null, Control.reportFontSize, .5 * 72, .5 * 72, .5 * 72, .5 * 72, isPreview, "", false, true, null,
+                null)) {
+           
+            // Loop through the car types showing which locations and tracks will
+            // service that car type
+            String carTypes[] = InstanceManager.getDefault(CarTypes.class).getNames();
+            
+            List<Location> locations = InstanceManager.getDefault(LocationManager.class).getLocationsByNameList();
 
-        // Loop through the car types showing which locations and tracks will
-        // service that car type
-        String carTypes[] = InstanceManager.getDefault(CarTypes.class).getNames();
-
-        List<Location> locations = InstanceManager.getDefault(LocationManager.class).getLocationsByNameList();
-
-        try {
             // title line
             String s = Bundle.getMessage(
                     "Type") + TAB + Bundle.getMessage("Location") + TAB + Bundle.getMessage("Track") + NEW_LINE;
@@ -91,12 +83,12 @@ public class PrintLocationsByCarTypesAction extends AbstractAction {
                     }
                 }
             }
+        } catch (HardcopyWriter.PrintCanceledException we) {
+            log.debug("Print canceled");
         } catch (IOException we) {
-            log.error("Error printing PrintLocationAction: {}", we);
+            log.error("Error printing PrintLocationAction: {}", we.getLocalizedMessage());
         }
-        // and force completion of the printing
-        writer.close();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PrintLocationsByCarTypesAction.class);
+    private static final Logger log = LoggerFactory.getLogger(PrintLocationsByCarTypesAction.class);
 }

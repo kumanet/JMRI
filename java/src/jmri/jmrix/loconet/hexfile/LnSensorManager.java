@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
 @SuppressFBWarnings(value = "NM_SAME_SIMPLE_NAME_AS_SUPERCLASS", justification = "This is in effect the same as its super class")
 public class LnSensorManager extends jmri.jmrix.loconet.LnSensorManager {
 
-    public LnSensorManager(LocoNetSystemConnectionMemo memo) {
-        super(memo);
+    public LnSensorManager(LocoNetSystemConnectionMemo memo, boolean interrogateAtStart) {
+        super(memo, interrogateAtStart);
     }
 
     // LocoNet-specific methods
@@ -56,6 +56,6 @@ public class LnSensorManager extends jmri.jmrix.loconet.LnSensorManager {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnSensorManager.class);
+    private static final Logger log = LoggerFactory.getLogger(LnSensorManager.class);
 
 }

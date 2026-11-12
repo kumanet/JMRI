@@ -1,6 +1,5 @@
 package jmri.jmrix.loconet.ds64;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -11,13 +10,13 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.Collections;
+
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
@@ -26,13 +25,13 @@ import javax.swing.JTabbedPane;
 import javax.swing.JToggleButton;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
 import jmri.jmrix.loconet.AbstractBoardProgPanel;
 import jmri.jmrix.loconet.LnConstants;
 import jmri.jmrix.loconet.LocoNetMessage;
 import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.ValidatedTextField;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A "tabbed" swing panel to display and modify Digitrax DS64 board
@@ -915,7 +914,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                             // have written a value for output2 - update GUI
                             outAddr2.setLastQueriedValue(outAddr2.getText());
                             outAddr2.repaint();
-                            indexToRead++;
+                            ++indexToRead;
                             read = false;
                             setOpSwIndex(indexToRead);
                             return 25;
@@ -944,7 +943,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                             } catch (NumberFormatException e) {
                                 routeA2[effectiveIndex].setIsUnused();
                             }
-                            indexToRead++;
+                            ++indexToRead;
                             read = false;
                             setOpSwIndex(indexToRead);
                             return 25;
@@ -965,7 +964,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                             } catch (NumberFormatException e) {
                                 routeA4[effectiveIndex].setIsUnused();
                             }
-                            indexToRead++;
+                            ++indexToRead;
                             read = false;
                             setOpSwIndex(indexToRead);
                             return 25;
@@ -986,7 +985,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                             } catch (NumberFormatException e) {
                                 routeA6[effectiveIndex].setIsUnused();
                             }
-                            indexToRead++;
+                            ++indexToRead;
                             read = false;
                             setOpSwIndex(indexToRead);
                             return 25;
@@ -1007,7 +1006,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                             } catch (NumberFormatException e) {
                                 routeA8[effectiveIndex].setIsUnused();
                             }
-                            indexToRead++;
+                            ++indexToRead;
                             read = false;
                             setOpSwIndex(indexToRead);
                             return 0;
@@ -1033,8 +1032,6 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
         }
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "DLS_DEAD_LOCAL_STORE",
-                justification = "False positive on the implied local variable in indexToRead++")
     private int determineNextStateForRead() {
         switch (indexToRead) {
             case 1: {
@@ -1070,7 +1067,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
             case 42:
             case 46: {
                 // have read a value for Route n.  go to next value if necessary
-                indexToRead++;
+                ++indexToRead;
                 read = false;
                 setOpSwIndex(indexToRead);
                 return 25;
@@ -1084,7 +1081,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
             case 43:
             case 47: {
                 // have read last values for Route n.  No next value so stop.
-                indexToRead++;
+                ++indexToRead;
                 read = false;
                 setOpSwIndex(indexToRead);
                 return 0;
@@ -1954,19 +1951,18 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
     /**
      * Reset the DS64 board
      */
-    @SuppressFBWarnings(value = "UPM_UNCALLED_PRIVATE_METHOD", justification = "Functionality not yet confirmed with hardware; may be useful at a future date.")
     private void boardFactoryReset() {
 
         // before proceeding, make sure that the user really wants to go forward
         Object[] dialogBoxButtonOptions = {
             Bundle.getMessage("ButtonResetToFactoryDefault"),
             Bundle.getMessage("ButtonCancel")};
-        int userReply = JOptionPane.showOptionDialog(this.getParent(),
+        int userReply = JmriJOptionPane.showOptionDialog(this,
                 Bundle.getMessage("DialogTextBoardResetWarning"),
                 Bundle.getMessage("WarningTitle"),
-                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE,
+                JmriJOptionPane.YES_NO_OPTION, JmriJOptionPane.QUESTION_MESSAGE,
                 null, dialogBoxButtonOptions, dialogBoxButtonOptions[1]);
-        if (userReply != 0) {
+        if ( userReply != JmriJOptionPane.YES_OPTION ) {
             factoryResetButton.setSelected(false);
             return; // compare only to exactly the value for executing the reset!
         }
@@ -2531,12 +2527,12 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                         Object[] dialogBoxButtonOptions = {
                             Bundle.getMessage("ButtonResetRouteN", routeNumber),
                             Bundle.getMessage("ButtonCancel")};
-                        int userReply = JOptionPane.showOptionDialog(this.getParent(),
+                        int userReply = JmriJOptionPane.showOptionDialog(this,
                                 Bundle.getMessage("DialogTextClearRouteWarning", routeNumber),
                                 Bundle.getMessage("WarningTitle"),
-                                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE,
+                                JmriJOptionPane.YES_NO_OPTION, JmriJOptionPane.QUESTION_MESSAGE,
                                 null, dialogBoxButtonOptions, dialogBoxButtonOptions[1]);
-                        if (userReply != 0) {
+                        if ( userReply != JmriJOptionPane.YES_OPTION ) {
                             resetRouteButton.setSelected(false);
                             return; // compare only to exactly the value for executing the "clear route" operation!
                         }
@@ -2683,7 +2679,6 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
 
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "DLS_DEAD_LOCAL_STORE", justification = "Cannot catch an exception without grabbing the exception, but we don't do anything with the exception details.")
     private void updateGuiFromOpSws49_64() {
         Integer readValue;
         boolean isUsed = true;
@@ -2694,7 +2689,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                 readValue = (readValue << 1) + (opsw[i] ? 1 : 0);
             }
         }
-        readValue++; // account for physical/user numbering difference
+        ++readValue; // account for physical/user numbering difference
 
         String readValueString = readValue.toString();
         if ((opsw[63] == true) && (opsw[64] == true)) {
@@ -2832,7 +2827,6 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
         }
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "DLS_DEAD_LOCAL_STORE", justification = "Cannot catch an exception without grabbing the exception, but we don't do anything with the exception details.")
     void updateGuiFromOpSws33_48() {
         Integer readValue;
         boolean isUsed = true;
@@ -2843,7 +2837,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
                 readValue = (readValue << 1) + (opsw[i] ? 1 : 0);
             }
         }
-        readValue++; // account for physical/user numbering difference
+        ++readValue; // account for physical/user numbering difference
 
         String readValueString = readValue.toString();
         if ((opsw[47] == true) && (opsw[48] == true)) {
@@ -3080,7 +3074,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
         }
     }
 
-    private class JRadioButtonWithInteger extends JRadioButton {
+    private static class JRadioButtonWithInteger extends JRadioButton {
 
         public int index;
 
@@ -3090,17 +3084,17 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
         }
     }
 
-    
+
     /**
      * Copy from the GUI OpSw tab to the GUI Basics tab
      */
     protected void copyOpswToBasic() {
         // copy over values from OpSw tab to the Basics tab
         outputType.setSelectedIndex(opsw[1]?1:0);
-        
+
         delayTime.setSelectedIndex(
             (opsw[2]?1:0) + (opsw[3]?2:0) + (opsw[4]?4:0) + (opsw[5]?8:0));
-        
+
         outputStates.setSelectedIndex(opsw[6]?1:0);
         isWritingResetOpSw = opsw[7];
         startupDelay.setSelectedIndex(opsw[8]?1:0);
@@ -3116,7 +3110,7 @@ public class Ds64TabbedPanel extends AbstractBoardProgPanel {
         output4CrossbuckFlasherCheckBox.setSelected(opsw[20]);
         localSensorType.setSelectedIndex(opsw[21]?1:0);
     }
-    
-    private final static Logger log = LoggerFactory.getLogger(Ds64TabbedPanel.class); // NOI18N
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Ds64TabbedPanel.class);
 
 }

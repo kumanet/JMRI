@@ -1,11 +1,7 @@
 package jmri.jmrit.operations.rollingstock.cars;
 
+import java.time.LocalDateTime;
 import java.util.List;
-
-import javax.swing.JComboBox;
-
-import org.junit.Assert;
-import org.junit.jupiter.api.Test;
 
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
@@ -14,6 +10,9 @@ import jmri.jmrit.operations.locations.Track;
 import jmri.jmrit.operations.routes.Route;
 import jmri.jmrit.operations.routes.RouteLocation;
 import jmri.jmrit.operations.trains.Train;
+
+import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for the Operations RollingStock Cars CarManager class Last manually
@@ -65,10 +64,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
-
         // now get cars by id
-        carList = manager.getByIdList();
+        List<Car> carList = manager.getByIdList();
         Assert.assertEquals("Number of Cars by id", 6, carList.size());
         Assert.assertEquals("1st car in list by id", c6, carList.get(0));
         Assert.assertEquals("2nd car in list by id", c2, carList.get(1));
@@ -131,9 +128,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by owner
-        carList = manager.getByOwnerList();
+        List<Car> carList = manager.getByOwnerList();
         Assert.assertEquals("Number of Cars by owner", 6, carList.size());
         Assert.assertEquals("1st car in list by owner", c3, carList.get(0));
         Assert.assertEquals("2nd car in list by owner", c6, carList.get(1));
@@ -149,12 +145,12 @@ public class CarManagerTest extends OperationsTestCase {
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
 
-        c1.setColor("RED");
-        c2.setColor("BLUE");
-        c3.setColor("YELLOW");
-        c4.setColor("BLACK");
-        c5.setColor("ROSE");
-        c6.setColor("TUSCAN");
+        c1.setColorName("RED");
+        c2.setColorName("BLUE");
+        c3.setColorName("YELLOW");
+        c4.setColorName("BLACK");
+        c5.setColorName("ROSE");
+        c6.setColorName("TUSCAN");
         // now get cars by color
         List<Car> carList = manager.getByColorList();
         Assert.assertEquals("Number of Cars by color", 6, carList.size());
@@ -171,9 +167,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by road name
-        carList = manager.getByRoadNameList();
+        List<Car> carList = manager.getByRoadNameList();
         Assert.assertEquals("Number of Cars by road name", 6, carList.size());
         Assert.assertEquals("1st car in list by road name", c6, carList.get(0));
         Assert.assertEquals("2nd car in list by road name", c2, carList.get(1));
@@ -188,9 +183,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by load
-        carList = manager.getByLoadList();
+        List<Car> carList = manager.getByLoadList();
         Assert.assertEquals("Number of Cars by load", 6, carList.size());
         Assert.assertEquals("1st car in list by load", c5, carList.get(0));
         Assert.assertEquals("2nd car in list by load", c4, carList.get(1));
@@ -254,9 +248,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by destination
-        carList = manager.getByDestinationList();
+        List<Car> carList = manager.getByDestinationList();
         Assert.assertEquals("Number of Cars by destination", 6, carList.size());
         Assert.assertEquals("1st car in list by destination", c2, carList.get(0));
         Assert.assertEquals("2nd car in list by destination", c1, carList.get(1));
@@ -516,7 +509,7 @@ public class CarManagerTest extends OperationsTestCase {
         Train t1 = new Train("id1", "F");
         t1.setRoute(r);
 
-        Kernel k = manager.newKernel("specialK");
+        Kernel k = InstanceManager.getDefault(KernelManager.class).newKernel("specialK");
 
         c4.setKernel(k); // make caboose lead car
         c2.setKernel(k);
@@ -591,6 +584,48 @@ public class CarManagerTest extends OperationsTestCase {
         Assert.assertEquals("5th car in list by t1 by dest", c6, carList.get(4));
         Assert.assertEquals("6th car in list by t1 by dest", c4, carList.get(5));
     }
+    
+    @Test
+    public void testListCarsByTrainDestinationPassengerNegitiveBlocking() {
+        initializeTest();
+
+        CarManager manager = InstanceManager.getDefault(CarManager.class);
+        Route r = new Route("id", "Test");
+        r.addLocation(l1);
+        r.addLocation(l2);
+        r.addLocation(l3);
+
+        Train t1 = new Train("id1", "F");
+        t1.setRoute(r);
+
+        c1.setPassenger(true);
+        c2.setPassenger(true);
+        c3.setPassenger(true);
+
+        c1.setBlocking(-6);
+        c2.setBlocking(0);
+        c3.setBlocking(-2);
+        c4.setBlocking(3); // caboose
+        c5.setBlocking(1); // FRED
+        c6.setBlocking(-4); // caboose
+
+        c1.setTrain(t1);
+        c2.setTrain(t1);
+        c3.setTrain(t1);
+        c4.setTrain(t1);
+        c5.setTrain(t1);
+        c6.setTrain(t1);
+
+        // now get cars by specific train
+        List<Car> carList = manager.getByTrainDestinationList(t1);
+        Assert.assertEquals("Number of Cars in t1 by dest", 6, carList.size());
+        Assert.assertEquals("1st car in list by t1 by dest", c1, carList.get(0));
+        Assert.assertEquals("2nd car in list by t1 by dest", c3, carList.get(1));
+        Assert.assertEquals("3rd car in list by t1 by dest", c2, carList.get(2));
+        Assert.assertEquals("4th car in list by t1 by dest", c5, carList.get(3));
+        Assert.assertEquals("5th car in list by t1 by dest", c6, carList.get(4));
+        Assert.assertEquals("6th car in list by t1 by dest", c4, carList.get(5));
+    }
 
     @Test
     public void testListCarsAvailableByTrainNoRoute() {
@@ -650,8 +685,8 @@ public class CarManagerTest extends OperationsTestCase {
         Assert.assertEquals("2nd car in list available for t3", c2, carList.get(1));
         Assert.assertEquals("3rd car in list available for t3", c3, carList.get(2));
 
-        // now don't allow pickups at the last location in the train's route
-        last.setPickUpAllowed(false);
+        // now don't allow local moves at the last location in the train's route
+        last.setLocalMovesAllowed(false);
         carList = manager.getAvailableTrainList(t3);
         Assert.assertEquals("Number of Cars available for t3", 2, carList.size());
         Assert.assertEquals("1st car in list available for t3", c2, carList.get(0));
@@ -709,7 +744,7 @@ public class CarManagerTest extends OperationsTestCase {
     }
 
     /**
-     * Cars at the last location are not normally included in car list if pick up is
+     * Cars at the last location are not normally included in car list if local moves is
      * disabled
      */
     @Test
@@ -721,7 +756,7 @@ public class CarManagerTest extends OperationsTestCase {
         r.addLocation(l1);
         r.addLocation(l2);
         RouteLocation last = r.addLocation(l3);
-        last.setPickUpAllowed(false); // no pulls
+        last.setLocalMovesAllowed(false); // no pulls
 
         Train t1 = new Train("id1", "F");
         t1.setRoute(r);
@@ -791,18 +826,21 @@ public class CarManagerTest extends OperationsTestCase {
         c1.setTrain(t1);
         c2.setTrain(t1);
         c3.setTrain(t1); // load name = "Tools"
-        c4.setTrain(t1);
+        c4.setTrain(t1); // load name = "Fuel"
         c5.setTrain(t1);
         c6.setTrain(t1);
 
         CarLoads cl = InstanceManager.getDefault(CarLoads.class);
         cl.addName("Boxcar", "Tools");
         cl.setPriority("Boxcar", "Tools", CarLoad.PRIORITY_HIGH);
+        cl.addName("Boxcar", "Fuel");
+        cl.setPriority("Boxcar", "Fuel", CarLoad.PRIORITY_MEDIUM);
 
         // 1st car in list should be the car with the high priority load
         List<Car> carList = manager.getAvailableTrainList(t1);
         Assert.assertEquals("Number of Cars available for t1", 6, carList.size());
         Assert.assertEquals("1st car in list available for t1", c3, carList.get(0));
+        Assert.assertEquals("2nd car in list available for t1", c4, carList.get(1));
     }
 
     @Test
@@ -810,9 +848,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by road number
-        carList = manager.getByNumberList();
+        List<Car> carList = manager.getByNumberList();
         Assert.assertEquals("Number of Cars by number", 6, carList.size());
         Assert.assertEquals("1st car in list by number", c6, carList.get(0));
         Assert.assertEquals("2nd car in list by number", c1, carList.get(1));
@@ -852,9 +889,8 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // now get cars by RFID
-        carList = manager.getByRfidList();
+        List<Car> carList = manager.getByRfidList();
         Assert.assertEquals("Number of Cars by rfid", 6, carList.size());
         Assert.assertEquals("1st car in list by rfid", c2, carList.get(0));
         Assert.assertEquals("2nd car in list by rfid", c5, carList.get(1));
@@ -884,7 +920,6 @@ public class CarManagerTest extends OperationsTestCase {
         initializeTest();
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
-        List<Car> carList = manager.getByIdList();
         // change car types so sort will work
         c1.setTypeName("F");
         c2.setTypeName("D");
@@ -894,7 +929,7 @@ public class CarManagerTest extends OperationsTestCase {
         c6.setTypeName("E");
 
         // now get cars by type
-        carList = manager.getByTypeList();
+        List<Car> carList = manager.getByTypeList();
         Assert.assertEquals("Number of Cars by type", 6, carList.size());
         Assert.assertEquals("1st car in list by type", c3, carList.get(0));
         Assert.assertEquals("2nd car in list by type", c4, carList.get(1));
@@ -910,89 +945,26 @@ public class CarManagerTest extends OperationsTestCase {
 
         CarManager manager = InstanceManager.getDefault(CarManager.class);
 
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        java.util.Date start = cal.getTime(); // save to rest time, to avoid
-        // test probelms if run near
-        // midnight.
-        java.util.Date time = cal.getTime();
-        c1.setLastDate(time); // right now
+        LocalDateTime time = LocalDateTime.of(1956, 7, 2, 12, 0);
+        c1.setLastDate(time);
 
-        cal.setTime(start);
-        cal.add(java.util.Calendar.HOUR_OF_DAY, -1);
-        time = cal.getTime();
-        c2.setLastDate(time); // one hour ago
+        time = LocalDateTime.of(1956, 7, 2, 11, 0);
+        c2.setLastDate(time); // one hour before
 
-        cal.setTime(start);
-        cal.add(java.util.Calendar.HOUR_OF_DAY, 1);
-        time = cal.getTime();
-        c3.setLastDate(time); // one hour from now
+        time = LocalDateTime.of(1956, 7, 2, 13, 0);
+        c3.setLastDate(time); // one hour later
 
-        cal.setTime(start);
-        cal.set(java.util.Calendar.DAY_OF_MONTH, -1);
-        time = cal.getTime();
-        c4.setLastDate(time); // one day ago.
+        time = LocalDateTime.of(1956, 6, 2, 12, 0);
+        c4.setLastDate(time); // one day before.
 
-        cal.setTime(start);
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
-        time = cal.getTime();
-        c5.setLastDate(time); // one day in the future now.
+        time = LocalDateTime.of(1956, 8, 2, 12, 0);
+        c5.setLastDate(time); // one day later.
 
-        cal.setTime(start);
-        cal.add(java.util.Calendar.YEAR, -1);
-        time = cal.getTime();
+        time = LocalDateTime.of(1955, 7, 2, 12, 0);
         c6.setLastDate(time); // one year ago.
 
         // now get cars by last move date.
         List<Car> carList = manager.getByLastDateList();
-        Assert.assertEquals("Number of Cars by last move date", 6, carList.size());
-        Assert.assertEquals("1st car in list by move date", c6, carList.get(0));
-        Assert.assertEquals("2nd car in list by move date", c4, carList.get(1));
-        Assert.assertEquals("3rd car in list by move date", c2, carList.get(2));
-        Assert.assertEquals("4th car in list by move date", c1, carList.get(3));
-        Assert.assertEquals("5th car in list by move date", c3, carList.get(4));
-        Assert.assertEquals("6th car in list by move date", c5, carList.get(5));
-    }
-
-    @Test
-    public void testSortListedCarsByLastMovedDate() {
-        initializeTest();
-
-        CarManager manager = InstanceManager.getDefault(CarManager.class);
-
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        java.util.Date start = cal.getTime(); // save to rest time, to avoid
-        // test probelms if run near
-        // midnight.
-        java.util.Date time = cal.getTime();
-        c1.setLastDate(time); // right now
-
-        cal.setTime(start);
-        cal.add(java.util.Calendar.HOUR_OF_DAY, -1);
-        time = cal.getTime();
-        c2.setLastDate(time); // one hour ago
-
-        cal.setTime(start);
-        cal.add(java.util.Calendar.HOUR_OF_DAY, 1);
-        time = cal.getTime();
-        c3.setLastDate(time); // one hour from now
-
-        cal.setTime(start);
-        cal.set(java.util.Calendar.DAY_OF_MONTH, -1);
-        time = cal.getTime();
-        c4.setLastDate(time); // one day ago.
-
-        cal.setTime(start);
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
-        time = cal.getTime();
-        c5.setLastDate(time); // one day in the future now.
-
-        cal.setTime(start);
-        cal.add(java.util.Calendar.YEAR, -1);
-        time = cal.getTime();
-        c6.setLastDate(time); // one year ago.
-
-        // now get cars by last move date.
-        List<Car> carList = manager.getByLastDateList(manager.getByIdList());
         Assert.assertEquals("Number of Cars by last move date", 6, carList.size());
         Assert.assertEquals("1st car in list by move date", c6, carList.get(0));
         Assert.assertEquals("2nd car in list by move date", c4, carList.get(1));
@@ -1099,52 +1071,6 @@ public class CarManagerTest extends OperationsTestCase {
 
         Assert.assertEquals("E", c4.getReturnWhenEmptyLoadName());
         Assert.assertEquals("L", c6.getReturnWhenLoadedLoadName());
-    }
-
-    @Test
-    public void testKernel() {
-        CarManager manager = InstanceManager.getDefault(CarManager.class);
-        Kernel k = manager.newKernel(CarManager.NONE);
-        Assert.assertNull(k);
-
-        k = manager.newKernel("A");
-        Assert.assertNotNull(k);
-
-        Kernel kt = manager.newKernel("A");
-        Assert.assertNotNull(kt);
-        Assert.assertEquals("Same kernel", k, kt);
-
-        manager.replaceKernelName("A", "B");
-        kt = manager.getKernelByName("B");
-        Assert.assertNotNull(kt);
-        // Replace when test was created doesn't delete the old kernel
-        // GUI does a replace followed by a delete
-        k = manager.getKernelByName("A");
-        Assert.assertNotNull(k);
-
-        manager.deleteKernel("B");
-        kt = manager.getKernelByName("B");
-        Assert.assertNull(kt);
-    }
-
-    @Test
-    public void testKernelComboBox() {
-        CarManager manager = InstanceManager.getDefault(CarManager.class);
-        JComboBox<String> cb = manager.getKernelComboBox();
-        Assert.assertEquals("Number of items", 1, cb.getItemCount());
-        Assert.assertEquals("Empty", CarManager.NONE, cb.getSelectedItem());
-
-        manager.newKernel("C");
-        manager.newKernel("B");
-        manager.newKernel("A");
-        cb = manager.getKernelComboBox();
-
-        Assert.assertEquals("Number of items", 4, cb.getItemCount());
-        Assert.assertEquals("Empty", CarManager.NONE, cb.getSelectedItem());
-
-        Assert.assertEquals("1st item", "A", cb.getItemAt(1));
-        Assert.assertEquals("1st item", "B", cb.getItemAt(2));
-        Assert.assertEquals("1st item", "C", cb.getItemAt(3));
     }
 
     @Test
@@ -1266,12 +1192,12 @@ public class CarManagerTest extends OperationsTestCase {
         c5.setLoadName("Bags");
         c6.setLoadName("Nails");
 
-        c1.setOwner("LAST");
-        c2.setOwner("FOOL");
-        c3.setOwner("AAA");
-        c4.setOwner("DAD");
-        c5.setOwner("DAB");
-        c6.setOwner("BOB");
+        c1.setOwnerName("LAST");
+        c2.setOwnerName("FOOL");
+        c3.setOwnerName("AAA");
+        c4.setOwnerName("DAD");
+        c5.setOwnerName("DAB");
+        c6.setOwnerName("BOB");
 
         // make a couple of cabooses
         c4.setCaboose(true);

@@ -2,8 +2,6 @@ package jmri.jmrix.powerline.configurexml;
 
 import jmri.configurexml.JmriConfigureXmlException;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring SerialSensorManagers.
@@ -30,5 +28,5 @@ public class SerialSensorManagerXml extends jmri.managers.configurexml.AbstractS
         return loadSensors(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(SerialSensorManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(SerialSensorManagerXml.class);
 }

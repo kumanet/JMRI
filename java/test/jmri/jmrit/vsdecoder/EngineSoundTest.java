@@ -2,7 +2,6 @@ package jmri.jmrit.vsdecoder;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -14,7 +13,7 @@ public class EngineSoundTest {
     @Test
     public void testCTor() {
         EngineSound t = new EngineSound("test");
-        Assert.assertNotNull("exists",t);
+        Assertions.assertNotNull(t, "exists");
     }
 
     @BeforeEach
@@ -24,13 +23,17 @@ public class EngineSoundTest {
 
     @AfterEach
     public void tearDown() {
+
+        // Potentially no Audio Device installed
+        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("Error initialising JOAL");
+
         // this created an audio manager, clean that up
         jmri.InstanceManager.getDefault(jmri.AudioManager.class).cleanup();
+        JUnitUtil.removeMatchingThreads("VSDecoderManagerThread");
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EngineSoundTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EngineSoundTest.class);
 
 }

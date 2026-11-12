@@ -2,7 +2,6 @@ package jmri.jmrit.logixng.expressions;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.time.Instant;
 import java.util.*;
 
 import jmri.*;
@@ -47,14 +46,8 @@ public class ExpressionClock extends AbstractDigitalExpression implements Proper
 
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
 
     public void set_Is_IsNot(Is_IsNot_Enum is_IsNot) {
@@ -177,7 +170,7 @@ public class ExpressionClock extends AbstractDigitalExpression implements Proper
                         ExpressionClock.formatTime(_endTime));
 
             default:
-                throw new RuntimeException("Unknown value of _timerType: "+_type.name());
+                throw new JmriUncheckedException("Unknown value of _timerType: "+_type.name());
         }
     }
 
@@ -274,6 +267,6 @@ public class ExpressionClock extends AbstractDigitalExpression implements Proper
 
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionClock.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionClock.class);
 
 }

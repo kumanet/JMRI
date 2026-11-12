@@ -1,5 +1,14 @@
 package jmri.managers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.beans.PropertyChangeListener;
 import java.util.*;
 
@@ -9,7 +18,6 @@ import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -17,9 +25,8 @@ import org.junit.jupiter.api.*;
  *
  * @author Bob Jacobsen 2003, 2006, 2008, 2014
  */
-public class ProxySensorManagerTest implements Manager.ManagerDataListener<Sensor>, PropertyChangeListener {
-
-    protected ProxySensorManager l = null; // holds objects under test
+public class ProxySensorManagerTest extends AbstractProxyManagerTestBase<ProxySensorManager,Sensor>
+    implements Manager.ManagerDataListener<Sensor>, PropertyChangeListener {
 
     @Test
     public void testDispose() {
@@ -31,27 +38,27 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         // create
         Sensor tj = l.newSensor("JS1", "mine");
         // check
-        Assert.assertTrue("real object returned ", tj != null);
-        Assert.assertTrue("user name correct ", tj == l.getByUserName("mine"));
-        Assert.assertTrue("system name correct ", tj == l.getBySystemName("JS1"));
+        assertNotNull( tj, "real object returned ");
+        assertSame( tj, l.getByUserName("mine"), "user name correct ");
+        assertSame( tj, l.getBySystemName("JS1"), "system name correct ");
     }
 
     @Test
     public void testSensorNameCase() {
-        Assert.assertEquals(0, l.getObjectCount());
+        assertEquals(0, l.getObjectCount());
         // create
         Sensor t = l.provideSensor("IS:XYZ");
-        Assert.assertNotEquals(t, l.provideSensor("IS:xyz"));  // upper case and lower case are different objects
+        assertNotEquals(t, l.provideSensor("IS:xyz"));  // upper case and lower case are different objects
         // check
-        Assert.assertTrue("real object returned ", t != null);
-        Assert.assertEquals("IS:XYZ", t.getSystemName());  // we force upper
-        Assert.assertTrue("system name correct ", t == l.getBySystemName("IS:XYZ"));
-        Assert.assertEquals(2, l.getObjectCount());
-        Assert.assertEquals(2, l.getNamedBeanSet().size());
+        assertNotNull( t, "real object returned ");
+        assertEquals("IS:XYZ", t.getSystemName());  // we force upper
+        assertSame( t, l.getBySystemName("IS:XYZ"), "system name correct ");
+        assertEquals(2, l.getObjectCount());
+        assertEquals(2, l.getNamedBeanSet().size());
         // test providing same name as existing sensor does not create new sensor
         l.provideSensor("IS:XYZ");
-        Assert.assertEquals(2, l.getObjectCount());
-        Assert.assertEquals(2, l.getNamedBeanSet().size());
+        assertEquals(2, l.getObjectCount());
+        assertEquals(2, l.getNamedBeanSet().size());
     }
 
     @Test
@@ -59,9 +66,9 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         // create
         Sensor ti = l.newSensor("IS1", "mine");
         // check
-        Assert.assertTrue("real object returned ", ti != null);
-        Assert.assertTrue("user name correct ", ti == l.getByUserName("mine"));
-        Assert.assertTrue("system name correct ", ti == l.getBySystemName("IS1"));
+        assertNotNull( ti, "real object returned " );
+        assertSame( ti, l.getByUserName("mine"), "user name correct ");
+        assertSame( ti, l.getBySystemName("IS1"), "system name correct ");
     }
 
     @Test
@@ -69,9 +76,9 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         // create
         Sensor tk = l.newSensor("KS1", "mine");
         // check
-        Assert.assertTrue("real object returned ", tk != null);
-        Assert.assertTrue("user name correct ", tk == l.getByUserName("mine"));
-        Assert.assertTrue("system name correct ", tk == l.getBySystemName("KS1"));
+        assertNotNull( tk, "real object returned " );
+        assertSame( tk, l.getByUserName("mine"), "user name correct ");
+        assertSame( tk, l.getBySystemName("KS1"), "system name correct ");
     }
 
     @Test
@@ -79,14 +86,16 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         // create
         Sensor t = l.provideSensor("9");
         // check
-        Assert.assertTrue("real object returned", t != null);
-        Assert.assertEquals("system name correct", "JS9", t.getSystemName());
-        Assert.assertEquals("can find by name", t, l.getBySystemName("JS9"));
+        assertNotNull( t, "real object returned");
+        assertEquals( "JS9", t.getSystemName(), "system name correct");
+        assertEquals( t, l.getBySystemName("JS9"), "can find by name");
     }
 
     @Test
     public void testProvideFailure() {
-        Assert.assertThrows(IllegalArgumentException.class, () -> l.provideSensor(""));
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class, () -> l.provideSensor(""));
+        assertNotNull(ex);
         JUnitAppender.assertErrorMessage("Invalid system name for Sensor: System name must start with \"" + l.getSystemNamePrefix() + "\".");
     }
 
@@ -94,43 +103,43 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
     public void testSingleObject() {
         // test that you always get the same representation
         Sensor t1 = l.newSensor("JS1", "mine");
-        Assert.assertTrue("t1 real object returned ", t1 != null);
-        Assert.assertEquals("same by user ", t1, l.getByUserName("mine"));
-        Assert.assertEquals("same by system ", t1, l.getBySystemName("JS1"));
+        assertNotNull( t1, "t1 real object returned ");
+        assertEquals( t1, l.getByUserName("mine"), "same by user ");
+        assertEquals( t1, l.getBySystemName("JS1"), "same by system ");
 
         Sensor t2 = l.newSensor("JS1", "mine");
-        Assert.assertTrue("t2 real object returned ", t2 != null);
+        assertNotNull( t2, "t2 real object returned ");
         // check
-        Assert.assertTrue("same new ", t1 == t2);
+        assertSame( t1, t2, "same new ");
     }
 
     @Test
     public void testMisses() {
         // try to get nonexistant objects
-        Assert.assertTrue(null == l.getByUserName("foo"));
-        Assert.assertTrue(null == l.getBySystemName("bar"));
+        assertNull( l.getByUserName("foo"));
+        assertNull( l.getBySystemName("bar"));
     }
 
     @Test
     public void testUpperLower() {  // verify that names are case sensitive
         Sensor t = l.provideSensor("JS1ABC");  // internal will always accept that name
         String name = t.getSystemName();
-        
+
         int prefixLength = l.getSystemPrefix().length()+1;     // 1 for type letter
         String lowerName = name.substring(0,prefixLength)+name.substring(prefixLength, name.length()).toLowerCase();
-        
-        Assert.assertNotEquals(t, l.getSensor(lowerName));
+
+        assertNotEquals(t, l.getSensor(lowerName));
     }
 
     @Test
     public void testRename() {
         // get
         Sensor t1 = l.newSensor("JS1", "before");
-        Assert.assertNotNull("t1 real object ", t1);
+        assertNotNull( t1, "t1 real object ");
         t1.setUserName("after");
         Sensor t2 = l.getByUserName("after");
-        Assert.assertEquals("same object", t1, t2);
-        Assert.assertEquals("no old object", null, l.getByUserName("before"));
+        assertEquals( t1, t2, "same object");
+        assertNull( l.getByUserName("before"), "no old object");
     }
 
     @Test
@@ -138,17 +147,17 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         Sensor jl212 = l.provideSensor("JS212");
         Sensor jl211 = l.provideSensor("JS211");
 
-        Assert.assertNotNull(jl212);
-        Assert.assertNotNull(jl211);
-        Assert.assertTrue(jl212 != jl211);
+        assertNotNull(jl212);
+        assertNotNull(jl211);
+        assertNotSame(jl212, jl211);
     }
 
     @Test
     public void testDefaultNotInternal() {
         Sensor lut = l.provideSensor("211");
 
-        Assert.assertNotNull(lut);
-        Assert.assertEquals("JS211", lut.getSystemName());
+        assertNotNull(lut);
+        assertEquals("JS211", lut.getSystemName());
     }
 
     @Test
@@ -158,312 +167,250 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         Sensor l2 = l.provideSensor("user 1");
         Sensor l3 = l.getSensor("user 1");
 
-        Assert.assertNotNull(l1);
-        Assert.assertNotNull(l2);
-        Assert.assertNotNull(l3);
-        Assert.assertEquals(l1, l2);
-        Assert.assertEquals(l3, l2);
-        Assert.assertEquals(l1, l3);
+        assertNotNull(l1);
+        assertNotNull(l2);
+        assertNotNull(l3);
+        assertEquals(l1, l2);
+        assertEquals(l3, l2);
+        assertEquals(l1, l3);
 
         Sensor l4 = l.getSensor("JLuser 1");
-        Assert.assertNull(l4);
+        assertNull(l4);
     }
 
     // the following methods test code in Manager and AbstractManager,
     // but they need a concrete implementation to do it, hence are here.
-    
+
     @Test
-    @SuppressWarnings("deprecation") // getNamedBeanList, addDataListener references
     public void testAddTracking() {
         Sensor s1 = l.provideSensor("IS1");
         s1.setUserName("Sensor 1");
-        
+
         l.addDataListener(this);
         l.addPropertyChangeListener("length", this);
         l.addPropertyChangeListener("DisplayListName", this);
-        
+
         // add an item
         Sensor s2 = l.provideSensor("IS2");
 
         // property listener should have been immediately invoked
-        Assert.assertEquals("propertyListenerCount", 1, propertyListenerCount);
-        Assert.assertEquals("last call", "length", propertyListenerLast);
+        assertEquals( 1, propertyListenerCount, "propertyListenerCount");
+        assertEquals( "length", propertyListenerLast, "last call");
 
         s2.setUserName("Sensor 2");
 
-        Assert.assertEquals("propertyListenerCount", 2, propertyListenerCount);
-        Assert.assertEquals("last call", "DisplayListName", propertyListenerLast);
+        assertEquals( 2, propertyListenerCount, "propertyListenerCount");
+        assertEquals( "DisplayListName", propertyListenerLast, "last call");
 
         // data listener should have been immediately invoked
-        Assert.assertEquals("events", 1, events);
-        Assert.assertEquals("last call 1", "Added", lastCall);
-        Assert.assertEquals("type 1", Manager.ManagerDataEvent.INTERVAL_ADDED, lastType);
-        Assert.assertEquals("start == end 1", lastEvent0, lastEvent1);
-        Assert.assertEquals("index 1", 1, lastEvent0);
-        Assert.assertEquals("content at index 1", s2, l.getNamedBeanList().get(lastEvent0));
+        assertEquals( 1, events, "events");
+        assertEquals( "Added", lastCall, "last call 1");
+        assertEquals( Manager.ManagerDataEvent.INTERVAL_ADDED, lastType, "type 1");
+        assertEquals( lastEvent0, lastEvent1, "start == end 1");
+        assertEquals( 1, lastEvent0, "index 1");
 
         // add an item
-        Sensor s3 = l.newSensor("IS3", "Sensor 3");
+        l.newSensor("IS3", "Sensor 3");
 
         // property listener should have been immediately invoked
-        Assert.assertEquals("propertyListenerCount", 3, propertyListenerCount);
-        Assert.assertEquals("last call", "length", propertyListenerLast);
+        assertEquals( 3, propertyListenerCount, "propertyListenerCount");
+        assertEquals( "length", propertyListenerLast, "last call");
 
         // listener should have been immediately invoked
-        Assert.assertEquals("events", 2, events);
-        Assert.assertEquals("last call 2", "Added", lastCall);
-        Assert.assertEquals("type 2", Manager.ManagerDataEvent.INTERVAL_ADDED, lastType);
-        Assert.assertEquals("start == end 2", lastEvent0, lastEvent1);
-        Assert.assertEquals("index 2", 2, lastEvent0);
-        Assert.assertEquals("content at index 2", s3, l.getNamedBeanList().get(lastEvent0));
+        assertEquals( 2, events, "events");
+        assertEquals( "Added", lastCall, "last call 2");
+        assertEquals( Manager.ManagerDataEvent.INTERVAL_ADDED, lastType,
+            "type 2");
+        assertEquals( lastEvent0, lastEvent1, "start == end 2");
+        assertEquals( 2, lastEvent0, "index 2");
 
         // can add a manager and still get notifications
         l.addManager(new InternalSensorManager(new InternalSystemConnectionMemo("Z", "Zulu")));
-        Sensor s4 = l.provideSensor("ZS2");
+        l.provideSensor("ZS2");
 
-        // property listener should have been immediately invoked
-        Assert.assertEquals("propertyListenerCount", 5, propertyListenerCount);
-        Assert.assertEquals("last call", "length", propertyListenerLast);
+        // property listener should have been immediately invoked, once
+        assertEquals( 4, propertyListenerCount, "propertyListenerCount");
+        assertEquals( "length", propertyListenerLast, "last call");
 
         // listener should have been immediately invoked
-        Assert.assertEquals("events", 3, events);
-        Assert.assertEquals("last call 2", "Added", lastCall);
-        Assert.assertEquals("type 2", Manager.ManagerDataEvent.INTERVAL_ADDED, lastType);
-        Assert.assertEquals("start == end 2", lastEvent0, lastEvent1);
-        Assert.assertEquals("index 3", 3, lastEvent0);
-        Assert.assertEquals("content at added index", s4, l.getNamedBeanList().get(lastEvent0));
-        
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
+        assertEquals( 3, events, "events");
+        assertEquals( "Added", lastCall, "last call 2");
+        assertEquals( Manager.ManagerDataEvent.INTERVAL_ADDED, lastType, "type 2");
+        assertEquals( lastEvent0, lastEvent1, "start == end 2");
+        assertEquals( 3, lastEvent0, "index 3");
+
+        JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
     }
 
     @Test
-    @SuppressWarnings("deprecation") // getNamedBeanList, addDataListener references
     public void testRemoveTrackingI() {
-        
+
         Sensor s1 = l.provideSensor("IS1");
         s1.setUserName("Sensor 1");
         Sensor s2 = l.provideSensor("IS2");
         l.provideSensor("IS3");
-        
+
         l.addDataListener(this);
-        List<Sensor> tlist = l.getNamedBeanList();
 
         l.deregister(s2);
-    
+
         // listener should have been immediately invoked
-        Assert.assertEquals("events", 1, events);
-        Assert.assertEquals("last call", "Removed", lastCall);
-        Assert.assertEquals("type", Manager.ManagerDataEvent.INTERVAL_REMOVED, lastType);
-        Assert.assertEquals("start == end 2", lastEvent0, lastEvent1);
-        Assert.assertEquals("index", 1, lastEvent0);
-        Assert.assertEquals("content at index", s2, tlist.get(lastEvent0));
-        
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
+        assertEquals( 1, events, "events");
+        assertEquals( "Removed", lastCall, "last call");
+        assertEquals( Manager.ManagerDataEvent.INTERVAL_REMOVED, lastType, "type");
+        assertEquals( lastEvent0, lastEvent1, "start == end 2");
+        assertEquals( 1, lastEvent0, "index");
+
+        JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
     }
 
     @Test
-    @SuppressWarnings("deprecation") // getNamedBeanList, addDataListener references
     public void testRemoveTrackingJ() {
-        
+
         l.provideSensor("IS10");
         l.provideSensor("IS11");
-        
+
         Sensor s1 = l.provideSensor("JS1");
         s1.setUserName("Sensor 1");
         Sensor s2 = l.provideSensor("JS2");
         l.provideSensor("JS3");
-        
+
         l.addDataListener(this);
-        List<Sensor> tlist = l.getNamedBeanList();
 
         l.deregister(s2);
-    
+
         // listener should have been immediately invoked
-        Assert.assertEquals("events", 1, events);
-        Assert.assertEquals("last call", "Removed", lastCall);
-        Assert.assertEquals("type", Manager.ManagerDataEvent.INTERVAL_REMOVED, lastType);
-        Assert.assertEquals("start == end 2", lastEvent0, lastEvent1);
-        Assert.assertEquals("index", 3, lastEvent0);
-        Assert.assertEquals("content at index", s2, tlist.get(lastEvent0));
-        
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
+        assertEquals( 1, events, "events");
+        assertEquals( "Removed", lastCall, "last call");
+        assertEquals( Manager.ManagerDataEvent.INTERVAL_REMOVED, lastType, "type");
+        assertEquals( lastEvent0, lastEvent1, "start == end 2");
+        assertEquals( 3, lastEvent0, "index");
+
+        JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
     }
 
     @Test
     public void testGetObjectCount() {
-        Assert.assertEquals(0, l.getObjectCount());
+        assertEquals(0, l.getObjectCount());
 
         l.provideSensor("IS10");
-        Assert.assertEquals(1, l.getObjectCount());
+        assertEquals(1, l.getObjectCount());
 
         l.provideSensor("JS1");
-        Assert.assertEquals(2, l.getObjectCount());
-        
+        assertEquals(2, l.getObjectCount());
+
         l.provideSensor("IS11");
-        Assert.assertEquals(3, l.getObjectCount());
+        assertEquals(3, l.getObjectCount());
 
         Sensor s2 = l.provideSensor("JS2");
         l.provideSensor("JS3");
-        Assert.assertEquals(5, l.getObjectCount());
-        
+        assertEquals(5, l.getObjectCount());
+
         l.deregister(s2);
-        Assert.assertEquals(4, l.getObjectCount());
+        assertEquals(4, l.getObjectCount());
     }
 
     @Test
-    @SuppressWarnings("deprecation") // setDataListenerMute, addDataListener references
     public void testRemoveTrackingJMute() {
-        
+
         l.setDataListenerMute(true);
-        
+
         l.provideSensor("IS10");
         l.provideSensor("IS11");
-        
+
         Sensor s1 = l.provideSensor("JS1");
         s1.setUserName("Sensor 1");
         Sensor s2 = l.provideSensor("JS2");
         l.provideSensor("JS3");
-        
+
         l.addDataListener(this);
 
         l.deregister(s2);
-    
+
         // listener should have not been invoked
-        Assert.assertEquals("events", 0, events);
+        assertEquals( 0, events, "events");
 
         // unmute and get notification
         l.setDataListenerMute(false);
-        Assert.assertEquals("events", 1, events);
-        Assert.assertEquals("last call", "Changed", lastCall);
-        Assert.assertEquals("type", Manager.ManagerDataEvent.CONTENTS_CHANGED, lastType);
-        Assert.assertEquals("index0", 0, lastEvent0);
-        Assert.assertEquals("index1", 3, lastEvent1); // originally five items, deleted 1, so 4, and last index is then 3
+        assertEquals( 1, events, "events");
+        assertEquals( "Changed", lastCall, "last call");
+        assertEquals( Manager.ManagerDataEvent.CONTENTS_CHANGED, lastType, "type");
+        assertEquals( 0, lastEvent0, "index0");
+        assertEquals( 3, lastEvent1, "index1"); // originally five items, deleted 1, so 4, and last index is then 3
     }
 
     @Test
-    @SuppressWarnings("deprecation") // getSystemNameList, getNamedBeanList references
     public void testOrderVsSorted() {
         Sensor s4 = l.provideSensor("IS4");
         Sensor s2 = l.provideSensor("IS2");
-        
-        List<String> sortedList = l.getSystemNameList();
-        List<Sensor> beanList = l.getNamedBeanList();
+
         SortedSet<Sensor> beanSet = l.getNamedBeanSet();
-        
-        Assert.assertEquals("sorted list length", 2, sortedList.size());
-        Assert.assertEquals("sorted list 1st", "IS2", sortedList.get(0));
-        Assert.assertEquals("sorted list 2nd", "IS4", sortedList.get(1));
 
-        Assert.assertEquals("bean list length", 2, beanList.size());
-        Assert.assertEquals("bean list 1st", s2, beanList.get(0));
-        Assert.assertEquals("bean list 2nd", s4, beanList.get(1));
-
-        Assert.assertEquals("bean set length", 2, beanSet.size());
+        assertEquals( 2, beanSet.size(), "bean set length");
         Iterator<Sensor> iter = beanSet.iterator();
-        Assert.assertEquals("bean set 1st", s2, iter.next());
-        Assert.assertEquals("bean set 2nd", s4, iter.next());
-        
+        assertEquals( s2, iter.next(), "bean set 1st");
+        assertEquals( s4, iter.next(), "bean set 2nd");
+
         // add and test (non) liveness
         Sensor s3 = l.provideSensor("IS3");
         Sensor s1 = l.provideSensor("IS1");
 
-        Assert.assertEquals("sorted list length", 2, sortedList.size());
-        Assert.assertEquals("sorted list 1st", "IS2", sortedList.get(0));
-        Assert.assertEquals("sorted list 2nd", "IS4", sortedList.get(1));
-
-        Assert.assertEquals("bean list length", 2, beanList.size());
-        Assert.assertEquals("bean list 1st", s2, beanList.get(0));
-        Assert.assertEquals("bean list 2nd", s4, beanList.get(1));
-
-        Assert.assertEquals("bean set length", 4, beanSet.size());
+        assertEquals( 4, beanSet.size(), "bean set length");
         iter = beanSet.iterator();
-        Assert.assertEquals("bean set 1st", s1, iter.next());
-        Assert.assertEquals("bean set 2nd", s2, iter.next());
-        Assert.assertEquals("bean set 3rd", s3, iter.next());
-        Assert.assertEquals("bean set 4th", s4, iter.next());
+        assertEquals( s1, iter.next(), "bean set 1st");
+        assertEquals( s2, iter.next(), "bean set 2nd");
+        assertEquals( s3, iter.next(), "bean set 3rd");
+        assertEquals( s4, iter.next(), "bean set 4th");
 
         // update and test update
-        sortedList = l.getSystemNameList();
-        beanList = l.getNamedBeanList();
         beanSet = l.getNamedBeanSet();
-        
-        Assert.assertEquals("sorted list length", 4, sortedList.size());
-        Assert.assertEquals("sorted list 1st", "IS1", sortedList.get(0));
-        Assert.assertEquals("sorted list 2nd", "IS2", sortedList.get(1));
-        Assert.assertEquals("sorted list 3rd", "IS3", sortedList.get(2));
-        Assert.assertEquals("sorted list 4th", "IS4", sortedList.get(3));
 
-        Assert.assertEquals("bean list length", 4, beanList.size());
-        Assert.assertEquals("bean list 1st", s1, beanList.get(0));
-        Assert.assertEquals("bean list 2nd", s2, beanList.get(1));
-        Assert.assertEquals("bean list 3rd", s3, beanList.get(2));
-        Assert.assertEquals("bean list 4th", s4, beanList.get(3));
-
-        Assert.assertEquals("bean set length", 4, beanSet.size());
+        assertEquals( 4, beanSet.size(), "bean set length");
         iter = beanSet.iterator();
-        Assert.assertEquals("bean set 1st", s1, iter.next());
-        Assert.assertEquals("bean set 2nd", s2, iter.next());
-        Assert.assertEquals("bean set 3rd", s3, iter.next());
-        Assert.assertEquals("bean set 4th", s4, iter.next());
-        
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getSystemNameList");
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
+        assertEquals( s1, iter.next(), "bean set 1st");
+        assertEquals( s2, iter.next(), "bean set 2nd");
+        assertEquals( s3, iter.next(), "bean set 3rd");
+        assertEquals( s4, iter.next(), "bean set 4th");
 
     }
 
     @Test
-    @SuppressWarnings("deprecation") // getSystemNameList, getNamedBeanList references
     public void testUnmodifiable() {
         Sensor s1 = l.provideSensor("IS1");
         l.provideSensor("IS2");
-        
-        List<String> nameList = l.getSystemNameList();
-        List<Sensor> beanList = l.getNamedBeanList();
+
         SortedSet<Sensor> beanSet = l.getNamedBeanSet();
 
-        try {
-            nameList.add("Foo");
-            Assert.fail("nameList should have thrown");
-        } catch (UnsupportedOperationException e) { /* this is OK */}
-
-        try {
-            beanList.add(s1);
-            Assert.fail("beanList should have thrown");
-        } catch (UnsupportedOperationException e) { /* this is OK */}
-
-        try {
-            beanSet.add(s1);
-            Assert.fail("beanSet should have thrown");
-        } catch (UnsupportedOperationException e) { /* this is OK */}
-        
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getSystemNameList");
-        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("getNamedBeanList");
+        UnsupportedOperationException ex = assertThrows( UnsupportedOperationException.class,
+            () -> beanSet.add(s1), "beanSet should have thrown");
+        assertNotNull(ex);
 
     }
 
     // check how proxy is integrated with defaults
     @Test
     public void testInstanceManagerIntegration() {
-        jmri.util.JUnitUtil.resetInstanceManager();
-        Assert.assertNotNull(InstanceManager.getDefault(SensorManager.class));
+        JUnitUtil.resetInstanceManager();
+        assertNotNull(InstanceManager.getDefault(SensorManager.class));
 
-        jmri.util.JUnitUtil.initInternalSensorManager();
+        JUnitUtil.initInternalSensorManager();
 
-        Assert.assertTrue(InstanceManager.getDefault(SensorManager.class) instanceof ProxySensorManager);
+        assertInstanceOf( ProxySensorManager.class,
+            InstanceManager.getDefault(SensorManager.class));
 
-        Assert.assertNotNull(InstanceManager.getDefault(SensorManager.class));
-        Assert.assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("IS1"));
+        assertNotNull(InstanceManager.getDefault(SensorManager.class));
+        assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("IS1"));
 
         InternalSensorManager m = new InternalSensorManager(new InternalSystemConnectionMemo("J", "Juliet"));
         InstanceManager.setSensorManager(m);
 
-        Assert.assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("JS1"));
-        Assert.assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("IS2"));
+        assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("JS1"));
+        assertNotNull(InstanceManager.getDefault(SensorManager.class).provideSensor("IS2"));
     }
 
     // Property listen & audit methods
-    static protected int propertyListenerCount = 0;
-    static protected String propertyListenerLast = null;
+    private int propertyListenerCount = 0;
+    private String propertyListenerLast = null;
 
     @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
@@ -472,12 +419,12 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
     }
 
     // Data listen & audit methods
-    int events;
-    int lastEvent0;
-    int lastEvent1;
-    int lastType;
-    String lastCall;
-    
+    private int events;
+    private int lastEvent0;
+    private int lastEvent1;
+    private int lastType;
+    private String lastCall;
+
     @Override
     public void intervalAdded(Manager.ManagerDataEvent<Sensor> e) {
         events++;
@@ -513,8 +460,8 @@ public class ProxySensorManagerTest implements Manager.ManagerDataListener<Senso
         l.addManager(new InternalSensorManager(new InternalSystemConnectionMemo("I", "India"))); // not in alpha order to make it exciting
         l.addManager(new InternalSensorManager(new InternalSystemConnectionMemo("K", "Kilo")));
 
-        jmri.InstanceManager.setSensorManager(l);
-        
+        InstanceManager.setSensorManager(l);
+
         propertyListenerCount = 0;
         propertyListenerLast = null;
 

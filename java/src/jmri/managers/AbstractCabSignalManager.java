@@ -5,14 +5,14 @@ import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
+
 import jmri.Block;
 import jmri.BlockManager;
 import jmri.CabSignal;
 import jmri.CabSignalListListener;
 import jmri.CabSignalManager;
+import jmri.InstanceManager;
 import jmri.LocoAddress;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract implementation of the {@link jmri.CabSignalManager} interface.
@@ -30,19 +30,26 @@ import org.slf4j.LoggerFactory;
  *
  * @author Paul Bender Copyright (C) 2019
  */
-abstract public class AbstractCabSignalManager implements CabSignalManager {
+public abstract class AbstractCabSignalManager implements CabSignalManager, jmri.Disposable {
 
-    protected HashMap<LocoAddress, CabSignal> signalList;
-    protected ArrayList<CabSignalListListener> listListeners;
+    private final HashMap<LocoAddress, CabSignal> signalList;
+    private final ArrayList<CabSignalListListener> listListeners;
 
-    // keep a list of listeners for block objects.
-    private ArrayList<PropertyChangeListener> mBlockListeners; 
-    private boolean blockInit = false;
+    // keep a list of Blocks with listeners.
+    private final ArrayList<Block> _blocksWithListeners;
+
+    // the BlockManager and listeners this manager registers with; kept so
+    // that the listeners removed are the ones that were added
+    private final BlockManager blockManager;
+    private final PropertyChangeListener blockConfigListener = this::handleBlockConfigChanged;
+    private final PropertyChangeListener blockListener = this::handleBlockChange;
 
     public AbstractCabSignalManager(){
-         signalList = new HashMap<LocoAddress, CabSignal>();
-         listListeners = new ArrayList<CabSignalListListener>();
-         mBlockListeners = new ArrayList<PropertyChangeListener>();
+        signalList = new HashMap<>();
+        listListeners = new ArrayList<>();
+        _blocksWithListeners = new ArrayList<>();
+        blockManager = InstanceManager.getDefault(BlockManager.class);
+        blockManager.addPropertyChangeListener(BlockManager.PROPERTY_BEANS, blockConfigListener);
     }
 
     /**
@@ -54,23 +61,23 @@ abstract public class AbstractCabSignalManager implements CabSignalManager {
      */
     @Override
     public CabSignal getCabSignal(LocoAddress address){
-        if(!blockInit) {
+        if(_blocksWithListeners.isEmpty()) {
            initBlocks();
         }
         if(!signalList.containsKey(address)){
            signalList.put(address, createCabSignal(address));
            notifyCabSignalListChanged();
         }
-        return signalList.get(address); 
+        return signalList.get(address);
     }
 
     /**
      * Create a new cab signal with the given address.
      *
-     * @param address the address the cba signal is for
+     * @param address the address the cab signal is for
      * @return a new cab signal
      */
-    abstract protected CabSignal createCabSignal(LocoAddress address);
+    protected abstract CabSignal createCabSignal(LocoAddress address);
 
     /**
      * Remove an old CabSignal.
@@ -91,7 +98,7 @@ abstract public class AbstractCabSignalManager implements CabSignalManager {
      * @return list of cab signal addresses
      */
     @Override
-    public Set getCabSignalList(){
+    public Set<LocoAddress> getCabSignalList(){
        return signalList.keySet();
     }
 
@@ -142,35 +149,54 @@ abstract public class AbstractCabSignalManager implements CabSignalManager {
 
     // Adds changelistener to blocks
     private void initBlocks(){
-        blockInit = true;
-        BlockManager bmgr = jmri.InstanceManager.getDefault(jmri.BlockManager.class);
-        Set<Block> blockSet = bmgr.getNamedBeanSet();
+        Set<Block> blockSet = blockManager.getNamedBeanSet();
         for (Block b : blockSet) {
-            PropertyChangeListener listener = (PropertyChangeEvent e) -> {
-                handleBlockChange(e);
-            };
-            b.addPropertyChangeListener(listener);
-            mBlockListeners.add(listener);
+            b.addPropertyChangeListener(blockListener);
+            _blocksWithListeners.add(b);
         }
+    }
+
+    private void removeListenerFromBlocks(){
+        for (Block b : _blocksWithListeners) {
+            b.removePropertyChangeListener(blockListener);
+        }
+        _blocksWithListeners.clear();
     }
 
     /**
      * Handle tasks when block contents change.
      * @param e propChgEvent
      */
-  private void handleBlockChange(PropertyChangeEvent e) {
-        log.debug("property {} new value {} old value {}",e.getPropertyName(), e.getNewValue(), e.getOldValue());
-        if (e.getPropertyName().equals("value")){
-           if(e.getOldValue() == null && e.getNewValue() != null){
-              for(CabSignal c : signalList.values()){
-                 if(c.getBlock() == null){
+    private void handleBlockChange(PropertyChangeEvent e) {
+        log.debug("property {} new value {} old value {}",
+            e.getPropertyName(), e.getNewValue(), e.getOldValue());
+        if ( Block.PROPERTY_VALUE.equals(e.getPropertyName())
+                && e.getOldValue() == null && e.getNewValue() != null ) {
+            for ( CabSignal c : signalList.values() ) {
+                if ( c.getBlock() == null ){
                     c.setBlock(); // cause this cab signal to look for a block.
-                 }
-              } 
-           }
+                }
+            }
         }
-   }
+    }
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractCabSignalManager.class);
+    private void handleBlockConfigChanged(PropertyChangeEvent e) {
+        log.debug("blocks changed in blockmanager {}", e);
+        removeListenerFromBlocks();
+        if ( !signalList.isEmpty() ) { // no need to add if no listeners.
+            initBlocks();
+        }
+    }
+
+    @Override
+    public void dispose(){
+        blockManager.removePropertyChangeListener(BlockManager.PROPERTY_BEANS, blockConfigListener);
+        for(CabSignal c : signalList.values()){
+            c.dispose();
+        }
+        removeListenerFromBlocks();
+    } 
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractCabSignalManager.class);
 
 }

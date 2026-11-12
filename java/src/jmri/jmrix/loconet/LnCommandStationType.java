@@ -1,6 +1,11 @@
 package jmri.jmrix.loconet;
 
 import jmri.ThrottleManager;
+import jmri.jmrix.loconet.SlotMapEntry.SlotType;
+
+import java.util.Arrays;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,64 +37,214 @@ import org.slf4j.LoggerFactory;
 @javax.annotation.concurrent.Immutable
 public enum LnCommandStationType {
 
-    //  enum value(name, canRead, progEndOp, ThrottleManager, SlotManager, supportsIdle, supportsMultimeter
+    //  enum value(name, canRead, progEndOp, ThrottleManager, SlotManager, supportsIdle, supportsMultimeter, Clock time type
+    //  supports slot250(reports number of slots)
     COMMAND_STATION_DCS100("DCS100 (Chief)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.SUPPORTS_OPC_IDLE,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),   // potential stat slots
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS240("DCS240 (Advanced Command Station)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.SUPPORTS_OPC_IDLE,
             MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
-            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION),
+            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,128,SlotType.SYSTEM),
+                    new SlotMapEntry(129,247,SlotType.LOCO),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.LOCO),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.LOCO)),
+            SupportsSlot250.SLOT250_AVAILABLE,
+//            SupportsSlot126.SLOT126_AVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
+    COMMAND_STATION_DCS240PLUS("DCS240+ (Advanced Command Station)",  // NOI18N
+            ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
+            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            "LnThrottleManager", "SlotManager",  // NOI18N
+            IdleSupport.SUPPORTS_OPC_IDLE,
+            MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
+            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,128,SlotType.SYSTEM),
+                    new SlotMapEntry(129,247,SlotType.LOCO),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.LOCO),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.LOCO)),
+            SupportsSlot250.SLOT250_AVAILABLE,
+//            SupportsSlot126.SLOT126_AVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
+
+    COMMAND_STATION_DCS210PLUS("DCS210+ (Advanced Command Station)",  // NOI18N
+            ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
+            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            "LnThrottleManager", "SlotManager",  // NOI18N
+            IdleSupport.SUPPORTS_OPC_IDLE,
+            MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
+            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,100,SlotType.LOCO),
+                    new SlotMapEntry(101,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_AVAILABLE,
+//            SupportsSlot126.SLOT126_AVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS210("DCS210 (Evolution Command Station)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.SUPPORTS_OPC_IDLE,
             MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
-            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION),
+            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,100,SlotType.LOCO),
+                    new SlotMapEntry(101,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_AVAILABLE,
+//            SupportsSlot126.SLOT126_AVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS200("DCS200",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.SUPPORTS_OPC_IDLE,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS050("DCS50 (Zephyr)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,12,SlotType.LOCO),
+                    new SlotMapEntry(13,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS051("DCS51 (Zephyr Xtra)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,19,SlotType.LOCO),
+                    new SlotMapEntry(20,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DCS052("DCS52 (Zephyr Express)", // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
-            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION),
+            LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,20,SlotType.LOCO),
+                    new SlotMapEntry(21,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_AVAILABLE,
+//            SupportsSlot126.SLOT126_AVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     COMMAND_STATION_DB150("DB150 (Empire Builder)", // NOI18N
             ReadsFromServiceModeTrack.NO_SVC_MODE_READS,
             ProgDepowersTrack.TRACK_TURNEDOFF_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.SUPPORTS_OPC_IDLE,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
-
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//          SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_AVAILABLE
+            ),
     // the following command stations are assumed to not support "OPC_IDLE"
     COMMAND_STATION_LBPS("LocoBuffer (PS)",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
@@ -97,29 +252,80 @@ public enum LnCommandStationType {
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_MM("Mix-Master",  // NOI18N
             ReadsFromServiceModeTrack.NO_SVC_MODE_READS,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_IBX_TYPE_1("Intellibox-I",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "Ib1ThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_IBX_TYPE_2("Intellibox-II",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
-            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            ProgDepowersTrack.TRACK_TURNEDOFF_BY_PROGRAMMING,
             "Ib2ThrottleManager", "UhlenbrockSlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
-
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.LOCO),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,247,SlotType.UNKNOWN),
+                    new SlotMapEntry(248,256,SlotType.SYSTEM),
+                    new SlotMapEntry(257,375,SlotType.UNKNOWN),
+                    new SlotMapEntry(376,384,SlotType.SYSTEM),
+                    new SlotMapEntry(385,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     // the following command stations are known to not support "OPC_IDLE"
     COMMAND_STATION_PR3_ALONE("PR3 standalone programmer",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
@@ -127,50 +333,153 @@ public enum LnCommandStationType {
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_PR2_ALONE("PR2 standalone programmer",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_STANDALONE("Stand-alone LocoNet",  // NOI18N
             ReadsFromServiceModeTrack.NO_SVC_MODE_READS,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
+    COMMAND_STATION_STANDALONE_EXT_TERM("Stand-alone LocoNet (using external LocoNet Data Termination!)",  // NOI18N
+            ReadsFromServiceModeTrack.NO_SVC_MODE_READS,
+            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            "LnThrottleManager", "SlotManager",  // NOI18N
+            IdleSupport.NO_OPC_IDLE_SUPPORT,
+            MultiMeterSupport.NO_MULTIMETER_SUPPORT,
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_PR4_ALONE("PR4 standalone programmer",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.NO_MULTIMETER_SUPPORT,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK13BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//           SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_USB_DCS240_ALONE("DCS240 USB interface as standalone programmer", // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",  // NOI18N
             IdleSupport.NO_OPC_IDLE_SUPPORT,
             MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT),
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
+    COMMAND_STATION_USB_DCS240PLUS_ALONE("DCS240+ USB interface as standalone programmer", // NOI18N
+            ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
+            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            "LnThrottleManager", "SlotManager",  // NOI18N
+            IdleSupport.NO_OPC_IDLE_SUPPORT,
+            MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
+    COMMAND_STATION_USB_DCS210Plus_ALONE("DCS210+ USB interface as standalone programmer", // NOI18N
+            ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
+            ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
+            "LnThrottleManager", "SlotManager",  // NOI18N
+            IdleSupport.NO_OPC_IDLE_SUPPORT,
+            MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            ),
     COMMAND_STATION_USB_DCS52_ALONE("DCS52 USB interface as standalone programmer",  // NOI18N
             ReadsFromServiceModeTrack.CAN_READ_ON_SVC_TRACK,
             ProgDepowersTrack.TRACK_UNCHANGED_BY_PROGRAMMING,
             "LnThrottleManager", "SlotManager",
             IdleSupport.NO_OPC_IDLE_SUPPORT, // NOI18N
             MultiMeterSupport.SUPPORTS_MULTIMETER_FUNCTION,
-            LocoResetSupport.NO_LOCO_RESET_SUPPORT);
-
+            LocoResetSupport.NO_LOCO_RESET_SUPPORT,
+            CommandStationClockFracType.CLOCK15BIT,
+            Arrays.asList(new SlotMapEntry(0,0,SlotType.SYSTEM),
+                    new SlotMapEntry(1,120,SlotType.UNKNOWN),
+                    new SlotMapEntry(121,127,SlotType.SYSTEM),
+                    new SlotMapEntry(128,432,SlotType.UNKNOWN)),
+            SupportsSlot250.SLOT250_UNAVAILABLE,
+//            SupportsSlot126.SLOT126_UNAVAILABLE,
+            SupportsSlot127.SLOT127_UNAVAILABLE
+            );
     // Note that the convention is that the first word (space-separated token) of the name is the
     // name of a configuration file for loconet.cmdstnconfig
     LnCommandStationType(String name, ReadsFromServiceModeTrack canRead,
             ProgDepowersTrack progEndOp,
             String throttleClassName, String slotManagerClassName,
             IdleSupport supportsIdle, MultiMeterSupport supportMultiMeter,
-            LocoResetSupport supportsLocoReset) {
+            LocoResetSupport supportsLocoReset, CommandStationClockFracType csClockFracType,
+            List<SlotMapEntry> slotMap, SupportsSlot250 supportsSlot250, SupportsSlot127 supportsSlot127) {
+//            List<SlotMapEntry> slotMap, SupportsSlot250 supportsSlot250, SupportsSlot126 supportsSlot126, SupportsSlot127 supportsSlot127) {
         this.name = name;
         this.canRead = canRead;
         this.progEndOp = progEndOp;
@@ -179,6 +488,11 @@ public enum LnCommandStationType {
         this.supportsIdle = supportsIdle;
         this.supportsMultiMeter = supportMultiMeter;
         this.supportsLocoReset = supportsLocoReset;
+        this.csClockFracType = csClockFracType;
+        this.slotMap = slotMap;
+        this.supportsSlot250 = supportsSlot250;
+//        this.supportsSlot126 = supportsSlot126;
+        this.supportsSlot127 = supportsSlot127;
     }
 
     final String name;
@@ -189,6 +503,11 @@ public enum LnCommandStationType {
     final IdleSupport supportsIdle;
     final MultiMeterSupport supportsMultiMeter;
     final LocoResetSupport supportsLocoReset;
+    final CommandStationClockFracType csClockFracType;
+    final List<SlotMapEntry> slotMap;
+    final SupportsSlot250 supportsSlot250;
+//  final SupportsSlot126 supportsSlot126;
+    final SupportsSlot127 supportsSlot127;
 
     public String getName() {
         return name;
@@ -215,7 +534,30 @@ public enum LnCommandStationType {
         return progEndOp == ProgDepowersTrack.TRACK_TURNEDOFF_BY_PROGRAMMING;
     }
 
-    static public LnCommandStationType getByName(String name) {
+    /**
+     * Does CS report slot availability in slot 250 ?
+     * @return true if it does
+     */
+    public boolean getSupportsSlot250() {
+        return supportsSlot250 == SupportsSlot250.SLOT250_AVAILABLE;
+    }
+
+//    /**
+//     * Does CS report slot availability in slot 126 (Extended CS OpSw)
+//     * @return true if it does
+//     */
+//    public boolean getSupportsSlot126() {
+//        return supportsSlot126 == SupportsSlot126.SLOT126_AVAILABLE;
+//    }
+    /**
+     * Does CS report slot availability in slot 127 (CS OpSw)
+     * @return true if it does
+     */
+    public boolean getSupportsSlot127() {
+        return supportsSlot127 == SupportsSlot127.SLOT127_AVAILABLE;
+    }
+
+    public static LnCommandStationType getByName(String name) {
         for (LnCommandStationType p : LnCommandStationType.values()) {
             if (p.name.equals(name)) {
                 return p;
@@ -320,6 +662,34 @@ public enum LnCommandStationType {
         return supportsLocoReset == LocoResetSupport.SUPPORTS_LOCO_RESET_FUNCTION;
     }
 
+    /**
+     * Returns CS Slot Map.
+     *
+     * @return true if command station supports OPC_RE_LOCO_RESET message
+     */
+    public List<SlotMapEntry> getSlotMap() {
+
+        return slotMap;
+    }
+
+    /**
+     * Returns CS Clock fraction Type
+     *
+     * @return the FracType
+     */
+    public CommandStationClockFracType getCsClockFracType() {
+
+        return csClockFracType;
+    }
+    
+    public SupportsSlot250 commandStationSupportSlot250() {
+        return supportsSlot250;
+    }
+
+    public SupportsSlot127 commandStationSupportSlot127() {
+        return supportsSlot127;
+    }
+
     protected enum ReadsFromServiceModeTrack {
         NO_SVC_MODE_READS, CAN_READ_ON_SVC_TRACK
     }
@@ -340,6 +710,26 @@ public enum LnCommandStationType {
         NO_LOCO_RESET_SUPPORT, SUPPORTS_LOCO_RESET_FUNCTION
     }
 
+    public enum CommandStationClockFracType {
+        CLOCKNONE,
+        CLOCK13BIT,
+        CLOCK15BIT
+    }
+    
+    public enum SupportsSlot250 {
+        SLOT250_AVAILABLE,
+        SLOT250_UNAVAILABLE
+    }
 
-    private final static Logger log = LoggerFactory.getLogger(LnCommandStationType.class);
+//    public enum SupportsSlot126 {
+//        SLOT126_AVAILABLE,
+//        SLOT126_UNAVAILABLE
+//    }
+//
+    public enum SupportsSlot127 {
+        SLOT127_AVAILABLE,
+        SLOT127_UNAVAILABLE
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(LnCommandStationType.class);
 }

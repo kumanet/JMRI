@@ -1,13 +1,7 @@
 package jmri.web.servlet.operations;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-
-import org.apache.commons.text.StringEscapeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.*;
 
 import jmri.InstanceManager;
 import jmri.jmrit.operations.locations.Track;
@@ -18,8 +12,12 @@ import jmri.jmrit.operations.rollingstock.engines.EngineManager;
 import jmri.jmrit.operations.routes.RouteLocation;
 import jmri.jmrit.operations.setup.Setup;
 import jmri.jmrit.operations.trains.Train;
-import jmri.jmrit.operations.trains.TrainCommon;
+import jmri.jmrit.operations.trains.trainbuilder.TrainCommon;
 import jmri.util.FileUtil;
+
+import org.apache.commons.text.StringEscapeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -27,7 +25,7 @@ import jmri.util.FileUtil;
  */
 public class HtmlConductor extends HtmlTrainCommon {
 
-    private final static Logger log = LoggerFactory.getLogger(HtmlConductor.class);
+    private static final Logger log = LoggerFactory.getLogger(HtmlConductor.class);
 
     public HtmlConductor(Locale locale, Train train) throws IOException {
         super(locale, train);
@@ -37,11 +35,16 @@ public class HtmlConductor extends HtmlTrainCommon {
     public String getLocation() throws IOException {
         RouteLocation location = train.getCurrentRouteLocation();
         if (location == null) {
-            return String.format(locale, FileUtil.readURL(FileUtil.findURL(Bundle.getMessage(locale,
-                    "ConductorSnippet.html"))), train.getIconName(), StringEscapeUtils.escapeHtml4(train
-                            .getDescription()), StringEscapeUtils.escapeHtml4(train.getComment()), Setup
-                    .isPrintRouteCommentsEnabled() ? train.getRoute().getComment() : "", strings
-                    .getProperty("Terminated"), "", // terminated train has nothing to do // NOI18N
+            return String.format(locale, 
+                    FileUtil.readURL(FileUtil.findURL(Bundle.getMessage(locale,"ConductorSnippet.html"))), 
+                    train.getIconName(), 
+                    StringEscapeUtils.escapeHtml4(train.getDescription()), 
+                    convertToHTMLColor(
+                            StringEscapeUtils
+                                    .escapeHtml4(TrainCommon.getTextSizeString(train.getCommentTerminationCurrentWithColor()))),
+                    Setup.isPrintRouteCommentsEnabled() ? train.getRoute().getComment() : "",
+                    strings.getProperty("Terminated"), 
+                    "", // terminated train has nothing to do // NOI18N
                     "", // engines in separate section
                     "", // pickup=true, local=false
                     "", // pickup=false, local=false
@@ -60,11 +63,14 @@ public class HtmlConductor extends HtmlTrainCommon {
         String setouts = performWork(false, false); // pickup=false, local=false
         String localMoves = performWork(false, true); // pickup=false, local=true
 
-        return String.format(locale, FileUtil.readURL(FileUtil.findURL(Bundle.getMessage(locale,
-                "ConductorSnippet.html"))), train.getIconName(), StringEscapeUtils.escapeHtml4(train.getDescription()),
-                StringEscapeUtils.escapeHtml4(train.getComment()), Setup.isPrintRouteCommentsEnabled() ? train
-                        .getRoute().getComment() : "", getCurrentAndNextLocation(),
-                getLocationComments(),
+        return String.format(locale, 
+                FileUtil.readURL(FileUtil.findURL(Bundle.getMessage(locale,"ConductorSnippet.html"))), 
+                train.getIconName(), 
+                StringEscapeUtils.escapeHtml4(train.getDescription()),
+                convertToHTMLColor(StringEscapeUtils.escapeHtml4(train.getCommentCurrentWithColor())),
+                Setup.isPrintRouteCommentsEnabled() ? train.getRoute().getComment() : "", 
+                getCurrentAndNextLocation(),
+                convertToHTMLColor(getLocationComments()),
                 pickupEngines(engineList, location), // engines in separate section
                 pickups, setouts, localMoves,
                 dropEngines(engineList, location), // engines in separate section
@@ -95,22 +101,22 @@ public class HtmlConductor extends HtmlTrainCommon {
     }
 
     // needed for location comments, not yet in formatter
-    private String getEngineChanges(RouteLocation location) {
+    private String getEngineChanges(RouteLocation rl) {
         // engine change or helper service?
         if (train.getSecondLegOptions() != Train.NO_CABOOSE_OR_FRED) {
-            if (location == train.getSecondLegStartRouteLocation()) {
-                return engineChange(location, train.getSecondLegOptions());
+            if (rl == train.getSecondLegStartRouteLocation()) {
+                return engineChange(rl, train.getSecondLegOptions());
             }
-            if (location == train.getSecondLegEndRouteLocation() && train.getSecondLegOptions() == Train.HELPER_ENGINES) {
-                return String.format(strings.getProperty("RemoveHelpersAt"), splitString(location.getName())); // NOI18N
+            if (rl == train.getSecondLegEndRouteLocation() && train.getSecondLegOptions() == Train.HELPER_ENGINES) {
+                return String.format(strings.getProperty("RemoveHelpersAt"), rl.getSplitName()); // NOI18N
             }
         }
         if (train.getThirdLegOptions() != Train.NO_CABOOSE_OR_FRED) {
-            if (location == train.getThirdLegStartRouteLocation()) {
-                return engineChange(location, train.getSecondLegOptions());
+            if (rl == train.getThirdLegStartRouteLocation()) {
+                return engineChange(rl, train.getSecondLegOptions());
             }
-            if (location == train.getThirdLegEndRouteLocation() && train.getThirdLegOptions() == Train.HELPER_ENGINES) {
-                return String.format(strings.getProperty("RemoveHelpersAt"), splitString(location.getName())); // NOI18N
+            if (rl == train.getThirdLegEndRouteLocation() && train.getThirdLegOptions() == Train.HELPER_ENGINES) {
+                return String.format(strings.getProperty("RemoveHelpersAt"), rl.getSplitName()); // NOI18N
             }
         }
         return "";
@@ -123,19 +129,19 @@ public class HtmlConductor extends HtmlTrainCommon {
         boolean work = isThereWorkAtLocation(train, routeLocation.getLocation());
 
         // print info only if new location
-        String routeLocationName = StringEscapeUtils.escapeHtml4(splitString(routeLocation.getName()));
+        String routeLocationName = StringEscapeUtils.escapeHtml4(routeLocation.getSplitName());
         if (work) {
             if (!train.isShowArrivalAndDepartureTimesEnabled()) {
                 builder.append(String.format(locale, strings.getProperty("ScheduledWorkAt"), routeLocationName)); // NOI18N
             } else if (routeLocation == train.getTrainDepartsRouteLocation()) {
                 builder.append(String.format(locale, strings.getProperty("WorkDepartureTime"), routeLocationName, train  // NOI18N
                         .getFormatedDepartureTime())); // NOI18N
-            } else if (!routeLocation.getDepartureTime().equals("")) {
+            } else if (!routeLocation.getDepartureTimeHourMinutes().equals(RouteLocation.NONE)) {
                 builder.append(String.format(locale, strings.getProperty("WorkDepartureTime"), routeLocationName,  // NOI18N
                         routeLocation.getFormatedDepartureTime())); // NOI18N
             } else if (Setup.isUseDepartureTimeEnabled()
                     && routeLocation != train.getTrainTerminatesRouteLocation()
-                    && !train.getExpectedDepartureTime(routeLocation).equals(Train.ALREADY_SERVICED)) {
+                    && !train.getExpectedArrivalTime(routeLocation).equals(Train.ALREADY_SERVICED)) {
                 builder.append(String.format(locale, strings.getProperty("WorkDepartureTime"), routeLocationName, train  // NOI18N
                         .getExpectedDepartureTime(routeLocation)));
             } else if (!train.getExpectedArrivalTime(routeLocation).equals(Train.ALREADY_SERVICED)) {
@@ -145,9 +151,9 @@ public class HtmlConductor extends HtmlTrainCommon {
                 builder.append(String.format(locale, strings.getProperty("ScheduledWorkAt"), routeLocationName)); // NOI18N
             }
             // add route comment
-            if (!routeLocation.getComment().trim().equals("")) {
+            if (!routeLocation.getComment().isBlank()) {
                 builder.append(String.format(locale, strings.getProperty("RouteLocationComment"), StringEscapeUtils  // NOI18N
-                        .escapeHtml4(routeLocation.getComment())));
+                        .escapeHtml4(routeLocation.getCommentWithColor())));
             }
 
             builder.append(getTrackComments(routeLocation, carList));
@@ -155,7 +161,7 @@ public class HtmlConductor extends HtmlTrainCommon {
             // add location comment
             if (Setup.isPrintLocationCommentsEnabled() && !routeLocation.getLocation().getComment().isEmpty()) {
                 builder.append(String.format(locale, strings.getProperty("LocationComment"), StringEscapeUtils  // NOI18N
-                        .escapeHtml4(routeLocation.getLocation().getComment())));
+                        .escapeHtml4(routeLocation.getLocation().getCommentWithColor())));
             }
         }
 
@@ -181,14 +187,14 @@ public class HtmlConductor extends HtmlTrainCommon {
                 }
             } else {
                 log.debug("No work ({})", routeLocation.getComment());               
-                if (routeLocation.getComment().trim().isEmpty()) {
+                if (routeLocation.getComment().isBlank()) {
                     // no route comment, no work at this location
                     if (train.isShowArrivalAndDepartureTimesEnabled()) {
                         if (routeLocation == train.getTrainDepartsRouteLocation()) {
                             builder.append(String.format(locale, strings
                                     .getProperty("NoScheduledWorkAtWithDepartureTime"), routeLocationName, train  // NOI18N
                                     .getFormatedDepartureTime()));
-                        } else if (!routeLocation.getDepartureTime().isEmpty()) {
+                        } else if (!routeLocation.getDepartureTimeHourMinutes().isEmpty()) {
                             builder.append(String.format(locale, strings
                                     .getProperty("NoScheduledWorkAtWithDepartureTime"), routeLocationName,  // NOI18N
                                     routeLocation.getFormatedDepartureTime()));
@@ -203,26 +209,24 @@ public class HtmlConductor extends HtmlTrainCommon {
                 } else {
                     // if a route comment, then only use location name and route comment, useful for passenger
                     // trains
-                    if (!routeLocation.getComment().equals(RouteLocation.NONE)) {
-                        if (routeLocation.getComment().trim().length() > 0) {
-                            builder.append(String.format(locale, strings.getProperty("CommentAt"), // NOI18N
-                                    routeLocationName, StringEscapeUtils
-                                    .escapeHtml4(routeLocation.getComment())));
-                        }
+                    if (!routeLocation.getComment().isBlank()) {
+                        builder.append(String.format(locale, strings.getProperty("CommentAt"), // NOI18N
+                                routeLocationName, StringEscapeUtils
+                                        .escapeHtml4(routeLocation.getCommentWithColor())));
                     }
                     if (train.isShowArrivalAndDepartureTimesEnabled()) {
                         if (routeLocation == train.getTrainDepartsRouteLocation()) {
                             builder.append(String.format(locale, strings
                                     .getProperty("CommentAtWithDepartureTime"), routeLocationName, train // NOI18N
                                     .getFormatedDepartureTime(), StringEscapeUtils
-                                    .escapeHtml4(routeLocation.getComment())));
-                        } else if (!routeLocation.getDepartureTime().equals(RouteLocation.NONE)) {
+                                            .escapeHtml4(routeLocation.getCommentWithColor())));
+                        } else if (!routeLocation.getDepartureTimeHourMinutes().equals(RouteLocation.NONE)) {
                             builder.append(String.format(locale, strings
                                     .getProperty("CommentAtWithDepartureTime"), routeLocationName, // NOI18N
                                     routeLocation.getFormatedDepartureTime(), StringEscapeUtils
-                                    .escapeHtml4(routeLocation.getComment())));
+                                            .escapeHtml4(routeLocation.getCommentWithColor())));
                         } else if (Setup.isUseDepartureTimeEnabled() &&
-                                !routeLocation.getComment().equals(RouteLocation.NONE)) {
+                                !routeLocation.getComment().isBlank()) {
                             builder.append(String.format(locale, strings
                                     .getProperty("NoScheduledWorkAtWithDepartureTime"), routeLocationName, // NOI18N
                                     train.getExpectedDepartureTime(routeLocation)));
@@ -232,7 +236,7 @@ public class HtmlConductor extends HtmlTrainCommon {
                 // add location comment
                 if (Setup.isPrintLocationCommentsEnabled() && !routeLocation.getLocation().getComment().isEmpty()) {
                     builder.append(String.format(locale, strings.getProperty("LocationComment"), StringEscapeUtils  // NOI18N
-                            .escapeHtml4(routeLocation.getLocation().getComment())));
+                            .escapeHtml4(routeLocation.getLocation().getCommentWithColor())));
                 }
             }
         } else {
@@ -251,33 +255,41 @@ public class HtmlConductor extends HtmlTrainCommon {
 
     private String pickupCars() {
         StringBuilder builder = new StringBuilder();
-        RouteLocation location = train.getCurrentRouteLocation();
+        RouteLocation rlocation = train.getCurrentRouteLocation();
         List<Car> carList = InstanceManager.getDefault(CarManager.class).getByTrainDestinationList(train);
-        List<Track> tracks = location.getLocation().getTracksByNameList(null);
+        List<Track> tracks = rlocation.getLocation().getTracksByNameList(null);
         List<String> trackNames = new ArrayList<>();
         List<String> pickedUp = new ArrayList<>();
         this.clearUtilityCarTypes();
         for (Track track : tracks) {
-            if (trackNames.contains(splitString(track.getName()))) {
+            if (trackNames.contains(track.getSplitName())) {
                 continue;
             }
-            trackNames.add(splitString(track.getName())); // use a track name once
+            trackNames.add(track.getSplitName()); // use a track name once
             // block cars by destination
             for (RouteLocation rld : train.getRoute().getLocationsBySequenceList()) {
                 for (Car car : carList) {
                     if (pickedUp.contains(car.getId())
-                            || (Setup.isSortByTrackNameEnabled() && !splitString(track.getName()).equals(
-                                    splitString(car.getTrackName())))) {
+                            || (Setup.isSortByTrackNameEnabled() && !track.getSplitName().equals(
+                                    car.getSplitTrackName()))) {
                         continue;
                     }
+                    if (car.isLocalMove() && rlocation == rld) {
+                        continue;
+                    }
+                    // block pick up cars
+                    // caboose or FRED is placed at end of the train
+                    // passenger cars are already blocked in the car list
+                    // passenger cars with negative block numbers are placed at
+                    // the front of the train, positive numbers at the end of
+                    // the train.
                     // note that a car in train doesn't have a track assignment
-                    if (car.getRouteLocation() == location && car.getTrack() != null
-                            && car.getRouteDestination() == rld) {
+                    if (isNextCar(car, rlocation, rld)) {
                         pickedUp.add(car.getId());
                         if (car.isUtility()) {
                             builder.append(pickupUtilityCars(carList, car, TrainCommon.IS_MANIFEST));
                          // use truncated format if there's a switch list
-                        } else if (Setup.isPrintTruncateManifestEnabled() && location.getLocation().isSwitchListEnabled()) {
+                        } else if (Setup.isPrintTruncateManifestEnabled() && rlocation.getLocation().isSwitchListEnabled()) {
                             builder.append(pickUpCar(car, Setup.getPickupTruncatedManifestMessageFormat()));
                         } else {
                             builder.append(pickUpCar(car, Setup.getPickupManifestMessageFormat()));
@@ -297,14 +309,14 @@ public class HtmlConductor extends HtmlTrainCommon {
         List<String> trackNames = new ArrayList<>();
         List<String> dropped = new ArrayList<>();
         for (Track track : tracks) {
-            if (trackNames.contains(splitString(track.getName()))) {
+            if (trackNames.contains(track.getSplitName())) {
                 continue;
             }
-            trackNames.add(splitString(track.getName())); // use a track name once
+            trackNames.add(track.getSplitName()); // use a track name once
             for (Car car : carList) {
                 if (dropped.contains(car.getId())
-                        || (Setup.isSortByTrackNameEnabled() && !splitString(track.getName()).equals(
-                                splitString(car.getDestinationTrackName())))) {
+                        || (Setup.isSortByTrackNameEnabled() && !track.getSplitName().equals(
+                                car.getSplitDestinationTrackName()))) {
                     continue;
                 }
                 if (car.isLocalMove() == local

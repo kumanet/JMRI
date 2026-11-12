@@ -1,33 +1,23 @@
 package jmri.jmrit;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Calendar;
 import java.util.Date;
+
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.swing.JFileChooser;
-import jmri.util.FileUtil;
-import jmri.util.JmriLocalEntityResolver;
-import jmri.util.NoArchiveFileFilter;
-import org.jdom2.Comment;
-import org.jdom2.Content;
-import org.jdom2.DocType;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.JDOMException;
-import org.jdom2.ProcessingInstruction;
+
+import org.jdom2.*;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import jmri.InstanceManager;
+import jmri.configurexml.LoadAndStorePreferences;
+import jmri.util.*;
 
 /**
  * Handle common aspects of XML files.
@@ -51,7 +41,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bob Jacobsen Copyright (C) 2001, 2002, 2007, 2012, 2014
  */
-public abstract class XmlFile {
+public class XmlFile {
 
     /**
      * Define root part of URL for XSLT style page processing instructions.
@@ -94,6 +84,27 @@ public abstract class XmlFile {
         CheckDtdThenSchema
     }
 
+    private String processingInstructionHRef;
+    private String processingInstructionType;
+
+    /**
+     * Get the value of the attribute 'href' of the process instruction of
+     * the last loaded document.
+     * @return the value of the attribute 'href' or null
+     */
+    public String getProcessingInstructionHRef() {
+        return processingInstructionHRef;
+    }
+
+    /**
+     * Get the value of the attribute 'type' of the process instruction of
+     * the last loaded document.
+     * @return the value of the attribute 'type' or null
+     */
+    public String getProcessingInstructionType() {
+        return processingInstructionType;
+    }
+
     /**
      * Read the contents of an XML file from its filename. The name is expanded
      * by the {@link #findFile} routine. If the file is not found, attempts to
@@ -103,13 +114,12 @@ public abstract class XmlFile {
      * @throws org.jdom2.JDOMException       only when all methods have failed
      * @throws java.io.FileNotFoundException if file not found
      * @return null if not found, else root element of located file
+     * @throws IOException when needed
      */
     public Element rootFromName(String name) throws JDOMException, IOException {
         File fp = findFile(name);
         if (fp != null && fp.exists() && fp.canRead()) {
-            if (log.isDebugEnabled()) {
-                log.debug("readFile: {} from {}", name, fp.getAbsolutePath());
-            }
+            log.debug("readFile: {} from {}", name, fp.getAbsolutePath());
             return rootFromFile(fp);
         }
         URL resource = FileUtil.findURL(name);
@@ -135,11 +145,10 @@ public abstract class XmlFile {
      * @throws java.io.FileNotFoundException if file not found
      * @return root element from the file. This should never be null, as an
      *         exception should be thrown if anything goes wrong.
+     * @throws IOException when needed
      */
-    public Element rootFromFile(File file) throws JDOMException, IOException {
-        if (log.isDebugEnabled()) {
-            log.debug("reading xml from file: {}", file.getPath());
-        }
+    public Element rootFromFile(@Nonnull File file) throws JDOMException, IOException {
+        log.debug("reading xml from file: {}", file.getPath());
 
         try (FileInputStream fs = new FileInputStream(file)) {
             return getRoot(fs);
@@ -156,6 +165,7 @@ public abstract class XmlFile {
      * @throws java.io.FileNotFoundException if file not found
      * @return root element from the file. This should never be null, as an
      *         exception should be thrown if anything goes wrong.
+     * @throws IOException when needed
      */
     public Element rootFromInputStream(InputStream stream) throws JDOMException, IOException {
         return getRoot(stream);
@@ -171,11 +181,10 @@ public abstract class XmlFile {
      * @throws FileNotFoundException   if file not found
      * @return root element from the file. This should never be null, as an
      *         exception should be thrown if anything goes wrong.
+     * @throws IOException when needed
      */
-    public Element rootFromURL(URL url) throws JDOMException, IOException {
-        if (log.isDebugEnabled()) {
-            log.debug("reading xml from URL: {}", url.toString());
-        }
+    public Element rootFromURL(@Nonnull URL url) throws JDOMException, IOException {
+        log.debug("reading xml from URL: {}", url);
         return getRoot(url.openConnection().getInputStream());
     }
 
@@ -190,6 +199,9 @@ public abstract class XmlFile {
     protected Element getRoot(InputStream stream) throws JDOMException, IOException {
         log.trace("getRoot from stream");
 
+        processingInstructionHRef = null;
+        processingInstructionType = null;
+
         SAXBuilder builder = getBuilder(getValidate());
         Document doc = builder.build(new BufferedInputStream(stream));
         doc = processInstructions(doc);  // handle any process instructions
@@ -202,9 +214,10 @@ public abstract class XmlFile {
      *
      * @param file File to be created.
      * @param doc  Document to be written out. This should never be null.
+     * @throws IOException when an IO error occurs
      * @throws FileNotFoundException if file not found
      */
-    public void writeXML(File file, Document doc) throws IOException, FileNotFoundException {
+    public void writeXML(@Nonnull File file, @Nonnull Document doc) throws IOException, FileNotFoundException {
         // ensure parent directory exists
         if (file.getParent() != null) {
             FileUtil.createDirectory(file.getParent());
@@ -227,7 +240,7 @@ public abstract class XmlFile {
      * @param name file name, either absolute or relative
      * @return true if the file exists in a searched place
      */
-    protected boolean checkFile(String name) {
+    protected boolean checkFile(@Nonnull String name) {
         File fp = new File(name);
         if (fp.exists()) {
             return true;
@@ -256,7 +269,8 @@ public abstract class XmlFile {
      *             "decoders/Mine.xml")
      * @return null if file found, otherwise the located File
      */
-    protected File findFile(String name) {
+    @CheckForNull
+    protected File findFile(@Nonnull String name) {
         URL url = FileUtil.findURL(name,
                 FileUtil.getUserFilesPath(),
                 ".",
@@ -277,9 +291,9 @@ public abstract class XmlFile {
      *
      * @param name Element to print, should not be null
      */
-    static public void dumpElement(@Nonnull Element name) {
+    public static void dumpElement(@Nonnull Element name) {
         name.getChildren().forEach((element) -> {
-            System.out.println(" Element: " + element.getName() + " ns: " + element.getNamespace());
+            log.info(" Element: {} ns: {}", element.getName(), element.getNamespace());
         });
     }
 
@@ -290,7 +304,7 @@ public abstract class XmlFile {
      * @param name Last part of file pathname i.e. subdir/name, without the
      *             pathname for either the xml or preferences directory.
      */
-    public void makeBackupFile(String name) {
+    public void makeBackupFile(@Nonnull String name) {
         File file = findFile(name);
         if (file == null) {
             log.info("No {} file to backup", name);
@@ -316,23 +330,19 @@ public abstract class XmlFile {
      * @param directory the backup directory to use.
      * @param file      the file to be backed up. The file name will have the
      *                  current date embedded in the backup name.
-     * @return true if successful.
+     * @return true if successful or file is null.
      */
-    public boolean makeBackupFile(String directory, File file) {
+    public boolean makeBackupFile(String directory, @CheckForNull File file) {
         if (file == null) {
             log.info("No file to backup");
         } else if (file.canWrite()) {
             String backupFullName = directory + File.separator + createFileNameWithDate(file.getName());
-            if (log.isDebugEnabled()) {
-                log.debug("new backup file: {}", backupFullName);
-            }
+            log.debug("new backup file: {}", backupFullName);
 
             File backupFile = findFile(backupFullName);
             if (backupFile != null) {
                 if (backupFile.delete()) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("deleted backup file {}", backupFullName);
-                    }
+                    log.debug("deleted backup file {}", backupFullName);
                 }
             } else {
                 backupFile = new File(backupFullName);
@@ -340,22 +350,16 @@ public abstract class XmlFile {
             // create directory if needed
             File parentDir = backupFile.getParentFile();
             if (!parentDir.exists()) {
-                if (log.isDebugEnabled()) {
-                    log.debug("creating backup directory: {}", parentDir.getName());
-                }
+                log.debug("creating backup directory: {}", parentDir.getName());
                 if (!parentDir.mkdirs()) {
                     log.error("backup directory not created");
                     return false;
                 }
             }
             if (file.renameTo(new File(backupFullName))) {
-                if (log.isDebugEnabled()) {
-                    log.debug("created new backup file {}", backupFullName);
-                }
+                log.debug("created new backup file {}", backupFullName);
             } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("could not create backup file {}", backupFullName);
-                }
+                log.debug("could not create backup file {}", backupFullName);
                 return false;
             }
         }
@@ -368,7 +372,7 @@ public abstract class XmlFile {
      * @param name Last part of file pathname i.e. subdir/name, without the
      *             pathname for either the xml or preferences directory.
      */
-    public void revertBackupFile(String name) {
+    public void revertBackupFile(@Nonnull String name) {
         File file = findFile(name);
         if (file == null) {
             log.info("No {} file to revert", name);
@@ -402,19 +406,15 @@ public abstract class XmlFile {
      */
     public String backupFileName(String name) {
         String f = name + ".bak";
-        if (log.isDebugEnabled()) {
-            log.debug("backup file name is: {}", f);
-        }
+        log.debug("backup file name is: {}", f);
         return f;
     }
 
-    public String createFileNameWithDate(String name) {
+    public String createFileNameWithDate(@Nonnull String name) {
         // remove .xml extension
         String[] fileName = name.split(".xml");
         String f = fileName[0] + "_" + getDate() + ".xml";
-        if (log.isDebugEnabled()) {
-            log.debug("backup file name is: {}", f);
-        }
+        log.debug("backup file name is: {}", f);
         return f;
     }
 
@@ -423,35 +423,16 @@ public abstract class XmlFile {
      *         hour minute second. The date is fixed length and always returns a
      *         date represented by 14 characters.
      */
-    private String getDate() {
+    private static String getDate() {
         Calendar now = Calendar.getInstance();
-        int month = now.get(Calendar.MONTH) + 1;
-        String m = Integer.toString(month);
-        if (month < 10) {
-            m = "0" + Integer.toString(month);
-        }
-        int day = now.get(Calendar.DATE);
-        String d = Integer.toString(day);
-        if (day < 10) {
-            d = "0" + Integer.toString(day);
-        }
-        int hour = now.get(Calendar.HOUR);
-        String h = Integer.toString(hour);
-        if (hour < 10) {
-            h = "0" + Integer.toString(hour);
-        }
-        int minute = now.get(Calendar.MINUTE);
-        String min = Integer.toString(minute);
-        if (minute < 10) {
-            min = "0" + Integer.toString(minute);
-        }
-        int second = now.get(Calendar.SECOND);
-        String sec = Integer.toString(second);
-        if (second < 10) {
-            sec = "0" + Integer.toString(second);
-        }
-        String date = "" + now.get(Calendar.YEAR) + m + d + h + min + sec;
-        return date;
+        return String.format("%d%02d%02d%02d%02d%02d",
+                now.get(Calendar.YEAR),
+                now.get(Calendar.MONTH) + 1,
+                now.get(Calendar.DATE),
+                now.get(Calendar.HOUR_OF_DAY),
+                now.get(Calendar.MINUTE),
+                now.get(Calendar.SECOND)
+        );
     }
 
     /**
@@ -462,10 +443,19 @@ public abstract class XmlFile {
      * @param doc the document containing processing instructions
      * @return the processed document
      */
-    Document processInstructions(Document doc) {
+    Document processInstructions(@Nonnull Document doc) {
         // this iterates over top level
         for (Content c : doc.cloneContent()) {
             if (c instanceof ProcessingInstruction) {
+                ProcessingInstruction pi = (ProcessingInstruction) c;
+                for (String attrName : pi.getPseudoAttributeNames()) {
+                    if ("href".equals(attrName)) {
+                        processingInstructionHRef = pi.getPseudoAttributeValue(attrName);
+                    }
+                    if ("type".equals(attrName)) {
+                        processingInstructionType = pi.getPseudoAttributeValue(attrName);
+                    }
+                }
                 try {
                     doc = processOneInstruction((ProcessingInstruction) c, doc);
                 } catch (org.jdom2.transform.XSLTransformException ex) {
@@ -481,7 +471,7 @@ public abstract class XmlFile {
         return doc;
     }
 
-    Document processOneInstruction(ProcessingInstruction p, Document doc) throws org.jdom2.transform.XSLTransformException, org.jdom2.JDOMException, java.io.IOException {
+    Document processOneInstruction(@Nonnull ProcessingInstruction p, Document doc) throws org.jdom2.transform.XSLTransformException, org.jdom2.JDOMException, java.io.IOException {
         log.trace("handling {}", p);
 
         // check target
@@ -516,7 +506,7 @@ public abstract class XmlFile {
      * @param dtd  name of an external DTD
      * @return new Document, with root installed
      */
-    static public Document newDocument(Element root, String dtd) {
+    public static Document newDocument(@Nonnull Element root, String dtd) {
         Document doc = new Document(root);
         doc.setDocType(new DocType(root.getName(), dtd));
         addDefaultInfo(root);
@@ -530,7 +520,7 @@ public abstract class XmlFile {
      * @param root Root element of the final document
      * @return new Document, with root installed
      */
-    static public Document newDocument(Element root) {
+    public static Document newDocument(Element root) {
         Document doc = new Document(root);
         addDefaultInfo(root);
         return doc;
@@ -549,11 +539,14 @@ public abstract class XmlFile {
      *
      * @param root The root element of the document that will be written.
      */
-    static public void addDefaultInfo(Element root) {
-        String content = "Written by JMRI version " + jmri.Version.name()
+    public static void addDefaultInfo(Element root) {
+        var loadAndStorePreferences = InstanceManager.getDefault(LoadAndStorePreferences.class);
+        if (!loadAndStorePreferences.isExcludeJmriVersion()) {
+            String content = "Written by JMRI version " + jmri.Version.name()
                 + " on " + (new Date()).toString();
-        Comment comment = new Comment(content);
-        root.addContent(comment);
+            Comment comment = new Comment(content);
+            root.addContent(comment);
+        }
     }
 
     /**
@@ -565,7 +558,7 @@ public abstract class XmlFile {
      *
      * @return the XML directory that ships with JMRI.
      */
-    static public String xmlDir() {
+    public static String xmlDir() {
         return FileUtil.getProgramPath() + "xml" + File.separator;
     }
 
@@ -575,15 +568,15 @@ public abstract class XmlFile {
      *
      * @return the default level of validation to apply to a file
      */
-    static public Validate getDefaultValidate() {
+    public static Validate getDefaultValidate() {
         return defaultValidate;
     }
 
-    static public void setDefaultValidate(Validate v) {
+    public static void setDefaultValidate(Validate v) {
         defaultValidate = v;
     }
 
-    static private Validate defaultValidate = Validate.None;
+    private static Validate defaultValidate = Validate.None;
 
     /**
      * Whether to verify the DTD of this XML file when read.
@@ -606,15 +599,15 @@ public abstract class XmlFile {
      *
      * @return the default DTD location
      */
-    static public String getDefaultDtdLocation() {
+    public static String getDefaultDtdLocation() {
         return defaultDtdLocation;
     }
 
-    static public void setDefaultDtdLocation(String v) {
+    public static void setDefaultDtdLocation(String v) {
         defaultDtdLocation = v;
     }
 
-    static public String defaultDtdLocation = "/xml/DTD/";
+    static String defaultDtdLocation = "/xml/DTD/";
 
     /**
      * Get the location for DTDs in this XML document.
@@ -644,7 +637,7 @@ public abstract class XmlFile {
      * @return a file chooser
      */
     public static JFileChooser userFileChooser(String filter, String... suffix) {
-        JFileChooser fc = new JFileChooser(FileUtil.getUserFilesPath());
+        JFileChooser fc = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
         fc.setFileFilter(new NoArchiveFileFilter(filter, suffix));
         return fc;
     }
@@ -657,19 +650,22 @@ public abstract class XmlFile {
      * @return a file chooser
      */
     public static JFileChooser userFileChooser() {
-        JFileChooser fc = new JFileChooser(FileUtil.getUserFilesPath());
+        JFileChooser fc = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
         fc.setFileFilter(new NoArchiveFileFilter());
         return fc;
     }
 
-    @SuppressWarnings("deprecation") // wait for updated Xerxes before coding substitute for SAXBuilder(String, boolean)
+    @SuppressWarnings("deprecation") // org.jdom2.input.SAXBuilder(java.lang.String saxDriverClass, boolean validate)
+    //{@see http://www.jdom.org/docs/apidocs/org/jdom2/input/SAXBuilder.html}
+    //{@see http://www.jdom.org/docs/apidocs/org/jdom2/input/sax/XMLReaders.html#NONVALIDATING}
+    // Validate.CheckDtdThenSchema may not be available readily
     public static SAXBuilder getBuilder(Validate validate) {  // should really be a Verify enum
         SAXBuilder builder;
 
         boolean verifyDTD = (validate == Validate.CheckDtd) || (validate == Validate.CheckDtdThenSchema);
         boolean verifySchema = (validate == Validate.RequireSchema) || (validate == Validate.CheckDtdThenSchema);
 
-        // old style 
+        // old style
         builder = new SAXBuilder("org.apache.xerces.parsers.SAXParser", verifyDTD);  // argument controls DTD validation
 
         // insert local resolver for includes, schema, DTDs
@@ -699,6 +695,6 @@ public abstract class XmlFile {
     }
 
     // initialize logging
-    private static final Logger log = LoggerFactory.getLogger(XmlFile.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(XmlFile.class);
 
 }

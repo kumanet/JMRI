@@ -1,5 +1,5 @@
 {
-    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "jmri-json-block-server-message",
     "type": "object",
     "description": "Data portion of message from JMRI to client for type \"block\"",
@@ -57,6 +57,14 @@
                 "null"
             ],
             "description": "The block's value, can be idTag, Reporter, or text"
+        },
+        "allocatedValue": {
+            "type": [
+                "string",
+                "object",
+                "null"
+            ],
+            "description": "The train the block is allocated to, for example by Dispatcher, which may not have reached it yet or may have left it: a roster entry, idTag or Reporter as an object, other values as text, or null if the block is not allocated or no value was given"
         },
         "sensor": {
             "type": [
@@ -121,6 +129,7 @@
         "sensor",
         "reporter",
         "value",
+        "allocatedValue",
         "speed",
         "curvature",
         "direction",

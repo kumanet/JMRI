@@ -45,6 +45,7 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
     public static final String VERTICAL_TOOLBAR = "verticalToolBar";
     public static final String SHOW_TOOL_TIP_TIME = "showToolTipDismissDelay";
     public static final String EDITOR_USE_OLD_LOC_SIZE = "editorUseOldLocSize";
+    public static final String JFILECHOOSER_FORMAT = "jfilechooserformat";
     public static final String MAX_COMBO_ROWS = "maxComboRows";
     /**
      * Smallest font size a user can set the font size to other than zero
@@ -69,11 +70,12 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
     private Font currentFont = null;
     private Font defaultFont = null;
     private int fontSize = 0;
-    private int defaultFontSize = 0;
+    private int defaultFontSize = 11; 
     private boolean nonStandardMouseEvent = false;
     private boolean graphicTableState = false;
     private boolean oblockEditTabbed = false;
     private boolean editorUseOldLocSize = false;
+    private int jFileChooserFormat = 0;
     private String lookAndFeel = UIManager.getLookAndFeel().getClass().getName();
     private int toolTipDismissDelay = ToolTipManager.sharedInstance().getDismissDelay();
     private int maxComboRows = 0;
@@ -89,20 +91,14 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
     private static final Logger log = LoggerFactory.getLogger(GuiLafPreferencesManager.class);
 
     @Override
-    @SuppressWarnings("deprecation") // use of apps.gui.GuiLafPreferencesManager
     public void initialize(Profile profile) throws InitializationException {
         if (!this.initialized) {
-            boolean migrate = false;
             Preferences preferences = ProfileUtils.getPreferences(profile, this.getClass(), true);
-            // if FONT_SIZE == MIN_VALUE, preferences have not been written
-            // using the new structure, so use the old structure
-            if (preferences.getInt(FONT_SIZE, Integer.MIN_VALUE) == Integer.MIN_VALUE) {
-                preferences = ProfileUtils.getPreferences(profile, apps.gui.GuiLafPreferencesManager.class, true);
-                migrate = preferences.getInt(FONT_SIZE, Integer.MIN_VALUE) != Integer.MIN_VALUE;
-            }
             this.setLocale(Locale.forLanguageTag(preferences.get(LOCALE, this.getLocale().toLanguageTag())));
-            this.setLookAndFeel(preferences.get(LOOK_AND_FEEL, this.getLookAndFeel()));
 
+            var lookAndFeelClassname = preferences.get(LOOK_AND_FEEL, this.getLookAndFeel());
+            this.setLookAndFeel(lookAndFeelClassname);
+            
             this.setDefaultFontSize(); // before we change anything
             this.setFontSize(preferences.getInt(FONT_SIZE, this.getDefaultFontSize()));
             if (this.getFontSize() == 0) {
@@ -119,6 +115,7 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
             this.setGraphicTableState(preferences.getBoolean(GRAPHIC_TABLE_STATE, this.isGraphicTableState()));
             this.setOblockEditTabbed(preferences.getBoolean(OBLOCK_EDIT_TABBED, this.isOblockEditTabbed()));
             this.setEditorUseOldLocSize(preferences.getBoolean(EDITOR_USE_OLD_LOC_SIZE, this.isEditorUseOldLocSize()));
+            this.setJFileChooserFormat(preferences.getInt(JFILECHOOSER_FORMAT, this.getJFileChooserFormat()));
             this.setMaxComboRows(preferences.getInt(MAX_COMBO_ROWS, this.getMaxComboRows()));
             this.setToolTipDismissDelay(preferences.getInt(SHOW_TOOL_TIP_TIME, this.getToolTipDismissDelay()));
 
@@ -128,7 +125,6 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
 
             this.applyLookAndFeel();
             this.applyFontSize();
-            this.setDirty(migrate);
             this.initialized = true;
         }
     }
@@ -181,6 +177,7 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
         preferences.putBoolean(GRAPHIC_TABLE_STATE, this.isGraphicTableState());
         preferences.putBoolean(OBLOCK_EDIT_TABBED, this.isOblockEditTabbed());
         preferences.putBoolean(EDITOR_USE_OLD_LOC_SIZE, this.isEditorUseOldLocSize());
+        preferences.putInt(JFILECHOOSER_FORMAT, this.jFileChooserFormat);
         preferences.putInt(MAX_COMBO_ROWS, this.getMaxComboRows());
         preferences.putInt(SHOW_TOOL_TIP_TIME, this.getToolTipDismissDelay());
         try {
@@ -277,6 +274,9 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
      * @return the currently selected font size
      */
     public int getFontSize() {
+        if (fontSize == 0) {
+            return defaultFontSize;
+        }
         return fontSize;
     }
 
@@ -457,6 +457,23 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
     }
 
     /**
+     * JFileChooser Type
+     * @return 0 default, 1 List 2 Detail
+     */
+    public int getJFileChooserFormat() {
+        return jFileChooserFormat;
+    }
+
+    /**
+     * @param jFileChooserFormat the JFileChooser 0 default, 1 list, 2 detail
+     */
+    public void setJFileChooserFormat( int jFileChooserFormat) {
+        int oldjFileChooserFormat = this.jFileChooserFormat;
+        this.jFileChooserFormat = jFileChooserFormat;
+        firePropertyChange(JFILECHOOSER_FORMAT, oldjFileChooserFormat, jFileChooserFormat);
+    }
+
+    /**
      * Get the name of the class implementing the preferred look and feel. Note
      * this may not be the in-use look and feel if the preferred look and feel
      * is not available on the current platform; and will be overwritten if
@@ -481,13 +498,14 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
         String oldLookAndFeel = this.lookAndFeel;
         this.lookAndFeel = lookAndFeel;
         firePropertyChange(LOOK_AND_FEEL, oldLookAndFeel, lookAndFeel);
+        // the actual change to the LAF will happen when that event reaches `applyLookAndFeel` below
     }
 
     /**
      * Apply the existing look and feel.
      */
     public void applyLookAndFeel() {
-        String lafClassName = null;
+        String lafClassName = lookAndFeel;
         for (LookAndFeelInfo LAF : UIManager.getInstalledLookAndFeels()) {
             // accept either name or classname of look and feel
             if (LAF.getClassName().equals(this.lookAndFeel) || LAF.getName().equals(this.lookAndFeel)) {
@@ -500,17 +518,30 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
         if (lafClassName != null) {
             if (!lafClassName.equals(UIManager.getLookAndFeel().getClass().getName())) {
                 log.debug("Apply look and feel \"{}\" ({})", this.lookAndFeel, lafClassName);
-                try {
-                    UIManager.setLookAndFeel(lafClassName);
-                } catch (ClassNotFoundException ex) {
-                    log.error("Could not find look and feel \"{}\".", this.lookAndFeel);
-                } catch (
-                        IllegalAccessException |
-                        InstantiationException ex) {
-                    log.error("Could not load look and feel \"{}\".", this.lookAndFeel);
-                } catch (UnsupportedLookAndFeelException ex) {
-                    log.error("Look and feel \"{}\" is not supported on this platform.", this.lookAndFeel);
-                }
+                final String localLafClassName = lafClassName;  // final for thread invoke
+                jmri.util.ThreadingUtil.runOnGUI(() -> {
+                    try {
+                        if (localLafClassName.startsWith("com.github.weisj.darklaf") ) {
+                            // DarkLAF special case - will have to use reflection if we have more than one in GuiLafConfigPane
+                            com.github.weisj.darklaf.LafManager.install(new com.github.weisj.darklaf.theme.HighContrastDarkTheme());
+                        } else {
+                            // Swing-handled class name
+                            UIManager.setLookAndFeel(localLafClassName);
+                        }
+                        if (localLafClassName.endsWith("GTKLookAndFeel")) {
+                            // remove useless task bar from GTK look'n feel JDektopPanes
+                            UIManager.put("InternalFrame.useTaskBar", Boolean.FALSE);
+                        }
+                    } catch (ClassNotFoundException ex) {
+                        log.error("Could not find look and feel \"{}\".", this.lookAndFeel);
+                    } catch (
+                            IllegalAccessException |
+                            InstantiationException ex) {
+                        log.error("Could not load look and feel \"{}\".", this.lookAndFeel);
+                    } catch (UnsupportedLookAndFeelException ex) {
+                        log.error("Look and feel \"{}\" is not supported on this platform.", this.lookAndFeel);
+                    }
+                });
             } else {
                 log.debug("Not updating look and feel {} matching existing look and feel", lafClassName);
             }
@@ -555,6 +586,8 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
      *
      * @param profile The profile to get the locale from
      */
+    @SuppressWarnings("deprecation")    // The constructor Locale(String) is deprecated since version 19
+                                        // The replacement Locale.of(String) isn't available before version 19
     public static void setLocaleMinimally(Profile profile) {
         // en is default if a locale preference has not been set
         String name = ProfileUtils.getPreferences(profile, GuiLafPreferencesManager.class, true).get("locale", "en");
@@ -587,9 +620,11 @@ public class GuiLafPreferencesManager extends Bean implements PreferencesManager
      * @param dirty true if preferences need to be saved
      */
     private void setDirty(boolean dirty) {
-        boolean oldDirty = this.dirty;
-        this.dirty = dirty;
-        super.firePropertyChange(PROP_DIRTY, oldDirty, dirty);
+        if (this.initialized) {
+            boolean oldDirty = this.dirty;
+            this.dirty = dirty;
+            super.firePropertyChange(PROP_DIRTY, oldDirty, dirty);
+        }
     }
 
     /**

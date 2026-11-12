@@ -20,6 +20,7 @@ public class BlockOrderTest {
     public void testCTor() {
         BlockOrder t = new BlockOrder(new OBlock("OB1", "Test"));
         assertThat(t).withFailMessage("exists").isNotNull();
+        assertThat(t.toString().startsWith("BlockOrder: Block")).withFailMessage("toString").isTrue();
     }
 
     /* for the sake of code coverage */
@@ -74,6 +75,6 @@ public class BlockOrderTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(BlockOrderTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(BlockOrderTest.class);
 
 }

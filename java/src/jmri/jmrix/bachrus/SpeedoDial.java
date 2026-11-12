@@ -1,5 +1,7 @@
 package jmri.jmrix.bachrus;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -54,7 +56,7 @@ public class SpeedoDial extends JPanel {
     int centreX;
     int centreY;
 
-    int units = Speed.MPH;
+    Speed.Unit unit = Speed.Unit.MPH;
 
     int baseMphLimit = 80;
     int baseKphLimit = 140;
@@ -93,6 +95,9 @@ public class SpeedoDial extends JPanel {
     }
 
     @Override
+    @SuppressFBWarnings(value = "FL_FLOATS_AS_LOOP_COUNTERS",
+        justification = "Major refactor required to unwind the float in loops."
+        +"Speeds above max speed, along with Mph / Kmph need to be considered.")
     public void paint(Graphics g) {
         super.paint(g);
         if (!(g instanceof Graphics2D) ) {
@@ -167,7 +172,7 @@ public class SpeedoDial extends JPanel {
         for (float i = 150; i < 391; i = i + secTick) {
             g2.fillOval(dotX((float) faceSize / 2 - 10 * dashSize, i), dotY((float) faceSize / 2 - 10 * dashSize, i),
                     5, 5);
-            if (((j & 1) == 0) || (units == Speed.KPH)) {
+            if (((j & 1) == 0) || (unit == Speed.Unit.KPH)) {
                 // kph are plotted every 20 when secondary, mph every 10
                 String speed = Integer.toString(10 * j);
                 int xOffset = fontM.stringWidth(speed);
@@ -274,14 +279,12 @@ public class SpeedoDial extends JPanel {
 
         centreX = panelWidth / 2;
         centreY = panelHeight / 2;
-
-        return;
     }
 
     void update(float speed) {
         // hand rotation starts at 12 o'clock position so offset it by 120 degrees
         // scale by the angle between major tick marks divided by 10
-        if (units == Speed.MPH) {
+        if (unit == Speed.Unit.MPH) {
             if (Speed.kphToMph(speed) > mphLimit) {
                 mphLimit += mphInc;
                 kphLimit += kphInc;
@@ -302,7 +305,7 @@ public class SpeedoDial extends JPanel {
     }
 
     void setTicks() {
-        if (units == Speed.MPH) {
+        if (unit == Speed.Unit.MPH) {
             priMajorTick = 240 / ((float) mphLimit / 10);
             priMinorTick = priMajorTick / 5;
             secTick = 240 / (Speed.mphToKph(mphLimit) / 10);
@@ -314,13 +317,13 @@ public class SpeedoDial extends JPanel {
     }
 
     void setUnitsMph() {
-        units = Speed.MPH;
+        unit = Speed.Unit.MPH;
         priString = "MPH";
         secString = "KPH";
     }
 
     void setUnitsKph() {
-        units = Speed.KPH;
+        unit = Speed.Unit.KPH;
         priString = "KPH";
         secString = "MPH";
     }

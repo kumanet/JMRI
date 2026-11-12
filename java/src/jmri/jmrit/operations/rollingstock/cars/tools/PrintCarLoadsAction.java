@@ -12,10 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
-import jmri.jmrit.operations.rollingstock.cars.CarLoad;
-import jmri.jmrit.operations.rollingstock.cars.CarLoads;
-import jmri.jmrit.operations.rollingstock.cars.CarTypes;
+import jmri.jmrit.operations.rollingstock.cars.*;
 import jmri.jmrit.operations.setup.Control;
+import jmri.jmrit.operations.trains.trainbuilder.TrainCommon;
 import jmri.util.davidflanagan.HardcopyWriter;
 
 /**
@@ -26,7 +25,7 @@ import jmri.util.davidflanagan.HardcopyWriter;
  *
  * @author Bob Jacobsen Copyright (C) 2003
  * @author Dennis Miller Copyright (C) 2005
- * @author Daniel Boudreau Copyright (C) 2011
+ * @author Daniel Boudreau Copyright (C) 2011, 2025
  */
 public class PrintCarLoadsAction extends AbstractAction {
 
@@ -50,8 +49,8 @@ public class PrintCarLoadsAction extends AbstractAction {
 
     public class CarLoadPrintOption {
 
-        static final String TAB = "\t"; // NOI18N
-        static final String NEW_LINE = "\n"; // NOI18N
+        protected static final String TAB = "\t"; // NOI18N
+        protected static final String NEW_LINE = "\n"; // NOI18N
 
         // no frame needed for now
         public CarLoadPrintOption() {
@@ -62,32 +61,17 @@ public class PrintCarLoadsAction extends AbstractAction {
         private void printCars() {
 
             // obtain a HardcopyWriter to do this
-            HardcopyWriter writer = null;
-            try {
-                writer = new HardcopyWriter(new Frame(), Bundle.getMessage("TitleCarLoads"), Control.reportFontSize, .5,
-                        .5, .5, .5, _isPreview);
-            } catch (HardcopyWriter.PrintCanceledException ex) {
-                log.debug("Print cancelled");
-                return;
-            }
+            try (HardcopyWriter writer =
+                    new HardcopyWriter(new Frame(), Bundle.getMessage("TitleCarLoads"), null, null,
+                            Control.reportFontSize, .5 * 72, .5 * 72, .5 * 72, .5 * 72, _isPreview, "", false, true,
+                            null, null)) {
 
-            // Loop through the Roster, printing as needed
-            String[] carTypes = InstanceManager.getDefault(CarTypes.class).getNames();
-            Hashtable<String, List<CarLoad>> list = InstanceManager.getDefault(CarLoads.class).getList();
-            try {
-                String s = Bundle.getMessage("Type") +
-                        TAB +
-                        tabString(Bundle.getMessage("Load"),
-                                InstanceManager.getDefault(CarLoads.class).getMaxNameLength() + 1) +
-                        Bundle.getMessage("Type") +
-                        "  " +
-                        Bundle.getMessage("Priority") +
-                        "  " +
-                        Bundle.getMessage("LoadPickupMessage") +
-                        "   " +
-                        Bundle.getMessage("LoadDropMessage") +
-                        NEW_LINE;
-                writer.write(s);
+                writer.write(getHeader());
+
+                // Loop through the Roster, printing as needed
+                String[] carTypes = InstanceManager.getDefault(CarTypes.class).getNames();
+                Hashtable<String, List<CarLoad>> list = InstanceManager.getDefault(CarLoads.class).getList();
+
                 for (String carType : carTypes) {
                     List<CarLoad> carLoads = list.get(carType);
                     if (carLoads == null) {
@@ -102,7 +86,8 @@ public class PrintCarLoadsAction extends AbstractAction {
                                         .equals(InstanceManager.getDefault(CarLoads.class).getDefaultLoadName())) &&
                                 carLoad.getPickupComment().equals(CarLoad.NONE) &&
                                 carLoad.getDropComment().equals(CarLoad.NONE) &&
-                                carLoad.getPriority().equals(CarLoad.PRIORITY_LOW)) {
+                                carLoad.getPriority().equals(CarLoad.PRIORITY_LOW) &&
+                                !carLoad.isHazardous()) {
                             continue;
                         }
                         // print the car type once
@@ -112,36 +97,43 @@ public class PrintCarLoadsAction extends AbstractAction {
                         }
                         StringBuffer buf = new StringBuffer(TAB);
                         buf.append(tabString(carLoad.getName(),
-                                InstanceManager.getDefault(CarLoads.class).getMaxNameLength() + 1));
-                        buf.append(tabString(carLoad.getLoadType(), 6)); // load
-                                                                         // or
-                                                                         // empty
-                        buf.append(tabString(carLoad.getPriority(), 5)); // low
-                                                                         // or
-                                                                         // high
-                        buf.append(tabString(carLoad.getPickupComment(), 27));
-                        buf.append(tabString(carLoad.getDropComment(), 27));
+                                InstanceManager.getDefault(CarLoads.class).getMaxNameLength()));
+                        // load type: load or empty
+                        buf.append(tabString(carLoad.getLoadType(), 5));
+                        // priority low, medium, or high
+                        buf.append(tabString(carLoad.getPriority(), 4));
+                        buf.append(tabString(
+                                carLoad.isHazardous() ? Bundle.getMessage("ButtonYes") : Bundle.getMessage("ButtonNo"),
+                                3));
+                        buf.append(tabString(carLoad.getPickupComment(), 26));
+                        buf.append(tabString(carLoad.getDropComment(), 27).trim());
                         writer.write(buf.toString() + NEW_LINE);
                     }
                 }
-            } catch (IOException we) {
-                log.error("Error printing car roster");
+            } catch (HardcopyWriter.PrintCanceledException ex) {
+                log.debug("Print canceled");
+            } catch (IOException ex) {
+                log.error("Error printing car roster: {}", ex.getLocalizedMessage());
             }
-            // and force completion of the printing
-            writer.close();
+        }
+
+        private String getHeader() {
+            return Bundle.getMessage("Type") +
+                    TAB +
+                    tabString(Bundle.getMessage("Load"),
+                            InstanceManager.getDefault(CarLoads.class).getMaxNameLength()) +
+                    tabString(Bundle.getMessage("Type"), 5) +
+                    tabString(Bundle.getMessage("Priority"), 4) +
+                    tabString(Bundle.getMessage("Hazardous"), 3) +
+                    tabString(Bundle.getMessage("LoadPickupMessage"), 26) +
+                    Bundle.getMessage("LoadDropMessage") +
+                    NEW_LINE;
         }
     }
 
     private static String tabString(String s, int fieldSize) {
-        if (s.length() > fieldSize) {
-            s = s.substring(0, fieldSize - 1);
-        }
-        StringBuffer buf = new StringBuffer(s + " ");
-        while (buf.length() < fieldSize) {
-            buf.append(" ");
-        }
-        return buf.toString();
+        return TrainCommon.padAndTruncate(s, fieldSize) + " ";
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PrintCarLoadsAction.class);
+    private static final Logger log = LoggerFactory.getLogger(PrintCarLoadsAction.class);
 }

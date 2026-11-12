@@ -10,17 +10,15 @@ import java.beans.PropertyChangeEvent;
 import java.io.File;
 import java.io.IOException;
 
-import java.text.DecimalFormat;
+import java.util.*;
 
-import java.util.Arrays;
-import java.util.Set;
-import java.util.Vector;
-
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableModel;
 
 import jmri.*;
 import jmri.implementation.SignalSpeedMap;
@@ -28,58 +26,59 @@ import jmri.jmrit.beantable.*;
 import jmri.jmrit.beantable.beanedit.BlockEditAction;
 import jmri.util.gui.GuiLafPreferencesManager;
 import jmri.util.swing.JComboBoxUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Data model for a Block Table.
  * Code originally within BlockTableAction.
- * 
+ *
  * @author Bob Jacobsen Copyright (C) 2003, 2008
  * @author Egbert Broerse Copyright (C) 2017
  * @author Steve Young Copyright (C) 2021
  */
 public class BlockTableDataModel extends BeanTableDataModel<Block> {
-    
-    static public final int EDITCOL = BeanTableDataModel.NUMCOLUMN;
-    static public final int DIRECTIONCOL = EDITCOL + 1;
-    static public final int LENGTHCOL = DIRECTIONCOL + 1;
-    static public final int CURVECOL = LENGTHCOL + 1;
-    static public final int STATECOL = CURVECOL + 1;
-    static public final int SENSORCOL = STATECOL + 1;
-    static public final int REPORTERCOL = SENSORCOL + 1;
-    static public final int CURRENTREPCOL = REPORTERCOL + 1;
-    static public final int PERMISCOL = CURRENTREPCOL + 1;
-    static public final int SPEEDCOL = PERMISCOL + 1;
 
-    private final boolean _graphicState = InstanceManager.getDefault(GuiLafPreferencesManager.class).isGraphicTableState();
-    
-    private final DecimalFormat twoDigit = new DecimalFormat("0.00");
-    
+    public static final int EDITCOL = BeanTableDataModel.NUMCOLUMN;
+    public static final int DIRECTIONCOL = EDITCOL + 1;
+    public static final int LENGTHCOL = DIRECTIONCOL + 1;
+    public static final int CURVECOL = LENGTHCOL + 1;
+    public static final int STATECOL = CURVECOL + 1;
+    public static final int SENSORCOL = STATECOL + 1;
+    public static final int REPORTERCOL = SENSORCOL + 1;
+    public static final int CURRENTREPCOL = REPORTERCOL + 1;
+    public static final int PERMISCOL = CURRENTREPCOL + 1;
+    public static final int SPEEDCOL = PERMISCOL + 1;
+    public static final int GHOSTCOL = SPEEDCOL + 1;
+    /** The trains train tracking records in the Block; read only, hidden until chosen. */
+    public static final int TRAINCOL = GHOSTCOL + 1;
+    /** Why train tracking records them there; hidden until chosen. */
+    public static final int WHYCOL = TRAINCOL + 1;
+    public static final int COLUMNCOUNT = WHYCOL + 1;
+
+    private final boolean _graphicState =
+        InstanceManager.getDefault(GuiLafPreferencesManager.class).isGraphicTableState();
+
     private Vector<String> speedList = new Vector<>();
-    private String[] sensorList;
-    private String[] reporterList;
-    
-    String defaultBlockSpeedText;
-    
+
+    private String defaultBlockSpeedText;
+
     public BlockTableDataModel(Manager<Block> mgr){
         super();
         setManager(mgr); // for consistency with other BeanTableModels, default BlockManager always used.
-        
-        defaultBlockSpeedText = (Bundle.getMessage("UseGlobal", "Global") + " " + InstanceManager.getDefault(BlockManager.class).getDefaultSpeed()); // first entry in drop down list
+        listenToTrainRecords();
+
+        defaultBlockSpeedText = Bundle.getMessage("UseGlobal", "Global") + " " +
+            InstanceManager.getDefault(BlockManager.class).getDefaultSpeed(); // first entry in drop down list
         speedList.add(defaultBlockSpeedText);
-        Vector<String> _speedMap = InstanceManager.getDefault(SignalSpeedMap.class).getValidSpeedNames();
-        for (int i = 0; i < _speedMap.size(); i++) {
-            if (!speedList.contains(_speedMap.get(i))) {
-                speedList.add(_speedMap.get(i));
+        Vector<String> speedMap = InstanceManager.getDefault(SignalSpeedMap.class).getValidSpeedNames();
+        for (int i = 0; i < speedMap.size(); i++) {
+            if (!speedList.contains(speedMap.get(i))) {
+                speedList.add(speedMap.get(i));
             }
         }
-        
-        updateSensorList();
-        updateReporterList();
+
     }
-    
+
     @Override
     public String getValue(String name) {
         if (name == null) {
@@ -132,7 +131,7 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
 
     @Override
     public int getColumnCount() {
-        return SPEEDCOL + 1;
+        return COLUMNCOUNT;
     }
 
     @Override
@@ -155,9 +154,11 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 box.setJTableCellClientProperties();
                 return box;
             case LENGTHCOL:
-                return (twoDigit.format(metricUi ?  b.getLengthCm() : b.getLengthIn()));
+                return metricUi ?  b.getLengthCm() : b.getLengthIn();
             case PERMISCOL:
                 return b.getPermissiveWorking();
+            case GHOSTCOL:
+                return b.getIsGhost();
             case SPEEDCOL:
                 String speed = b.getBlockSpeed();
                 if (!speedList.contains(speed)) {
@@ -169,48 +170,21 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 JComboBoxUtil.setupComboBoxMaxRows(c);
                 return c;
             case STATECOL:
-                return blockDescribeState(b.getState());
+                return b.describeState(b.getState());
             case SENSORCOL:
-                Sensor sensor = b.getSensor();
-                JComboBox<String> cs = new JComboBox<>(sensorList);
-                String name = "";
-                if (sensor != null) {
-                    name = sensor.getDisplayName();
-                }
-                cs.setSelectedItem(name);
-                JComboBoxUtil.setupComboBoxMaxRows(cs);
-                return cs;
+                return b.getSensor();
             case REPORTERCOL:
-                Reporter reporter = b.getReporter();
-                JComboBox<String> rs = new JComboBox<>(reporterList);
-                String repname = "";
-                if (reporter != null) {
-                    repname = reporter.getDisplayName();
-                }
-                rs.setSelectedItem(repname);
-                JComboBoxUtil.setupComboBoxMaxRows(rs);
-                return rs;
+                return b.getReporter();
             case CURRENTREPCOL:
                 return b.isReportingCurrent();
             case EDITCOL:
                 return Bundle.getMessage("ButtonEdit");
+            case TRAINCOL:
+                return trainsIn(b);
+            case WHYCOL:
+                return whyIn(b);
             default:
                 return super.getValueAt(row, col);
-        }
-    }
-    
-    // TODO : Add Block.UNDETECTED
-    // TODO : Move to Block.describeState(int)
-    private String blockDescribeState(int blockState){
-        switch (blockState) {
-            case (Block.OCCUPIED):
-                return Bundle.getMessage("BlockOccupied");
-            case (Block.UNOCCUPIED):
-                return Bundle.getMessage("BlockUnOccupied");
-            case (Block.UNKNOWN):
-                return Bundle.getMessage("BlockUnknown");
-            default:
-                return Bundle.getMessage("BlockInconsistent");
         }
     }
 
@@ -237,13 +211,16 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
             case PERMISCOL:
                 b.setPermissiveWorking((Boolean) value);
                 break;
+            case GHOSTCOL:
+                b.setIsGhost((boolean) value);
+                break;
             case SPEEDCOL:
                 @SuppressWarnings("unchecked")
                 String speed = (String) ((JComboBox<String>) value).getSelectedItem();
                 try {
                     b.setBlockSpeed(speed);
                 } catch (JmriException ex) {
-                    JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
+                    JmriJOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
                     return;
                 }
                 if (!speedList.contains(speed) && !speed.contains("Global")) { // NOI18N
@@ -251,23 +228,18 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 }
                 break;
             case REPORTERCOL:
-                @SuppressWarnings("unchecked")
-                String strReporter = (String) ((JComboBox<String>) value).getSelectedItem();
-                Reporter r = InstanceManager.getDefault(ReporterManager.class).getReporter(strReporter);
-                b.setReporter(r);
+                if ( value==null || value instanceof Reporter) {
+                    b.setReporter((Reporter)value);
+                }
                 break;
             case SENSORCOL:
-                @SuppressWarnings("unchecked")
-                String strSensor = (String) ((JComboBox<String>) value).getSelectedItem();
-                b.setSensor(strSensor);
+                b.setSensor(value instanceof Sensor ? ((Sensor)value).getDisplayName() : "");
                 break;
             case CURRENTREPCOL:
                 b.setReportingCurrent((Boolean) value);
                 break;
             case EDITCOL:
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    editButton(b);
-                });
+                javax.swing.SwingUtilities.invokeLater( () -> editButton(b) );
                 break;
             default:
                 super.setValueAt(value, row, col);
@@ -288,6 +260,8 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 return Bundle.getMessage("BlockLengthColName");
             case PERMISCOL:
                 return Bundle.getMessage("BlockPermColName");
+            case GHOSTCOL:
+                return Bundle.getMessage("BlockGhostColName");
             case SPEEDCOL:
                 return Bundle.getMessage("BlockSpeedColName");
             case STATECOL:
@@ -300,6 +274,10 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 return Bundle.getMessage("BlockReporterCurrent");
             case EDITCOL:
                 return Bundle.getMessage("ButtonEdit");
+            case TRAINCOL:
+                return Bundle.getMessage("BlockTrainColName");
+            case WHYCOL:
+                return Bundle.getMessage("BlockWhyColName");
             default:
                 return super.getColumnName(col);
         }
@@ -310,8 +288,11 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
         switch (col) {
             case DIRECTIONCOL:
             case VALUECOL: // not a button
-            case LENGTHCOL:
+            case TRAINCOL:
+            case WHYCOL:
                 return String.class;
+            case LENGTHCOL:
+                return Float.class;
             case STATECOL: // may use an image to show block state
                 if (_graphicState) {
                     return JLabel.class;
@@ -320,11 +301,14 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
                 }
             case SPEEDCOL:
             case CURVECOL:
-            case REPORTERCOL:
-            case SENSORCOL:
                 return JComboBox.class;
+            case REPORTERCOL:
+                return Reporter.class;
+            case SENSORCOL:
+                return Sensor.class;
             case CURRENTREPCOL:
             case PERMISCOL:
+            case GHOSTCOL:
                 return Boolean.class;
             case EDITCOL:
                 return JButton.class;
@@ -339,6 +323,7 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
             case DIRECTIONCOL:
             case LENGTHCOL:
             case PERMISCOL:
+            case GHOSTCOL:
             case SPEEDCOL:
             case CURRENTREPCOL:
             case EDITCOL:
@@ -348,6 +333,10 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
             case REPORTERCOL:
             case SENSORCOL:
                 return new JTextField(8).getPreferredSize().width;
+            case TRAINCOL:
+                return new JTextField(12).getPreferredSize().width;
+            case WHYCOL:
+                return new JTextField(30).getPreferredSize().width;
             default:
                 return super.getPreferredWidth(col);
         }
@@ -364,6 +353,7 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
             case CURVECOL:
             case LENGTHCOL:
             case PERMISCOL:
+            case GHOSTCOL:
             case SPEEDCOL:
             case REPORTERCOL:
             case SENSORCOL:
@@ -371,6 +361,8 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
             case EDITCOL:
                 return true;
             case STATECOL:
+            case TRAINCOL:
+            case WHYCOL:
                 return false;
             default:
                 return super.isCellEditable(row, col);
@@ -378,13 +370,94 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
     }
 
     @Override
+    public JTable makeJTable(@Nonnull String name, @Nonnull TableModel model,
+        @CheckForNull RowSorter<? extends TableModel> sorter) {
+        if (!(model instanceof BlockTableDataModel)){
+            throw new IllegalArgumentException("Model is not a BlockTableDataModel");
+        }
+        return configureJTable(name, new BlockTableJTable((BlockTableDataModel)model), sorter);
+    }
+
+    @Override
     public void configureTable(JTable table) {
-        InstanceManager.sensorManagerInstance().addPropertyChangeListener(this);
-        InstanceManager.getDefault(ReporterManager.class).addPropertyChangeListener(this);
         configStateColumn(table);
         super.configureTable(table);
+        if (table.getColumnModel() instanceof jmri.util.swing.XTableColumnModel) {
+            jmri.util.swing.XTableColumnModel columns = (jmri.util.swing.XTableColumnModel) table.getColumnModel();
+            columns.setColumnVisible(columns.getColumnByModelIndex(TRAINCOL), false);
+            columns.setColumnVisible(columns.getColumnByModelIndex(WHYCOL), false);
+        }
     }
-    
+
+    private final java.beans.PropertyChangeListener trainRecordsListener = this::trainRecordsChanged;
+    private final java.beans.PropertyChangeListener trainRecordListener = e -> {
+        if (TrainRecord.PROPERTY_BLOCKS.equals(e.getPropertyName())
+                || TrainRecord.PROPERTY_CONFIDENCE.equals(e.getPropertyName())
+                || TrainRecord.PROPERTY_NAME.equals(e.getPropertyName())) {
+            jmri.util.ThreadingUtil.runOnGUIEventually(this::fireTableDataChanged);
+        }
+    };
+
+    private void listenToTrainRecords() {
+        TrainRecordManager trm = InstanceManager.getNullableDefault(TrainRecordManager.class);
+        if (trm == null) {
+            return;
+        }
+        trm.addPropertyChangeListener(TrainRecordManager.PROPERTY_RECORDS, trainRecordsListener);
+        for (TrainRecord r : trm.getRecords()) {
+            r.addPropertyChangeListener(trainRecordListener);
+        }
+    }
+
+    private void trainRecordsChanged(PropertyChangeEvent e) {
+        if (e.getOldValue() instanceof TrainRecord) {
+            ((TrainRecord) e.getOldValue()).removePropertyChangeListener(trainRecordListener);
+        }
+        if (e.getNewValue() instanceof TrainRecord) {
+            ((TrainRecord) e.getNewValue()).addPropertyChangeListener(trainRecordListener);
+        }
+        jmri.util.ThreadingUtil.runOnGUIEventually(this::fireTableDataChanged);
+    }
+
+    @Override
+    public synchronized void dispose() {
+        TrainRecordManager trm = InstanceManager.getNullableDefault(TrainRecordManager.class);
+        if (trm != null) {
+            trm.removePropertyChangeListener(TrainRecordManager.PROPERTY_RECORDS, trainRecordsListener);
+            for (TrainRecord r : trm.getRecords()) {
+                r.removePropertyChangeListener(trainRecordListener);
+            }
+        }
+        super.dispose();
+    }
+
+    private static java.util.List<TrainRecord> trainRecordsIn(Block b) {
+        TrainRecordManager trm = InstanceManager.getNullableDefault(TrainRecordManager.class);
+        return trm == null ? java.util.List.of() : trm.getRecordsIn(b);
+    }
+
+    private static String trainsIn(Block b) {
+        StringBuilder sb = new StringBuilder();
+        for (TrainRecord r : trainRecordsIn(b)) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(jmri.jmrit.trainrecord.TrainRecordReasons.displayName(r));
+        }
+        return sb.toString();
+    }
+
+    private static String whyIn(Block b) {
+        StringBuilder sb = new StringBuilder();
+        for (TrainRecord r : trainRecordsIn(b)) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(jmri.jmrit.trainrecord.TrainRecordReasons.why(r, b));
+        }
+        return sb.toString();
+    }
+
     void editButton(Block b) {
         BlockEditAction beanEdit = new BlockEditAction();
         beanEdit.setBean(b);
@@ -409,26 +482,16 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
 
     @Override
     public void propertyChange(PropertyChangeEvent e) {
-        if (e.getSource() instanceof SensorManager) {
-            if (e.getPropertyName().equals("length") || e.getPropertyName().equals("DisplayListName")) { // NOI18N
-                updateSensorList();
-            }
-        }
-        if (e.getSource() instanceof ReporterManager) {
-            if (e.getPropertyName().equals("length") || e.getPropertyName().equals("DisplayListName")) { // NOI18N
-                updateReporterList();
-            }
-        }
-        if (e.getPropertyName().equals("DefaultBlockSpeedChange")) { // NOI18N
+        if ( BlockManager.PROPERTY_DEFAULT_BLOCK_SPEED_CHANGE.equals(e.getPropertyName()) ) {
             updateSpeedList();
         } else {
             super.propertyChange(e);
         }
     }
-    
+
     private boolean metricUi = InstanceManager.getDefault(UserPreferencesManager.class)
         .getSimplePreferenceState(BlockTableAction.BLOCK_METRIC_PREF);
-    
+
     /**
      * Set and refresh the UI to use Metric or Imperial values.
      * @param boo true if metric, false for Imperial.
@@ -437,55 +500,19 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
         metricUi = boo;
         fireTableDataChanged();
     }
-    
-    private void updateSensorList() {
-        Set<Sensor> nameSet = InstanceManager.sensorManagerInstance().getNamedBeanSet();
-        String[] displayList = new String[nameSet.size()];
-        int i = 0;
-        for (Sensor nBean : nameSet) {
-            if (nBean != null) {
-                displayList[i++] = nBean.getDisplayName();
-            }
-        }
-        Arrays.sort(displayList);
-        sensorList = new String[displayList.length + 1];
-        sensorList[0] = "";
-        i = 1;
-        for (String name : displayList) {
-            sensorList[i] = name;
-            i++;
-        }
-    }
-
-    private void updateReporterList() {
-        Set<Reporter> nameSet = InstanceManager.getDefault(ReporterManager.class).getNamedBeanSet();
-        String[] displayList = new String[nameSet.size()];
-        int i = 0;
-        for (Reporter nBean : nameSet) {
-            if (nBean != null) {
-                displayList[i++] = nBean.getDisplayName();
-            }
-        }
-        Arrays.sort(displayList);
-        reporterList = new String[displayList.length + 1];
-        reporterList[0] = "";
-        i = 1;
-        for (String name : displayList) {
-            reporterList[i] = name;
-            i++;
-        }
-    }
 
     private void updateSpeedList() {
         speedList.remove(defaultBlockSpeedText);
-        defaultBlockSpeedText = (Bundle.getMessage("UseGlobal", "Global") + " " + InstanceManager.getDefault(BlockManager.class).getDefaultSpeed());
+        defaultBlockSpeedText = (Bundle.getMessage("UseGlobal", "Global")
+            + " " + InstanceManager.getDefault(BlockManager.class).getDefaultSpeed());
         speedList.add(0, defaultBlockSpeedText);
         fireTableDataChanged();
     }
-    
-    public void setDefaultSpeeds(JFrame _who) {
+
+    public void setDefaultSpeeds(JFrame frame) {
         JComboBox<String> blockSpeedCombo = new JComboBox<>(speedList);
-        
+        JComboBoxUtil.setupComboBoxMaxRows(blockSpeedCombo);
+
         blockSpeedCombo.setEditable(true);
 
         JPanel block = new JPanel();
@@ -507,14 +534,14 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
         block.setAlignmentX(Component.LEFT_ALIGNMENT);
         speedspanel.add(block);
 
-        int retval = JOptionPane.showConfirmDialog(
-                _who,
+        int retval = JmriJOptionPane.showConfirmDialog(
+                frame,
                 speedspanel,
                 title,
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.INFORMATION_MESSAGE);
+                JmriJOptionPane.OK_CANCEL_OPTION,
+                JmriJOptionPane.INFORMATION_MESSAGE);
         log.debug("Retval = {}", retval);
-        if (retval != JOptionPane.OK_OPTION) { // OK button not clicked
+        if (retval != JmriJOptionPane.OK_OPTION) { // OK button not clicked
             return;
         }
 
@@ -523,15 +550,8 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
         try {
             InstanceManager.getDefault(BlockManager.class).setDefaultSpeed(speedValue);
         } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(_who, ex.getMessage() + "\n" + speedValue);
+            JmriJOptionPane.showMessageDialog(frame, ex.getLocalizedMessage()+ "\n" + speedValue);
         }
-    }
-    
-    @Override
-    synchronized public void dispose() {
-        InstanceManager.getDefault(SensorManager.class).removePropertyChangeListener(this);
-        InstanceManager.getDefault(ReporterManager.class).removePropertyChangeListener(this);
-        super.dispose();
     }
 
     /**
@@ -543,29 +563,25 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
      * @param table a JTable of Blocks
      */
     protected void configStateColumn(JTable table) {
-        // have the state column hold a JPanel (icon)
-        //setColumnToHoldButton(table, VALUECOL, new JLabel("1234")); // for small round icon, but cannot be converted to JButton
-        // add extras, override BeanTableDataModel
-        log.debug("Block configStateColumn (I am {})", super.toString());
-        if (_graphicState) { // load icons, only once
-            //table.setDefaultEditor(JLabel.class, new ImageIconRenderer()); // there's no editor for state column in BlockTable
-            table.setDefaultRenderer(JLabel.class, new ImageIconRenderer()); // item class copied from SwitchboardEditor panel
-            // else, classic text style state indication, do nothing extra
-        }
+        log.debug("Block configStateColumn (I am {})", this);
+        if (_graphicState) {
+            // have the state column hold a JPanel (icon)
+            table.setDefaultRenderer(JLabel.class, new ImageIconRenderer());
+        } // else, classic text style state indication, do nothing extra
     }
-    
+
     // state column may be image so have the tooltip as text version of Block state.
     // length column tooltip confirms inches or cm.
     @Override
-    public String getCellToolTip(JTable table, int row, int col) {
-        switch (col) {
+    public String getCellToolTip(JTable table, int modelRow, int modelCol) {
+        switch (modelCol) {
             case BlockTableDataModel.STATECOL:
-                Block b = (Block) getValueAt(row, 0);
-                return blockDescribeState(b.getState());
+                Block b = (Block) getValueAt(modelRow, 0);
+                return b.describeState(b.getState());
             case BlockTableDataModel.LENGTHCOL:
                 return ( metricUi ? Bundle.getMessage("LengthCentimeters"): Bundle.getMessage("LengthInches"));
             default:
-                return super.getCellToolTip(table, row, col);
+                return super.getCellToolTip(table, modelRow, modelCol);
         }
     }
 
@@ -615,21 +631,23 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
         }
 
         public JLabel updateLabel(Block b) {
+            // TODO Undetected ?
+            // TODO adjust table row height for Block icons
             //  if (iconHeight > 0) { // if necessary, increase row height;
-            //table.setRowHeight(row, Math.max(table.getRowHeight(), iconHeight - 5)); // TODO adjust table row height for Block icons
+            //table.setRowHeight(row, Math.max(table.getRowHeight(), iconHeight - 5));
             //                     }
             if (b.getState()==Block.UNOCCUPIED && offIcon != null) {
                 label = new JLabel(offIcon);
-                label.setVerticalAlignment(JLabel.BOTTOM);
+                label.setVerticalAlignment(SwingConstants.BOTTOM);
             } else if (b.getState()==Block.OCCUPIED && onIcon != null) {
                 label = new JLabel(onIcon);
-                label.setVerticalAlignment(JLabel.BOTTOM);
+                label.setVerticalAlignment(SwingConstants.BOTTOM);
             } else if (b.getState()==Block.INCONSISTENT) {
-                label = new JLabel("X", JLabel.CENTER); // centered text alignment
+                label = new JLabel("X", SwingConstants.CENTER); // centered text alignment
                 label.setForeground(Color.red);
                 iconHeight = 0;
             } else { // Unknown Undetected Other
-                label = new JLabel("?", JLabel.CENTER); // centered text alignment
+                label = new JLabel("?", SwingConstants.CENTER); // centered text alignment
                 iconHeight = 0;
             }
             label.addMouseListener(new MouseAdapter() {
@@ -674,6 +692,6 @@ public class BlockTableDataModel extends BeanTableDataModel<Block> {
 
     } // end of ImageIconRenderer class
 
-    private final static Logger log = LoggerFactory.getLogger(BlockTableDataModel.class);
-    
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BlockTableDataModel.class);
+
 }

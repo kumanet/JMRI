@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.annotation.CheckForNull;
+
 /**
  * Interface for obtaining Conditionals
  * <p>
@@ -27,7 +29,7 @@ public interface ConditionalManager extends Manager<Conditional> {
 
     // to free resources when no longer used
     @Override
-    public void dispose();
+    void dispose();
 
     /**
      * Method to create a new Conditional if the Conditional does not exist
@@ -42,7 +44,7 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @return the new conditional or null if a Conditional already exists with
      *         either name
      */
-    public Conditional createNewConditional(String systemName, String userName);
+    Conditional createNewConditional(String systemName, String userName);
 
     /**
      * Parses the Conditional system name to get the parent Logix system name,
@@ -51,7 +53,17 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param name system name of Conditional
      * @return the logix for the conditional
      */
-    public Logix getParentLogix(String name);
+    @CheckForNull
+    Logix getParentLogix(String name);
+
+    /**
+     * Forget a deleted Logix as the parent of any Conditionals, so that
+     * {@link #getParentLogix(String)} no longer returns it. Called by the
+     * {@link LogixManager} when it deletes a Logix.
+     *
+     * @param x the deleted Logix
+     */
+    void forgetParentLogix(Logix x);
 
     /**
      * Method to get an existing Conditional. First looks up assuming that name
@@ -63,17 +75,20 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param name name to look up
      * @return null if no match found
      */
-    public Conditional getConditional(Logix x, String name);
+    @CheckForNull
+    Conditional getConditional(Logix x, String name);
 
-    public Conditional getConditional(String name);
-
-    @Override
-    public Conditional getByUserName(String s);
-
-    public Conditional getByUserName(Logix x, String s);
+    @CheckForNull
+    Conditional getConditional(String name);
 
     @Override
-    public Conditional getBySystemName(String s);
+    @CheckForNull
+    Conditional getByUserName(String s);
+
+    Conditional getByUserName(Logix x, String s);
+
+    @Override
+    Conditional getBySystemName(String s);
 
     /**
      * Get a list of all Conditional system names with the specified Logix
@@ -82,7 +97,7 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param x the logix
      * @return a list of Conditional system names
      */
-    public List<String> getSystemNameListForLogix(Logix x);
+    List<String> getSystemNameListForLogix(Logix x);
 
     /**
      * Delete Conditional by removing it from the manager. The parent Logix must
@@ -98,7 +113,7 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @return a copy of the map
      * @since 4.7.4
      */
-    public HashMap<String, ArrayList<String>> getWhereUsedMap();
+    HashMap<String, ArrayList<String>> getWhereUsedMap();
 
     /**
      * Add a conditional reference to the array indicated by the target system name.
@@ -106,7 +121,7 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param target The system name for the target conditional
      * @param reference The system name of the conditional that contains the conditional reference
      */
-    public void addWhereUsed(String target, String reference);
+    void addWhereUsed(@CheckForNull String target, @CheckForNull String reference);
 
     /**
      * Get a list of conditional references for the indicated conditional
@@ -114,7 +129,7 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param target The target conditional for a conditional reference
      * @return an ArrayList or null if none
      */
-    public ArrayList<String> getWhereUsed(String target);
+    ArrayList<String> getWhereUsed(String target);
 
     /**
      * Remove a conditional reference from the array indicated by the target system name.
@@ -122,13 +137,13 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param target The system name for the target conditional
      * @param reference The system name of the conditional that contains the conditional reference
      */
-    public void removeWhereUsed(String target, String reference);
+    void removeWhereUsed(String target, String reference);
 
     /**
      * Display the complete structure, used for debugging purposes.
      * @since 4.7.4
      */
-    public void displayWhereUsed();
+    void displayWhereUsed();
 
     /**
      * Get the target system names used by this conditional
@@ -136,6 +151,6 @@ public interface ConditionalManager extends Manager<Conditional> {
      * @param reference The system name of the conditional the refers to other conditionals.
      * @return a list of the target conditionals
      */
-    public ArrayList<String> getTargetList(String reference);
+    ArrayList<String> getTargetList(String reference);
 
 }

@@ -35,10 +35,11 @@ public class ExpressionSlotUsageXmlTest {
     
     @AfterEach
     public void tearDown() {
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
     
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionSlotUsageTest.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionSlotUsageTest.class);
 
 }

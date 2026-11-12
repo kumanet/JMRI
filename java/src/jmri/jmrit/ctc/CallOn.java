@@ -7,14 +7,10 @@ package jmri.jmrit.ctc;
 import java.util.ArrayList;
 import java.util.HashSet;
 import jmri.Block;
-import jmri.BlockManager;
-import jmri.InstanceManager;
 import jmri.NamedBeanHandle;
-import jmri.NamedBeanHandleManager;
 import jmri.Sensor;
 import jmri.jmrit.ctc.ctcserialdata.CallOnData;
 import jmri.jmrit.ctc.ctcserialdata.OtherData;
-import jmri.jmrit.ctc.ctcserialdata.ProjectsCommonSubs;
 
 /*
 This module supports Call On functionality.
@@ -196,7 +192,7 @@ NOTE:
         return returnValue;
     }
 
-    static private int arrayFind(String[] array, String aString) {
+    private static int arrayFind(String[] array, String aString) {
         for (int index = 0; index < array.length; index++) {
             if (aString.equals(array[index])) return index;
         }

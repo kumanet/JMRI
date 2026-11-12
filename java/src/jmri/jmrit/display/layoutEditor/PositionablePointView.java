@@ -18,6 +18,8 @@ import jmri.jmrit.signalling.SignallingGuiTools;
 import jmri.util.*;
 import jmri.util.swing.JCBHandle;
 import jmri.util.swing.JmriColorChooser;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * MVC View component for the PositionablePoint class.
@@ -53,7 +55,7 @@ public class PositionablePointView extends LayoutTrackView {
         this.positionablePoint = point;
     }
 
-    final private PositionablePoint positionablePoint;
+    private final PositionablePoint positionablePoint;
 
     public PositionablePoint getPoint() {
         return positionablePoint;
@@ -253,9 +255,15 @@ public class PositionablePointView extends LayoutTrackView {
         return new Rectangle2D.Double(c.getX() - 0.5, c.getY() - 0.5, 1.0, 1.0);
     }
 
-    @CheckReturnValue
-    protected LayoutEditor getLayoutEditor() {
-        return layoutEditor;
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Anchors, end bumpers and edge connectors are not drawn in a layout
+     * block's colours; the track segments joined to them are.
+     */
+    @Override
+    public boolean usesLayoutBlock(@Nonnull LayoutBlock layoutBlock) {
+        return false;
     }
 
     @CheckReturnValue
@@ -614,10 +622,6 @@ public class PositionablePointView extends LayoutTrackView {
         }
     }
 
-    // initialization instance variables (used when loading a LayoutEditor)
-    public String trackSegment1Name = "";
-    public String trackSegment2Name = "";
-
     /**
      * setup a connection to a track
      *
@@ -717,28 +721,22 @@ public class PositionablePointView extends LayoutTrackView {
     protected int maxHeight() {
         return 5;
     }
-    // cursor location reference for this move (relative to object)
-    int xClick = 0;
-    int yClick = 0;
 
-    public void mousePressed(MouseEvent e) {
-        // remember where we are
-        xClick = e.getX();
-        yClick = e.getY();
+    public void mousePressed(JmriMouseEvent e) {
         // if (debug) log.debug("Pressed: "+where(e));
         if (e.isPopupTrigger()) {
             showPopup(e);
         }
     }
 
-    public void mouseReleased(MouseEvent e) {
+    public void mouseReleased(JmriMouseEvent e) {
         // if (debug) log.debug("Release: "+where(e));
         if (e.isPopupTrigger()) {
             showPopup(e);
         }
     }
 
-    public void mouseClicked(MouseEvent e) {
+    public void mouseClicked(JmriMouseEvent e) {
         if (e.isPopupTrigger()) {
             showPopup(e);
         }
@@ -751,7 +749,7 @@ public class PositionablePointView extends LayoutTrackView {
      */
     @Override
     @Nonnull
-    protected JPopupMenu showPopup(@Nonnull MouseEvent mouseEvent) {
+    protected JPopupMenu showPopup(@Nonnull JmriMouseEvent mouseEvent) {
         if (popup != null) {
             popup.removeAll();
         } else {
@@ -798,8 +796,8 @@ public class PositionablePointView extends LayoutTrackView {
                 if (blockEnd != null) {
                     jmi = popup.add(Bundle.getMessage("MakeLabel", Bundle.getMessage("BlockID")) + blockEnd.getDisplayName());
                     jmi.setEnabled(false);
+                    addSensorsAndSignalMasksMenuItemsFlag = true;
                 }
-                addSensorsAndSignalMasksMenuItemsFlag = true;
                 break;
             case EDGE_CONNECTOR:
                 jmi = popup.add(Bundle.getMessage("MakeLabel", Bundle.getMessage("EdgeConnector")) + getName());
@@ -1204,7 +1202,8 @@ public class PositionablePointView extends LayoutTrackView {
             @Override
             public void actionPerformed(ActionEvent e
             ) {
-                if (canRemove() && layoutEditor.removePositionablePoint(positionablePoint)) {
+                if (canRemove() && removeInlineLogixNG()
+                        && layoutEditor.removePositionablePoint(positionablePoint)) {
                     // user is serious about removing this point from the panel
                     clearPossibleSelection();
                     remove();
@@ -1318,6 +1317,8 @@ public class PositionablePointView extends LayoutTrackView {
         }
 
         layoutEditor.setShowAlignmentMenu(popup);
+
+        addCommonPopupItems(mouseEvent, popup);
 
         popup.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
 
@@ -1456,6 +1457,11 @@ public class PositionablePointView extends LayoutTrackView {
     void setLink() {
         if (getConnect1() == null || getConnect1().getLayoutBlock() == null) {
             log.error("{}.setLink(); Can not set link until we have a connecting track with a block assigned", getName());
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("EdgeLinkErrorMessage"),
+                    Bundle.getMessage("EdgeLinkErrorTitle"),
+                    JmriJOptionPane.ERROR_MESSAGE
+                    );
             return;
         }
         editLink = new JDialog();
@@ -1986,5 +1992,5 @@ public class PositionablePointView extends LayoutTrackView {
         // nothing to see here, move along...
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PositionablePointView.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PositionablePointView.class);
 }

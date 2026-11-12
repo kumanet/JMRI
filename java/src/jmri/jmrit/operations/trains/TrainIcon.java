@@ -2,18 +2,11 @@ package jmri.jmrit.operations.trains;
 
 import java.awt.Point;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
-import java.text.MessageFormat;
 import java.util.List;
 
-import javax.swing.AbstractAction;
-import javax.swing.JMenu;
-import javax.swing.JOptionPane;
-import javax.swing.JPopupMenu;
+import javax.swing.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import jmri.DccLocoAddress;
 import jmri.InstanceManager;
 import jmri.jmrit.display.Editor;
 import jmri.jmrit.display.LocoIcon;
@@ -21,8 +14,12 @@ import jmri.jmrit.operations.rollingstock.cars.Car;
 import jmri.jmrit.operations.rollingstock.cars.CarManager;
 import jmri.jmrit.operations.routes.Route;
 import jmri.jmrit.operations.routes.RouteLocation;
+import jmri.jmrit.operations.trains.gui.TrainConductorAction;
 import jmri.jmrit.operations.trains.tools.ShowCarsInTrainAction;
 import jmri.jmrit.throttle.ThrottleFrameManager;
+import jmri.jmrit.throttle.interfaces.ThrottleControllerUI;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * An icon that displays the position of a train icon on a panel.
@@ -69,8 +66,8 @@ public class TrainIcon extends LocoIcon {
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         if (!_train.setTrainIconCoordinates()) {
-                            JOptionPane.showMessageDialog(null, Bundle.getMessage("SeeOperationsSettings"), Bundle
-                                    .getMessage("SetX&YisDisabled"), JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("SeeOperationsSettings"), Bundle
+                                    .getMessage("SetX&YisDisabled"), JmriJOptionPane.ERROR_MESSAGE);
                         }
                     }
                 });
@@ -104,18 +101,18 @@ public class TrainIcon extends LocoIcon {
         return _consistNumber;
     }
 
-    jmri.jmrit.throttle.ThrottleFrame _tf = null;
+    ThrottleControllerUI _tf = null;
 
     private void createThrottle() {
         _tf = InstanceManager.getDefault(ThrottleFrameManager.class).createThrottleFrame();
         if (getConsistNumber() > 0) {
-            _tf.getAddressPanel().setAddress(getConsistNumber(), false); // use consist address
-            if (JOptionPane.showConfirmDialog(null, Bundle.getMessage("SendFunctionCommands"), Bundle
-                    .getMessage("ConsistThrottle"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-                _tf.getAddressPanel().setRosterEntry(_entry); // use lead loco address
+            _tf.setAddress(new DccLocoAddress(getConsistNumber(), false)); // use consist address
+            if (JmriJOptionPane.showConfirmDialog(null, Bundle.getMessage("SendFunctionCommands"), Bundle
+                    .getMessage("ConsistThrottle"), JmriJOptionPane.YES_NO_OPTION) == JmriJOptionPane.YES_OPTION) {
+                _tf.setRosterEntry(_entry); // use lead loco address
             }
         } else {
-            _tf.getAddressPanel().setRosterEntry(_entry);
+            _tf.setRosterEntry(_entry);
         }
         _tf.toFront();
     }
@@ -130,33 +127,41 @@ public class TrainIcon extends LocoIcon {
         for (RouteLocation rl : route.getLocationsBySequenceList()) {
             int pickupCars = 0;
             int dropCars = 0;
+            int localCars = 0;
             String current = "     ";
             if (_train.getCurrentRouteLocation() == rl) {
                 current = "-> "; // NOI18N
             }
             for (Car car : carList) {
-                if (car.getRouteLocation() == rl && !car.getTrackName().equals(Car.NONE)) {
+                if (car.getRouteLocation() == rl &&
+                        !car.getTrackName().equals(Car.NONE) &&
+                        car.getRouteDestination() == rl) {
+                    localCars++;
+                } else if (car.getRouteLocation() == rl && !car.getTrackName().equals(Car.NONE)) {
                     pickupCars++;
                 }
-                if (car.getRouteDestination() == rl) {
+                else if (car.getRouteDestination() == rl) {
                     dropCars++;
                 }
             }
-            String rText = "";
+            String rText = current + rl.getName();
             String pickups = "";
             String drops = "";
+            String local = "";
             if (pickupCars > 0) {
-                pickups = " " + Bundle.getMessage("Pickup") + " " + pickupCars;
-                if (dropCars > 0) {
-                    drops = ", " + Bundle.getMessage("SetOut") + " " + dropCars;
-                }
-            } else if (dropCars > 0) {
-                drops = " " + Bundle.getMessage("SetOut") + " " + dropCars;
+                pickups = " " + Bundle.getMessage("Pickup") + " " + pickupCars + ",";
             }
-            if (pickupCars > 0 || dropCars > 0) {
-                rText = current + rl.getName() + "  (" + pickups + drops + " )";
-            } else {
-                rText = current + rl.getName();
+            if (dropCars > 0) {
+                drops = " " + Bundle.getMessage("SetOut") + " " + dropCars + ",";
+            }
+            if (localCars > 0) {
+                local = " " + Bundle.getMessage("LocalMoves") + " " + localCars + ",";
+            }
+            if (pickupCars > 0 || dropCars > 0 || localCars > 0) {
+                String actonText = pickups + drops + local;
+                // remove last comma
+                actonText = actonText.substring(0, actonText.length() - 1);
+                rText = rText + "  (" + actonText + " )";
             }
             routeMenu.add(new RouteAction(rText, rl));
         }
@@ -209,10 +214,10 @@ public class TrainIcon extends LocoIcon {
                         if (nextRl == _rl && i == r + 1) {
                             _train.move();
                         } else if (nextRl == _rl) {
-                            if (JOptionPane.showConfirmDialog(null, MessageFormat.format(Bundle
-                                    .getMessage("MoveTrainTo"), new Object[]{_rl.getName()}), MessageFormat.format(
-                                    Bundle.getMessage("MoveTrain"), new Object[]{_train.getIconName()}),
-                                    JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                            if (JmriJOptionPane.showConfirmDialog(null, Bundle
+                                    .getMessage("MoveTrainTo", _rl.getName()), 
+                                    Bundle.getMessage("MoveTrain", _train.getIconName()),
+                                    JmriJOptionPane.YES_NO_OPTION) == JmriJOptionPane.YES_OPTION) {
                                 while (_train.getCurrentRouteLocation() != _rl) {
                                     _train.move();
                                 }
@@ -232,7 +237,7 @@ public class TrainIcon extends LocoIcon {
      * route.
      */
     @Override
-    public void doMouseDragged(MouseEvent event) {
+    public void doMouseDragged(JmriMouseEvent event) {
         log.debug("Mouse dragged, X={} Y={}", getX(), getY());
         if (_train != null) {
             RouteLocation next = _train.getNextRouteLocation(_train.getCurrentRouteLocation());
@@ -241,9 +246,9 @@ public class TrainIcon extends LocoIcon {
                 log.debug("Next location ({}), X={} Y={}", next.getName(), nextPoint.x, nextPoint.y);
                 if (Math.abs(getX() - nextPoint.x) < next.getTrainIconRangeX() && Math.abs(getY() - nextPoint.y) < next.getTrainIconRangeY()) {
                     log.debug("Train icon ({}) within range of ({})", _train.getName(), next.getName());
-                    if (JOptionPane.showConfirmDialog(null, MessageFormat.format(Bundle.getMessage("MoveTrainTo"),
-                            new Object[]{next.getName()}), MessageFormat.format(Bundle.getMessage("MoveTrain"),
-                            new Object[]{_train.getIconName()}), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                    if (JmriJOptionPane.showConfirmDialog(null, Bundle.getMessage("MoveTrainTo",
+                            next.getName()), Bundle.getMessage("MoveTrain",
+                            _train.getIconName()), JmriJOptionPane.YES_NO_OPTION) == JmriJOptionPane.YES_OPTION) {
                         _train.move();
                     }
                 }
@@ -251,5 +256,5 @@ public class TrainIcon extends LocoIcon {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TrainIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrainIcon.class);
 }

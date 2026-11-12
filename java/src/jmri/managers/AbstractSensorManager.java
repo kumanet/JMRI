@@ -8,8 +8,6 @@ import jmri.Manager;
 import jmri.Sensor;
 import jmri.SensorManager;
 import jmri.SystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract base implementation of the SensorManager interface.
@@ -20,7 +18,7 @@ public abstract class AbstractSensorManager extends AbstractManager<Sensor> impl
 
     /**
      * Create a new SensorManager instance.
-     * 
+     *
      * @param memo the system connection
      */
     public AbstractSensorManager(SystemConnectionMemo memo) {
@@ -137,13 +135,13 @@ public abstract class AbstractSensorManager extends AbstractManager<Sensor> impl
 
     /**
      * Internal method to invoke the factory and create a new Sensor.
-     * 
+     *
      * Called after all the logic for returning an existing Sensor
      * has been invoked.
      * An existing SystemName is not found, existing UserName not found.
-     * 
+     *
      * Implementing classes should base Sensor on the system name, then add user name.
-     * 
+     *
      * @param systemName the system name to use for the new Sensor
      * @param userName   the optional user name to use for the new Sensor
      * @return the new Sensor
@@ -154,30 +152,29 @@ public abstract class AbstractSensorManager extends AbstractManager<Sensor> impl
 
     /**
      * {@inheritDoc}
-     * Note that this null implementation only needs be implemented in
-     * system-specific SensorManagers where readout of sensor status from the
-     * layout is possible.
+     * Delay between requesting individual Sensor status is determined by the
+     * Connection Output Interval Setting.
      */
     @Override
     public void updateAll() {
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean allowMultipleAdditions(@Nonnull String systemName) {
-        return false;
+        int i = 0;
+        for ( Sensor nb : getNamedBeanSet() ) {
+            jmri.util.ThreadingUtil.runOnLayoutDelayed( nb::requestUpdateFromLayout,
+                i * getMemo().getOutputInterval() );
+            i++;
+        }
     }
 
     /**
      * Default Sensor ensures a numeric only system name.
-     * {@inheritDoc} 
+     * {@inheritDoc}
      */
     @Nonnull
     @Override
     public String createSystemName(@Nonnull String curAddress, @Nonnull String prefix) throws JmriException {
         return prefix + typeLetter() + checkNumeric(curAddress);
     }
-    
+
     protected long sensorDebounceGoingActive = 0L;
     protected long sensorDebounceGoingInActive = 0L;
 
@@ -242,6 +239,6 @@ public abstract class AbstractSensorManager extends AbstractManager<Sensor> impl
         return Bundle.getMessage("EnterNumber1to9999ToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractSensorManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractSensorManager.class);
 
 }

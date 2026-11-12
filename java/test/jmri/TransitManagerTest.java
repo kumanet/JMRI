@@ -3,7 +3,6 @@ package jmri;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
 
 /**
  *
@@ -13,8 +12,8 @@ public class TransitManagerTest {
 
     @Test
     public void testCTor() {
-        TransitManager t = new TransitManager();
-        Assert.assertNotNull("exists",t);
+        TransitManager t = new jmri.managers.DefaultTransitManager();
+        Assertions.assertNotNull( t, "exists");
     }
 
     @BeforeEach
@@ -25,10 +24,9 @@ public class TransitManagerTest {
     @AfterEach
     public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TransitManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(TransitManagerTest.class);
 
 }

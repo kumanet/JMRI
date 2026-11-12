@@ -68,6 +68,9 @@ public class BlockContentsIconXml extends PositionableLabelXml {
                 element.addContent(e2);
             }
         }
+
+        storeLogixNG_Data(p, element);
+
         return element;
     }
 
@@ -157,7 +160,9 @@ public class BlockContentsIconXml extends PositionableLabelXml {
         }
         l.setOriginalLocation(x, y);
         l.displayState();
+
+        loadLogixNG_Data(l, element);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(BlockContentsIconXml.class);
+    private static final Logger log = LoggerFactory.getLogger(BlockContentsIconXml.class);
 }

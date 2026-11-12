@@ -43,7 +43,7 @@ public class StringFormulaSwing extends AbstractStringExpressionSwing {
             parser.parseExpression(_formula.getText());
         } catch (ParserException ex) {
             errorMessages.add(Bundle.getMessage("StringFormula_InvalidFormula", _formula.getText()));
-            log.error("Invalid formula '"+_formula.getText()+"'. Error: "+ex.getMessage(), ex);
+            log.error("Invalid formula '{}'. Error: ", _formula.getText(), ex);
             return false;
         }
         return true;
@@ -84,6 +84,6 @@ public class StringFormulaSwing extends AbstractStringExpressionSwing {
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringFormulaSwing.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringFormulaSwing.class);
     
 }

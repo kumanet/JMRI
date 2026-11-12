@@ -64,10 +64,10 @@ public class DefaultMaleStringExpressionSocket extends AbstractMaleSocket
             }
         } catch (RuntimeException e) {
             handleError(this, Bundle.getMessage("ExceptionEvaluate", e.getLocalizedMessage()), e, log);
+        } finally {
+            currentConditionalNG.getStack().setCount(currentStackPos);
+            currentConditionalNG.getSymbolTable().removeSymbols(_localVariables);
         }
-        
-        currentConditionalNG.getStack().setCount(currentStackPos);
-        currentConditionalNG.getSymbolTable().removeSymbols(_localVariables);
         
         return result;
     }
@@ -92,7 +92,7 @@ public class DefaultMaleStringExpressionSocket extends AbstractMaleSocket
      */
     @Override
     public void registerListenersForThisClass() {
-        ((StringExpressionBean)getObject()).registerListeners();
+        getObject().registerListeners();
     }
     
     /**
@@ -100,7 +100,7 @@ public class DefaultMaleStringExpressionSocket extends AbstractMaleSocket
      */
     @Override
     public void unregisterListenersForThisClass() {
-        ((StringExpressionBean)getObject()).unregisterListeners();
+        getObject().unregisterListeners();
     }
     
     @Override
@@ -216,6 +216,6 @@ public class DefaultMaleStringExpressionSocket extends AbstractMaleSocket
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleStringExpressionSocket.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleStringExpressionSocket.class);
 
 }

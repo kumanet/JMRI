@@ -3,8 +3,8 @@ package jmri.jmrit.operations.trains.excel;
 import java.awt.GraphicsEnvironment;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
 import org.junit.Assume;
+import org.junit.jupiter.api.Test;
 
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
@@ -36,11 +36,11 @@ public class SetupExcelProgramManifestFrameTest extends OperationsTestCase {
         f.initComponents();
         Assert.assertTrue(f.isShowing());
 
-        JemmyUtil.enterClickAndLeave(f.addButton);
+        JemmyUtil.enterClickAndLeaveThreadSafe(f.addButton);
 
         // abort find file
         JemmyUtil.pressDialogButton(Bundle.getMessage("FindDesiredExcelFile"), "Cancel");
-
+        JemmyUtil.waitFor(f);
         JUnitUtil.dispose(f);
         
         JUnitOperationsUtil.checkOperationsShutDownTask();
@@ -55,11 +55,10 @@ public class SetupExcelProgramManifestFrameTest extends OperationsTestCase {
         f.initComponents();
         Assert.assertTrue(f.isShowing());
 
-        JemmyUtil.enterClickAndLeave(f.testButton);
-
+        JemmyUtil.enterClickAndLeaveThreadSafe(f.testButton);
         // kill dialog
         JemmyUtil.pressDialogButton(f, Bundle.getMessage("ManifestCreatorNotFound"), Bundle.getMessage("ButtonOK"));
-
+        JemmyUtil.waitFor(f);
         JUnitUtil.dispose(f);
         JUnitOperationsUtil.checkOperationsShutDownTask();
     }
@@ -85,7 +84,16 @@ public class SetupExcelProgramManifestFrameTest extends OperationsTestCase {
         JUnitUtil.dispose(f);
         JUnitOperationsUtil.checkOperationsShutDownTask();
     }
+    
+    @Test
+    public void testCloseWindowOnSave() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        SetupExcelProgramManifestFrame f = new SetupExcelProgramManifestFrame();
+        f.initComponents();
+        JUnitOperationsUtil.testCloseWindowOnSave(f.getTitle());
+        JUnitOperationsUtil.checkOperationsShutDownTask();
+    }
 
-    // private final static Logger log = LoggerFactory.getLogger(SetupExcelProgramManifestFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SetupExcelProgramManifestFrameTest.class);
 
 }

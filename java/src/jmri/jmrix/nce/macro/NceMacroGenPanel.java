@@ -1,15 +1,12 @@
 package jmri.jmrix.nce.macro;
 
-import java.awt.Dimension;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
+import java.awt.*;
+
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import jmri.jmrix.nce.NceMessage;
-import jmri.jmrix.nce.NceReply;
-import jmri.jmrix.nce.NceSystemConnectionMemo;
-import jmri.jmrix.nce.NceTrafficController;
+
+import jmri.jmrix.nce.*;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Pane for user input of NCE macros.
@@ -21,8 +18,8 @@ import jmri.jmrix.nce.NceTrafficController;
 public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements jmri.jmrix.nce.NceListener {
 
     // member declarations
-    javax.swing.JLabel jLabel1 = new javax.swing.JLabel(Bundle.getMessage("Macro"));
-    javax.swing.JLabel macroText = new javax.swing.JLabel(Bundle.getMessage("Reply"));
+    javax.swing.JLabel jLabel1 = new javax.swing.JLabel(Bundle.getMessage("MacroLabel"));
+    javax.swing.JLabel macroText = new javax.swing.JLabel(Bundle.getMessage("ReplyLabel"));
     javax.swing.JLabel macroReply = new javax.swing.JLabel();
     javax.swing.JButton sendButton = new javax.swing.JButton(Bundle.getMessage("Send"));
     javax.swing.JTextField packetTextField = new javax.swing.JTextField(4);
@@ -72,6 +69,14 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
     }
 
     /**
+     * The minimum frame size for font size 16
+     */
+    @Override
+    public Dimension getMinimumDimension() {
+        return new Dimension(200, 200);
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -84,8 +89,8 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
         macroReply.setText(Bundle.getMessage("unknown"));
 
         // load tool tips
-        sendButton.setToolTipText("Execute NCE macro");
-        packetTextField.setToolTipText("Enter macro 0 to 255");
+        sendButton.setToolTipText(Bundle.getMessage("toolTipExecuteMacro"));
+        packetTextField.setToolTipText(Bundle.getMessage("toolTipEnterMacro", 255));
 
         packetTextField.setMaximumSize(new Dimension(packetTextField
                 .getMaximumSize().width, packetTextField.getPreferredSize().height));
@@ -108,7 +113,6 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
                 sendButtonActionPerformed(e);
             }
         });
-
     }
 
     public void sendButtonActionPerformed(java.awt.event.ActionEvent e) {
@@ -117,9 +121,11 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
         // Send Macro
         NceMessage m = createMacroCmd(input);
         if (m == null) {
-            macroReply.setText("error");
-            JOptionPane.showMessageDialog(this,
-                    Bundle.getMessage("EnterMacroNumber"), Bundle.getMessage("NceMacro"), JOptionPane.ERROR_MESSAGE);
+            macroReply.setText(Bundle.getMessage("error"));
+            JmriJOptionPane.showMessageDialog(this,
+                    Bundle.getMessage("EnterMacroNumber", 255),
+                    Bundle.getMessage("NceMacro"),
+                    JmriJOptionPane.ERROR_MESSAGE);
             return;
         }
         macroReply.setText(Bundle.getMessage("waiting"));
@@ -140,7 +146,7 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
         if (r.getNumDataElements() == NceMessage.REPLY_1) {
 
             int recChar = r.getElement(0);
-            if (recChar == '!') {
+            if (recChar == NceMessage.NCE_OKAY) {
                 macroReply.setText(Bundle.getMessage("okay"));
             }
             if (recChar == '0') {
@@ -226,7 +232,7 @@ public class NceMacroGenPanel extends jmri.jmrix.nce.swing.NcePanel implements j
     /**
      * Nested class to create one of these using old-style defaults.
      */
-    static public class Default extends jmri.jmrix.nce.swing.NceNamedPaneAction {
+    public static class Default extends jmri.jmrix.nce.swing.NceNamedPaneAction {
 
         public Default() {
             super("Open NCE Send Macro Window",

@@ -1,10 +1,15 @@
 package jmri.jmrit.logixng.actions;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 import jmri.*;
 import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.util.LogixNG_SelectEnum;
+import jmri.jmrit.logixng.util.LogixNG_SelectInteger;
+import jmri.jmrit.logixng.util.parser.ParserException;
 import jmri.util.ThreadingUtil;
 
 /**
@@ -15,8 +20,11 @@ import jmri.util.ThreadingUtil;
  */
 public class ActionClock extends AbstractDigitalAction {
 
-    private ClockState _clockState = ClockState.SetClock;
-    private int _clockTime = 0;
+    private final LogixNG_SelectEnum<ClockState> _selectEnum =
+            new LogixNG_SelectEnum<>(this, ClockState.values(), ClockState.SetClock);
+    private final LogixNG_SelectInteger _selectValue =
+            new LogixNG_SelectInteger(this, new TimeFormatterParserValidator());
+
 
     public ActionClock(String sys, String user)
             throws BadUserNameException, BadSystemNameException {
@@ -24,32 +32,24 @@ public class ActionClock extends AbstractDigitalAction {
     }
 
     @Override
-    public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) {
+    public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames) throws ParserException {
         DigitalActionManager manager = InstanceManager.getDefault(DigitalActionManager.class);
         String sysName = systemNames.get(getSystemName());
         String userName = userNames.get(getSystemName());
         if (sysName == null) sysName = manager.getAutoSystemName();
         ActionClock copy = new ActionClock(sysName, userName);
         copy.setComment(getComment());
-        copy.setBeanState(_clockState);
-        copy.setClockTime(_clockTime);
+        _selectEnum.copy(copy._selectEnum);
+        _selectValue.copy(copy._selectValue);
         return manager.registerAction(copy);
     }
 
-    public void setBeanState(ClockState state) {
-        _clockState = state;
+    public LogixNG_SelectEnum<ClockState> getSelectEnum() {
+        return _selectEnum;
     }
 
-    public ClockState getBeanState() {
-        return _clockState;
-    }
-
-    public void setClockTime(int minutes) {
-        _clockTime = minutes;
-    }
-
-    public int getClockTime() {
-        return _clockTime;
+    public LogixNG_SelectInteger getSelectTime() {
+        return _selectValue;
     }
 
     /**
@@ -69,36 +69,38 @@ public class ActionClock extends AbstractDigitalAction {
 
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return true;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
 
     /** {@inheritDoc} */
     @Override
     public void execute() throws JmriException {
-        ClockState theState = _clockState;
+
+        ClockState theState = _selectEnum.evaluateEnum(getConditionalNG());
+        int theValue = _selectValue.evaluateValue(getConditionalNG());
+
+        jmri.Timebase timebase = InstanceManager.getDefault(jmri.Timebase.class);
+
         ThreadingUtil.runOnLayoutWithJmriException(() -> {
             switch(theState) {
                 case SetClock:
                     Calendar cal = Calendar.getInstance();
-                    cal.setTime(InstanceManager.getDefault(jmri.Timebase.class).getTime());
-                    cal.set(Calendar.HOUR_OF_DAY, _clockTime / 60);
-                    cal.set(Calendar.MINUTE, _clockTime % 60);
+                    cal.setTime(timebase.getTime());
+                    cal.set(Calendar.HOUR_OF_DAY, theValue / 60);
+                    cal.set(Calendar.MINUTE, theValue % 60);
                     cal.set(Calendar.SECOND, 0);
-                    InstanceManager.getDefault(jmri.Timebase.class).userSetTime(cal.getTime());
+                    timebase.userSetTime(cal.getTime());
                     break;
+
                 case StartClock:
-                    InstanceManager.getDefault(jmri.Timebase.class).setRun(true);
+                    timebase.setRun(true);
                     break;
+
                 case StopClock:
-                    InstanceManager.getDefault(jmri.Timebase.class).setRun(false);
+                    timebase.setRun(false);
                     break;
+
                 default:
                     throw new IllegalArgumentException("Invalid clock state: " + theState.name());
             }
@@ -122,10 +124,20 @@ public class ActionClock extends AbstractDigitalAction {
 
     @Override
     public String getLongDescription(Locale locale) {
-        if (getBeanState() == ClockState.SetClock) {
-            return Bundle.getMessage(locale, "ActionClock_LongTime", _clockState._text, ActionClock.formatTime(getClockTime()));
+        String value;
+        if (_selectValue.isDirectAddressing()) {
+            value = formatTime(_selectValue.getValue());
+        } else {
+            value = _selectValue.getDescription(locale);
         }
-        return Bundle.getMessage(locale, "ActionClock_Long", _clockState._text);
+        if (_selectEnum.isDirectAddressing()) {
+            if (_selectEnum.getEnum() == ClockState.SetClock) {
+                return Bundle.getMessage(locale, "ActionClock_LongTime", _selectEnum.getDescription(locale), value);
+            }
+            return Bundle.getMessage(locale, "ActionClock_Long", _selectEnum.getDescription(locale), value);
+        } else {
+            return Bundle.getMessage(locale, "ActionClock_LongTimeIndirect", _selectEnum.getDescription(locale), value);
+        }
     }
 
     /** {@inheritDoc} */
@@ -136,18 +148,9 @@ public class ActionClock extends AbstractDigitalAction {
 
     /** {@inheritDoc} */
     @Override
-    public void registerListenersForThisClass() {
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void unregisterListenersForThisClass() {
-    }
-
-    /** {@inheritDoc} */
-    @Override
     public void disposeMe() {
     }
+
 
     public enum ClockState {
         SetClock(Bundle.getMessage("ActionClock_SetClock")),
@@ -167,6 +170,76 @@ public class ActionClock extends AbstractDigitalAction {
 
     }
 
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ActionPower.class);
+
+    private static class TimeFormatterParserValidator
+            implements LogixNG_SelectInteger.FormatterParserValidator {
+
+        @Override
+        public int getInitialValue() {
+            return 0;
+        }
+
+        @Override
+        public String format(int value) {
+            return ActionClock.formatTime(value);
+        }
+
+        @Override
+        public int parse(String str) {
+            int minutes;
+
+            try {
+                minutes = Integer.parseInt(str);
+                if (minutes < 0 || minutes > 1439) {
+                    return 0;
+                }
+                return minutes;
+            } catch (NumberFormatException e) {
+                // Do nothing
+            }
+
+            LocalTime newHHMM;
+            try {
+                newHHMM = LocalTime.parse(str.trim(), DateTimeFormatter.ofPattern("H:mm"));
+                minutes = newHHMM.getHour() * 60 + newHHMM.getMinute();
+                if (minutes < 0 || minutes > 1439) {
+                    return 0;
+                }
+                return minutes;
+            } catch (DateTimeParseException ex) {
+                return 0;
+            }
+        }
+
+        @Override
+        public String validate(String str) {
+            int minutes;
+
+            try {
+                minutes = Integer.parseInt(str);
+                if (minutes < 0 || minutes > 1439) {
+                    return Bundle.getMessage("ActionClock_RangeError");
+                }
+                return null;
+            } catch (NumberFormatException e) {
+                // Do nothing
+            }
+
+            LocalTime newHHMM;
+            try {
+                newHHMM = LocalTime.parse(str.trim(), DateTimeFormatter.ofPattern("H:mm"));
+                minutes = newHHMM.getHour() * 60 + newHHMM.getMinute();
+                if (minutes < 0 || minutes > 1439) {
+                    return Bundle.getMessage("ActionClock_RangeError");
+                }
+            } catch (DateTimeParseException ex) {
+                return Bundle.getMessage("ActionClock_ParseError", ex.getParsedString());
+            }
+            return null;
+        }
+
+    }
+
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ActionPower.class);
 
 }

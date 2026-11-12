@@ -25,12 +25,12 @@ import org.slf4j.LoggerFactory;
  * @author Dave Duchamp Copyright (c) 2008
  * @author George Warner Copyright (c) 2017-2018
  */
-final public class LayoutEditorAuxTools {
+public final class LayoutEditorAuxTools {
     // constants
 
     // operational instance variables
-    final private LayoutModels models;
-    final private List<LayoutConnectivity> cList = new ArrayList<>(); // LayoutConnectivity list
+    private final LayoutModels models;
+    private final List<LayoutConnectivity> cList = new ArrayList<>(); // LayoutConnectivity list
     private boolean blockConnectivityChanged = false;  // true if block connectivity may have changed
     private boolean initialized = false;
 
@@ -87,13 +87,14 @@ final public class LayoutEditorAuxTools {
      * 2) and 3) above. For case 1), two track segments, the direction reflects
      * an "average" over the two track segments. See LayoutConnectivity for the
      * allowed values of direction.
+     * <p>
+     * Normally the initialization only occurs once after the panel is loaded.  When edge
+     * connectors are used, an incomplete LayoutConnectivity table can occur due to the
+     * panel loading sequence and the complexity of edge connector relationships.
+     * An additional initialization is allowed to build the final LayoutConnectivity table.
      */
     public void initializeBlockConnectivity() {
-        if (initialized) {
-            log.error("Call to initialize a connectivity list that has already been initialized");  // NOI18N
-            return;
-        }
-        cList.clear(); 
+        cList.clear();
         List<LayoutConnectivity> lcs = null;
 
         for (LayoutTrackView ltv : models.getLayoutTrackViews()) {
@@ -294,7 +295,7 @@ final public class LayoutEditorAuxTools {
                             || ((ltz.getTurnoutType() == LayoutTurnout.TurnoutType.LH_XOVER)
                             && ((lc.getConnectedType() == HitPointType.TURNOUT_A)
                             || (lc.getConnectedType() == HitPointType.TURNOUT_C)))) {
-                            
+
                         Turnout ltzto = ltz.getTurnout();
                         if (ltzto != null) {
                             bs = new BeanSetting(ltzto, ltz.getTurnoutName(), Turnout.CLOSED);
@@ -445,7 +446,8 @@ final public class LayoutEditorAuxTools {
                                 p.addSetting(bs);
                             } else {
                                 log.error("No assigned turnout (J): LTO = {}, blk = {}", // NOI18N
-                                        ((LayoutTurnout) curConnection).getName(), ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
+                                    curConnection.getName(),
+                                    ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
                             }
                             prevConnection = curConnection;
                             if (typeCurConnection == HitPointType.TURNOUT_A) {
@@ -475,7 +477,8 @@ final public class LayoutEditorAuxTools {
                             p.addSetting(bs);
                         } else {
                             log.error("No assigned turnout (K): LTO = {}, blk = {}", // NOI18N
-                                    ((LayoutTurnout) curConnection).getName(), ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
+                                curConnection.getName(),
+                                ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
                         }
                         prevConnection = curConnection;
                         curConnection = ((LayoutTurnout) curConnection).getConnectA();
@@ -491,7 +494,8 @@ final public class LayoutEditorAuxTools {
                             p.addSetting(bs);
                         } else {
                             log.error("No assigned turnout (L): LTO = {}, blk = {}", // NOI18N
-                                    ((LayoutTurnout) curConnection).getName(), ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
+                                curConnection.getName(),
+                                ((LayoutTurnout) curConnection).getLayoutBlock().getDisplayName());
                         }
                         prevConnection = curConnection;
                         curConnection = ((LayoutTurnout) curConnection).getConnectA();
@@ -843,6 +847,16 @@ final public class LayoutEditorAuxTools {
                     );
                 }
                 curConnection = null;
+            } else if (HitPointType.isTraverserSlotHitType(typeCurConnection)) {
+                if (log.isInfoEnabled()) {
+                    log.warn("Layout Block: {}, found track type: {}, to " // NOI18N
+                                    + "Block: {}, is potentially assigned to traverser slot", // NOI18N
+                            layoutBlock.getDisplayName(),
+                            typeCurConnection,
+                            p.getBlock().getDisplayName()
+                    );
+                }
+                curConnection = null;
             } else {
                 // catch when some new type got added
                 log.error("Layout Block: {} found unknown track type: {}" // NOI18N
@@ -857,6 +871,6 @@ final public class LayoutEditorAuxTools {
     }   // addBeanSettings
 
     // initialize logging
-    private final static Logger log
+    private static final Logger log
             = LoggerFactory.getLogger(LayoutEditorAuxTools.class);
 }

@@ -1,9 +1,6 @@
 package jmri.jmrit.logixng.tools.debugger.configurexml;
 
-import java.util.List;
-
 import jmri.jmrit.logixng.*;
-import jmri.jmrit.logixng.SymbolTable.InitialValueType;
 import jmri.jmrit.logixng.configurexml.MaleSocketXml;
 
 import org.jdom2.Element;
@@ -86,5 +83,5 @@ public class AbstractDebuggerMaleSocketXml
         return true;
     }
     
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractDebuggerMaleSocketXml.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractDebuggerMaleSocketXml.class);
 }

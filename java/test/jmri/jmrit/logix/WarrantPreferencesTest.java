@@ -2,10 +2,7 @@ package jmri.jmrit.logix;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
@@ -16,7 +13,7 @@ public class WarrantPreferencesTest {
     @Test
     public void testCTor() {
         WarrantPreferences t = new WarrantPreferences();
-        assertThat(t).withFailMessage("exists").isNotNull();
+        Assertions.assertNotNull( t, "exists");
     }
 
     @BeforeEach
@@ -29,6 +26,6 @@ public class WarrantPreferencesTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(WarrantPreferencesTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(WarrantPreferencesTest.class);
 
 }

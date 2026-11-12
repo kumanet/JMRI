@@ -1,17 +1,16 @@
 package jmri.jmrit.display.layoutEditor.LayoutEditorDialogs;
 
-import java.awt.GraphicsEnvironment;
 import java.awt.geom.Point2D;
 
 import javax.swing.*;
 
-import jmri.jmrit.display.EditorFrameOperator;
 import jmri.jmrit.display.layoutEditor.*;
 import jmri.util.*;
 import jmri.util.swing.JemmyUtil;
 
 import org.junit.Assume;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.netbeans.jemmy.operators.*;
 
 /**
@@ -19,19 +18,18 @@ import org.netbeans.jemmy.operators.*;
  *
  * @author Bob Jacobsen Copyright (C) 2020
  */
+@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")
 public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        new LayoutTurntableEditor(null);
+        LayoutTurntableEditor t = new LayoutTurntableEditor(layoutEditor);
+        Assertions.assertNotNull(t);
     }
 
-
-     @Test
+    @Test
     public void testEditTurntableDone() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         Assume.assumeFalse("Ignoring intermittent test", Boolean.getBoolean("jmri.skipTestsRequiringSeparateRunning"));
 
         createTurnouts();
@@ -86,24 +84,27 @@ public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
 
         // Set ray turnouts
         //TODO: fix hardcoded index
-        JComboBoxOperator turnout_cbo = new JComboBoxOperator(jFrameOperator, 1);
-        JComboBoxOperator state_cbo = new JComboBoxOperator(jFrameOperator, 2);
+        // Index 0 is Block Name
+        // Index 1 is Mainline (newly added)
+        // Index 2 starts the ray turnouts
+        JComboBoxOperator turnout_cbo = new JComboBoxOperator(jFrameOperator, 2);
+        JComboBoxOperator state_cbo = new JComboBoxOperator(jFrameOperator, 3);
 
         turnout_cbo.selectItem(1); //TODO: fix hardcoded index
         state_cbo.selectItem(0); //TODO: fix hardcoded index
 
-        turnout_cbo = new JComboBoxOperator(jFrameOperator, 3);
-        state_cbo = new JComboBoxOperator(jFrameOperator, 4);
+        turnout_cbo = new JComboBoxOperator(jFrameOperator, 4);
+        state_cbo = new JComboBoxOperator(jFrameOperator, 5);
         turnout_cbo.selectItem(1); //TODO: fix hardcoded index
         state_cbo.selectItem(1); //TODO: fix hardcoded index
 
-        turnout_cbo = new JComboBoxOperator(jFrameOperator, 5);
-        state_cbo = new JComboBoxOperator(jFrameOperator, 6);
+        turnout_cbo = new JComboBoxOperator(jFrameOperator, 6);
+        state_cbo = new JComboBoxOperator(jFrameOperator, 7);
         turnout_cbo.selectItem(2); //TODO: fix hardcoded index
         state_cbo.selectItem(0); //TODO: fix hardcoded index
 
-        turnout_cbo = new JComboBoxOperator(jFrameOperator, 7);
-        state_cbo = new JComboBoxOperator(jFrameOperator, 8);
+        turnout_cbo = new JComboBoxOperator(jFrameOperator, 8);
+        state_cbo = new JComboBoxOperator(jFrameOperator, 9);
         turnout_cbo.selectItem(2); //TODO: fix hardcoded index
         state_cbo.selectItem(1); //TODO: fix hardcoded index
 
@@ -131,12 +132,11 @@ public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
         new JButtonOperator(jFrameOperator, Bundle.getMessage("ButtonDone")).doClick();
         jFrameOperator.waitClosed();    // make sure the dialog actually closed
 
-        jmri.util.JUnitAppender.assertErrorMessage("provideLayoutBlock: no name given and not assigning auto block names");
+        //jmri.util.JUnitAppender.assertErrorMessage("provideLayoutBlock: no name given and not assigning auto block names");
     }
 
     @Test
     public void testEditTurntableCancel() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         LayoutTurntableEditor editor = new LayoutTurntableEditor(layoutEditor);
 
@@ -150,7 +150,6 @@ public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testEditTurntableClose() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         LayoutTurntableEditor editor = new LayoutTurntableEditor(layoutEditor);
 
@@ -165,7 +164,6 @@ public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testEditTurntableErrors() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         LayoutTurntableEditor editor = new LayoutTurntableEditor(layoutEditor);
 
@@ -214,52 +212,35 @@ public class LayoutTurntableEditorTest extends LayoutTrackEditorTest {
 
     }
 
-    private LayoutEditor layoutEditor = null;
     private LayoutTurntableView layoutTurntableView = null;
     private LayoutTurntable layoutTurntable = null;
 
     @BeforeEach
+    @Override
     public void setUp() {
         super.setUp();
-        JUnitUtil.resetProfileManager();
-        JUnitUtil.initLayoutBlockManager();
-        JUnitUtil.initInternalTurnoutManager();
-        JUnitUtil.initInternalSensorManager();
-        if (!GraphicsEnvironment.isHeadless()) {
 
-            layoutEditor = new LayoutEditor();
-            layoutEditor.setVisible(true);
+        Point2D point = new Point2D.Double(150.0, 100.0);
+        Point2D delta = new Point2D.Double(50.0, 10.0);
 
-            Point2D point = new Point2D.Double(150.0, 100.0);
-            Point2D delta = new Point2D.Double(50.0, 10.0);
+        // Turntable
+        point = MathUtil.add(point, delta);
+        layoutTurntable = new LayoutTurntable("Turntable", layoutEditor);
+        layoutTurntableView = new LayoutTurntableView(layoutTurntable, point, layoutEditor);
+        layoutEditor.addLayoutTrack(layoutTurntable, layoutTurntableView);
 
-            // Turntable
-            point = MathUtil.add(point, delta);
-            layoutTurntable = new LayoutTurntable("Turntable", layoutEditor);
-            layoutTurntableView = new LayoutTurntableView(layoutTurntable, point, layoutEditor);
-            layoutEditor.addLayoutTrack(layoutTurntable, layoutTurntableView);
-        }
     }
 
     @AfterEach
+    @Override
     public void tearDown() {
         if (layoutTurntable != null) {
             layoutTurntable.remove();
         }
-
-        if (layoutEditor != null) {
-            EditorFrameOperator efo = new EditorFrameOperator(layoutEditor);
-            efo.closeFrameWithConfirmations();
-        }
-
         layoutTurntable = null;
-        layoutEditor = null;
 
-        JUnitUtil.resetWindows(false, false);
-        JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         super.tearDown();
     }
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurntableEditorTest.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurntableEditorTest.class);
 }

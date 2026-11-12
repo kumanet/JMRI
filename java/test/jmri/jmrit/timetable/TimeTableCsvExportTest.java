@@ -74,21 +74,18 @@ public class TimeTableCsvExportTest {
 
     @BeforeEach
     public void setUp(@TempDir File folder) throws IOException {
-        jmri.util.JUnitUtil.setUp();
+        JUnitUtil.setUp();
 
         JUnitUtil.resetInstanceManager();
         JUnitUtil.resetProfileManager(new NullProfile(folder));
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
-        // use reflection to reset the static file location.
-        Class<?> c = jmri.jmrit.timetable.configurexml.TimeTableXml.TimeTableXmlFile.class;
-        java.lang.reflect.Field f = c.getDeclaredField("fileLocation");
-        f.setAccessible(true);
-        f.set(new String(), null);
+    public void tearDown() {
+        // reset the static file location.
+        jmri.jmrit.timetable.configurexml.TimeTableXml.TimeTableXmlFile.resetFileLocation();
         JUnitUtil.tearDown();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TimeTableCsvExportTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TimeTableCsvExportTest.class);
 }

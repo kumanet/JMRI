@@ -16,6 +16,9 @@ import org.junit.jupiter.api.Test;
 public class TestWaitsForever {
 
     @Test
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = {"DM_GC", "WA_NOT_IN_LOOP"},
+        justification = "Method only invoked in a local dev environment")
+//    @SuppressWarnings("UseOfSystemOutOrSystemErr")
     public synchronized void deliberatelyWaitForever() throws InterruptedException {
         Runtime.getRuntime().gc();
         System.err.println("start permanent wait");
@@ -32,6 +35,6 @@ public class TestWaitsForever {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TestWaitsForever.class);
+    // private static final Logger log = LoggerFactory.getLogger(TestWaitsForever.class);
 
 }

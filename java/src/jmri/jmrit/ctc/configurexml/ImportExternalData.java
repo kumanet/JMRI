@@ -6,19 +6,11 @@ import java.beans.XMLDecoder;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
-
-import java.lang.reflect.Field;
-import java.util.*;
-
-// import jmri.jmrit.XmlFile;
-import jmri.util.FileUtil;
 import jmri.*;
 import jmri.jmrit.ctc.*;
 import jmri.jmrit.ctc.editor.code.*;
@@ -110,7 +102,7 @@ public class ImportExternalData {
     }
 
     @SuppressFBWarnings(value = "OS_OPEN_STREAM_EXCEPTION_PATH", justification = "Low risk due to rare usage")
-    static private void convertClassNameReferences(String fileName) throws Exception {
+    private static void convertClassNameReferences(String fileName) throws Exception {
         String temporaryFilename = fileName + TEMPORARY_EXTENSION;
         int errors = 0;
         if (!CTCFiles.deleteFile(temporaryFilename)) errors++;   // Just delete it for safety before we start:
@@ -128,7 +120,7 @@ public class ImportExternalData {
         log.debug("convertClassNameReferences: errors = {}", errors);
      }
 
-    static private void writeLine(BufferedWriter bufferedWriter, String aLine) throws IOException {
+    private static void writeLine(BufferedWriter bufferedWriter, String aLine) throws IOException {
         bufferedWriter.write(aLine); bufferedWriter.newLine();
     }
 

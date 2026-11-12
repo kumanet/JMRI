@@ -19,6 +19,7 @@ public class SprogVersionActionTest {
         m.setSprogTrafficController(new SprogTrafficControlScaffold(m));
         SprogVersionAction t = new SprogVersionAction("test",m);
         Assert.assertNotNull("exists",t);
+        m.getSprogTrafficController().dispose();
     }
 
     @BeforeEach
@@ -31,6 +32,6 @@ public class SprogVersionActionTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SprogVersionActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SprogVersionActionTest.class);
 
 }

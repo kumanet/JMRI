@@ -55,12 +55,15 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
     @Override
     public Programmer getProgrammer() {
         if (progBox == null) {
+            log.trace("getProgrammer returns null with no progBox");
             return null;
         }
         GlobalProgrammerManager pm = (GlobalProgrammerManager) progBox.getSelectedItem();
         if (pm == null) {
+            log.trace("getProgrammer returns null with no selection");
             return null;
         }
+        log.trace("getProgrammer returns {}", pm.getGlobalProgrammer());
         return pm.getGlobalProgrammer();
     }
 
@@ -83,8 +86,10 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
      *
      * @return empty list if none
      */
-    protected List<GlobalProgrammerManager> getMgrList() {
-        return InstanceManager.getList(jmri.GlobalProgrammerManager.class);
+    protected final List<GlobalProgrammerManager> getMgrList() {
+        var list = InstanceManager.getList(jmri.GlobalProgrammerManager.class);
+        log.trace("gtMgrList returns {}", list.size());
+        return list;
     }
 
     public ProgServiceModeComboBox(int direction) {
@@ -94,6 +99,7 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
 
         // general GUI config
         setLayout(new BoxLayout(this, direction));
+        this.setOpaque(false);
 
         // create the programmer display combo box
         progBox = new JComboBox<>();
@@ -105,8 +111,8 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
             }
             if (globProg != null) {
                 v.add(pm);
-                log.debug("ProgSMCombo added programmer {} as item {}",
-                        (pm != null ? pm.getClass() : "null"), v.size());
+                log.debug("ProgServiceModeComboBox added programmer {} as item {}",
+                        (pm != null ? pm.getClass() : "null"), pm);
                 // listen for changes
                 globProg.addPropertyChangeListener(this);
             }
@@ -114,6 +120,8 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
 
         add(progLabel);
         add(progBox = new JComboBox<>(v));
+        progBox.getAccessibleContext().setAccessibleName(Bundle.getMessage("ProgrammerLabel"));
+
         // if only one, don't show is confusing to user, so show combo with just 1 choice)
         progBox.setSelectedItem(InstanceManager.getDefault(jmri.GlobalProgrammerManager.class)); // set default
         progBox.addActionListener(new ActionListener() {
@@ -123,14 +131,16 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
                 programmerSelected();
             }
         });
+        log.trace("progBox loadeded with {}", progBox.getItemCount());
 
-        // install items in GUI
+        // install mode selection items in GUI
         add(new JLabel(Bundle.getMessage("ProgrammingModeLabel")));
-
         add(modeBox);
+        modeBox.getAccessibleContext().setAccessibleName(Bundle.getMessage("ProgrammingModeLabel"));
 
         // and execute the setup for 1st time
         programmerSelected();
+        log.trace("ctor ends");
     }
 
     /**
@@ -140,14 +150,14 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
         DefaultComboBoxModel<ProgrammingMode> model = new DefaultComboBoxModel<>();
         Programmer p = getProgrammer();
         if (p != null) {
-            for (ProgrammingMode mode : getProgrammer().getSupportedModes()) {
+            for (ProgrammingMode mode : p.getSupportedModes()) {
                 model.addElement(mode);
             }
         }
-        log.trace("programmerSelected sets model");
+        log.trace("programmerSelected setting modes");
         modeBox.setModel(model);
-        ProgrammingMode mode = (getProgrammer() != null) ? getProgrammer().getMode() : null;
-        log.trace("programmerSelected sets mode {}", mode);
+        ProgrammingMode mode = (p != null) ? p.getMode() : null;
+        log.trace("programmerSelected set mode {}", mode);
         modeBox.setSelectedItem(mode);
     }
 
@@ -180,5 +190,5 @@ public class ProgServiceModeComboBox extends ProgModeSelector implements Propert
     @Override
     public void dispose() {
     }
-    private final static Logger log = LoggerFactory.getLogger(ProgServiceModeComboBox.class);
+    private static final Logger log = LoggerFactory.getLogger(ProgServiceModeComboBox.class);
 }

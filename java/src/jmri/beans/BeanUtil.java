@@ -1,5 +1,7 @@
 package jmri.beans;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.beans.IndexedPropertyDescriptor;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
@@ -91,7 +93,7 @@ public class BeanUtil {
                     IllegalArgumentException |
                     InvocationTargetException |
                     IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Exception: ", ex);
             }
         }
     }
@@ -129,6 +131,8 @@ public class BeanUtil {
      * @param index The element to return.
      * @return the value at <i>index</i> or null
      */
+    @SuppressFBWarnings(value = {"THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"},
+            justification = "We throw cause of exception if the cause is a runtime exception")
     public static Object getIntrospectedIndexedProperty(Object bean, String key, int index) {
         if (bean != null && key != null) {
             try {
@@ -145,13 +149,13 @@ public class BeanUtil {
                 if (tex instanceof RuntimeException) {
                     throw (RuntimeException) tex;
                 } else {
-                    log.error(ex.getMessage(), ex);
+                    log.error("RuntimeException: ", ex);
                 }
             } catch (
                     IllegalAccessException |
                     IllegalArgumentException |
                     IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Exception: ", ex);
             }
         }
         return null;
@@ -214,7 +218,7 @@ public class BeanUtil {
                     IllegalArgumentException |
                     InvocationTargetException |
                     IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Exception: ", ex);
             }
         }
     }
@@ -277,7 +281,7 @@ public class BeanUtil {
                     IllegalArgumentException |
                     InvocationTargetException |
                     IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Exception: ", ex);
             }
         }
         return null;
@@ -352,7 +356,7 @@ public class BeanUtil {
                 // catch only introspection-related exceptions, and allow all
                 // other to pass through
             } catch (IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Exception: ", ex);
             }
         }
         return false;
@@ -387,7 +391,7 @@ public class BeanUtil {
                 // catch only introspection-related exceptions, and allow all
                 // other to pass through
             } catch (IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Introspection Exception: ", ex);
             }
         }
         return false;
@@ -426,7 +430,7 @@ public class BeanUtil {
                 // catch only introspection-related exceptions, and allow all
                 // other to pass through
             } catch (IntrospectionException ex) {
-                log.warn(ex.getMessage(), ex);
+                log.warn("Introspection Exception: ", ex);
             }
         }
         return names;
@@ -452,7 +456,7 @@ public class BeanUtil {
      * it is wrapped by a PropertyChangeListenerProxy such that using
      * {@code Arrays.toList(getPropertyChangeListeners()).contains(needle) } may
      * return false when <i>needle</i> is listening to a specific property.
-     * 
+     *
      * @param listeners the array of listeners to search through
      * @param needle    the listener to search for
      * @return true if <i>needle</i> is in <i>listeners</i>; false otherwise

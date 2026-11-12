@@ -78,7 +78,7 @@ public class CbusDccOpsModeProgrammer extends CbusDccProgrammer implements Addre
     @Override
     @Nonnull
     public List<ProgrammingMode> getSupportedModes() {
-        List<ProgrammingMode> ret = new ArrayList<>();
+        List<ProgrammingMode> ret = new ArrayList<>(1);
         ret.add(ProgrammingMode.OPSBYTEMODE);
         return ret;
     }
@@ -136,5 +136,5 @@ public class CbusDccOpsModeProgrammer extends CbusDccProgrammer implements Addre
     void cleanup() {
     }
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusDccOpsModeProgrammer.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusDccOpsModeProgrammer.class);
 }

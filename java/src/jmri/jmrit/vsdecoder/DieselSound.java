@@ -7,8 +7,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import jmri.util.PhysicalLocation;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Diesel Sound initial version.
@@ -16,24 +14,19 @@ import org.slf4j.LoggerFactory;
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2011
+ * @author Klaus Killinger Copyright (C) 2025
  */
-
-// Usage:
-// EngineSound() : constructor
-// play() : plays short horn pop
-// loop() : starts extended sustain horn
-// stop() : ends extended sustain horn (plays end sound)
 class DieselSound extends EngineSound {
 
     // Engine Sounds
@@ -55,7 +48,6 @@ class DieselSound extends EngineSound {
         log.debug("EngineSound Play: current_notch = {}", current_notch);
         if (notch_sounds.containsKey(current_notch) && (isEngineStarted() || auto_start_engine)) {
             notch_sounds.get(current_notch).play();
-            is_playing = true;
         }
     }
 
@@ -64,7 +56,6 @@ class DieselSound extends EngineSound {
     public void loop() {
         if (notch_sounds.containsKey(current_notch) && (isEngineStarted() || auto_start_engine)) {
             notch_sounds.get(current_notch).play();
-            is_playing = true;
         }
     }
 
@@ -73,7 +64,6 @@ class DieselSound extends EngineSound {
         if (notch_sounds.containsKey(current_notch)) {
             notch_sounds.get(current_notch).stop();
         }
-        is_playing = false;
     }
 
     @Override
@@ -133,7 +123,7 @@ class DieselSound extends EngineSound {
     public void startEngine() {
         start_sound.play();
         current_notch = calcEngineNotch(0.0f);
-        //t = newTimer(4500, false, new ActionListener() { 
+        //t = newTimer(4500, false, new ActionListener() {
         t = newTimer(start_sound.getLengthAsInt() - start_sound.getFadeOutTime(), false, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -239,11 +229,12 @@ class DieselSound extends EngineSound {
         //int num_notches;
         String fn;
         SoundBite sb;
+        boolean buffer_ok = true;
 
         // Handle the common stuff.
         super.setXml(e, vf);
 
-        log.debug("Diesel EngineSound: {}", e.getAttribute("name").getValue());
+        log.debug("Diesel EngineSound: {}, name: {}", e.getAttribute("name").getValue(), name);
         notch_sounds = new HashMap<Integer, SoundBite>();
         transition_sounds = new ArrayList<NotchTransition>();
 
@@ -254,13 +245,16 @@ class DieselSound extends EngineSound {
             el = itr.next();
             fn = el.getChildText("file");
             int nn = Integer.parseInt(el.getChildText("notch"));
-            //log.debug("Notch: {}, File: {}", nn, fn);
-            sb = new SoundBite(vf, fn, "Engine_n" + i, "Engine_" + i);
-            sb.setLooped(true);
-            sb.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
-            sb.setGain(setXMLGain(el));
-            // Store in the list.
-            notch_sounds.put(nn, sb);
+            sb = new SoundBite(vf, fn, name + "_n" + i, name + "_" + i);
+            if (sb.isInitialized()) {
+                sb.setLooped(true);
+                sb.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
+                sb.setGain(setXMLGain(el));
+                // Store in the list.
+                notch_sounds.put(nn, sb);
+            } else {
+                buffer_ok = false;
+            }
             i++;
         }
 
@@ -271,15 +265,18 @@ class DieselSound extends EngineSound {
         while (itr.hasNext()) {
             el = itr.next();
             fn = el.getChildText("file");
-            nt = new NotchTransition(vf, fn, "Engine_nt" + i, "Engine_nt" + i);
-            nt.setPrevNotch(Integer.parseInt(el.getChildText("prev-notch")));
-            nt.setNextNotch(Integer.parseInt(el.getChildText("next-notch")));
-            //log.debug("Transition - prev: {}, next: {}, file: {}", nt.getPrevNotch(), nt.getNextNotch(), fn);
-            nt.setLooped(false);
-            nt.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
-            // Handle gain
-            nt.setGain(setXMLGain(el));
-            transition_sounds.add(nt);
+            nt = new NotchTransition(vf, fn, name + "_nt" + i, name + "_nt" + i);
+            if (nt.isInitialized()) {
+                nt.setPrevNotch(Integer.parseInt(el.getChildText("prev-notch")));
+                nt.setNextNotch(Integer.parseInt(el.getChildText("next-notch")));
+                nt.setLooped(false);
+                nt.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
+                // Handle gain
+                nt.setGain(setXMLGain(el));
+                transition_sounds.add(nt);
+            } else {
+                buffer_ok = false;
+            }
             i++;
         }
 
@@ -287,26 +284,38 @@ class DieselSound extends EngineSound {
         el = e.getChild("start-sound");
         if (el != null) {
             fn = el.getChild("file").getValue();
-            //log.debug("Start sound: {}", fn);
-            start_sound = new SoundBite(vf, fn, "Engine_start",
-                    "Engine_Start");
-            // Handle gain
-            start_sound.setGain(setXMLGain(el));
-            start_sound.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
-            start_sound.setLooped(false);
+            start_sound = new SoundBite(vf, fn, name + "_start", name + "_Start");
+            if (start_sound.isInitialized()) {
+                // Handle gain
+                start_sound.setGain(setXMLGain(el));
+                start_sound.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
+                start_sound.setLooped(false);
+            } else {
+                buffer_ok = false;
+            }
         }
+
         el = e.getChild("shutdown-sound");
         if (el != null) {
             fn = el.getChild("file").getValue();
-            //log.debug("Shutdown sound: {}", fn);
-            shutdown_sound = new SoundBite(vf, fn, "Engine_shutdown", "Engine_Shutdown");
-            shutdown_sound.setLooped(false);
-            // Handle gain
-            shutdown_sound.setGain(setXMLGain(el));
-            shutdown_sound.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
+            shutdown_sound = new SoundBite(vf, fn, name + "_shutdown", name + "_Shutdown");
+            if (shutdown_sound.isInitialized()) {
+                shutdown_sound.setLooped(false);
+                // Handle gain
+                shutdown_sound.setGain(setXMLGain(el));
+                shutdown_sound.setFadeTimes(this.getFadeInTime(), this.getFadeOutTime());
+            } else {
+                buffer_ok = false;
+            }
+        }
+
+        if (buffer_ok) {
+            setBuffersFreeState(true);
+        } else {
+            setBuffersFreeState(false);
         }
     }
 
-    private static final Logger log = LoggerFactory.getLogger(DieselSound.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DieselSound.class);
 
 }

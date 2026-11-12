@@ -2,7 +2,6 @@ package jmri.jmrix.dccpp;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender
  * @author Mark Underwood (C) 2015
+ * @author Chad Francis (C) 2026
  */
 public class DCCppLightTest extends jmri.implementation.AbstractLightTestBase {
 
@@ -18,21 +18,22 @@ public class DCCppLightTest extends jmri.implementation.AbstractLightTestBase {
         return xnis.numListeners();
     }
 
-    DCCppInterfaceScaffold xnis;
-
     @Override
     public void checkOnMsgSent() {
-        Assert.assertEquals("ON message", "a 6 0 1",
-                xnis.outbound.elementAt(xnis.outbound.size() - 1).toString());
-        Assert.assertEquals("ON state", jmri.Light.ON, t.getState());
+        Assertions.assertEquals( "a 6 0 1",
+                xnis.outbound.elementAt(xnis.outbound.size() - 1).toString(), "ON message");
+        Assertions.assertEquals( jmri.Light.ON, t.getState(), "ON state");
     }
 
     @Override
     public void checkOffMsgSent() {
-        Assert.assertEquals("OFF message", "a 6 0 0",
-                xnis.outbound.elementAt(xnis.outbound.size() - 1).toString());
-        Assert.assertEquals("OFF state", jmri.Light.OFF, t.getState());
+        Assertions.assertEquals( "a 6 0 0",
+                xnis.outbound.elementAt(xnis.outbound.size() - 1).toString(), "OFF message");
+        Assertions.assertEquals( jmri.Light.OFF, t.getState(), "OFF state");
     }
+
+    private DCCppInterfaceScaffold xnis = null;
+    private DCCppSystemConnectionMemo memo = null;
 
     @Override
     @BeforeEach
@@ -40,7 +41,7 @@ public class DCCppLightTest extends jmri.implementation.AbstractLightTestBase {
         JUnitUtil.setUp();
         // prepare an interface
         xnis = new DCCppInterfaceScaffold(new DCCppCommandStation());
-        DCCppSystemConnectionMemo memo = new DCCppSystemConnectionMemo(xnis);
+        memo = new DCCppSystemConnectionMemo(xnis);
         xnis.setSystemConnectionMemo(memo);
         memo.setSystemPrefix("d2");
         DCCppLightManager xlm = new DCCppLightManager(xnis.getSystemConnectionMemo());
@@ -50,9 +51,69 @@ public class DCCppLightTest extends jmri.implementation.AbstractLightTestBase {
 
     @AfterEach
     public void tearDown() {
-        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
+        Assertions.assertNotNull(memo);
+        memo.getDCCppTrafficController().terminateThreads();
+        memo.dispose();
         JUnitUtil.tearDown();
+    }
 
+    // --- CS VPIN mode tests ---
+
+    @Test
+    public void testDefaultModeIsStandard() {
+        DCCppLight light = (DCCppLight) t;
+        Assertions.assertNull(light.getProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY),
+                "default mode property is null (Accessory Decoder)");
+    }
+
+    @Test
+    public void testSetModeCsVpin() {
+        DCCppLight light = (DCCppLight) t;
+        light.setProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY, DCCppLight.MODE_NAMES[1]);
+        Assertions.assertEquals(DCCppLight.MODE_NAMES[1],
+                light.getProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY), "mode is CS VPIN");
+    }
+
+    @Test
+    public void testSetModeByName() {
+        DCCppLight light = (DCCppLight) t;
+        light.setProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY, "CS VPIN");
+        Assertions.assertEquals("CS VPIN",
+                light.getProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY), "mode is CS VPIN");
+        light.setProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY, "Accessory Decoder");
+        Assertions.assertEquals("Accessory Decoder",
+                light.getProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY), "mode reverts to Accessory Decoder");
+    }
+
+    @Test
+    public void testVpinModeOnSendsHighCommand() {
+        DCCppLight light = (DCCppLight) t;
+        light.setProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY, DCCppLight.MODE_NAMES[1]);
+        light.setState(jmri.Light.ON);
+        String msg = xnis.outbound.elementAt(xnis.outbound.size() - 1).toString();
+        // <z 21> drives pin HIGH (ON)
+        Assertions.assertEquals("z 21", msg, "CS VPIN ON sends <z vpin>");
+        Assertions.assertEquals(jmri.Light.ON, light.getState(), "state is ON");
+    }
+
+    @Test
+    public void testVpinModeOffSendsLowCommand() {
+        DCCppLight light = (DCCppLight) t;
+        light.setProperty(DCCppLightManager.DCCPP_LIGHT_MODE_KEY, DCCppLight.MODE_NAMES[1]);
+        light.setState(jmri.Light.ON);  // set to ON first
+        light.setState(jmri.Light.OFF);
+        String msg = xnis.outbound.elementAt(xnis.outbound.size() - 1).toString();
+        // <z -21> drives pin LOW (OFF)
+        Assertions.assertEquals("z -21", msg, "CS VPIN OFF sends <z -vpin>");
+        Assertions.assertEquals(jmri.Light.OFF, light.getState(), "state is OFF");
+    }
+
+    @Test
+    public void testModeNames() {
+        String[] names = DCCppLight.MODE_NAMES;
+        Assertions.assertEquals(2, names.length, "two valid mode names");
+        Assertions.assertEquals("Accessory Decoder", names[0], "first mode name");
+        Assertions.assertEquals("CS VPIN", names[1], "second mode name");
     }
 
 }

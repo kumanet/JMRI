@@ -2,10 +2,8 @@ package jmri.jmrit.display.layoutEditor;
 
 import jmri.util.JUnitUtil;
 
-import java.awt.GraphicsEnvironment;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
 
 /**
@@ -13,6 +11,7 @@ import org.junit.jupiter.api.*;
  *
  * @author Bob Jacobsen Copyright (C) 2016
  */
+@DisabledIfHeadless
 public class LayoutTrackViewTest {
 
     // LayoutTrackView is abstract, so there's
@@ -20,20 +19,18 @@ public class LayoutTrackViewTest {
     // LayoutInstance support to all the subtypes.  This is
     // needed because multiple LayoutEditor objects don't always play nice.
 
-    public LayoutEditor layoutEditor;
+    protected LayoutEditor layoutEditor;
 
-    @BeforeAll
+    @BeforeEach
     @javax.annotation.OverridingMethodsMustInvokeSuper
     public void setUp() {
         JUnitUtil.setUp();
-        if (!GraphicsEnvironment.isHeadless()) {
-            JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
+        layoutEditor = new LayoutEditor();
 
-            layoutEditor = new LayoutEditor();
-        }
     }
 
-    @AfterAll
+    @AfterEach
     @javax.annotation.OverridingMethodsMustInvokeSuper
     public void tearDown() {
         if (layoutEditor != null) {
@@ -42,7 +39,6 @@ public class LayoutTrackViewTest {
         layoutEditor = null;
 
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 }

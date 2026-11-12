@@ -1,5 +1,6 @@
 package jmri.jmrit.dispatcher;
 
+import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
@@ -17,12 +18,13 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
+
 import jmri.InstanceManager;
 import jmri.Scale;
 import jmri.ScaleManager;
@@ -31,8 +33,7 @@ import jmri.jmrit.dispatcher.DispatcherFrame.TrainsFrom;
 import jmri.jmrit.display.EditorManager;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
 import jmri.util.JmriJFrame;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Set up and processes items in the Dispatcher Options menu.
@@ -40,6 +41,10 @@ import org.slf4j.LoggerFactory;
  * @author Dave Duchamp Copyright (C) 2008
  */
 public class OptionsMenu extends JMenu {
+
+    // Empty constructor for class based preferences when "Skip message in future?" is enabled.
+    public OptionsMenu() {
+    }
 
     public OptionsMenu(DispatcherFrame f) {
         dispatcher = f;
@@ -103,10 +108,11 @@ public class OptionsMenu extends JMenu {
 
     // options window items
     JmriJFrame optionsFrame = null;
-    Container optionsPane = null;
+    Container optionsContainer = null;
+    JPanel optionsPane = null;
     JCheckBox useConnectivityCheckBox = new JCheckBox(Bundle.getMessage("UseConnectivity"));
-    JComboBox<String> layoutEditorBox = new JComboBox<>();
     ArrayList<LayoutEditor> layoutEditorList = new ArrayList<>();
+
     JCheckBox autoAllocateCheckBox = new JCheckBox(Bundle.getMessage("AutoAllocateBox"));
     JCheckBox autoTurnoutsCheckBox = new JCheckBox(Bundle.getMessage("AutoTurnoutsBox"));
     JRadioButton trainsFromRoster = new JRadioButton(Bundle.getMessage("TrainsFromRoster"));
@@ -128,7 +134,10 @@ public class OptionsMenu extends JMenu {
     JSpinner minThrottleIntervalSpinner = new JSpinner(new SpinnerNumberModel(100, 20, 1000, 1));
     JSpinner fullRampTimeSpinner = new JSpinner(new SpinnerNumberModel(5000, 1000, 20000, 1));
     JCheckBox trustKnownTurnoutsCheckBox = new JCheckBox(Bundle.getMessage("trustKnownTurnouts"));
+    JCheckBox useTurnoutConnectionDelayCheckBox = new JCheckBox(Bundle.getMessage("useTurnoutConnectionDelay"));
     JComboBox<String> stoppingSpeedBox = new JComboBox<>();
+    JCheckBox useOccupiedTrackSpeedCheckBox = new JCheckBox(Bundle.getMessage("useOccupiedTrackSpeed"));
+    JCheckBox useStrictTrainTrackingBox = new JCheckBox(Bundle.getMessage("useStrictTrackChecking"));
 
     String[] signalTypes = {Bundle.getMessage("SignalType1"), Bundle.getMessage("SignalType2"), Bundle.getMessage("SignalType3")};
 
@@ -136,14 +145,13 @@ public class OptionsMenu extends JMenu {
         if (optionsFrame == null) {
             optionsFrame = new JmriJFrame(Bundle.getMessage("OptionWindowItem"), false, true);
             optionsFrame.addHelpMenu("package.jmri.jmrit.dispatcher.Options", true);
-            optionsPane = optionsFrame.getContentPane();
-            optionsPane.setLayout(new BoxLayout(optionsFrame.getContentPane(), BoxLayout.Y_AXIS));
+            optionsContainer = optionsFrame.getContentPane();
+            optionsPane = new JPanel();
+            optionsPane.setLayout(new BoxLayout(optionsPane, BoxLayout.Y_AXIS));
             JPanel p1 = new JPanel();
             p1.setLayout(new FlowLayout());
             p1.add(useConnectivityCheckBox);
             useConnectivityCheckBox.setToolTipText(Bundle.getMessage("UseConnectivityHint"));
-            p1.add(layoutEditorBox);
-            layoutEditorBox.setToolTipText(Bundle.getMessage("LayoutEditorHint"));
             signalTypeBox = new JComboBox<>(signalTypes);
             p1.add(signalTypeBox);
             signalTypeBox.setToolTipText(Bundle.getMessage("SignalTypeHint"));
@@ -202,12 +210,27 @@ public class OptionsMenu extends JMenu {
             p5.setLayout(new FlowLayout());
             p5.add(autoTurnoutsCheckBox);
             autoTurnoutsCheckBox.setToolTipText(Bundle.getMessage("AutoTurnoutsBoxHint"));
-            optionsPane.add(p5);
+            optionsPane.add(p5);  
             JPanel p16 = new JPanel();
             p16.setLayout(new FlowLayout());
             p16.add(trustKnownTurnoutsCheckBox);
             trustKnownTurnoutsCheckBox.setToolTipText(Bundle.getMessage("trustKnownTurnoutsHint"));
             optionsPane.add(p16);
+            JPanel p16a = new JPanel();
+            p16a.setLayout(new FlowLayout());
+            p16a.add(useTurnoutConnectionDelayCheckBox);
+            useTurnoutConnectionDelayCheckBox.setToolTipText(Bundle.getMessage("trustKnownTurnoutsHint"));
+            optionsPane.add(p16a);
+            JPanel p16b = new JPanel();
+            p16b.setLayout(new FlowLayout());
+            p16b.add(useOccupiedTrackSpeedCheckBox);
+            useOccupiedTrackSpeedCheckBox.setToolTipText(Bundle.getMessage("useOccupiedTrackSpeedHint"));
+            optionsPane.add(p16b);
+            JPanel p16c = new JPanel();
+            p16c.setLayout(new FlowLayout());
+            p16c.add(useStrictTrainTrackingBox);
+            useStrictTrainTrackingBox.setToolTipText(Bundle.getMessage("useStrictTrackCheckingHint"));
+            optionsPane.add(p16c);
             JPanel p6 = new JPanel();
             p6.setLayout(new FlowLayout());
             p6.add(shortNameCheckBox);
@@ -290,6 +313,7 @@ public class OptionsMenu extends JMenu {
             optionsPane.add(p18);
 
             optionsPane.add(new JSeparator());
+            JPanel ftr = new JPanel();
             JPanel p9 = new JPanel();
             p9.setLayout(new FlowLayout());
             JButton cancelButton = null;
@@ -311,16 +335,17 @@ public class OptionsMenu extends JMenu {
                 }
             });
             applyButton.setToolTipText(Bundle.getMessage("ApplyButtonHint"));
-            optionsPane.add(p9);
+            ftr.add(p9);
+            JScrollPane scrPane = new JScrollPane(optionsPane);
+            optionsContainer.add(scrPane, BorderLayout.CENTER);
+            optionsContainer.add(ftr, BorderLayout.SOUTH);
+
         }
-        if (initializeLayoutEditorCombo()) {
-            useConnectivityCheckBox.setVisible(true);
-            layoutEditorBox.setVisible(true);
-        } else {
-            useConnectivityCheckBox.setVisible(false);
-            layoutEditorBox.setVisible(false);
-        }
+
+        initializeLayoutEditorList();
+        useConnectivityCheckBox.setEnabled(!layoutEditorList.isEmpty());
         useConnectivityCheckBox.setSelected(dispatcher.getUseConnectivity());
+
         signalTypeBox.setSelectedIndex(dispatcher.getSignalType());
         switch (dispatcher.getTrainsFrom()) {
             case TRAINSFROMROSTER:
@@ -338,6 +363,9 @@ public class OptionsMenu extends JMenu {
         autoAllocateCheckBox.setSelected(dispatcher.getAutoAllocate());
         autoTurnoutsCheckBox.setSelected(dispatcher.getAutoTurnouts());
         trustKnownTurnoutsCheckBox.setSelected(dispatcher.getTrustKnownTurnouts());
+        useOccupiedTrackSpeedCheckBox.setSelected(dispatcher.getUseOccupiedTrackSpeed());
+        useStrictTrainTrackingBox.setSelected(dispatcher.getUseStrictTrainTracking());
+        useTurnoutConnectionDelayCheckBox.setSelected(dispatcher.getUseTurnoutConnectionDelay());
         shortNameCheckBox.setSelected(dispatcher.getShortActiveTrainNames());
         nameInBlockCheckBox.setSelected(dispatcher.getShortNameInBlock());
         rosterInBlockCheckBox.setSelected(dispatcher.getRosterEntryInBlock());
@@ -349,19 +377,21 @@ public class OptionsMenu extends JMenu {
         minThrottleIntervalSpinner.setValue(dispatcher.getMinThrottleInterval());
         fullRampTimeSpinner.setValue(dispatcher.getFullRampTime());
 
-        if (dispatcher.getLayoutEditor() != null) {
-            openDispatcherWithPanel.setSelected(dispatcher.getLayoutEditor().getOpenDispatcherOnLoad());
+        boolean openDispatcher = false;
+        for (LayoutEditor panel : layoutEditorList) {
+            if (panel.getOpenDispatcherOnLoad()) {
+                openDispatcher = true;
+            }
         }
+        openDispatcherWithPanel.setSelected(openDispatcher);
+        openDispatcherWithPanel.setEnabled(!layoutEditorList.isEmpty());
+
         optionsFrame.pack();
         optionsFrame.setVisible(true);
     }
 
     private void applyOptions(ActionEvent e) {
-        if (layoutEditorList.size() > 0) {
-            int index = layoutEditorBox.getSelectedIndex();
-            dispatcher.setLayoutEditor(layoutEditorList.get(index));
-            dispatcher.setUseConnectivity(useConnectivityCheckBox.isSelected());
-        }
+        dispatcher.setUseConnectivity(useConnectivityCheckBox.isSelected());
         dispatcher.setSetSSLDirectionalSensors(setSSLDirectionalSensorsCheckBox.isSelected());
         if (trainsFromRoster.isSelected()) {
             dispatcher.setTrainsFrom(TrainsFrom.TRAINSFROMROSTER);
@@ -376,11 +406,14 @@ public class OptionsMenu extends JMenu {
         dispatcher.setAutoTurnouts(autoTurnoutsCheckBox.isSelected());
         autoTurnoutsItem.setSelected(autoTurnoutsCheckBox.isSelected());
         dispatcher.setTrustKnownTurnouts(trustKnownTurnoutsCheckBox.isSelected());
+        dispatcher.setUseOccupiedTrackSpeed(useOccupiedTrackSpeedCheckBox.isSelected());
+        dispatcher.setUseStrictTrainTracking(useStrictTrainTrackingBox.isSelected());
+        dispatcher.setUseTurnoutConnectionDelay(useTurnoutConnectionDelayCheckBox.isSelected());
         dispatcher.setSignalType(signalTypeBox.getSelectedIndex());
         if (autoTurnoutsCheckBox.isSelected() && ((layoutEditorList.size() == 0)
                 || (!useConnectivityCheckBox.isSelected()))) {
-            JOptionPane.showMessageDialog(optionsFrame, Bundle.getMessage(
-                    "AutoTurnoutsWarn"), Bundle.getMessage("WarningTitle"), JOptionPane.WARNING_MESSAGE);
+            JmriJOptionPane.showMessageDialog(optionsFrame, Bundle.getMessage(
+                    "AutoTurnoutsWarn"), Bundle.getMessage("WarningTitle"), JmriJOptionPane.WARNING_MESSAGE);
         }
         dispatcher.setShortActiveTrainNames(shortNameCheckBox.isSelected());
         dispatcher.setShortNameInBlock(nameInBlockCheckBox.isSelected());
@@ -392,17 +425,37 @@ public class OptionsMenu extends JMenu {
         dispatcher.setUseScaleMeters(scaleMeters.isSelected());
         dispatcher.setMinThrottleInterval((int) minThrottleIntervalSpinner.getValue());
         dispatcher.setFullRampTime((int) fullRampTimeSpinner.getValue());
-        dispatcher.getLayoutEditor().setOpenDispatcherOnLoad(openDispatcherWithPanel.isSelected());
+
+        for (LayoutEditor panel : layoutEditorList) {
+            panel.setOpenDispatcherOnLoad(openDispatcherWithPanel.isSelected());
+        }
+
         dispatcher.setStoppingSpeedName( (String) stoppingSpeedBox.getSelectedItem());
         optionsFrame.setVisible(false);
         optionsFrame.dispose(); // prevent this window from being listed in the Window menu.
         optionsFrame = null;
         // display save options reminder
         InstanceManager.getDefault(jmri.UserPreferencesManager.class).
-                showInfoMessage(Bundle.getMessage("ReminderTitle"), Bundle.getMessage("ReminderSaveOptions"),
+                showInfoMessage(this,Bundle.getMessage("ReminderTitle"), Bundle.getMessage("ReminderSaveOptions"),
                         OptionsMenu.class.getName(),
                         "remindSaveDispatcherOptions"); // NOI18N
         initializeMenu();
+    }
+
+    /**
+     * Get the class description for the UserMessagePreferencesPane.
+     * @return The class description
+     */
+    public String getClassDescription() {
+        return Bundle.getMessage("OptionWindowItem");
+    }
+
+    /**
+     * Set the item details for the UserMessagePreferencesPane.
+     */
+    public void setMessagePreferencesDetails() {
+        InstanceManager.getDefault(jmri.UserPreferencesManager.class).
+                setPreferenceItemDetails(OptionsMenu.class.getName(), "remindSaveDispatcherOptions", Bundle.getMessage("HideSaveReminder"));  // NOI18N
     }
 
     private void cancelOptions(ActionEvent e) {
@@ -420,31 +473,13 @@ public class OptionsMenu extends JMenu {
         try {
             InstanceManager.getDefault(OptionsFile.class).writeDispatcherOptions(dispatcher);
         } catch (java.io.IOException ioe) {
-            log.error("Exception writing Dispatcher options: {}", ioe);
+            log.error("Exception writing Dispatcher options", ioe);
         }
     }
 
-    private boolean initializeLayoutEditorCombo() {
+    private void initializeLayoutEditorList() {
         // get list of Layout Editor panels
         layoutEditorList = new ArrayList<>(InstanceManager.getDefault(EditorManager.class).getAll(LayoutEditor.class));
-        if (layoutEditorList.isEmpty()) {
-            return false;
-        }
-        layoutEditorBox.removeAllItems();
-        for (int i = 0; i < layoutEditorList.size(); i++) {
-            layoutEditorBox.addItem(layoutEditorList.get(i).getTitle());
-        }
-        if (layoutEditorList.size() > 1) {
-            LayoutEditor le = dispatcher.getLayoutEditor();
-            for (int j = 0; j < layoutEditorList.size(); j++) {
-                if (le == layoutEditorList.get(j)) {
-                    layoutEditorBox.setSelectedIndex(j);
-                }
-            }
-        } else {
-            layoutEditorBox.setSelectedIndex(0);
-        }
-        return true;
     }
 
     private void initializeScaleCombo() {
@@ -468,6 +503,6 @@ public class OptionsMenu extends JMenu {
         stoppingSpeedBox.setSelectedItem(dispatcher.getStoppingSpeedName());
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OptionsMenu.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OptionsMenu.class);
 
 }

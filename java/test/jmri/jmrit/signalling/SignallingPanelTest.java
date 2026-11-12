@@ -80,10 +80,9 @@ public class SignallingPanelTest {
     @AfterEach
     public void tearDown() {
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SignallingPanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SignallingPanelTest.class);
 
 }

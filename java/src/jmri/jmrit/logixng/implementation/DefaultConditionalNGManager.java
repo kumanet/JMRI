@@ -1,5 +1,12 @@
 package jmri.jmrit.logixng.implementation;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import java.beans.*;
+
+import javax.annotation.Nonnull;
+import javax.annotation.OverridingMethodsMustInvokeSuper;
+
 import jmri.InstanceManager;
 import jmri.InvokeOnGuiThread;
 import jmri.jmrit.logixng.*;
@@ -187,7 +194,7 @@ public class DefaultConditionalNGManager extends AbstractManager<ConditionalNG>
         InstanceManager.getDefault(LogixNG_Manager.class).getNamedBeanSet().forEach(logixNG -> {
             for (int i = 0; i < logixNG.getNumConditionalNGs(); i++) {
                 if (logixNG.getConditionalNG(i) != null) {
-                    logixNG.getConditionalNG(i).setRunDelayed(false);
+                    logixNG.getConditionalNG(i).setRunDelayed(value);
                 }
             }
         });
@@ -196,7 +203,7 @@ public class DefaultConditionalNGManager extends AbstractManager<ConditionalNG>
     static volatile DefaultConditionalNGManager _instance = null;
 
     @InvokeOnGuiThread  // this method is not thread safe
-    static public DefaultConditionalNGManager instance() {
+    public static DefaultConditionalNGManager instance() {
         if (!ThreadingUtil.isGUIThread()) {
             LoggingUtil.warnOnce(log, "instance() called on wrong thread");
         }
@@ -213,6 +220,51 @@ public class DefaultConditionalNGManager extends AbstractManager<ConditionalNG>
         return ConditionalNG.class;
     }
 
+    /**
+     * Inform all registered listeners of a vetoable change.If the propertyName
+     * is "CanDelete" ALL listeners with an interest in the bean will throw an
+     * exception, which is recorded returned back to the invoking method, so
+     * that it can be presented back to the user.However if a listener decides
+     * that the bean can not be deleted then it should throw an exception with
+     * a property name of "DoNotDelete", this is thrown back up to the user and
+     * the delete process should be aborted.
+     *
+     * @param p   The programmatic name of the property that is to be changed.
+     *            "CanDelete" will inquire with all listeners if the item can
+     *            be deleted. "DoDelete" tells the listener to delete the item.
+     * @param old The old value of the property.
+     * @throws java.beans.PropertyVetoException If the recipients wishes the
+     *                                          delete to be aborted (see above)
+     */
+    @OverridingMethodsMustInvokeSuper
+    public void fireVetoableChange(String p, Object old) throws PropertyVetoException {
+        PropertyChangeEvent evt = new PropertyChangeEvent(this, p, old, null);
+        for (VetoableChangeListener vc : vetoableChangeSupport.getVetoableChangeListeners()) {
+            vc.vetoableChange(evt);
+        }
+    }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalNGManager.class);
+    /** {@inheritDoc} */
+    @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "LogixNG is a tree that must be deleted recursively")
+    public final void deleteBean(@Nonnull ConditionalNG conditionalNG, @Nonnull String property) throws PropertyVetoException {
+        FemaleSocket child = conditionalNG.getFemaleSocket();
+        if (child.isConnected()) {
+            MaleSocket maleSocket = child.getConnectedSocket();
+            maleSocket.getManager().deleteBean(maleSocket, property);
+        }
+
+        // throws PropertyVetoException if vetoed
+        fireVetoableChange(property, conditionalNG);
+        if (property.equals("DoDelete")) { // NOI18N
+            if (conditionalNG.getLogixNG() != null) {
+                conditionalNG.getLogixNG().deleteConditionalNG(conditionalNG);
+            }
+            conditionalNG.dispose();
+        }
+    }
+
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalNGManager.class);
 }

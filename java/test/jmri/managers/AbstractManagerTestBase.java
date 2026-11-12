@@ -131,33 +131,34 @@ public abstract class AbstractManagerTestBase<T extends Manager<E>, E extends Na
         Assert.assertNotNull(s);
         Assert.assertFalse(s.isEmpty());
     }
-    
+
     @Test
     public void testMakeSystemNameWithPrefix() {
         String s = l.makeSystemName(l.getSystemNamePrefix()+getASystemNameWithNoPrefix());
         Assert.assertNotNull(s);
         Assert.assertFalse(s.isEmpty());
     }
-    
-    @Test
-    public void testMakeSystemNameWithNoPrefixNotASystemName() {
-        
-        Assert.assertThrows(jmri.NamedBean.BadSystemNameException.class, () -> l.makeSystemName("$:"));
-        JUnitAppender.assertErrorMessageStartsWith("Invalid system name for " + l.getBeanTypeHandled() + ": ");
-        
-    } 
-    
-    @Test
-    public void testMakeSystemNameWithPrefixNotASystemName() {
-        
-        Assert.assertThrows(jmri.NamedBean.BadSystemNameException.class, () -> l.makeSystemName(l.getSystemNamePrefix()+"$:"));
-        JUnitAppender.assertErrorMessageStartsWith("Invalid system name for " + l.getBeanTypeHandled() + ": ");
-        
-    }
-    
-    
 
     @Test
+    public void testMakeSystemNameWithNoPrefixNotASystemName() {
+
+        Assert.assertThrows(jmri.NamedBean.BadSystemNameException.class, () -> l.makeSystemName("$:"));
+        JUnitAppender.assertErrorMessageStartsWith("Invalid system name for " + l.getBeanTypeHandled() + ": ");
+
+    }
+
+    @Test
+    public void testMakeSystemNameWithPrefixNotASystemName() {
+
+        Assert.assertThrows(jmri.NamedBean.BadSystemNameException.class, () -> l.makeSystemName(l.getSystemNamePrefix()+"$:"));
+        JUnitAppender.assertErrorMessageStartsWith("Invalid system name for " + l.getBeanTypeHandled() + ": ");
+
+    }
+
+
+
+    @Test
+    @SuppressWarnings("unchecked") // tested managers are AbstractManagers
     public void testAutoSystemNames() {
         AbstractManager<E> m = (AbstractManager<E>) l;
         String sysPrefix = l.getSystemNamePrefix();
@@ -179,10 +180,10 @@ public abstract class AbstractManagerTestBase<T extends Manager<E>, E extends Na
         m.updateAutoNumber("12" + ":AUT:0203"); // Bad system name prefix
         Assert.assertEquals(sysPrefix + ":AUTO:0103", m.getAutoSystemName());
     }
-    
+
     protected String getASystemNameWithNoPrefix() {
         return "1";
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(AbstractManagerTestBase.class);
+    // private static final Logger log = LoggerFactory.getLogger(AbstractManagerTestBase.class);
 }

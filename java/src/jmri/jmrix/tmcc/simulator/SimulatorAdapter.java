@@ -1,17 +1,11 @@
 package jmri.jmrix.tmcc.simulator;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
 
-import jmri.jmrix.tmcc.SerialMessage;
-import jmri.jmrix.tmcc.SerialPortController; // no special xSimulatorController
-import jmri.jmrix.tmcc.SerialReply;
-import jmri.jmrix.tmcc.SerialTrafficController;
-import jmri.jmrix.tmcc.TmccSystemConnectionMemo;
+// no special xSimulatorController
+import jmri.jmrix.tmcc.*;
 import jmri.util.ImmediatePipedOutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,10 +26,9 @@ import org.slf4j.LoggerFactory;
 public class SimulatorAdapter extends SerialPortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
 
-    final static int SENSOR_MSG_RATE = 10;
+    static final int SENSOR_MSG_RATE = 10;
 
     private boolean outputBufferEmpty = true;
     private boolean checkBuffer = true;
@@ -59,7 +52,7 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
             log.debug("tempPipeI created");
             pout = new DataOutputStream(tempPipeI);
             inpipe = new DataInputStream(new PipedInputStream(tempPipeI));
-            log.debug("inpipe created {}", inpipe != null);
+            log.debug("inpipe created");
             PipedOutputStream tempPipeO = new ImmediatePipedOutputStream();
             outpipe = new DataOutputStream(tempPipeO);
             pin = new DataInputStream(new PipedInputStream(tempPipeO));
@@ -118,15 +111,6 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
         sourceThread.setName("TMCC Simulator");
         sourceThread.setPriority(Thread.MIN_PRIORITY);
         sourceThread.start();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void connect() throws java.io.IOException {
-        log.debug("connect called");
-        super.connect();
     }
 
     // Base class methods for the SerialPortController simulated interface
@@ -226,11 +210,10 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
                 writeReply(r);
                 if (log.isDebugEnabled()) {
                     StringBuilder buf = new StringBuilder();
-                    buf.append("TMCC Simulator Thread sent reply: ");
                     for (int i = 0; i < r.getNumDataElements(); i++) {
                         buf.append(Integer.toHexString(0xFF & r.getElement(i))).append(" ");
                     }
-                    log.debug(buf.toString());
+                    log.debug("TMCC Simulator Thread sent reply: {}", buf );
                 }
             }
         }
@@ -328,6 +311,6 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
     private DataOutputStream outpipe = null; // feed pin
     private DataInputStream inpipe = null; // feed pout
 
-    private final static Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
 
 }

@@ -1,7 +1,6 @@
 package jmri.jmrit.beantable;
 
 import jmri.util.gui.GuiLafPreferencesManager;
-import java.awt.GraphicsEnvironment;
 
 import javax.annotation.Nonnull;
 import javax.swing.JFrame;
@@ -13,15 +12,16 @@ import jmri.SensorManager;
 import jmri.jmrix.internal.InternalSensorManager;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
 import jmri.util.JUnitUtil;
+import jmri.util.ThreadingUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 import jmri.util.swing.JemmyUtil;
 
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+
 import org.netbeans.jemmy.operators.*;
 import org.netbeans.jemmy.util.NameComponentChooser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for the jmri.jmrit.beantable.SensorTableAction class.
@@ -32,7 +32,7 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
 
     @Test
     public void testCTor() {
-        Assert.assertNotNull("exists", a);
+        assertNotNull( a, "exists");
     }
 
     @Override
@@ -43,7 +43,7 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
     @Override
     @Test
     public void testGetClassDescription() {
-        Assert.assertEquals("Sensor Table Action class description", "Sensor Table", a.getClassDescription());
+        assertEquals( "Sensor Table", a.getClassDescription(), "Sensor Table Action class description");
     }
 
     /**
@@ -53,7 +53,7 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
     @Override
     @Test
     public void testIncludeAddButton() {
-        Assert.assertTrue("Default include add button", a.includeAddButton());
+        assertTrue( a.includeAddButton(), "Default include add button");
     }
 
     /**
@@ -62,38 +62,35 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
      * @since 4.7.4
      */
     @Test
+    @DisabledIfHeadless
     public void testAddAndInvoke() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        a.actionPerformed(null); // show table
+        ThreadingUtil.runOnGUI(() -> a.actionPerformed(null)); // show table
         // create 2 sensors and see if they exist
         Sensor is1 = InstanceManager.sensorManagerInstance().provideSensor("IS1");
         Sensor is2 = InstanceManager.sensorManagerInstance().provideSensor("IS2");
-        try {
-            is1.setKnownState(Sensor.ACTIVE);
-            is2.setKnownState(Sensor.INACTIVE);
-        } catch (jmri.JmriException reason) {
-            log.warn("Exception flipping sensor is1: {}", reason);
-        }
+
+        assertDoesNotThrow( () -> { is1.setKnownState(Sensor.ACTIVE); });
+        assertDoesNotThrow( () -> { is2.setKnownState(Sensor.INACTIVE); });
 
         // set graphic state column display preference to false, read by createModel()
         InstanceManager.getDefault(GuiLafPreferencesManager.class).setGraphicTableState(false);
 
-        SensorTableAction _sTable;
-        _sTable = new SensorTableAction();
-        Assert.assertNotNull("found SensorTable frame", _sTable);
+        SensorTableAction _sTable = new SensorTableAction();
+        assertNotNull( _sTable, "found SensorTable frame");
 
         // set to true, use icons
         InstanceManager.getDefault(GuiLafPreferencesManager.class).setGraphicTableState(true);
-        SensorTableAction _s1Table;
-        _s1Table = new SensorTableAction();
-        Assert.assertNotNull("found SensorTable1 frame", _s1Table);
+        SensorTableAction _s1Table = new SensorTableAction();
+        assertNotNull( _s1Table, "found SensorTable1 frame");
 
-        _s1Table.addPressed(null);
+        ThreadingUtil.runOnGUI(() -> _s1Table.addPressed(null));
+
         JFrame af = JFrameOperator.waitJFrame(Bundle.getMessage("TitleAddSensor"), true, true);
-        Assert.assertNotNull("found Add frame", af);
-        // close AddPane
-        _s1Table.cancelPressed(null);
+        assertNotNull( af, "found Add frame");
+
+        ThreadingUtil.runOnGUI(() -> _s1Table.cancelPressed(null)); // close AddPane
+
         // more Sensor Add pane tests in SensorTableWindowTest
 
         // clean up
@@ -113,27 +110,28 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
 
     @Test
     @Override
+    @DisabledIfHeadless
     public void testAddButton() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assume.assumeTrue(a.includeAddButton());
-        a.actionPerformed(null);
+        assertTrue(a.includeAddButton());
+        ThreadingUtil.runOnGUI(() -> a.actionPerformed(null)); // show table
         JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
 
         // find the "Add... " button and press it.
-        jmri.util.swing.JemmyUtil.pressButton(new JFrameOperator(f),Bundle.getMessage("ButtonAdd"));
+        JemmyUtil.pressButton(new JFrameOperator(f),Bundle.getMessage("ButtonAdd"));
         new org.netbeans.jemmy.QueueTool().waitEmpty();
         JFrame f1 = JFrameOperator.waitJFrame(getAddFrameName(), true, true);
-        jmri.util.swing.JemmyUtil.pressButton(new JFrameOperator(f1),Bundle.getMessage("ButtonClose")); // not sure why this is close in this frame.
+        JemmyUtil.pressButton(new JFrameOperator(f1),Bundle.getMessage("ButtonClose")); // not sure why this is close in this frame.
         JUnitUtil.dispose(f1);
         JUnitUtil.dispose(f);
     }
 
     @Test
     @Override
+    @DisabledIfHeadless
     public void testEditButton() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assume.assumeTrue(a.includeAddButton());
-        a.actionPerformed(null);
+
+        assertTrue(a.includeAddButton());
+        ThreadingUtil.runOnGUI(() -> a.actionPerformed(null)); // show table
         JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
 
         // find the "Add... " button and press it.
@@ -143,11 +141,11 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
         JFrame f1 = JFrameOperator.waitJFrame(getAddFrameName(), true, true);
         //Enter 1 in the text field labeled "Hardware address:"
         JTextField hwAddressField = JTextFieldOperator.findJTextField(f1, new NameComponentChooser("hwAddressTextField"));
-        Assert.assertNotNull("hwAddressTextField", hwAddressField);
+        assertNotNull( hwAddressField, "hwAddressTextField");
 
         // set to "1"
         new JTextFieldOperator(hwAddressField).typeText("1");
-        //and press create 
+        //and press create
         JemmyUtil.pressButton(new JFrameOperator(f1),Bundle.getMessage("ButtonCreate"));
         new org.netbeans.jemmy.QueueTool().waitEmpty();
 
@@ -166,41 +164,41 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
     public String getEditFrameName(){
         return "Edit Sensor IS1";
     }
-    
+
     @Test
+    @DisabledIfHeadless
     public void testAddFailureCreate() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        
-        InstanceManager.setDefault(SensorManager.class, new CreateNewSensorAlwaysException());
-        
+
+        InstanceManager.setDefault(SensorManager.class, new AlwaysExceptionCreateNewSensor());
+
         a = new SensorTableAction();
-        Assume.assumeTrue(a.includeAddButton());
-        
-        a.actionPerformed(null);
+        assertTrue(a.includeAddButton());
+
+        ThreadingUtil.runOnGUI(() -> a.actionPerformed(null)); // show table
         JFrame f = JFrameOperator.waitJFrame(getTableFrameName(), true, true);
         // find the "Add... " button and press it.
         JemmyUtil.pressButton(new JFrameOperator(f), Bundle.getMessage("ButtonAdd"));
-        
+
         JFrame f1 = JFrameOperator.waitJFrame(getAddFrameName(), true, true);
         JTextField hwAddressField = JTextFieldOperator.findJTextField(f1, new NameComponentChooser("hwAddressTextField"));
-        Assert.assertNotNull("hwAddressTextField", hwAddressField);
+        assertNotNull( hwAddressField, "hwAddressTextField");
         // set to "1"
         new JTextFieldOperator(hwAddressField).setText("1");
         Thread add1 = JemmyUtil.createModalDialogOperatorThread(
             Bundle.getMessage("ErrorBeanCreateFailed","Sensor" , "IS1"), Bundle.getMessage("ButtonOK"));  // NOI18N
-        
+
         //and press create
         JemmyUtil.pressButton(new JFrameOperator(f1), Bundle.getMessage("ButtonCreate"));
         JUnitUtil.waitFor(()->{return !(add1.isAlive());}, "dialog finished");  // NOI18N
-        
+
         JemmyUtil.pressButton(new JFrameOperator(f1), Bundle.getMessage("ButtonClose")); // not sure why this is close in this frame.
         JUnitUtil.dispose(f1);
         JUnitUtil.dispose(f);
     }
-    
-    private class CreateNewSensorAlwaysException extends InternalSensorManager {
 
-        public CreateNewSensorAlwaysException() {
+    private static class AlwaysExceptionCreateNewSensor extends InternalSensorManager {
+
+        AlwaysExceptionCreateNewSensor() {
             super(InstanceManager.getDefault(InternalSystemConnectionMemo.class));
         }
 
@@ -210,7 +208,7 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
         protected Sensor createNewSensor(@Nonnull String systemName, String userName) throws IllegalArgumentException {
             throw new IllegalArgumentException("createNewSensor Exception Text");
         }
-        
+
     }
 
     @Override
@@ -219,7 +217,7 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
         JUnitUtil.setUp();
         JUnitUtil.resetProfileManager();
         JUnitUtil.initInternalSensorManager();
-        helpTarget = "package.jmri.jmrit.beantable.SensorTable"; 
+        helpTarget = "package.jmri.jmrit.beantable.SensorTable";
         a = new SensorTableAction();
     }
 
@@ -228,9 +226,10 @@ public class SensorTableActionTest extends AbstractTableActionBase<Sensor> {
     public void tearDown() {
         a.dispose();
         a = null;
+        JUnitUtil.clearShutDownManager();
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SensorTableActionTest.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SensorTableActionTest.class);
 
 }

@@ -28,35 +28,39 @@ public class JsonThrottleManager implements InstanceManagerAutoDefault {
         // do nothing
     }
 
-    public Collection<JsonThrottle> getThrottles() {
-        return this.throttles.values();
+    // Synchronized throughout: notifyThrottleFound() is now deferred to the
+    // EDT (see AbstractThrottleManager), so that deferred callback and a
+    // thread handling a fresh JSON request can touch these maps at the
+    // same time. getThrottles() returns a copy since callers iterate it.
+    public synchronized Collection<JsonThrottle> getThrottles() {
+        return new ArrayList<>(this.throttles.values());
     }
 
-    public void put(DccLocoAddress address, JsonThrottle throttle) {
+    public synchronized void put(DccLocoAddress address, JsonThrottle throttle) {
         this.throttles.put(address, throttle);
     }
 
-    public void put(JsonThrottle throttle, JsonThrottleSocketService service) {
+    public synchronized void put(JsonThrottle throttle, JsonThrottleSocketService service) {
         this.services.computeIfAbsent(throttle, v -> new ArrayList<>()).add(service);
     }
 
-    public boolean containsKey(DccLocoAddress address) {
+    public synchronized boolean containsKey(DccLocoAddress address) {
         return this.throttles.containsKey(address);
     }
 
-    public JsonThrottle get(DccLocoAddress address) {
+    public synchronized JsonThrottle get(DccLocoAddress address) {
         return this.throttles.get(address);
     }
 
-    public void remove(DccLocoAddress address) {
+    public synchronized void remove(DccLocoAddress address) {
         this.throttles.remove(address);
     }
 
-    public List<JsonThrottleSocketService> getServers(JsonThrottle throttle) {
+    public synchronized List<JsonThrottleSocketService> getServers(JsonThrottle throttle) {
         return this.services.computeIfAbsent(throttle, v -> new ArrayList<>());
     }
 
-    public void remove(JsonThrottle throttle, JsonThrottleSocketService server) {
+    public synchronized void remove(JsonThrottle throttle, JsonThrottleSocketService server) {
         this.getServers(throttle).remove(server);
     }
 
@@ -75,23 +79,9 @@ public class JsonThrottleManager implements InstanceManagerAutoDefault {
     public boolean requestThrottle(DccLocoAddress address, ThrottleListener listener) {
         return InstanceManager.getDefault(ThrottleManager.class).requestThrottle(address, listener, false);
     }
-    
+
     public boolean requestThrottle(jmri.BasicRosterEntry rosterEntry, ThrottleListener listener) {
         return InstanceManager.getDefault(ThrottleManager.class).requestThrottle(rosterEntry, listener, false);
-    }
-
-    /**
-     * Make the JsonThrottle listen to the given address.
-     *
-     * @param address  the address to listen to
-     * @param throttle the throttle that should listen
-     * @deprecated since 4.19.5 without direct replacement; JsonThrottles
-     * already attach themselves as listeners to the throttle in
-     * {@link JsonThrottle#notifyThrottleFound(jmri.DccThrottle)}
-     */
-    @Deprecated
-    public void attachListener(DccLocoAddress address, JsonThrottle throttle) {
-        InstanceManager.getDefault(ThrottleManager.class).attachListener(address, throttle);
     }
 
     // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JsonThrottleManager.class);

@@ -1,11 +1,10 @@
 package jmri.jmrit.display.controlPanelEditor;
 
-import java.awt.GraphicsEnvironment;
 import jmri.jmrit.display.PositionableIconTest;
 import jmri.jmrit.logix.Portal;
 import jmri.util.JUnitUtil;
-import org.junit.Assert;
-import org.junit.Assume;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -17,14 +16,14 @@ public class PortalIconTest extends PositionableIconTest {
 
     @Test
     @Override
+    @DisabledIfHeadless
     public void testCtor() {
-        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
         Assertions.assertNotNull(p, "exists");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testPortalCtor() {
-        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
         Portal po1 = new Portal("Po1");
         PortalIcon p1 = new PortalIcon(editor, po1);
         Assertions.assertNotNull(p1, "exists");
@@ -32,16 +31,15 @@ public class PortalIconTest extends PositionableIconTest {
 
     @Override
     @Test
-//    @Disabled("not supported for PortalIcon")
+    @DisabledIfHeadless
     public void testDoViemMenu() {
-        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
         Assertions.assertFalse(p.doViemMenu(), "Do View Menu");
     }
 
     @Override
     @Test
+    @DisabledIfHeadless
     public void testGetNameString() {
-        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
         Portal po2 = new Portal("Name String");
         PortalIcon p2 = new PortalIcon(editor, po2);
         Assertions.assertNotNull(p2.getNameString(), "Name String");
@@ -50,11 +48,10 @@ public class PortalIconTest extends PositionableIconTest {
     @Override
     @BeforeEach
     public void setUp() {
-        super.setUp();
-        if (!GraphicsEnvironment.isHeadless()) {
-            editor = new ControlPanelEditor("Portal Icon Test Panel");
-            p = new PortalIcon(editor);
-        }
+        super.setUp(); // creates EditorScaffold
+        JUnitUtil.dispose(editor);
+        editor = new ControlPanelEditor("Portal Icon Test Panel");
+        p = new PortalIcon(editor);
     }
 
     @AfterEach

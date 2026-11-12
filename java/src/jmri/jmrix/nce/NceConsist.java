@@ -1,13 +1,12 @@
 package jmri.jmrix.nce;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.Consist;
 import jmri.ConsistListener;
 import jmri.DccLocoAddress;
 import jmri.implementation.DccConsist;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The Consist definition for a consist on an NCE system. It uses the NCE
@@ -15,6 +14,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Paul Bender Copyright (C) 2011
  * @author Daniel Boudreau Copyright (C) 2012
+ * @author Ken Cameron Copyright (C) 2023
  */
 public class NceConsist extends jmri.implementation.DccConsist implements jmri.jmrix.nce.NceListener {
 
@@ -30,7 +30,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
     private byte _consistNum = 0;    // consist number (short address of consist)
 
     // Initialize a consist for the specific address
-    // the Default consist type is an advanced consist 
+    // the Default consist type is an advanced consist
     public NceConsist(int address, NceSystemConnectionMemo m) {
         super(address);
         tc = m.getNceTrafficController();
@@ -38,7 +38,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
     }
 
     // Initialize a consist for the specific address
-    // the Default consist type is an advanced consist 
+    // the Default consist type is an advanced consist
     public NceConsist(DccLocoAddress locoAddress, NceSystemConnectionMemo m) {
         super(locoAddress);
         tc = m.getNceTrafficController();
@@ -52,7 +52,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
            // already disposed;
            return;
         }
-        if (consistList.size() > 0) {
+        if (!consistList.isEmpty()) {
             // kill this consist
             DccLocoAddress locoAddress = consistList.get(0);
             killConsist(locoAddress.getNumber(), locoAddress.isLongAddress());
@@ -92,35 +92,35 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
         if (!contains(locoAddress)) {
             // NCE has 6 commands for adding a loco to a consist, lead, rear, and mid, plus direction
             // First loco to consist?
-            if (consistList.size() == 0) {
+            if (consistList.isEmpty()) {
                 // add lead loco
-                byte command = NceBinaryCommand.LOCO_CMD_FWD_CONSIST_LEAD;
+                byte command = NceMessage.LOCO_CMD_FWD_CONSIST_LEAD;
                 if (!directionNormal) {
-                    command = NceBinaryCommand.LOCO_CMD_REV_CONSIST_LEAD;
+                    command = NceMessage.LOCO_CMD_REV_CONSIST_LEAD;
                 }
                 addLocoToConsist(locoAddress.getNumber(), locoAddress.isLongAddress(), command);
                 consistPosition.put(locoAddress, DccConsist.POSITION_LEAD);
             } // Second loco to consist?
             else if (consistList.size() == 1) {
                 // add rear loco
-                byte command = NceBinaryCommand.LOCO_CMD_FWD_CONSIST_REAR;
+                byte command = NceMessage.LOCO_CMD_FWD_CONSIST_REAR;
                 if (!directionNormal) {
-                    command = NceBinaryCommand.LOCO_CMD_REV_CONSIST_REAR;
+                    command = NceMessage.LOCO_CMD_REV_CONSIST_REAR;
                 }
                 addLocoToConsist(locoAddress.getNumber(), locoAddress.isLongAddress(), command);
                 consistPosition.put(locoAddress, DccConsist.POSITION_TRAIL);
             } else {
                 // add mid loco
-                byte command = NceBinaryCommand.LOCO_CMD_FWD_CONSIST_MID;
+                byte command = NceMessage.LOCO_CMD_FWD_CONSIST_MID;
                 if (!directionNormal) {
-                    command = NceBinaryCommand.LOCO_CMD_REV_CONSIST_MID;
+                    command = NceMessage.LOCO_CMD_REV_CONSIST_MID;
                 }
                 addLocoToConsist(locoAddress.getNumber(), locoAddress.isLongAddress(), command);
                 consistPosition.put(locoAddress, consistPosition.size());
             }
             // add loco to lists
             consistList.add(locoAddress);
-            consistDir.put(locoAddress, Boolean.valueOf(directionNormal));
+            consistDir.put(locoAddress, directionNormal);
         } else {
             log.error("Loco {} is already part of this consist {}", locoAddress, getConsistAddress());
         }
@@ -261,7 +261,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
         if (isLong) {
             address += 0xC000; // set the upper two bits for long addresses
         }
-        sendNceBinaryCommand(address, NceBinaryCommand.LOCO_CMD_DELETE_LOCO_CONSIST, (byte) 0);
+        sendNceBinaryCommand(address, NceMessage.LOCO_CMD_DELETE_LOCO_CONSIST, (byte) 0);
     }
 
     /**
@@ -273,7 +273,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
         if (isLong) {
             address += 0xC000; // set the upper two bits for long addresses
         }
-        sendNceBinaryCommand(address, NceBinaryCommand.LOCO_CMD_KILL_CONSIST, (byte) 0);
+        sendNceBinaryCommand(address, NceMessage.LOCO_CMD_KILL_CONSIST, (byte) 0);
     }
 
     private void sendNceBinaryCommand(int nceAddress, byte nceLocoCmd, byte consistNumber) {
@@ -303,7 +303,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
             log.error("reply length error, expecting: {} got: {}", _replyLen, r.getNumDataElements());
             return;
         }
-        if (_replyLen == 1 && r.getElement(0) == '!') {
+        if (_replyLen == 1 && r.getElement(0) == NceMessage.NCE_OKAY) {
             log.debug("Command complete okay for consist {}", getConsistAddress());
         } else {
             log.error("Error, command failed for consist {}", getConsistAddress());
@@ -326,10 +326,6 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
         private static final int REAR = 1;
         private static final int MID = 2;
 
-        private static final int CS_CONSIST_MEM = 0xF500;  // start of NCE CS Consist memory
-        private static final int CS_CON_MEM_REAR = 0xF600;  // address of rear consist locos
-        private static final int CS_CON_MEM_MID = 0xF700;  // address of mid consist locos
-
         public void setConsist(int number) {
             _consistNum = number;
         }
@@ -347,11 +343,8 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
                 readConsistMemory(_consistNum, MID);
                 setValid(true);
             } catch (InterruptedException e) {
-                return; // we're done!
+                // we're done!
             } catch (Throwable t) {
-                if ( ! (t instanceof java.lang.ThreadDeath) ) {
-                    log.error("NceReadConsist.run caught ", t);
-                }
                 throw t;
             }
         }
@@ -371,12 +364,12 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
                 return;
             }
             _locoNum = eNum;
-            int nceMemAddr = (consistNum * 2) + CS_CONSIST_MEM;
+            int nceMemAddr = (consistNum * 2) + tc.csm.getConsistHeadAddr();
             if (eNum == REAR) {
-                nceMemAddr = (consistNum * 2) + CS_CON_MEM_REAR;
+                nceMemAddr = (consistNum * 2) + tc.csm.getConsistTailAddr();
             }
             if (eNum == MID) {
-                nceMemAddr = (consistNum * 8) + CS_CON_MEM_MID;
+                nceMemAddr = (consistNum * 8) + tc.csm.getConsistMidAddr();
             }
             if (eNum == LEAD || _validConsist) {
                 byte[] bl = NceBinaryCommand.accMemoryRead(nceMemAddr);
@@ -435,7 +428,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
                 }
 
                 if (_validConsist && _locoNum == MID) {
-                    for (int index = 0; index < 8; index = index + 2) {
+                    for (int index = 0; index < 8; index += 2) {
                         checkLocoConsist(r, index, consistPosition.size());
                     }
                 }
@@ -449,7 +442,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
                 }
 
                 if (_validConsist && _locoNum == MID) {
-                    for (int index = 0; index < 8; index = index + 2) {
+                    for (int index = 0; index < 8; index += 2) {
                         addLocoConsist(r, index, consistPosition.size());
                     }
                 }
@@ -468,7 +461,7 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
          */
         private boolean addLocoConsist(NceReply r, int index, int position) {
             int address = getLocoAddrText(r, index);
-            boolean isLong = getLocoAddressType(r, index); // Long (true) or short (false) address?   
+            boolean isLong = getLocoAddressType(r, index); // Long (true) or short (false) address?
             if (address != 0) {
                 log.debug("Add loco address {} to consist {}", address, _consistNum);
                 restore(new DccLocoAddress(address, isLong), true, position); // we don't know the direction of the loco
@@ -510,14 +503,10 @@ public class NceConsist extends jmri.implementation.DccConsist implements jmri.j
         private boolean getLocoAddressType(NceReply r, int index) {
             int rC = r.getElement(index);
             rC = rC & 0xC0; // long address if 2 msb are set
-            if (rC == 0xC0) {
-                return true;
-            } else {
-                return false;
-            }
+            return rC == 0xC0;
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NceConsist.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceConsist.class);
 
 }

@@ -1,6 +1,7 @@
 package jmri.jmrit.beantable.oblock;
 
 import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.text.ParseException;
 
 import java.util.*;
@@ -16,8 +17,7 @@ import jmri.jmrit.logix.Portal;
 import jmri.jmrit.logix.PortalManager;
 import jmri.util.IntlUtilities;
 import jmri.util.gui.GuiLafPreferencesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * GUI to define the Signals within an OBlock.
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * @author Pete Cressman (C) 2010
  * @author Egbert Broerse (C) 2020
  */
-public class SignalTableModel extends AbstractTableModel {
+public class SignalTableModel extends AbstractTableModel implements PropertyChangeListener {
 
     public static final int NAME_COLUMN = 0;
     public static final int FROM_BLOCK_COLUMN = 1;
@@ -50,7 +50,7 @@ public class SignalTableModel extends AbstractTableModel {
     public static final int LENGTHCOL = 4;
     public static final int UNITSCOL = 5;
     public static final int DELETE_COL = 6;
-    static public final int EDIT_COL = 7; // only used on _tabbed UI
+    public static final int EDIT_COL = 7; // only used on _tabbed UI
     public static final int NUMCOLS = 7;  // returns 7+1 for _tabbed
     int _lastIdx; // for debug
 
@@ -447,8 +447,8 @@ public class SignalTableModel extends AbstractTableModel {
                         _tempLen *= 25.4f;                            
                     }
                 } catch (ParseException e) {
-                    JOptionPane.showMessageDialog(null, Bundle.getMessage("BadNumber", tempRow[LENGTHCOL]),
-                            Bundle.getMessage("ErrorTitle"), JOptionPane.WARNING_MESSAGE);                    
+                    JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("BadNumber", tempRow[LENGTHCOL]),
+                            Bundle.getMessage("ErrorTitle"), JmriJOptionPane.WARNING_MESSAGE);                    
                 }
                 return;
             }
@@ -717,8 +717,8 @@ public class SignalTableModel extends AbstractTableModel {
         }
 
         if (msg != null) {
-            JOptionPane.showMessageDialog(null, msg,
-                    Bundle.getMessage("WarningTitle"), JOptionPane.WARNING_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null, msg,
+                    Bundle.getMessage("WarningTitle"), JmriJOptionPane.WARNING_MESSAGE);
             // doesn't close by clicking OK after DnD as focus lost, only Esc in JMRI 4.21.2 on macOS
         }
     }
@@ -741,12 +741,13 @@ public class SignalTableModel extends AbstractTableModel {
             // open SignalEditFrame
             SignalEditFrame sef = new SignalEditFrame(Bundle.getMessage("TitleSignalEditor", sr.getSignal().getDisplayName()),
                     signal, sr, this);
+            sef.initComponents();
             // TODO run on separate thread?
             sef.setVisible(true);
         }
     }
 
-    static private String setSignal(SignalRow signalRow, boolean deletePortal) {
+    private static String setSignal(SignalRow signalRow, boolean deletePortal) {
         Portal portal = signalRow.getPortal();
         float length = signalRow.getLength();
         if (portal.setProtectSignal(signalRow.getSignal(), length, signalRow.getToBlock())) {
@@ -765,7 +766,7 @@ public class SignalTableModel extends AbstractTableModel {
         return null;
     }
 
-    static private boolean checkPortalBlock(Portal portal, OBlock block) {
+    private static boolean checkPortalBlock(Portal portal, OBlock block) {
         if (block == null) {
             return false;
         }
@@ -797,11 +798,11 @@ public class SignalTableModel extends AbstractTableModel {
             case FROM_BLOCK_COLUMN:
             case PORTAL_COLUMN:
             case TO_BLOCK_COLUMN:
-                return new JTextField(11).getPreferredSize().width;
+                return new JTextField(12).getPreferredSize().width;
             case LENGTHCOL:
-                return new JTextField(5).getPreferredSize().width;
+                return new JTextField(6).getPreferredSize().width;
             case UNITSCOL:
-                return new JTextField(4).getPreferredSize().width;
+                return new JTextField(5).getPreferredSize().width;
             case DELETE_COL:
                 return new JButton("DELETE").getPreferredSize().width; // NOI18N
             case EDIT_COL:
@@ -821,6 +822,8 @@ public class SignalTableModel extends AbstractTableModel {
         inEditMode = editing;
     }
 
+    // TODO - This class does not appear to add a PCL to a Portal / OBlock / Manager, should it ?
+    @Override
     public void propertyChange(PropertyChangeEvent e) {
         String property = e.getPropertyName();
         if (property.equals("length") || property.equals("portalCount")
@@ -830,6 +833,6 @@ public class SignalTableModel extends AbstractTableModel {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SignalTableModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignalTableModel.class);
 
 }

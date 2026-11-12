@@ -1,8 +1,6 @@
 package jmri.jmrix.jmriclient.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring
@@ -31,5 +29,5 @@ public class JMRIClientTurnoutManagerXml extends jmri.managers.configurexml.Abst
     }
 
     // initialize logging
-//    private final static Logger log = LoggerFactory.getLogger(JMRIClientTurnoutManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(JMRIClientTurnoutManagerXml.class);
 }

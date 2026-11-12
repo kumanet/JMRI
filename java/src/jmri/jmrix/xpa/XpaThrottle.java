@@ -3,6 +3,7 @@ package jmri.jmrix.xpa;
 import jmri.DccLocoAddress;
 import jmri.LocoAddress;
 import jmri.SpeedStepMode;
+import jmri.SystemConnectionMemo;
 import jmri.jmrix.AbstractThrottle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,10 @@ public class XpaThrottle extends AbstractThrottle {
      *
      * @param address the address for the throttle
      * @param t the controller for the system connection
+     * @param memo the System connection.
      */
-    public XpaThrottle(LocoAddress address, XpaTrafficController t) {
-        super(null);
+    public XpaThrottle(LocoAddress address, XpaTrafficController t, SystemConnectionMemo memo) {
+        super(memo);
         this.address = address.getNumber();
         this.speedStepMode = SpeedStepMode.INCREMENTAL;
         this.isForward = true;
@@ -38,6 +40,11 @@ public class XpaThrottle extends AbstractThrottle {
         log.debug("XpaThrottle constructor called for address {}", address);
     }
 
+    @Deprecated (since="5.13.3", forRemoval=true)
+    public XpaThrottle(LocoAddress address, XpaTrafficController t) {
+        this(address, t, jmri.InstanceManager.getDefault(jmri.jmrix.xpa.XpaSystemConnectionMemo.class));
+    }
+
     /**
      * Set the speed and direction.
      * <p>
@@ -48,9 +55,12 @@ public class XpaThrottle extends AbstractThrottle {
     @Override
     public void setSpeedSetting(float speed) {
         super.setSpeedSetting(speed);
-        int value = (int) ((127) * speed);
+        int value = Math.round((127) * speed);
         if (value > 127) {
             value = 127;    // max possible speed
+        }
+        if (speed > 0 && value == 0) {
+            value = 1;
         }
         if (this.speedvalue != value) {
             XpaMessage m;
@@ -146,6 +156,6 @@ public class XpaThrottle extends AbstractThrottle {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(XpaThrottle.class);
+    private static final Logger log = LoggerFactory.getLogger(XpaThrottle.class);
 
 }

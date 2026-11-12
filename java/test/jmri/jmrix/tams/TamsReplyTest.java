@@ -17,12 +17,13 @@ public class TamsReplyTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new TamsReply();
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TamsReplyTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(TamsReplyTest.class);
 
 }

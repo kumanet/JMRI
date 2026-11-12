@@ -1,9 +1,11 @@
 package jmri.jmrix.nce;
 
-import jmri.util.JUnitUtil;
-
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import jmri.util.JUnitUtil;
 
 /**
  * JUnit tests for the NceMessage class.
@@ -31,6 +33,7 @@ public class NceMessageTest extends jmri.jmrix.AbstractMessageTestBase {
         }
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = msg = null;
@@ -173,6 +176,6 @@ public class NceMessageTest extends jmri.jmrix.AbstractMessageTestBase {
         Assert.assertEquals("content", "93 02 81 FF 7E", msg.toString());
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceMessageTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NceMessageTest.class);
 
 }

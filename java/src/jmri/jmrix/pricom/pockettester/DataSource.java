@@ -1,11 +1,11 @@
 package jmri.jmrix.pricom.pockettester;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.FlowLayout;
-import java.io.DataInputStream;
-import java.io.OutputStream;
-import java.util.Enumeration;
+import java.io.*;
 import java.util.Vector;
+
 import javax.swing.Action;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
@@ -14,13 +14,12 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import purejavacomm.CommPortIdentifier;
-import purejavacomm.NoSuchPortException;
-import purejavacomm.PortInUseException;
-import purejavacomm.SerialPort;
-import purejavacomm.UnsupportedCommOperationException;
+
+import jmri.jmrix.purejavacomm.CommPortIdentifier;
+import jmri.jmrix.purejavacomm.NoSuchPortException;
+import jmri.jmrix.purejavacomm.PortInUseException;
+import jmri.jmrix.purejavacomm.SerialPort;
+import jmri.jmrix.purejavacomm.UnsupportedCommOperationException;
 
 /**
  * Simple GUI for controlling the PRICOM Pocket Tester.
@@ -44,11 +43,11 @@ public class DataSource extends jmri.util.JmriJFrame {
      *
      * @return null until a DataSource has been created.
      */
-    static public DataSource instance() {
+    public static DataSource instance() {
         return existingInstance;
     }
 
-    void setInstance(DataSource source) {
+    static void setInstance(DataSource source) {
         if (existingInstance != null) {
             log.error("Setting instance after it has already been set");
         } else {
@@ -56,7 +55,6 @@ public class DataSource extends jmri.util.JmriJFrame {
         }
     }
 
-    Vector<String> portNameVector = null;
     SerialPort activeSerialPort = null;
 
     JLabel version = new JLabel("");  // hold version label when returned
@@ -93,7 +91,7 @@ public class DataSource extends jmri.util.JmriJFrame {
                     //} catch (jmri.jmrix.SerialConfigException ex) {
                     //    log.error("Error while opening port.  Did you select the right one?\n"+ex);
                 } catch (java.lang.UnsatisfiedLinkError ex) {
-                    log.error("Error while opening port.  Did you select the right one?\n{}", ex);
+                    log.error("Error while opening port.  Did you select the right one?", ex);
                 }
             }
         });
@@ -251,10 +249,10 @@ public class DataSource extends jmri.util.JmriJFrame {
             final byte endbyte = bytes[bytes.length - 1];
             ostream.write(endbyte);
         } catch (java.io.IOException e) {
-            log.error("Exception on output: {}", e);
+            log.error("Exception on output", e);
         } catch (java.lang.InterruptedException e) {
             Thread.currentThread().interrupt(); // retain if needed later
-            log.error("Interrupted output: {}", e);
+            log.error("Interrupted output", e);
         }
     }
 
@@ -284,14 +282,8 @@ public class DataSource extends jmri.util.JmriJFrame {
             = new javax.swing.JComboBox<String>(new String[]{"9600", "19200", "38400", "57600", "115200"});
     protected javax.swing.JButton openPortButton = new javax.swing.JButton();
 
-    @SuppressWarnings("deprecation")
     @Override
     public void dispose() {
-        // stop operations here. This is a deprecated method, but OK for us.
-        if (readerThread != null) {
-            readerThread.stop();
-        }
-
         // release port
         if (activeSerialPort != null) {
             activeSerialPort.close();
@@ -299,26 +291,13 @@ public class DataSource extends jmri.util.JmriJFrame {
         serialStream = null;
         ostream = null;
         activeSerialPort = null;
-        portNameVector = null;
 
         // and clean up parent
         super.dispose();
     }
 
     public Vector<String> getPortNames() {
-        // first, check that the comm package can be opened and ports seen
-        portNameVector = new Vector<String>();
-        Enumeration<CommPortIdentifier> portIDs = CommPortIdentifier.getPortIdentifiers();
-        // find the names of suitable ports
-        while (portIDs.hasMoreElements()) {
-            CommPortIdentifier id = portIDs.nextElement();
-            // filter out line printers 
-            if (id.getPortType() != CommPortIdentifier.PORT_PARALLEL) // accumulate the names in a vector
-            {
-                portNameVector.addElement(id.getName());
-            }
-        }
-        return portNameVector;
+        return jmri.jmrix.AbstractSerialPortController.getActualPortNames();
     }
 
     @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value="SR_NOT_CHECKED",
@@ -329,7 +308,7 @@ public class DataSource extends jmri.util.JmriJFrame {
             // get and open the primary port
             CommPortIdentifier portID = CommPortIdentifier.getPortIdentifier(portName);
             try {
-                activeSerialPort = (SerialPort) portID.open(appName, 2000);  // name of program, msec to wait
+                activeSerialPort = portID.open(null, 2000);  // name of program, msec to wait
             } catch (PortInUseException p) {
                 handlePortBusy(p, portName);
                 return "Port " + p + " in use already";
@@ -391,7 +370,7 @@ public class DataSource extends jmri.util.JmriJFrame {
     }
 
     void handlePortBusy(PortInUseException p, String port) {
-        log.error("Port {} in use, cannot open", p);
+        log.error("Port {} in use, cannot open", port, p);
     }
 
     DataInputStream serialStream = null;
@@ -400,7 +379,7 @@ public class DataSource extends jmri.util.JmriJFrame {
             justification = "Class is no longer active, no hardware with which to test fix")
     OutputStream ostream = null;
 
-    private final static Logger log = LoggerFactory.getLogger(DataSource.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DataSource.class);
 
     /**
      * Internal class to handle the separate character-receive thread
@@ -472,7 +451,7 @@ public class DataSource extends jmri.util.JmriJFrame {
     } // end class Reader
 
     // data members to hold contact with the listeners
-    final private Vector<DataListener> listeners = new Vector<DataListener>();
+    private final Vector<DataListener> listeners = new Vector<DataListener>();
 
     public synchronized void addListener(DataListener l) {
         // add only if not already registered

@@ -1,8 +1,11 @@
 package jmri.implementation;
 
 import java.util.Arrays;
+
 import jmri.SignalHead;
 import jmri.Turnout;
+import jmri.util.ArrayUtil;
+import jmri.util.StringUtil;
 
 import javax.annotation.Nonnull;
 
@@ -22,6 +25,10 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
         super(systemName);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Nonnull
     @Override
     public String getAppearanceName(int appearance) {
         String ret = jmri.util.StringUtil.getNameFromState(
@@ -32,14 +39,22 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
         return ("");
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Nonnull
     @Override
     public String getAppearanceName() {
         return getAppearanceName(getAppearance());
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Nonnull
     @Override
     public String getAppearanceKey(int appearance) {
-        String ret = jmri.util.StringUtil.getNameFromState(
+        String ret = StringUtil.getNameFromState(
                 appearance, getValidStates(), getValidStateKeys());
         if (ret != null) {
             return ret;
@@ -47,6 +62,10 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
         return ("");
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Nonnull
     @Override
     public String getAppearanceKey() {
         return getAppearanceKey(getAppearance());
@@ -54,6 +73,9 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
 
     protected int mAppearance = DARK;
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getAppearance() {
         return mAppearance;
@@ -75,7 +97,9 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
      * Restricting aspect.
      */
     @Override
-    public boolean isShowingRestricting() { return getAppearance() == FLASHRED || getAppearance() == LUNAR || getAppearance() == FLASHLUNAR; }
+    public boolean isShowingRestricting() {
+        return getAppearance() == FLASHRED || getAppearance() == LUNAR || getAppearance() == FLASHLUNAR;
+    }
 
     /**
      * Determine whether this signal shows an aspect or appearance
@@ -100,7 +124,7 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
 
     /**
      * Default behavior for "lit" parameter is to track value and return it.
-     *
+     * {@inheritDoc}
      * @return is lit
      */
     @Override
@@ -115,6 +139,7 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
 
     /**
      * "Held" parameter is just tracked and notified.
+     * {@inheritDoc}
      * @return is held
      */
     @Override
@@ -165,14 +190,11 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
      * @param appearance the index of the appearance
      * @return translated name for appearance
      */
+    @Nonnull
     public static String getDefaultStateName(int appearance) {
         String ret = jmri.util.StringUtil.getNameFromState(
                 appearance, getDefaultValidStates(), getDefaultValidStateNames());
-        if (ret != null) {
-            return ret;
-        } else {
-            return ("");
-        }
+        return ( ret != null ? ret : "" );
     }
 
     private static final int[] validStates = new int[]{
@@ -186,6 +208,7 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
         FLASHGREEN,
         FLASHLUNAR
     };
+
     private static final String[] validStateKeys = new String[]{
         "SignalHeadStateDark",
         "SignalHeadStateRed",
@@ -223,28 +246,63 @@ public abstract class AbstractSignalHead extends AbstractNamedBean
     }
 
     /**
+     * Describe SignalHead state.
+     * Does not have to be a valid state for this SignalHead instance hence
+     * suitable for state error logging.
+     * Can include multiple head states, with exception of DARK,
+     * the only state which must exist on its own.
+     * Includes the HELD state if present.
+     * @see SignalHead#getAppearanceName(int)
+     * @param state the state to describe.
+     * @return description of state from Bundle.
+     */
+    @Override
+    public String describeState(int state) {
+        var bundleStrings = StringUtil.getNamesFromState(state, allStateNumbers, allStateNames);
+        StringBuilder sb = new StringBuilder();
+        for (String str : bundleStrings) {
+            sb.append(Bundle.getMessage(str));
+            sb.append(" ");
+        }
+        return sb.toString().trim();
+    }
+
+    // all states, including HELD
+    private static final int[] allStateNumbers = ArrayUtil.appendArray(validStates, new int[]{HELD});
+
+    // all state names, including HELD
+    private static final String[] allStateNames = ArrayUtil.appendArray(validStateKeys, new String[]{"SignalHeadStateHeld"});
+
+    /**
      * Check if a given turnout is used on this head.
      *
      * @param t Turnout object to check
      * @return true if turnout is configured as output or driver of head
      */
-    abstract boolean isTurnoutUsed(Turnout t);
+    public abstract boolean isTurnoutUsed(Turnout t);
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void vetoableChange(java.beans.PropertyChangeEvent evt) throws java.beans.PropertyVetoException {
-        if ("CanDelete".equals(evt.getPropertyName())) { // NOI18N
+        if (jmri.Manager.PROPERTY_CAN_DELETE.equals(evt.getPropertyName())) {
             if (isTurnoutUsed((Turnout) evt.getOldValue())) {
-                java.beans.PropertyChangeEvent e = new java.beans.PropertyChangeEvent(this, "DoNotDelete", null, null);
-                throw new java.beans.PropertyVetoException(Bundle.getMessage("InUseTurnoutSignalHeadVeto", getDisplayName()), e); // NOI18N
+                var e = new java.beans.PropertyChangeEvent(this, jmri.Manager.PROPERTY_DO_NOT_DELETE, null, null);
+                throw new java.beans.PropertyVetoException(
+                    Bundle.getMessage("InUseTurnoutSignalHeadVeto", getDisplayName()), e); // NOI18N
             }
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @Nonnull String getBeanType() {
         return Bundle.getMessage("BeanNameSignalHead");
     }
 
-//     private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractSignalHead.class);
+//     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractSignalHead.class);
 
 }

@@ -8,7 +8,8 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 @ParametersAreNonnullByDefault
 @CheckReturnValue
-@SuppressFBWarnings(value = "NM_SAME_SIMPLE_NAME_AS_SUPERCLASS", justification = "Desired pattern is repeated class names with package-level access to members")
+@SuppressFBWarnings(value = {"NM_SAME_SIMPLE_NAME_AS_SUPERCLASS", "HSM_HIDING_METHOD"},
+    justification = "Desired pattern is repeated class names with package-level access to members")
 
 @javax.annotation.concurrent.Immutable
 
@@ -20,6 +21,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
  *
  * @author Bob Jacobsen Copyright (C) 2012
  * @since 3.3.1
+ * @author Ken Cameron (C) 2023
  */
 public class Bundle extends jmri.jmrix.nce.Bundle {
 
@@ -38,7 +40,7 @@ public class Bundle extends jmri.jmrix.nce.Bundle {
      * @param key Bundle key to be translated
      * @return Internationalized text
      */
-    static String getMessage(String key) {
+    public static String getMessage(String key) {
         return getBundle().handleGetMessage(key);
     }
 
@@ -77,7 +79,7 @@ public class Bundle extends jmri.jmrix.nce.Bundle {
         return getBundle().handleGetMessage(locale, key, subs);
     }
 
-    private final static Bundle b = new Bundle();
+    private static final Bundle b = new Bundle();
 
     @Override
     @CheckForNull

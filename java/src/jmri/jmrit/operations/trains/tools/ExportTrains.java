@@ -2,23 +2,19 @@ package jmri.jmrit.operations.trains.tools;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import javax.swing.JOptionPane;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
 import jmri.jmrit.XmlFile;
 import jmri.jmrit.operations.setup.OperationsSetupXml;
 import jmri.jmrit.operations.trains.Train;
-import jmri.jmrit.operations.trains.TrainCommon;
 import jmri.jmrit.operations.trains.TrainManager;
+import jmri.jmrit.operations.trains.trainbuilder.TrainCommon;
+import jmri.util.swing.JmriJOptionPane;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
 /**
  * Exports the train roster into a comma delimited file (CSV). Only trains that
@@ -52,7 +48,8 @@ public class ExportTrains extends XmlFile {
             }
             writeFile(defaultOperationsFilename());
         } catch (IOException e) {
-            log.error("Exception while writing the new CSV operations file, may not be complete: {}", e);
+            log.error("Exception while writing the new CSV operations file, may not be complete: {}",
+                    e.getLocalizedMessage());
         }
     }
 
@@ -70,14 +67,17 @@ public class ExportTrains extends XmlFile {
 
             // create header
             fileOut.printRecord(Bundle.getMessage("Name"), Bundle.getMessage("Description"), Bundle.getMessage("Time"),
+                    Bundle.getMessage("Done"),
                     Bundle.getMessage("Route"), Bundle.getMessage("Departs"), Bundle.getMessage("Terminates"),
                     Bundle.getMessage("Status"), Bundle.getMessage("Comment"), Bundle.getMessage("LocoTypes"),
-                    Bundle.getMessage("CarTypes"), Bundle.getMessage("RoadOption"), Bundle.getMessage("Roads"),
+                    Bundle.getMessage("CarTypes"), Bundle.getMessage("RoadOption"), Bundle.getMessage("RoadsCar"),
+                    Bundle.getMessage("RoadOption"), Bundle.getMessage("RoadsCaboose"), Bundle.getMessage("RoadOption"),
+                    Bundle.getMessage("RoadsLoco"),
                     Bundle.getMessage("LoadOption"), Bundle.getMessage("Loads"), Bundle.getMessage("OwnerOption"),
                     Bundle.getMessage("Owners"), Bundle.getMessage("Built"),
                     Bundle.getMessage("NormalModeWhenBuilding"), Bundle.getMessage("AllowCarsToReturn"),
                     Bundle.getMessage("AllowThroughCars"), Bundle.getMessage("SendCustomToStaging"),
-                    MessageFormat.format(Bundle.getMessage("SendToTerminal"), new Object[] { "" }),
+                    Bundle.getMessage("SendToTerminal", ""),
                     Bundle.getMessage("AllowLocalMoves"), Bundle.getMessage("ServiceAllCars"),
                     Bundle.getMessage("BuildConsist"));
 
@@ -92,12 +92,15 @@ public class ExportTrains extends XmlFile {
                 if (train.getRoute() != null) {
                     routeName = train.getRoute().getName();
                 }
-                fileOut.printRecord(train.getName(), train.getDescription(), train.getDepartureTime(), routeName,
+                fileOut.printRecord(train.getName(), train.getDescription(), train.getDepartureTime(),
+                        train.getExpectedDepartureTime(train.getTrainTerminatesRouteLocation(), true), routeName,
                         train.getTrainDepartsName(), train.getTrainTerminatesName(), train.getStatus(),
-                        train.getComment(), TrainCommon.formatStringToCommaSeparated(train.getLocoTypeNames()),
-                        TrainCommon.formatStringToCommaSeparated(train.getCarTypeNames()), getRoadOption(train),
-                        getRoads(train), getLoadOption(train), getLoads(train), getOwnerOption(train), getOwners(train),
-                        getBuilt(train), train.isBuildTrainNormalEnabled() ? Bundle.getMessage("ButtonYes") : "",
+                        train.getCommentCurrent(), TrainCommon.formatStringToCommaSeparated(train.getLocoTypeNames()),
+                        TrainCommon.formatStringToCommaSeparated(train.getCarTypeNames()), getCarRoadOption(train),
+                        getCarRoads(train), getCabooseRoadOption(train), getCabooseRoads(train),
+                        getLocoRoadOption(train), getLocoRoads(train), getLoadOption(train),
+                        getLoads(train), getOwnerOption(train), getOwners(train), getBuilt(train),
+                        train.isBuildTrainNormalEnabled() ? Bundle.getMessage("ButtonYes") : "",
                         train.isAllowReturnToStagingEnabled() ? Bundle.getMessage("ButtonYes") : "",
                         train.isAllowThroughCarsEnabled() ? Bundle.getMessage("ButtonYes") : "",
                         train.isSendCarsWithCustomLoadsToStagingEnabled() ? Bundle.getMessage("ButtonYes") : "",
@@ -178,40 +181,77 @@ public class ExportTrains extends XmlFile {
                 }
             }
 
-            fileOut.flush();
-            fileOut.close();
             log.info("Exported {} trains to file {}", count, defaultOperationsFilename());
-            JOptionPane.showMessageDialog(null,
-                    MessageFormat.format(Bundle.getMessage("ExportedTrainsToFile"),
-                            new Object[] { count, defaultOperationsFilename() }),
-                    Bundle.getMessage("ExportComplete"), JOptionPane.INFORMATION_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("ExportedTrainsToFile",
+                            count, defaultOperationsFilename()),
+                    Bundle.getMessage("ExportComplete"), JmriJOptionPane.INFORMATION_MESSAGE);
         } catch (IOException e) {
-            log.error("Can not open export trains CSV file: {}", file.getName());
-            JOptionPane.showMessageDialog(null,
-                    MessageFormat.format(Bundle.getMessage("ExportedTrainsToFile"),
-                            new Object[] { 0, defaultOperationsFilename() }),
-                    Bundle.getMessage("ExportFailed"), JOptionPane.ERROR_MESSAGE);
+            log.error("Can not open export trains CSV file: {}", e.getLocalizedMessage());
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("ExportedTrainsToFile",
+                            0, defaultOperationsFilename()),
+                    Bundle.getMessage("ExportFailed"), JmriJOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private String getRoadOption(Train train) {
+    private String getCarRoadOption(Train train) {
         String roadOption = Bundle.getMessage("AcceptAll");
-
-        if (train.getRoadOption().equals(Train.INCLUDE_ROADS)) {
+        if (train.getCarRoadOption().equals(Train.INCLUDE_ROADS)) {
             roadOption = Bundle.getMessage(
-                    "AcceptOnly") + " " + train.getRoadNames().length + " " + Bundle.getMessage("Roads");
-        } else if (train.getRoadOption().equals(Train.EXCLUDE_ROADS)) {
+                    "AcceptOnly") + " " + train.getCarRoadNames().length + " " + Bundle.getMessage("Roads");
+        } else if (train.getCarRoadOption().equals(Train.EXCLUDE_ROADS)) {
             roadOption = Bundle.getMessage(
-                    "Exclude") + " " + train.getRoadNames().length + " " + Bundle.getMessage("Roads");
+                    "Exclude") + " " + train.getCarRoadNames().length + " " + Bundle.getMessage("Roads");
         }
         return roadOption;
     }
 
-    private String getRoads(Train train) {
-        if (train.getRoadOption().equals(Train.ALL_ROADS)) {
+    private String getCarRoads(Train train) {
+        if (train.getCarRoadOption().equals(Train.ALL_ROADS)) {
             return "";
         } else {
-            return TrainCommon.formatStringToCommaSeparated(train.getRoadNames());
+            return TrainCommon.formatStringToCommaSeparated(train.getCarRoadNames());
+        }
+    }
+    
+    private String getCabooseRoadOption(Train train) {
+        String roadOption = Bundle.getMessage("AcceptAll");
+        if (train.getCabooseRoadOption().equals(Train.INCLUDE_ROADS)) {
+            roadOption = Bundle.getMessage(
+                    "AcceptOnly") + " " + train.getCabooseRoadNames().length + " " + Bundle.getMessage("Roads");
+        } else if (train.getCabooseRoadOption().equals(Train.EXCLUDE_ROADS)) {
+            roadOption = Bundle.getMessage(
+                    "Exclude") + " " + train.getCabooseRoadNames().length + " " + Bundle.getMessage("Roads");
+        }
+        return roadOption;
+    }
+
+    private String getCabooseRoads(Train train) {
+        if (train.getCabooseRoadOption().equals(Train.ALL_ROADS)) {
+            return "";
+        } else {
+            return TrainCommon.formatStringToCommaSeparated(train.getCabooseRoadNames());
+        }
+    }
+
+    private String getLocoRoadOption(Train train) {
+        String roadOption = Bundle.getMessage("AcceptAll");
+        if (train.getLocoRoadOption().equals(Train.INCLUDE_ROADS)) {
+            roadOption = Bundle.getMessage(
+                    "AcceptOnly") + " " + train.getLocoRoadNames().length + " " + Bundle.getMessage("Roads");
+        } else if (train.getLocoRoadOption().equals(Train.EXCLUDE_ROADS)) {
+            roadOption = Bundle.getMessage(
+                    "Exclude") + " " + train.getLocoRoadNames().length + " " + Bundle.getMessage("Roads");
+        }
+        return roadOption;
+    }
+
+    private String getLocoRoads(Train train) {
+        if (train.getLocoRoadOption().equals(Train.ALL_ROADS)) {
+            return "";
+        } else {
+            return TrainCommon.formatStringToCommaSeparated(train.getLocoRoadNames());
         }
     }
 
@@ -286,6 +326,6 @@ public class ExportTrains extends XmlFile {
 
     private static String operationsFileName = "ExportOperationsTrainRoster.csv"; // NOI18N
 
-    private final static Logger log = LoggerFactory.getLogger(ExportTrains.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExportTrains.class);
 
 }

@@ -65,6 +65,7 @@ public class AllocatedSection {
         mSequence = seq;
         mNextSection = next;
         mNextSectionSequence = nextSeqNo;
+        mDirection = mSection.getState();
         if (mSection.getOccupancy() == Section.OCCUPIED) {
             mEntered = true;
         }
@@ -96,6 +97,8 @@ public class AllocatedSection {
     private Section mNextSection = null;
     private int mNextSectionSequence = 0;
     private PropertyChangeListener mSectionListener = null;
+    // the direction the Section is allocated in, kept after it is released
+    private volatile int mDirection;
     private boolean mEntered = false;
     private boolean mExited = false;
     private int mAllocationNumber = 0;     // used to keep track of allocation order
@@ -110,6 +113,37 @@ public class AllocatedSection {
     //
     public void setAutoTurnoutsResponse(List<LayoutTrackExpectedState<LayoutTurnout>> atr) {
         autoTurnoutsResponse = atr;
+    }
+
+    /**
+     * Get the length of the section remaining including current block
+     * @param block block to start totaling block lengths
+     * @return length in millimetres
+     */
+    public float getLengthRemaining(Block block) {
+        float length = 0.0f;
+        if (mSection == null) {
+            return length;
+        }
+        int bStart = mSection.getBlockSequenceNumber(block);
+        if (mSection.getState() == Section.FORWARD) {
+            for (int ix = bStart;ix < mSection.getNumBlocks();ix++) {
+                Block b = (mSection.getBlockBySequenceNumber(ix));
+                if (b != null) {
+                    length += b.getLengthMm();
+                }
+            }
+        }
+        else if (mSection.getState() == Section.REVERSE) {
+            for (int ix =  0 ;ix <= bStart ;ix++) {
+                Block b = (mSection.getBlockBySequenceNumber(ix));
+                if (b != null) {
+                    length += b.getLengthMm();
+                }
+            }
+        }
+        log.trace("Remaining length in section[{}] is [{}]",mSection.getDisplayName(), length);
+        return length;
     }
 
     public List<LayoutTrackExpectedState<LayoutTurnout>> getAutoTurnoutsResponse() {
@@ -216,7 +250,7 @@ public class AllocatedSection {
     /**
      * Methods
      */
-    protected void setStoppingSensors() {
+    protected final void setStoppingSensors() {
         if (mSection.getState() == Section.FORWARD) {
             mForwardStoppingSensor = mSection.getForwardStoppingSensor();
             mReverseStoppingSensor = mSection.getReverseStoppingSensor();
@@ -230,13 +264,29 @@ public class AllocatedSection {
         return mActiveTrain.getTransit().getTransitSectionFromSectionAndSeq(mSection, mSequence);
     }
 
+    /**
+     * Get the direction the Section is allocated in: FORWARD or REVERSE,
+     * following any change of direction while it is allocated, for example
+     * when the train reverses.
+     * <p>
+     * Once the Section has been released, this is still the direction it was
+     * allocated in, not the Section's state then, so that a Block change in it
+     * that is still being handled finds the next Block the way the train was
+     * going.
+     *
+     * @return Section.FORWARD or Section.REVERSE, or the Section's state if it
+     *         has not yet been given a direction
+     */
     public int getDirection() {
+        int direction = mDirection;
+        if (direction == Section.FORWARD || direction == Section.REVERSE) {
+            return direction;
+        }
         return mSection.getState();
     }
 
-    public int getLength() {
-        return mSection.getLengthI(InstanceManager.getDefault(DispatcherFrame.class).getUseScaleMeters(),
-                InstanceManager.getDefault(DispatcherFrame.class).getScale());
+    public int getActualLength() {
+        return mSection.getActualLength();
     }
 
     public void reset() {
@@ -248,11 +298,26 @@ public class AllocatedSection {
     }
 
     private synchronized void handleSectionChange(PropertyChangeEvent e) {
+        if ("state".equals(e.getPropertyName())) {
+            int state = mSection.getState();
+            if (state == Section.FORWARD || state == Section.REVERSE) {
+                // set free on release: keep the direction it was allocated in
+                mDirection = state;
+            }
+        }
+        log.trace("{}:AllocatedSection[{}]:handleSectionChange Property Name[{}] old[{}] New[{}]",
+                mActiveTrain.getActiveTrainName(), mSection.getDisplayName(),
+                e.getPropertyName(), e.getOldValue(), e.getNewValue());
         if (mSection.getOccupancy() == Section.OCCUPIED) {
             mEntered = true;
         } else if (mSection.getOccupancy() == Section.UNOCCUPIED) {
             if (mEntered) {
                 mExited = true;
+                // set colour to still allocated.
+                // release will reset the colour to unoccupied.
+                if (InstanceManager.getDefault(DispatcherFrame.class).getExtraColorForAllocated()) {
+                    mSection.setAlternateColorFromActiveBlock(true);
+                }
             }
         }
         if (mActiveTrain.getAutoActiveTrain() != null) {
@@ -262,16 +327,10 @@ public class AllocatedSection {
                 mActiveTrain.getAutoActiveTrain().handleSectionOccupancyChange(this);
             }
         }
-
-        //       if (mEntered && !mExited && mActiveTrain.getResetWhenDone() && mActiveTrain.getDelayedRestart() != ActiveTrain.NODELAY) {
-        //           if (getSequence() == mActiveTrain.getEndBlockSectionSequenceNumber()) {
-        //               mActiveTrain.setRestart();
-        //           }
-        //       }
         InstanceManager.getDefault(DispatcherFrame.class).sectionOccupancyChanged();
     }
 
-    public synchronized void initializeMonitorBlockOccupancy() {
+    public synchronized final void initializeMonitorBlockOccupancy() {
         if (mBlockList != null) {
             return;
         }
@@ -296,15 +355,12 @@ public class AllocatedSection {
             }
 
             Block b = mBlockList.get(index);
-            if (!isInActiveBlockList(b)) {
-                int occ = b.getState();
-                Runnable handleBlockChange = new RespondToBlockStateChange(b, occ, this);
-                Thread tBlockChange = jmri.util.ThreadingUtil.newThread(handleBlockChange, "Allocated Section Block Change on " + b.getDisplayName());
-                tBlockChange.start();
-                addToActiveBlockList(b);
-                if (InstanceManager.getDefault(DispatcherFrame.class).getSupportVSDecoder()) {
-                    firePropertyChangeEvent("BlockStateChange", null, b.getSystemName()); // NOI18N
-                }
+            // Handle every change, with the state it changed to, in the order the
+            // changes happen; all the train's Blocks share one queue.
+            int occ = (e.getNewValue() instanceof Integer) ? (Integer) e.getNewValue() : b.getState();
+            mActiveTrain.queueBlockStateChange(new RespondToBlockStateChange(b, occ, this));
+            if (InstanceManager.getDefault(DispatcherFrame.class).getSupportVSDecoder()) {
+                firePropertyChangeEvent("BlockStateChange", null, b.getSystemName()); // NOI18N
             }
         }
     }
@@ -332,6 +388,8 @@ public class AllocatedSection {
         return null;
     }
 
+    // The active Block list is no longer used by Dispatcher, which now queues every
+    // Block change; these methods are kept for compatibility.
     protected synchronized void addToActiveBlockList(Block b) {
         if (b != null) {
             mActiveBlockList.add(b);
@@ -372,7 +430,7 @@ public class AllocatedSection {
     }
 
 // _________________________________________________________________________________________
-    // This class responds to Block state change in a separate thread
+    // This class responds to a Block state change, run from the train's Block change queue
     class RespondToBlockStateChange implements Runnable {
 
         public RespondToBlockStateChange(Block b, int occ, AllocatedSection as) {
@@ -387,27 +445,31 @@ public class AllocatedSection {
             // The forced delay has been removed. The delay can be controlled by the debounce
             // values in the sensor table. The use of an additional fixed 250 milliseconds
             // caused it to always fail when crossing small blocks at speed.
+            if (mActiveTrain.isTerminating()) {
+                // the train is being terminated, or was while this change was waiting to be handled
+                return;
+            }
             if (mActiveTrain.getAutoActiveTrain() != null) {
                 // automatically running train
-                mActiveTrain.getAutoActiveTrain().handleBlockStateChange(_aSection, _block);
+                mActiveTrain.getAutoActiveTrain().handleBlockStateChange(_aSection, _block, _occ);
             } else if (_occ == Block.OCCUPIED) {
                 // manual running train - block newly occupied
                 if (!mActiveTrain.getAutoRun()) {
                     if ((_block == mActiveTrain.getEndBlock()) && mActiveTrain.getReverseAtEnd()) {
                         // reverse direction of Allocated Sections
                         mActiveTrain.reverseAllAllocatedSections();
-                        mActiveTrain.setRestart();
+                        mActiveTrain.setRestart(mActiveTrain.getDelayReverseRestart(),mActiveTrain.getReverseRestartDelay(),
+                                mActiveTrain.getReverseRestartSensor(),mActiveTrain.getResetReverseRestartSensor());
                     } else if ((_block == mActiveTrain.getStartBlock()) && mActiveTrain.getResetWhenDone()) {
                         // reset the direction of Allocated Sections
                         mActiveTrain.resetAllAllocatedSections();
-                        mActiveTrain.setRestart();
+                        mActiveTrain.setRestart(mActiveTrain.getDelayedRestart(),mActiveTrain.getRestartDelay(),
+                                mActiveTrain.getRestartSensor(),mActiveTrain.getResetRestartSensor());
                     } else if (_block == mActiveTrain.getEndBlock() || _block == mActiveTrain.getStartBlock() ) {
                         mActiveTrain.setStatus(ActiveTrain.DONE);
                     }
                 }
             }
-            // remove from lists
-            removeFromActiveBlockList(_block);
         }
 
         private Block _block = null;
@@ -431,5 +493,5 @@ public class AllocatedSection {
         pcs.firePropertyChange(name, oldVal, newVal);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AllocatedSection.class);
+    private static final Logger log = LoggerFactory.getLogger(AllocatedSection.class);
 }

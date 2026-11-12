@@ -40,7 +40,7 @@ public class SerialLightManager extends AbstractLightManager {
      *
      * @throws IllegalArgumentException if system name is not in a valid format 
      * or if the
-     * system name does not correspond to a configured C/MRI digital output bit
+     * system name does not correspond to a configured digital output bit
      */
     @Override
     @Nonnull
@@ -106,6 +106,6 @@ public class SerialLightManager extends AbstractLightManager {
         return Bundle.getMessage("AddOutputEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialLightManager.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialLightManager.class);
 
 }

@@ -1,12 +1,12 @@
 package jmri.jmrit.logixng.implementation.configurexml;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.configurexml.JmriConfigureXmlException;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.DefaultAnalogExpressionManager;
@@ -25,7 +25,7 @@ import org.jdom2.Element;
 public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
 
     private final Map<String, Class<?>> xmlClasses = new HashMap<>();
-    
+
     public DefaultAnalogExpressionManagerXml() {
     }
 
@@ -43,13 +43,13 @@ public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
         if (tm != null) {
             if (tm.getNamedBeanSet().isEmpty()) return null;
             for (MaleAnalogExpressionSocket expression : tm.getNamedBeanSet()) {
-                log.debug("expression system name is " + expression.getSystemName());  // NOI18N
+                log.debug("expression system name is {}", expression.getSystemName());  // NOI18N
                 try {
                     List<Element> elements = new ArrayList<>();
                     // The male socket may be embedded in other male sockets
                     MaleAnalogExpressionSocket a = expression;
+                    elements.add(storeMaleSocket(a));
                     while (!(a instanceof DefaultMaleAnalogExpressionSocket)) {
-                        elements.add(storeMaleSocket(a));
                         a = (MaleAnalogExpressionSocket) a.getObject();
                     }
                     Element e = jmri.configurexml.ConfigXmlManager.elementFromObject(a.getObject());
@@ -57,7 +57,7 @@ public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
                         for (Element ee : elements) e.addContent(ee);
                         expressions.addContent(e);
                     } else {
-                        throw new RuntimeException("Cannot load xml configurator for " + a.getObject().getClass().getName());
+                        throw new JmriUncheckedException("Cannot load xml configurator for " + a.getObject().getClass().getName());
                     }
                 } catch (RuntimeException e) {
                     log.error("Error storing action: {}", e, e);
@@ -103,26 +103,27 @@ public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
      * @param expressions Element containing the Logix elements to load.
      */
     public void loadExpressions(Element expressions) {
-        
+
         List<Element> expressionList = expressions.getChildren();  // NOI18N
-        log.debug("Found " + expressionList.size() + " actions");  // NOI18N
+        log.debug("Found {} actions", expressionList.size() );  // NOI18N
 
         for (int i = 0; i < expressionList.size(); i++) {
-            
+
             String className = expressionList.get(i).getAttribute("class").getValue();
 //            log.error("className: " + className);
-            
+
             Class<?> clazz = xmlClasses.get(className);
-            
+
             if (clazz == null) {
                 try {
+                    className = jmri.configurexml.ConfigXmlManager.currentClassName(className);
                     clazz = Class.forName(className);
                     xmlClasses.put(className, clazz);
                 } catch (ClassNotFoundException ex) {
-                    log.error("cannot load class " + className, ex);
+                    log.error("cannot load class {}", className, ex);
                 }
             }
-            
+
             if (clazz != null) {
                 Constructor<?> c = null;
                 try {
@@ -130,18 +131,18 @@ public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
                 } catch (NoSuchMethodException | SecurityException ex) {
                     log.error("cannot create constructor", ex);
                 }
-                
+
                 if (c != null) {
                     try {
                         AbstractNamedBeanManagerConfigXML o = (AbstractNamedBeanManagerConfigXML)c.newInstance();
-                        
+
                         MaleSocket oldLastItem = InstanceManager.getDefault(AnalogExpressionManager.class).getLastRegisteredMaleSocket();
                         o.load(expressionList.get(i), null);
-                        
+
                         // Load male socket data if a new bean has been registered
                         MaleSocket newLastItem = InstanceManager.getDefault(AnalogExpressionManager.class).getLastRegisteredMaleSocket();
                         if (newLastItem != oldLastItem) loadMaleSocket(expressionList.get(i), newLastItem);
-                        else throw new RuntimeException("No new bean has been added. This class: "+getClass().getName());
+                        else throw new JmriUncheckedException("No new bean has been added. This class: "+getClass().getName());
                     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                         log.error("cannot create object", ex);
                     } catch (JmriConfigureXmlException ex) {
@@ -188,5 +189,5 @@ public class DefaultAnalogExpressionManagerXml extends AbstractManagerXml {
         return InstanceManager.getDefault(AnalogExpressionManager.class).getXMLOrder();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultAnalogExpressionManagerXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultAnalogExpressionManagerXml.class);
 }

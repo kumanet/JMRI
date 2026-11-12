@@ -78,7 +78,7 @@ public class UsbPortAdapter extends AbstractPortController {
             log.debug("Getting device at {}", port);
             String error = openPort(port, serialNumber);
             if (error != null) {
-                log.error(error);
+                log.error("Could not open {}",error);
             }
         }
         return usbDevice;
@@ -215,6 +215,6 @@ public class UsbPortAdapter extends AbstractPortController {
         return result;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(UsbPortAdapter.class
+    private static final Logger log = LoggerFactory.getLogger(UsbPortAdapter.class
     );
 }

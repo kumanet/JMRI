@@ -34,7 +34,7 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
         return Bundle.getMessage("BeanNameSignalAppMap");
     }
 
-    static public DefaultSignalAppearanceMap getMap(String signalSystemName, String aspectMapName) {
+    public static DefaultSignalAppearanceMap getMap(String signalSystemName, String aspectMapName) {
         log.debug("getMap signalSystem= \"{}\", aspectMap= \"{}\"", signalSystemName, aspectMapName);
         DefaultSignalAppearanceMap map = maps.get("map:" + signalSystemName + ":" + aspectMapName);
         if (map == null) {
@@ -50,7 +50,7 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
     }
 
     // added 3.9.7 so CATS can create own implementations
-    static public DefaultSignalAppearanceMap findMap(String systemName) {
+    public static DefaultSignalAppearanceMap findMap(String systemName) {
         return maps.get(systemName);
     }
 
@@ -74,7 +74,7 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
 
             List<Element> l = root.getChild("appearances").getChildren("appearance");
 
-            // find all appearances, include them by aspect name, 
+            // find all appearances, include them by aspect name,
             log.debug("   reading {} aspectname elements", l.size());
             for (int i = 0; i < l.size(); i++) {
                 String name = l.get(i).getChild("aspectname").getText();
@@ -156,7 +156,7 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
     }
 
     static void loadSpecificMap(String signalSystemName, String aspectMapName, DefaultSignalAppearanceMap SMmap, Element root) {
-        log.debug("load specific signalSystem= \"{}\", aspectMap= \"{}\"{}", aspectMapName, signalSystemName);
+        log.debug("load specific signalSystem= \"{}\", aspectMap= \"{}\"", signalSystemName, aspectMapName);
         loadSpecificAspect(signalSystemName, aspectMapName, HELD, SMmap, root);
         loadSpecificAspect(signalSystemName, aspectMapName, DANGER, SMmap, root);
         loadSpecificAspect(signalSystemName, aspectMapName, PERMISSIVE, SMmap, root);
@@ -439,7 +439,7 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
         StringBuilder retval = new StringBuilder();
         retval.append(toString());
         retval.append("\n  BeanType: "+getBeanType());
-                
+
         retval.append("\n  aspects:");
         Enumeration<String> values = getAspects();
         while (values.hasMoreElements()) {
@@ -453,12 +453,12 @@ public class DefaultSignalAppearanceMap extends AbstractNamedBean implements jmr
                 retval.append("\n       key: "+key+" value: "+aspectAttributeMap.get(aspect).get(key));
             }
         }
-        
+
         retval.append("\n  SignalSystem = "+getSignalSystem());
-        
+
         return new String(retval);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DefaultSignalAppearanceMap.class);
+    private static final Logger log = LoggerFactory.getLogger(DefaultSignalAppearanceMap.class);
 
 }

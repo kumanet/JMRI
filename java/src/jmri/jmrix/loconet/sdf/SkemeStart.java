@@ -45,7 +45,7 @@ public class SkemeStart extends SdfMacro {
         return 4;
     }
 
-    static public SdfMacro match(SdfBuffer buff) {
+    public static SdfMacro match(SdfBuffer buff) {
         // course match
         if ((buff.getAtIndex() & 0xFF) != 0xF1) {
             return null;
@@ -106,15 +106,14 @@ public class SkemeStart extends SdfMacro {
 
     @Override
     public String allInstructionString(String indent) {
-        String output;
-        output = indent + oneInstructionString();
-
+        StringBuilder output = new StringBuilder(indent);
+        output.append(oneInstructionString());
         if (children == null) {
-            return output;
+            return output.toString();
         }
         for (int i = 0; i < children.size(); i++) {
-            output += children.get(i).allInstructionString(indent + "  ");
+            output.append(children.get(i).allInstructionString(indent + "  "));
         }
-        return output;
+        return output.toString();
     }
 }

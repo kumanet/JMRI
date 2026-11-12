@@ -1,9 +1,14 @@
 package jmri.jmrix.lenz;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import jmri.Sensor;
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -30,7 +35,8 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
 
     @Override
     public void checkStatusRequestMsgSent() {
-        Assert.assertEquals("Sensor Status Request Sent", "42 05 80 C7", xnis.outbound.elementAt(0).toString());
+        assertEquals( "42 05 80 C7", xnis.outbound.elementAt(0).toString(),
+            "Sensor Status Request Sent");
     }
 
     // XNetSensor test for incoming status message
@@ -39,7 +45,7 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
         XNetReply m;
 
         // Verify this was created in UNKNOWN state
-        Assert.assertEquals(t.getKnownState(), Sensor.UNKNOWN);
+        assertEquals(Sensor.UNKNOWN, t.getKnownState() );
 
         // notify the Sensor that somebody else changed it...
         m = new XNetReply();
@@ -51,7 +57,7 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
         m.setElement(3, 0x05);     // The XOR of everything above
         ((XNetSensor) t).message(m);
         jmri.util.JUnitUtil.waitFor(() -> t.getState() == t.getRawState(), "raw state = state");
-        Assert.assertEquals("Known state after activate ", jmri.Sensor.ACTIVE, t.getKnownState());
+        assertEquals( Sensor.ACTIVE, t.getKnownState(), "Known state after activate ");
 
         m = new XNetReply();
         m.setElement(0, 0x42);     // Opcode for feedback response
@@ -62,17 +68,54 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
         m.setElement(3, 0x07);     // The XOR of everything above
         ((XNetSensor) t).message(m);
 
-        Assert.assertEquals("Known state after inactivate ", jmri.Sensor.INACTIVE, t.getKnownState());
+        assertEquals( Sensor.INACTIVE, t.getKnownState(), "Known state after inactivate ");
 
+    }
+
+    @Test
+    public void testIncomingReplyGivesItsReceivedTime() {
+        List<Long> times = new ArrayList<>();
+        List<Integer> states = new ArrayList<>();
+        t.addRawStateListener((sensor, oldState, newState, timeNanos) -> {
+            states.add(newState);
+            times.add(timeNanos);
+        });
+
+        XNetReply rActive = new XNetReply("42 05 42 05"); // feedback module 5, input 2 on
+        rActive.setReceivedTime(1234L);
+        ((XNetSensor) t).message(rActive);
+
+        long before = System.nanoTime();
+        ((XNetSensor) t).message(new XNetReply("42 05 40 07")); // input 2 off; not stamped, no time recorded
+        long after = System.nanoTime();
+
+        assertEquals(List.of(Sensor.ACTIVE, Sensor.INACTIVE), states);
+        assertEquals(1234L, times.get(0), "the time the reply was received");
+        assertTrue(times.get(1) >= before && times.get(1) <= after, "not stamped: dated when set");
+    }
+
+    @Test
+    public void testXNetBroadcastSensorStatusMsg() {
+        XNetReply reply = new XNetReply("44 04 40 05 42 47");
+        ((XNetSensor) t).message(reply);
+        assertEquals(Sensor.ACTIVE, t.getKnownState(), "feedback from second module pair");
+
+        reply = new XNetReply("44 04 40 05 40 45");
+        ((XNetSensor) t).message(reply);
+        assertEquals(Sensor.INACTIVE, t.getKnownState(), "updated feedback from second module pair");
+
+        reply = new XNetReply("44 04 40 06 42 44");
+        ((XNetSensor) t).message(reply);
+        assertEquals(Sensor.INACTIVE, t.getKnownState(), "unmatched module pair does not change state");
     }
 
     // XNetSensor test for setting state
     @Test
     public void testXNetSensorSetState() throws jmri.JmriException {
-        t.setKnownState(jmri.Sensor.ACTIVE);
-        Assert.assertEquals(t.getKnownState(), Sensor.ACTIVE);
+        t.setKnownState( Sensor.ACTIVE);
+        assertEquals( Sensor.ACTIVE, t.getKnownState());
         t.setKnownState(jmri.Sensor.INACTIVE);
-        Assert.assertEquals(t.getKnownState(), Sensor.INACTIVE);
+        assertEquals( Sensor.INACTIVE, t.getKnownState());
     }
 
     // XNetSensor test for outgoing status request
@@ -83,18 +126,20 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
 
         s.requestUpdateFromLayout();
         // check that the correct message was sent
-        Assert.assertEquals("Sensor Status Request Sent", "42 40 80 82", xnis2.outbound.elementAt(0).toString());
+        assertEquals( "42 40 80 82", xnis2.outbound.elementAt(0).toString(),
+            "Sensor Status Request Sent");
 
+        xnis2.terminateThreads();
     }
 
     @Override
     @Test
     public void testDispose() throws jmri.JmriException {
-        t.setState(jmri.Sensor.ACTIVE); // in case registration with TrafficController is deferred to after first use
-        Assert.assertEquals("controller listeners ", 1, numListeners());
+        t.setState( Sensor.ACTIVE); // in case registration with TrafficController is deferred to after first use
+        assertEquals( 1, numListeners(), "controller listeners ");
         t.dispose();
         // XPressNet leaves one listener after the dispose, should it?
-        Assert.assertEquals("controller listeners remaining", 1, numListeners());
+        assertEquals( 1, numListeners(), "controller listeners remaining");
     }
 
     @Override
@@ -109,8 +154,8 @@ public class XNetSensorTest extends jmri.implementation.AbstractSensorTestBase {
     @AfterEach
     public void tearDown() {
         t.dispose();
+        xnis.terminateThreads();
         xnis = null;
-        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
     }
 

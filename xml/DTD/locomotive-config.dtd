@@ -17,18 +17,19 @@
 <!-- for more details.                                                      -->
 
 <!ELEMENT locomotive-config (locomotive)>
-<!ATTLIST locomotive-config>
+<!ATTLIST locomotive-config xmlns:xsi CDATA #IMPLIED>
+<!ATTLIST locomotive-config xsi:noNamespaceSchemaLocation CDATA #IMPLIED>
 
 <!-- The identification attributes in locomotive and -->
 <!-- decoder must be kept the same as the ones in the roster DTD -->
 <!-- This copy is used if we have to import an existing file into a roster -->
 
 <!ELEMENT locomotive (dateupdated?,dateUpdated?, decoder, locoaddress*, functionlabels?, attributepairs?, values?) >
-<!ATTLIST locomotive id		      CDATA #REQUIRED>          
-<!ATTLIST locomotive fileName	CDATA #IMPLIED>  
-<!ATTLIST locomotive groupName  CDATA #IMPLIED>        
-<!ATTLIST locomotive roadName	  CDATA #IMPLIED>          
-<!ATTLIST locomotive roadNumber	CDATA #IMPLIED>          
+<!ATTLIST locomotive id		      CDATA #REQUIRED>
+<!ATTLIST locomotive fileName	CDATA #IMPLIED>
+<!ATTLIST locomotive groupName  CDATA #IMPLIED>
+<!ATTLIST locomotive roadName	  CDATA #IMPLIED>
+<!ATTLIST locomotive roadNumber	CDATA #IMPLIED>
 <!ATTLIST locomotive mfg	      CDATA #IMPLIED>
 <!ATTLIST locomotive owner	    CDATA #IMPLIED>
 <!ATTLIST locomotive model	    CDATA #IMPLIED>
@@ -52,22 +53,29 @@
 <!ATTLIST decoder comment CDATA #IMPLIED>
 
 <!-- define general locomotive address -->
-<!ELEMENT locoaddress (dcclocoaddress) >
+<!ELEMENT locoaddress (dcclocoaddress, number, protocol) >
 
 <!-- define DCC locomotive address -->
 <!ELEMENT dcclocoaddress EMPTY >
 <!ATTLIST dcclocoaddress number      CDATA #IMPLIED>
 <!ATTLIST dcclocoaddress longaddress ( yes | no) "no">
 
+<!-- define DCC locomotive number -->
+<!ELEMENT number (#PCDATA) >
+
+<!-- define DCC locomotive protocol -->
+<!ELEMENT protocol (#PCDATA) >
+
 <!-- The values section defines values for CVs and/or variables -->
 <!ELEMENT values (decoderDef, (CVvalue | varValue)*, indexedCVvalue* )>
 
 <!ELEMENT decoderDef (varValue*) >   <!-- Where the variable definitions came from -->
-		  						
+
 <!ELEMENT CVvalue EMPTY>
-<!ATTLIST CVvalue name    CDATA #IMPLIED>         <!-- CV number, used for identification -->
-<!ATTLIST CVvalue value   CDATA #REQUIRED>        <!-- Value of specified CV -->
-<!ATTLIST CVvalue comment CDATA #IMPLIED>
+<!ATTLIST CVvalue name      CDATA #IMPLIED>         <!-- CV number, used for identification -->
+<!ATTLIST CVvalue value     CDATA #REQUIRED>        <!-- Value of specified CV -->
+<!ATTLIST CVvalue comment   CDATA #IMPLIED>
+<!ATTLIST CVvalue state     CDATA #IMPLIED>         <!-- values from AbstractValue.ValueState -->
 
 <!ELEMENT indexedCVvalue EMPTY>
 <!ATTLIST indexedCVvalue name    CDATA #REQUIRED> <!-- Indexed CV name, used for identification -->
@@ -80,16 +88,17 @@
 <!ATTLIST indexedCVvalue comment CDATA #IMPLIED>
 
 <!ELEMENT varValue EMPTY>
-<!ATTLIST varValue item    CDATA #IMPLIED>        <!-- item name used for identification -->
-<!ATTLIST varValue name    CDATA #IMPLIED>        <!-- old form of item name, for compatibility -->
-<!ATTLIST varValue value   CDATA #REQUIRED>       <!-- Value of specified variable -->
-<!ATTLIST varValue comment CDATA #IMPLIED>
+<!ATTLIST varValue item      CDATA #IMPLIED>        <!-- item name used for identification -->
+<!ATTLIST varValue name      CDATA #IMPLIED>        <!-- old form of item name, for compatibility -->
+<!ATTLIST varValue value     CDATA #REQUIRED>       <!-- Value of specified variable -->
+<!ATTLIST varValue comment   CDATA #IMPLIED>
+<!ATTLIST varValue state     CDATA #IMPLIED>         <!-- values from AbstractValue.ValueState -->
 
 <!ELEMENT functionlabels (functionlabel*) >
 
 <!ELEMENT functionlabel (#PCDATA) >
-<!ATTLIST functionlabel	num	      CDATA #REQUIRED>   
-<!ATTLIST functionlabel	lockable (true | false) "true">   
+<!ATTLIST functionlabel	num	      CDATA #REQUIRED>
+<!ATTLIST functionlabel	lockable (true | false) "true">
 <!ATTLIST functionlabel functionImage CDATA #IMPLIED>
 <!ATTLIST functionlabel functionImagePressed  CDATA #IMPLIED>
 

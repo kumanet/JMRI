@@ -1,11 +1,9 @@
 package jmri.jmrit.operations.rollingstock.cars.tools;
 
-import java.awt.GraphicsEnvironment;
 import java.util.List;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
-import org.junit.Assume;
+import org.junit.jupiter.api.Test;
 
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
@@ -27,23 +25,24 @@ public class ExportCarsTest extends OperationsTestCase {
         ExportCars t = new ExportCars(carList);
         Assert.assertNotNull("exists", t);
     }
-    
+
     @Test
+    @jmri.util.junit.annotations.DisabledIfHeadless
     public void testCreateFile() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        
+
         JUnitOperationsUtil.initOperationsData();
-        List<Car> carList = InstanceManager.getDefault(CarManager.class).getByIdList();
+        CarManager cm = InstanceManager.getDefault(CarManager.class);
+
+        // Improve test coverage by having an Out of Service car
+        Car car = cm.newRS("SP", "1234");
+        car.setOutOfService(true);
+        List<Car> carList = cm.getByIdList();
+
         ExportCars exportCars = new ExportCars(carList);
         Assert.assertNotNull("exists", exportCars);
 
         // should cause export complete dialog to appear
-        Thread export = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                exportCars.writeOperationsCarFile();
-            }
-        });
+        Thread export = new Thread(exportCars::writeOperationsCarFile);
         export.setName("Export Cars"); // NOI18N
         export.start();
 
@@ -53,10 +52,12 @@ public class ExportCarsTest extends OperationsTestCase {
 
         JemmyUtil.pressDialogButton(Bundle.getMessage("ExportComplete"), Bundle.getMessage("ButtonOK"));
 
+        jmri.util.JUnitUtil.waitFor(() -> !export.isAlive(), "wait for export to complete");
+
         java.io.File file = new java.io.File(ExportCars.defaultOperationsFilename());
         Assert.assertTrue("Confirm file creation", file.exists());
 
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ExportCarsTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ExportCarsTest.class);
 }

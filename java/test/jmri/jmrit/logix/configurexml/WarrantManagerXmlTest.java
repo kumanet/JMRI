@@ -2,7 +2,6 @@ package jmri.jmrit.logix.configurexml;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +30,6 @@ public class WarrantManagerXmlTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(WarrantManagerXmlTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(WarrantManagerXmlTest.class);
 
 }

@@ -290,7 +290,7 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
      * @throws java.io.IOException from underlying operation
      */
     @SuppressWarnings("fallthrough")
-    @SuppressFBWarnings(value = "SF_SWITCH_FALLTHROUGH")
+    @SuppressFBWarnings(value = {"SF_SWITCH_FALLTHROUGH","SF_DEAD_STORE_DUE_TO_SWITCH_FALLTHROUGH"})
     boolean doNextStep(AbstractMRReply msg, DataInputStream istream) throws java.io.IOException {
         switch (state) {
             case 0:
@@ -377,7 +377,7 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
         }
     }
 
-    void loadBuffer(AbstractMRReply msg) {
+    protected void loadBuffer(AbstractMRReply msg) {
         msg.setElement(0, buffer[0]);
         msg.setElement(1, buffer[1]);
         msg.setElement(2, buffer[2]);
@@ -426,6 +426,6 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
         return m.getNumDataElements(); // All are same length as message
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
 
 }

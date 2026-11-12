@@ -1,9 +1,12 @@
 package jmri.jmrit.logix.configurexml;
 
+import java.awt.GraphicsEnvironment;
 import java.util.HashMap;
 import java.util.List;
 import java.util.SortedSet;
-import javax.swing.JOptionPane;
+
+import javax.annotation.Nonnull;
+
 import jmri.BeanSetting;
 import jmri.InstanceManager;
 import jmri.NamedBean;
@@ -15,11 +18,10 @@ import jmri.jmrit.logix.OBlockManager;
 import jmri.jmrit.logix.OPath;
 import jmri.jmrit.logix.Portal;
 import jmri.jmrit.logix.PortalManager;
-import jmri.jmrit.logix.WarrantTableAction;
+import jmri.util.swing.JmriJOptionPane;
+
 import org.jdom2.Attribute;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides the abstract base and store functionality for configuring the
@@ -73,19 +75,22 @@ public class OBlockManagerXml // extends XmlFile
                 elem.setAttribute("length", "" + block.getLengthMm());
                 elem.setAttribute("units", block.isMetric() ? "true" : "false");
                 elem.setAttribute("curve", "" + block.getCurvature());
-                if (block.getNamedSensor() != null) {
+                var namedSensor = block.getNamedSensor();
+                if (namedSensor != null) {
                     Element se = new Element("sensor");
-                    se.setAttribute("systemName", block.getNamedSensor().getName());
+                    se.setAttribute("systemName", namedSensor.getName());
                     elem.addContent(se);
                 }
-                if (block.getNamedErrorSensor() != null) {
+                var errorSensor = block.getNamedErrorSensor();
+                if ( errorSensor != null) {
                     Element se = new Element("errorSensor");
-                    se.setAttribute("systemName", block.getNamedErrorSensor().getName());
+                    se.setAttribute("systemName", errorSensor.getName());
                     elem.addContent(se);
                 }
-                if (block.getReporter() != null) {
+                var reporter = block.getReporter();
+                if ( reporter != null) {
                     Element se = new Element("reporter");
-                    se.setAttribute("systemName", block.getReporter().getSystemName());
+                    se.setAttribute("systemName", reporter.getSystemName());
                     se.setAttribute("reportCurrent", block.isReportingCurrent() ? "true" : "false");
                     elem.addContent(se);
                 }
@@ -109,7 +114,7 @@ public class OBlockManagerXml // extends XmlFile
         return blocks;
     }
 
-    static private Element storePortal(Portal portal) {
+    private static Element storePortal(@Nonnull Portal portal) {
         Element elem = new Element("portal");
         elem.setAttribute("portalName", portal.getName());
         OBlock block = portal.getFromBlock();
@@ -161,14 +166,16 @@ public class OBlockManagerXml // extends XmlFile
      * Key is sufficient to mark the Portal's knowledge of the path. Full path
      * info will get loaded from the HashMap.
      */
-    static private Element storePathKey(OPath path) {
+    @Nonnull
+    private static Element storePathKey( @Nonnull OPath path) {
         Element elem = new Element("path");
         elem.setAttribute("pathName", path.getName());
         elem.setAttribute("blockName", "" + path.getBlock().getSystemName());
         return elem;
     }
 
-    static private Element storePath(OPath path) {
+    @Nonnull
+    private static Element storePath( @Nonnull OPath path) {
         Element elem = new Element("path");
         elem.setAttribute("pathName", path.getName());
         elem.setAttribute("blockName", "" + path.getBlock().getSystemName());
@@ -220,6 +227,7 @@ public class OBlockManagerXml // extends XmlFile
         return block;
     }
 
+    @Nonnull
     private OPath getPath(OBlock block, String name) {
         String key = block.getSystemName() + name;
         OPath path = _pathMap.get(key);
@@ -242,11 +250,6 @@ public class OBlockManagerXml // extends XmlFile
         for (Element bl : blockList) {
             loadBlock(bl);
         }
-        // Build data structure for blocks to know with whom they share turnouts.
-        // check whether any turnouts are shared between two blocks;
-        for (OBlock oblock : _manager.getNamedBeanSet()) {
-            WarrantTableAction.getDefault().checkSharedTurnouts(oblock);
-        }
         return true;
     }
 
@@ -255,7 +258,7 @@ public class OBlockManagerXml // extends XmlFile
         log.error("load called. Invalid method.");
     }
 
-    private void loadBlock(Element elem) {
+    private void loadBlock(@Nonnull Element elem) {
         if (elem.getAttribute("systemName") == null) {
             log.error("unexpected null for block systemName elem = {}", elem);
             return;
@@ -288,7 +291,7 @@ public class OBlockManagerXml // extends XmlFile
         if (sensors.size() > 1) {
             log.error("More than one sensor present: {}", sensors.size());
         }
-        if (sensors.size() > 0) {
+        if (!sensors.isEmpty()) {
             // sensor
             String name = sensors.get(0).getAttribute("systemName").getValue();
             block.setSensor(name);
@@ -309,7 +312,7 @@ public class OBlockManagerXml // extends XmlFile
                     block.setReporter(rep);
                 }
             } catch (Exception ex) {
-                log.error("No Reporter named \"{}\" found. threw exception: {}", name,  ex);
+                log.error("No Reporter named \"{}\" found. threw exception", name,  ex);
             }
             if (reporter.getAttribute("reportCurrent") != null) {
                 block.setReportingCurrent(reporter.getAttribute("reportCurrent").getValue().equals("true"));
@@ -326,7 +329,10 @@ public class OBlockManagerXml // extends XmlFile
             try {
                 block.setBlockSpeed(elem.getAttribute("speedNotch").getValue());
             } catch (jmri.JmriException ex) {
-                JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + elem.getAttribute("speedNotch").getValue());
+                log.error("Error setting SpeedNotch {} threw exception", elem.getAttribute("speedNotch").getValue(),  ex);
+                if (!GraphicsEnvironment.isHeadless()) {
+                    JmriJOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + elem.getAttribute("speedNotch").getValue());
+                }
             }
         }
 
@@ -531,6 +537,6 @@ public class OBlockManagerXml // extends XmlFile
         return InstanceManager.getDefault(OBlockManager.class).getXMLOrder();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OBlockManagerXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OBlockManagerXml.class);
 
 }

@@ -1,0 +1,30 @@
+# This workflow will build a Java project with Maven
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
+
+name: Headless CI Tests
+
+on: [ push, pull_request ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up JDK 11
+      uses: actions/setup-java@v6
+      with:
+        distribution: 'zulu'
+        java-version: 11
+        # problem-matcher=false disable annotations viewing PRs
+        problem-matcher: false
+    - name: Cache Maven packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+    - name: Run HeadLessTest with Maven
+      run: |
+        # run tests using maven with graphics suppressed; the runner has no sound hardware, so use the null audio system
+        mvn test "-Djmri.skipTestsRequiringSeparateRunning=true"  "-Djava.awt.headless=true" "-Djmri.jmrit.audio.DefaultAudioManager.implementation=jmri.jmrit.audio.NullAudioFactory" "-Dsurefire.printSummary=false"

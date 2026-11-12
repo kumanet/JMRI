@@ -1,6 +1,5 @@
 package jmri.implementation;
 
-
 /**
  * A signal head that exists only within the program.
  * <p>
@@ -23,16 +22,8 @@ public class VirtualSignalHead extends DefaultSignalHead {
     }
 
     @Override
-    boolean isTurnoutUsed(jmri.Turnout t) {
+    public boolean isTurnoutUsed(jmri.Turnout t) {
         return false;
     }
 
-    /**
-     * Remove references to and from this object, so that it can eventually be
-     * garbage-collected.
-     */
-    @Override
-    public void dispose() {
-        super.dispose();
-    }
 }

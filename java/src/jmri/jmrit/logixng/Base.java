@@ -6,11 +6,10 @@ import java.util.*;
 
 import javax.annotation.*;
 
-import jmri.JmriException;
-import jmri.NamedBean;
-import jmri.beans.PropertyChangeProvider;
-
 import org.apache.commons.lang3.mutable.MutableInt;
+
+import jmri.*;
+import jmri.beans.PropertyChangeProvider;
 
 /**
  * The base interface for LogixNG expressions and actions.
@@ -20,6 +19,12 @@ import org.apache.commons.lang3.mutable.MutableInt;
  */
 public interface Base extends PropertyChangeProvider {
 
+    /**
+     * Separator returned by enums toString() methods to get a separator
+     * in JComboBoxes. See {@link jmri.jmrit.logixng.expressions.ExpressionEntryExit.EntryExitState}
+     * for an example.
+     */
+    String SEPARATOR = "---------------";
 
     /**
      * The name of the property child count.
@@ -37,7 +42,7 @@ public interface Base extends PropertyChangeProvider {
      * added to the list so that the listener can register itself as a
      * listener of this female socket.
      */
-    public static final String PROPERTY_CHILD_COUNT = "ChildCount";
+    String PROPERTY_CHILD_COUNT = "ChildCount";
 
     /**
      * The name of the property child reorder.
@@ -48,44 +53,44 @@ public interface Base extends PropertyChangeProvider {
      * List&lt;FemaleSocket&gt; with the FemaleSockets that are reordered so
      * that the listener can update the tree.
      */
-    public static final String PROPERTY_CHILD_REORDER = "ChildReorder";
+    String PROPERTY_CHILD_REORDER = "ChildReorder";
 
     /**
      * The socket has been connected.
      * This constant is used in calls to firePropertyChange().
      * The socket fires a property change when it is connected or disconnected.
      */
-    public static final String PROPERTY_SOCKET_CONNECTED = "SocketConnected";
+    String PROPERTY_SOCKET_CONNECTED = "SocketConnected";
 
     /**
      * The socket has been disconnected.
      * This constant is used in calls to firePropertyChange().
      * The socket fires a property change when it is connected or disconnected.
      */
-    public static final String PROPERTY_SOCKET_DISCONNECTED = "SocketDisconnected";
+    String PROPERTY_SOCKET_DISCONNECTED = "SocketDisconnected";
 
     /**
      * The last result of the expression has changed.
      * This constant is used in calls to firePropertyChange().
      */
-    public static final String PROPERTY_LAST_RESULT_CHANGED = "LastResultChanged";
+    String PROPERTY_LAST_RESULT_CHANGED = "LastResultChanged";
 
     /**
      * Constant representing an "connected" state of the socket
      */
-    public static final int SOCKET_CONNECTED = 0x02;
+    int SOCKET_CONNECTED = 0x02;
 
     /**
      * Constant representing an "disconnected" state of the socket
      */
-    public static final int SOCKET_DISCONNECTED = 0x04;
+    int SOCKET_DISCONNECTED = 0x04;
 
 
     /**
      * Get the system name.
      * @return the system name
      */
-    public String getSystemName();
+    String getSystemName();
 
     /**
      * Get the user name.
@@ -93,7 +98,7 @@ public interface Base extends PropertyChangeProvider {
      */
     @CheckReturnValue
     @CheckForNull
-    public String getUserName();
+    String getUserName();
 
     /**
      * Get associated comment text.
@@ -103,13 +108,14 @@ public interface Base extends PropertyChangeProvider {
      */
     @CheckReturnValue
     @CheckForNull
-    public String getComment();
+    String getComment();
 
     /**
      * Get the user name.
      * @param s the new user name
+     * @throws NamedBean.BadUserNameException when needed
      */
-    public void setUserName(@CheckForNull String s) throws NamedBean.BadUserNameException;
+    void setUserName(@CheckForNull String s) throws NamedBean.BadUserNameException;
 
     /**
      * Create a deep copy of myself and my children
@@ -122,7 +128,7 @@ public interface Base extends PropertyChangeProvider {
      * @return a deep copy
      * @throws jmri.JmriException in case of an error
      */
-    public Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames)
+    Base getDeepCopy(Map<String, String> systemNames, Map<String, String> userNames)
             throws JmriException;
 
     /**
@@ -134,7 +140,7 @@ public interface Base extends PropertyChangeProvider {
      * @return myself
      * @throws jmri.JmriException in case of an error
      */
-    public Base deepCopyChildren(
+    Base deepCopyChildren(
             Base original,
             Map<String, String> systemNames,
             Map<String, String> userNames)
@@ -147,13 +153,13 @@ public interface Base extends PropertyChangeProvider {
      *
      * @param comment the comment or null to remove an existing comment
      */
-    public void setComment(@CheckForNull String comment);
+    void setComment(@CheckForNull String comment);
 
     /**
      * Get a short description of this item.
      * @return a short description
      */
-    default public String getShortDescription() {
+    default String getShortDescription() {
         return getShortDescription(Locale.getDefault());
     }
 
@@ -161,7 +167,7 @@ public interface Base extends PropertyChangeProvider {
      * Get a long description of this item.
      * @return a long description
      */
-    default public String getLongDescription() {
+    default String getLongDescription() {
         return getLongDescription(Locale.getDefault());
     }
 
@@ -170,32 +176,48 @@ public interface Base extends PropertyChangeProvider {
      * @param locale The locale to be used
      * @return a short description
      */
-    public String getShortDescription(Locale locale);
+    String getShortDescription(Locale locale);
 
     /**
      * Get a long description of this item.
      * @param locale The locale to be used
      * @return a long description
      */
-    public String getLongDescription(Locale locale);
+    String getLongDescription(Locale locale);
+
+    /**
+     * Get the Module of this item, if it's part of a module.
+     * @return the Module that owns this item or null if it's
+     *         owned by a ConditonalNG.
+     */
+    default Module getModule() {
+        Base parent = this.getParent();
+        while (parent != null) {
+            if (parent instanceof Module) {
+                return (Module) parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
 
     /**
      * Get the ConditionalNG of this item.
      * @return the ConditionalNG that owns this item
      */
-    public ConditionalNG getConditionalNG();
+    ConditionalNG getConditionalNG();
 
     /**
      * Get the LogixNG of this item.
      * @return the LogixNG that owns this item
      */
-    public LogixNG getLogixNG();
+    LogixNG getLogixNG();
 
     /**
      * Get the root of the tree that this item belongs to.
      * @return the top most item in the tree
      */
-    public Base getRoot();
+    Base getRoot();
 
     /**
      * Get the parent.
@@ -213,7 +235,7 @@ public interface Base extends PropertyChangeProvider {
      *
      * @return the parent of this object
      */
-    public Base getParent();
+    Base getParent();
 
     /**
      * Set the parent.
@@ -232,15 +254,15 @@ public interface Base extends PropertyChangeProvider {
      *
      * @param parent the new parent of this object
      */
-    public void setParent(Base parent);
+    void setParent(Base parent);
 
     /**
      * Set the parent for all the children.
-     * 
+     *
      * @param errors a list of potential errors
      * @return true if success, false otherwise
      */
-    public boolean setParentForAllChildren(List<String> errors);
+    boolean setParentForAllChildren(List<String> errors);
 
     /**
      * Get a child of this item
@@ -248,15 +270,16 @@ public interface Base extends PropertyChangeProvider {
      * @return the child
      * @throws IllegalArgumentException if the index is less than 0 or greater
      * or equal with the value returned by getChildCount()
+     * @throws UnsupportedOperationException when needed
      */
-    public FemaleSocket getChild(int index)
+    FemaleSocket getChild(int index)
             throws IllegalArgumentException, UnsupportedOperationException;
 
     /**
      * Get the number of children.
      * @return the number of children
      */
-    public int getChildCount();
+    int getChildCount();
 
     /**
      * Is the operation allowed on this child?
@@ -264,7 +287,7 @@ public interface Base extends PropertyChangeProvider {
      * @param oper the operation to do
      * @return true if operation is allowed, false otherwise
      */
-    public default boolean isSocketOperationAllowed(int index, FemaleSocketOperation oper) {
+    default boolean isSocketOperationAllowed(int index, FemaleSocketOperation oper) {
         if (this instanceof MaleSocket) {
             return ((MaleSocket)this).getObject().isSocketOperationAllowed(index, oper);
         }
@@ -276,7 +299,7 @@ public interface Base extends PropertyChangeProvider {
      * @param index the index of the child to do the operation on
      * @param oper the operation to do
      */
-    public default void doSocketOperation(int index, FemaleSocketOperation oper) {
+    default void doSocketOperation(int index, FemaleSocketOperation oper) {
         if (this instanceof MaleSocket) {
             ((MaleSocket)this).getObject().doSocketOperation(index, oper);
         }
@@ -287,30 +310,21 @@ public interface Base extends PropertyChangeProvider {
      * Get the category.
      * @return the category
      */
-    public Category getCategory();
-
-    /**
-     * Is this external?
-     * Does it affects or is dependent on external things, like
-     * turnouts and sensors? Timers are considered as internal since they
-     * behavies the same on every computer on every layout.
-     * @return true if this is external
-     */
-    public boolean isExternal();
+    Category getCategory();
 
     /**
      * Is this item active? If this item is enabled and all the parents are
      * enabled, this item is active.
      * @return true if active, false otherwise.
      */
-    public boolean isActive();
+    boolean isActive();
 
     /**
      * Setup this object and its children.
      * This method is used to lookup system names for child sockets, turnouts,
      * sensors, and so on.
      */
-    public void setup();
+    void setup();
 
     /**
      * Deactivate this object, so that it releases as many resources as possible
@@ -329,7 +343,7 @@ public interface Base extends PropertyChangeProvider {
      * be keeping any other objects alive. Therefore, this method should null
      * out any references to other objects that this object contained.
      */
-    public void dispose();  // remove _all_ connections!
+    void dispose();  // remove _all_ connections!
 
     /**
      * Set whenether this object is enabled or disabled.
@@ -338,14 +352,14 @@ public interface Base extends PropertyChangeProvider {
      *
      * @param enable true if this object should be enabled, false otherwise
      */
-//    public void setEnabled(boolean enable);
+//    void setEnabled(boolean enable);
 
     /**
      * Determines whether this object is enabled.
      *
      * @return true if the object is enabled, false otherwise
      */
-    public default boolean isEnabled() {
+    default boolean isEnabled() {
         return true;
     }
 
@@ -355,7 +369,7 @@ public interface Base extends PropertyChangeProvider {
      * Important: This method may be called more than once. Methods overriding
      * this method must ensure that listeners are not registered more than once.
      */
-    public void registerListeners();
+    void registerListeners();
 
     /**
      * Unregister listeners if this object needs that.
@@ -363,7 +377,7 @@ public interface Base extends PropertyChangeProvider {
      * Important: This method may be called more than once. Methods overriding
      * this method must ensure that listeners are not unregistered more than once.
      */
-    public void unregisterListeners();
+    void unregisterListeners();
 
     /**
      * Print the tree to a stream.
@@ -372,7 +386,7 @@ public interface Base extends PropertyChangeProvider {
      * @param indent the indentation of each level
      * @param lineNumber the line number
      */
-    public default void printTree(
+    default void printTree(
             PrintWriter writer,
             String indent,
             MutableInt lineNumber) {
@@ -387,7 +401,7 @@ public interface Base extends PropertyChangeProvider {
      * @param indent the indentation of each level
      * @param lineNumber the line number
      */
-    public void printTree(
+    void printTree(
             PrintTreeSettings settings,
             PrintWriter writer,
             String indent,
@@ -401,7 +415,7 @@ public interface Base extends PropertyChangeProvider {
      * @param indent the indentation of each level
      * @param lineNumber the line number
      */
-    public default void printTree(
+    default void printTree(
             Locale locale,
             PrintWriter writer,
             String indent,
@@ -418,7 +432,7 @@ public interface Base extends PropertyChangeProvider {
      * @param indent the indentation of each level
      * @param lineNumber the line number
      */
-    public void printTree(
+    void printTree(
             PrintTreeSettings settings,
             Locale locale,
             PrintWriter writer,
@@ -435,13 +449,25 @@ public interface Base extends PropertyChangeProvider {
      * @param currentIndent the current indentation
      * @param lineNumber the line number
      */
-    public void printTree(
+    void printTree(
             PrintTreeSettings settings,
             Locale locale,
             PrintWriter writer,
             String indent,
             String currentIndent,
             MutableInt lineNumber);
+
+    static String getListenString(boolean listen) {
+        if (listen) {
+            return Bundle.getMessage("Base_Listen");
+        } else {
+            return Bundle.getMessage("Base_NoListen");
+        }
+    }
+
+    static String getNoListenString() {
+        return Bundle.getMessage("Base_NoListen");
+    }
 
     /**
      * Navigate the LogixNG tree.
@@ -451,7 +477,7 @@ public interface Base extends PropertyChangeProvider {
      * @param report A list of NamedBeanUsageReport usage reports.
      * @param cdl    The current ConditionalNG bean.  Null for Module searches since there is no conditional
      */
-    public void getUsageTree(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl);
+    void getUsageTree(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl);
 
     /**
      * Add a new NamedBeanUsageReport to the report list if there are any matches in this action or expresssion.
@@ -467,7 +493,7 @@ public interface Base extends PropertyChangeProvider {
      * @param report A list of NamedBeanUsageReport usage reports.
      * @param cdl    The current ConditionalNG bean.  Null for Module searches since there is no conditional
      */
-    public void getUsageDetail(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl);
+    void getUsageDetail(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl);
 
     /**
      * Request a call-back when a bound property changes. Bound properties are
@@ -484,7 +510,7 @@ public interface Base extends PropertyChangeProvider {
      * @param listenerRef A textual reference for the listener, that can be
      *                        presented to the user when a delete is called
      */
-    public void addPropertyChangeListener(@Nonnull PropertyChangeListener listener, String name, String listenerRef);
+    void addPropertyChangeListener(@Nonnull PropertyChangeListener listener, String name, String listenerRef);
 
     /**
      * Request a call-back when a bound property changes. Bound properties are
@@ -503,12 +529,12 @@ public interface Base extends PropertyChangeProvider {
      * @param listenerRef  A textual reference for the listener, that can be
      *                         presented to the user when a delete is called
      */
-    public void addPropertyChangeListener(@Nonnull String propertyName, @Nonnull PropertyChangeListener listener,
+    void addPropertyChangeListener(@Nonnull String propertyName, @Nonnull PropertyChangeListener listener,
             String name, String listenerRef);
 
-    public void updateListenerRef(@Nonnull PropertyChangeListener l, String newName);
+    void updateListenerRef(@Nonnull PropertyChangeListener l, String newName);
 
-    public void vetoableChange(@Nonnull PropertyChangeEvent evt) throws PropertyVetoException;
+    void vetoableChange(@Nonnull PropertyChangeEvent evt) throws PropertyVetoException;
 
     /**
      * Get the textual reference for the specific listener
@@ -517,7 +543,7 @@ public interface Base extends PropertyChangeProvider {
      * @return the textual reference
      */
     @CheckReturnValue
-    public String getListenerRef(@Nonnull PropertyChangeListener l);
+    String getListenerRef(@Nonnull PropertyChangeListener l);
 
     /**
      * Returns a list of all the listeners references
@@ -525,7 +551,16 @@ public interface Base extends PropertyChangeProvider {
      * @return a list of textual references
      */
     @CheckReturnValue
-    public ArrayList<String> getListenerRefs();
+    ArrayList<String> getListenerRefs();
+
+    /**
+     * Returns a list of all the listeners references for this object
+     * and all its children.
+     *
+     * @param list a list of textual references
+     */
+    @CheckReturnValue
+    void getListenerRefsIncludingChildren(List<String> list);
 
     /**
      * Number of current listeners. May return -1 if the information is not
@@ -534,7 +569,7 @@ public interface Base extends PropertyChangeProvider {
      * @return the number of listeners.
      */
     @CheckReturnValue
-    public int getNumPropertyChangeListeners();
+    int getNumPropertyChangeListeners();
 
     /**
      * Get a list of all the property change listeners that are registered using
@@ -546,34 +581,77 @@ public interface Base extends PropertyChangeProvider {
      */
     @CheckReturnValue
     @Nonnull
-    public PropertyChangeListener[] getPropertyChangeListenersByReference(@Nonnull String name);
+    PropertyChangeListener[] getPropertyChangeListenersByReference(@Nonnull String name);
 
     /**
      * Do something on every item in the sub tree of this item.
      * @param r the action to do on all items.
      */
-    public default void forEntireTree(RunnableWithBase r) {
+    default void forEntireTree(RunnableWithBase r) {
         r.run(this);
         for (int i=0; i < getChildCount(); i++) {
             getChild(i).forEntireTree(r);
         }
     }
 
+    /**
+     * Do something on every item in the sub tree of this item.
+     * @param r the action to do on all items.
+     * @throws Exception if an exception occurs
+     */
+    default void forEntireTreeWithException(RunnableWithBaseThrowException r) throws Exception {
+        r.run(this);
+        for (int i=0; i < getChildCount(); i++) {
+            getChild(i).forEntireTreeWithException(r);
+        }
+    }
 
-    public interface RunnableWithBase {
-        public void run(@Nonnull Base b);
+    /**
+     * Does this item has the child b?
+     * @param  b the child
+     * @return true if this item has the child b, false otherwise
+     */
+    default boolean hasChild(@Nonnull Base b) {
+        for (int i=0; i < getChildCount(); i++) {
+            if (getChild(i) == b) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Does this item exists in the tree?
+     * @return true if the item exists in the tree, false otherwise
+     */
+    default boolean existsInTree() {
+        Base parent = getParent();
+        return parent == null || (parent.hasChild(this) && parent.existsInTree());
+    }
+
+
+    interface RunnableWithBase {
+        void run(@Nonnull Base b);
+    }
+
+
+    interface RunnableWithBaseThrowException {
+        void run(@Nonnull Base b) throws Exception;
     }
 
 
 
-    public final String PRINT_LINE_NUMBERS_FORMAT = "%8d:  ";
+    final String PRINT_LINE_NUMBERS_FORMAT = "%8d:  ";
 
 
-    public static class PrintTreeSettings {
+    static class PrintTreeSettings {
         public boolean _printLineNumbers = false;
+        public boolean _printDisplayName = false;
+        public boolean _hideUserName = false;           // Used for tests
         public boolean _printErrorHandling = true;
         public boolean _printNotConnectedSockets = true;
         public boolean _printLocalVariables = true;
+        public boolean _printSystemNames = false;
+        public boolean _printDisabled = false;
+        public boolean _printStartup = false;
     }
 
 }

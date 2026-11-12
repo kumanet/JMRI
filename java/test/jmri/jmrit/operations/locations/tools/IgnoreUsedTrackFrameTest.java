@@ -2,18 +2,17 @@ package jmri.jmrit.operations.locations.tools;
 
 import java.awt.GraphicsEnvironment;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.*;
-import org.junit.Assume;
-
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsTestCase;
-import jmri.jmrit.operations.locations.Location;
-import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.locations.Track;
+import jmri.jmrit.operations.locations.*;
+import jmri.jmrit.operations.locations.gui.YardEditFrame;
 import jmri.util.JUnitOperationsUtil;
 import jmri.util.JUnitUtil;
 import jmri.util.swing.JemmyUtil;
+
+import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.jupiter.api.Test;
 
 /**
  *
@@ -30,8 +29,10 @@ public class IgnoreUsedTrackFrameTest extends OperationsTestCase {
         Location loc = lmanager.getLocationByName("North Industries");
         Assert.assertNotNull("exists", loc);
         Track track = loc.getTrackByName("NI Yard", null);
+        
+        YardEditFrame yef = new YardEditFrame(track);
 
-        IgnoreUsedTrackFrame iutf = new IgnoreUsedTrackFrame(track);
+        IgnoreUsedTrackFrame iutf = new IgnoreUsedTrackFrame(yef);
         Assert.assertNotNull("exists",iutf);
         
         // confirm default
@@ -44,7 +45,19 @@ public class IgnoreUsedTrackFrameTest extends OperationsTestCase {
         
         JUnitUtil.dispose(iutf);
     }
+    
+    @Test
+    public void testCloseWindowOnSave() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        JUnitOperationsUtil.initOperationsData();
+        LocationManager lmanager = InstanceManager.getDefault(LocationManager.class);
+        Location loc = lmanager.getLocationByName("North Industries");
+        Track track = loc.getTrackByName("NI Yard", null);
+        YardEditFrame yef = new YardEditFrame(track);
+        IgnoreUsedTrackFrame f = new IgnoreUsedTrackFrame(yef);
+        JUnitOperationsUtil.testCloseWindowOnSave(f.getTitle());
+    }
 
-    // private final static Logger log = LoggerFactory.getLogger(IgnoreUsedTrackFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(IgnoreUsedTrackFrameTest.class);
 
 }

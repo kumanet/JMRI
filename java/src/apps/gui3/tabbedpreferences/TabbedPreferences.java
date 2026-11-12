@@ -2,6 +2,7 @@ package apps.gui3.tabbedpreferences;
 
 import apps.AppConfigBase;
 import apps.ConfigBundle;
+
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
@@ -11,6 +12,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -18,22 +21,21 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTabbedPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
-import jmri.InstanceManager;
-import jmri.ShutDownManager;
+
+import jmri.*;
 import jmri.swing.PreferencesPanel;
 import jmri.swing.PreferencesSubPanel;
 import jmri.util.FileUtil;
 import jmri.util.ThreadingUtil;
+import jmri.util.swing.JmriJOptionPane;
+
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provide access to preferences via a tabbed pane.
@@ -43,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * {@link jmri.swing.PreferencesPanel} interface.
  * <p>
  * JMRI apps (generally) create one object of this type on the main thread as
- * part of initialization, which is then made available via the 
+ * part of initialization, which is then made available via the
  * {@link InstanceManager}.
  *
  * @author Bob Jacobsen Copyright 2010, 2019
@@ -70,7 +72,7 @@ public class TabbedPreferences extends AppConfigBase {
     ArrayList<Element> preferencesElements = new ArrayList<>();
 
     JPanel detailpanel = new JPanel();
-    { 
+    {
         // The default panel needs to have a CardLayout
         detailpanel.setLayout(new CardLayout());
     }
@@ -113,7 +115,7 @@ public class TabbedPreferences extends AppConfigBase {
 
         preferencesArray.add(new PreferencesCatItems("WITHROTTLE", rb
                 .getString("MenuWiThrottle"), 900));
-                
+
         // initialization process via init
         init();
     }
@@ -279,7 +281,8 @@ public class TabbedPreferences extends AppConfigBase {
             }
         }
         if (itemBeingAdded == null) {
-            itemBeingAdded = new PreferencesCatItems(prefItem, itemText, sortOrder);
+            itemBeingAdded = new PreferencesCatItems(
+                    prefItem, itemText, sortOrder, item.getIsEnabled());
             preferencesArray.add(itemBeingAdded);
             // As this is a new item in the selection list, we need to update
             // the JList.
@@ -361,9 +364,22 @@ public class TabbedPreferences extends AppConfigBase {
 
         list.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         list.setLayoutOrientation(JList.VERTICAL);
+        ReferenceNotNull<Integer> lastSelection = new ReferenceNotNull<>(-1);
         list.addListSelectionListener((ListSelectionEvent e) -> {
             PreferencesCatItems item = preferencesArray.get(list.getSelectedIndex());
-            selection(item.getPrefItem());
+            String newSelection = item.getPrefItem();
+
+            BooleanSupplier getIsEnabled = item.getIsEnabled;
+            if (list.getSelectedIndex() != lastSelection.get()
+                    && getIsEnabled != null
+                    && !getIsEnabled.getAsBoolean()) {
+                // The new selection is currently disabled
+                // so return to previous selection
+                list.setSelectedIndex(lastSelection.get());
+            } else {
+                lastSelection.set(list.getSelectedIndex());
+                selection(newSelection);
+            }
         });
         buttonpanel.add(listScroller);
         buttonpanel.add(save);
@@ -379,12 +395,12 @@ public class TabbedPreferences extends AppConfigBase {
         if (!this.isPreferencesValid() && !sdm.isShuttingDown()) {
             for (PreferencesPanel panel : this.getPreferencesPanels().values()) {
                 if (!panel.isPreferencesValid()) {
-                    switch (JOptionPane.showConfirmDialog(this,
+                    switch (JmriJOptionPane.showConfirmDialog(this,
                             Bundle.getMessage("InvalidPreferencesMessage", panel.getTabbedPreferencesTitle()),
                             Bundle.getMessage("InvalidPreferencesTitle"),
-                            JOptionPane.YES_NO_OPTION,
-                            JOptionPane.ERROR_MESSAGE)) {
-                        case JOptionPane.YES_OPTION:
+                            JmriJOptionPane.YES_NO_OPTION,
+                            JmriJOptionPane.ERROR_MESSAGE)) {
+                        case JmriJOptionPane.YES_OPTION:
                             // abort save and return to broken preferences
                             this.gotoPreferenceItem(panel.getPreferencesItem(), panel.getTabbedPreferencesTitle());
                             return;
@@ -407,6 +423,7 @@ public class TabbedPreferences extends AppConfigBase {
         String itemText;
         String prefItem;
         int sortOrder = Integer.MAX_VALUE;
+        BooleanSupplier getIsEnabled;
         JTabbedPane tabbedPane = new JTabbedPane();
         ArrayList<String> disableItemsList = new ArrayList<>();
 
@@ -416,6 +433,13 @@ public class TabbedPreferences extends AppConfigBase {
             prefItem = pref;
             itemText = title;
             this.sortOrder = sortOrder;
+        }
+
+        PreferencesCatItems(String pref, String title, int sortOrder, BooleanSupplier getIsEnabled) {
+            prefItem = pref;
+            itemText = title;
+            this.sortOrder = sortOrder;
+            this.getIsEnabled = getIsEnabled;
         }
 
         void addPreferenceItem(String title, String labelkey, JComponent item,
@@ -582,6 +606,6 @@ public class TabbedPreferences extends AppConfigBase {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TabbedPreferences.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TabbedPreferences.class);
 
 }

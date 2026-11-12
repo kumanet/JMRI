@@ -2,36 +2,22 @@ package jmri.jmrit.beantable;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.beans.PropertyChangeEvent;
 import java.lang.reflect.InvocationTargetException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Vector;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
-import javax.swing.ListSelectionModel;
-import javax.swing.SortOrder;
+
+import javax.annotation.Nonnull;
+
+import javax.swing.*;
 import javax.swing.table.TableRowSorter;
+
 import jmri.*;
 import jmri.swing.RowSorterUtil;
 import jmri.util.AlphanumComparator;
 import jmri.util.gui.GuiLafPreferencesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.*;
 
 /**
  * Provide access to the various tables in the tabbed Tables interface via a listed pane (normally to the left).
@@ -80,7 +66,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
             InstanceManager.store(ListedTableFrame.this, jmri.jmrit.beantable.ListedTableFrame.class);
         }
     }
-    
+
     /**
      * Initialise all tables to be added to Frame.
      * Should be called after ListedTableFrame construction and before initComponents()
@@ -98,12 +84,14 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
             addTable("jmri.jmrit.beantable.SignalMastLogicTableAction", Bundle.getMessage("MenuItemSignalMastLogicTable"), true);
             addTable("jmri.jmrit.beantable.ReporterTableTabAction", Bundle.getMessage("MenuItemReporterTable"), false);
             addTable("jmri.jmrit.beantable.MemoryTableAction", Bundle.getMessage("MenuItemMemoryTable"), true);
+            addTable("jmri.jmrit.beantable.StringIOTableAction", Bundle.getMessage("MenuItemStringIOTable"), true);
             addTable("jmri.jmrit.beantable.RouteTableAction", Bundle.getMessage("MenuItemRouteTable"), true);
             addTable("jmri.jmrit.beantable.LRouteTableAction", Bundle.getMessage("MenuItemLRouteTable"), true);
             addTable("jmri.jmrit.beantable.LogixTableAction", Bundle.getMessage("MenuItemLogixTable"), true);
             addTable("jmri.jmrit.beantable.LogixNGTableAction", Bundle.getMessage("MenuItemLogixNGTable"), true);
             addTable("jmri.jmrit.beantable.LogixNGModuleTableAction", Bundle.getMessage("MenuItemLogixNGModuleTable"), true);
             addTable("jmri.jmrit.beantable.LogixNGTableTableAction", Bundle.getMessage("MenuItemLogixNGTableTable"), true);
+            addTable("jmri.jmrit.beantable.LogixNGGlobalVariableTableAction", Bundle.getMessage("MenuItemLogixNGGlobalVariableTableAction"), true);
             addTable("jmri.jmrit.beantable.BlockTableAction", Bundle.getMessage("MenuItemBlockTable"), true);
             if (InstanceManager.getDefault(GuiLafPreferencesManager.class).isOblockEditTabbed()) { // select _tabbed in prefs
                 addTable("jmri.jmrit.beantable.OBlockTableAction", Bundle.getMessage("MenuItemOBlockTable"), false);
@@ -137,7 +125,8 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         for (TabbedTableItemListArray item : tabbedTableItemListArrayArray) {
             // Here we add all the tables into the panel
             try {
-                TabbedTableItem<E> itemModel = new TabbedTableItem<>(item.getClassAsString(), item.getItemString(), item.getStandardTableModel());
+                TabbedTableItem<E> itemModel = new TabbedTableItem<>(
+                    item.getClassAsString(), item.getItemString(), item.getStandardTableModel());
                 detailPanel.add(itemModel.getPanel(), itemModel.getClassAsString());
                 tabbedTableArray.add(itemModel);
                 itemModel.getAAClass().addToFrame(this);
@@ -157,7 +146,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
 
         list.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         list.setLayoutOrientation(JList.VERTICAL);
-        list.addMouseListener(actionList);
+        list.addMouseListener(JmriMouseListener.adapt(actionList));
 
         listPanel = new JPanel();
         listPanel.setLayout(new BorderLayout(5, 0));
@@ -238,7 +227,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         pref.setSaveAllowed(true);
     }
 
-    void buildMenus(final TabbedTableItem<E> item) {
+    void buildMenus( @Nonnull final TabbedTableItem<E> item) {
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu(Bundle.getMessage("MenuFile"));
         menuBar.add(fileMenu);
@@ -247,7 +236,11 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         fileMenu.add(newItem);
         newItem.addActionListener((ActionEvent e) -> actionList.openNewTableWindow(list.getSelectedIndex()));
 
-        fileMenu.add(new jmri.configurexml.StoreMenu());
+        // do not display Store All Table Content in IdTag Table 
+        if (!( item.getAAClass() instanceof IdTagTableAction || 
+            item.getAAClass() instanceof IdTagTableTabAction ) ) {
+            fileMenu.add(new jmri.configurexml.StoreMenu());
+        }
 
         JMenuItem printItem = new JMenuItem(Bundle.getMessage("PrintTable"));
         fileMenu.add(printItem);
@@ -264,6 +257,19 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
                 log.warn("Printing error", e1);
             } catch (NullPointerException ex) {
                 log.error("Trying to print returned a NPE error");
+            }
+        });
+
+        JMenuItem exportItem = new JMenuItem(Bundle.getMessage("ExportTable"));
+        fileMenu.add(exportItem);
+        exportItem.addActionListener((ActionEvent e) -> {
+            if (item.getStandardTableModel()) {
+                item.getDataModel().exportToCSV(null);
+            } else {
+                // following goes through frame to avoid recreating data model
+                var model = item.getAAClass()
+                                    .getDataModel();
+                model.exportToCSV(null);
             }
         });
 
@@ -284,8 +290,6 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         }
         this.revalidate();
     }
-
-    TabbedTableItem<E> lastSelectedItem = null;
 
     /* This is a bit of a bodge to add the contents to the bottom box and keep
      * it backwardly compatible with the original views. When the original views
@@ -333,7 +337,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
      * Flag Table initialisation started
      * @param newVal true when started
      */
-    private synchronized static void setInit(boolean newVal) {
+    private static synchronized void setInit(boolean newVal) {
         init = newVal;
     }
 
@@ -342,19 +346,17 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
      *
      * @param <E> main class of the table(s)
      */
-    static class TabbedTableItem<E extends NamedBean> {
+    public static class TabbedTableItem<E extends NamedBean> {
 
-        AbstractTableAction<E> tableAction;
-        String className;
-        String itemText;
-        BeanTableDataModel<E> dataModel;
-        JTable dataTable;
-        JScrollPane dataScroll;
-        Box bottomBox;
-        int bottomBoxIndex; // index to insert extra stuff
-        static final int bottomStrutWidth = 20;
+        private AbstractTableAction<E> tableAction;
+        private final String className;
+        private String itemText;
+        private BeanTableDataModel<E> dataModel;
+        private JTable dataTable;
+        private JScrollPane dataScroll;
+        private final JPanel bottomBox;
 
-        boolean standardModel;
+        private final boolean standardModel;
 
         final JPanel dataPanel = new JPanel();
 
@@ -364,9 +366,8 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
             itemText = choice;
             standardModel = stdModel;
 
-            bottomBox = Box.createHorizontalBox();
-            bottomBox.add(Box.createHorizontalGlue());
-            bottomBoxIndex = 0;
+            bottomBox = new JPanel();
+            bottomBox.setLayout(new WrapLayout(WrapLayout.LEFT, 20, 5));
 
             try {
                 Class<?> cl = Class.forName(aaClass);
@@ -419,8 +420,8 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
             dataScroll.getViewport().setPreferredSize(dataTableSize);
 
             // set preferred scrolling options
-            dataScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-            dataScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+            dataScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+            dataScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 
             dataPanel.add(dataScroll, BorderLayout.CENTER);
 
@@ -436,16 +437,20 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
                 propertyVisible.setToolTipText(Bundle.getMessage
                         ("ShowSystemSpecificPropertiesToolTip"));
                 addToBottomBox(propertyVisible);
-                propertyVisible.addActionListener((ActionEvent e) -> dataModel.setPropertyColumnsVisible(dataTable, propertyVisible.isSelected()));
+                propertyVisible.addActionListener((ActionEvent e) ->
+                    dataModel.setPropertyColumnsVisible(dataTable, propertyVisible.isSelected()));
                 dataModel.setPropertyColumnsVisible(dataTable, false);
             }
+            tableAction.addToFrame(this);
             dataModel.persistTable(dataTable);
         }
 
         void addPanelModel() {
             try {
                 dataPanel.add(tableAction.getPanel(), BorderLayout.CENTER);
-                dataPanel.add(bottomBox, BorderLayout.SOUTH);
+                if ( bottomBox.getComponentCount()>0 ) {
+                    dataPanel.add(bottomBox, BorderLayout.SOUTH);
+                }
             } catch (NullPointerException e) {
                 log.error("An error occurred while trying to create the table for {}", itemText, e);
             }
@@ -475,11 +480,12 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
             return dataTable;
         }
 
-        protected void addToBottomBox(Component comp) {
-            bottomBox.add(Box.createHorizontalStrut(bottomStrutWidth), bottomBoxIndex);
-            ++bottomBoxIndex;
-            bottomBox.add(comp, bottomBoxIndex);
-            ++bottomBoxIndex;
+        BeanTableDataModel<E> getDataModel() {
+            return dataModel;
+        }
+
+        public void addToBottomBox(Component comp) {
+            bottomBox.add(comp);
         }
 
         void dispose() {
@@ -496,7 +502,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         }
     }
 
-    static class TabbedTableItemListArray {
+    private static class TabbedTableItemListArray {
 
         String className;
         String itemText;
@@ -527,7 +533,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
      * List panel and allows for right click popups and double click to open new
      * windows of the items we are hovering over.
      */
-    class ActionJList extends MouseAdapter {
+    private class ActionJList extends JmriMouseAdapter {
 
         JPopupMenu popUp;
         JMenuItem menuItem;
@@ -537,7 +543,7 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         ActionJList(BeanTableFrame<E> f) {
             frame = f;
             popUp = new JPopupMenu();
-            menuItem = new JMenuItem("Open in New Window"); // TODO I18N
+            menuItem = new JMenuItem(Bundle.getMessage("MenuOpenInNewWindow"));
             popUp.add(menuItem);
             menuItem.addActionListener((ActionEvent e) -> openNewTableWindow(mouseItem));
             currentItemSelected = 0;
@@ -546,14 +552,14 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
         private int currentItemSelected;
 
         @Override
-        public void mousePressed(MouseEvent e) {
+        public void mousePressed(JmriMouseEvent e) {
             if (e.isPopupTrigger()) {
                 showPopup(e);
             }
         }
 
         @Override
-        public void mouseReleased(MouseEvent e) {
+        public void mouseReleased(JmriMouseEvent e) {
             if (e.isPopupTrigger()) {
                 showPopup(e);
             }
@@ -561,21 +567,17 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
 
         // records the original pre-click index
         private int beforeClickIndex;
-        
-        //Records the item index that the mouse is currently over
-        private int mouseItem;        
 
-        void showPopup(MouseEvent e) {
+        //Records the item index that the mouse is currently over
+        private int mouseItem;
+
+        void showPopup(JmriMouseEvent e) {
             popUp.show(e.getComponent(), e.getX(), e.getY());
             mouseItem = list.locationToIndex(e.getPoint());
         }
 
-        void setCurrentItem(int current) {
-            currentItemSelected = current;
-        }
-
         @Override
-        public void mouseClicked(MouseEvent e) {
+        public void mouseClicked(JmriMouseEvent e) {
 
             mouseItem = list.locationToIndex(e.getPoint());
             if (popUp.isVisible()) {
@@ -607,12 +609,13 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
 
                 @Override
                 public void run() {
-                    ListedTableAction tmp = new ListedTableAction(item.getItemString(), item.getClassAsString(), cardHolder.getDividerLocation());
+                    ListedTableAction tmp = new ListedTableAction(
+                        item.getItemString(), item.getClassAsString(), cardHolder.getDividerLocation());
                     tmp.actionPerformed();
                 }
             }
             WindowMaker t = new WindowMaker(item);
-            javax.swing.SwingUtilities.invokeLater(t);
+            SwingUtilities.invokeLater(t);
         }
 
         void selectListItem(int index) {
@@ -626,13 +629,13 @@ public class ListedTableFrame<E extends NamedBean> extends BeanTableFrame<E> {
                 item.getAAClass().setFrame(frame);
                 buildMenus(item);
             } catch (Exception ex) {
-                log.error(ex.getLocalizedMessage(), ex);
+                log.error("Could not build table {}", item, ex);
             }
             list.ensureIndexIsVisible(index);
             list.setSelectedIndex(index);
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ListedTableFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ListedTableFrame.class);
 
 }

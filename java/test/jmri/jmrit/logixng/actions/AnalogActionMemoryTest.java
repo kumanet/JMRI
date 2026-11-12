@@ -1,5 +1,14 @@
 package jmri.jmrit.logixng.actions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyVetoException;
 import java.util.ArrayList;
@@ -7,46 +16,44 @@ import java.util.ArrayList;
 import jmri.*;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.DefaultConditionalNGScaffold;
-import jmri.jmrit.logixng.implementation.DefaultSymbolTable;
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test AnalogActionMemory
- * 
+ *
  * @author Daniel Bergqvist 2018
  */
 public class AnalogActionMemoryTest extends AbstractAnalogActionTestBase {
 
-    LogixNG logixNG;
-    ConditionalNG conditionalNG;
+    private LogixNG logixNG;
+    private ConditionalNG conditionalNG;
     protected Memory _memory;
-    
+
     @Override
     public ConditionalNG getConditionalNG() {
         return conditionalNG;
     }
-    
+
     @Override
     public LogixNG getLogixNG() {
         return logixNG;
     }
-    
+
     @Override
     public MaleSocket getConnectableChild() {
         return null;
     }
-    
+
     @Override
     public String getExpectedPrintedTree() {
         return String.format("Set memory IM1 ::: Use default%n");
     }
-    
+
     @Override
     public String getExpectedPrintedTreeFromRoot() {
         return String.format(
@@ -59,184 +66,164 @@ public class AnalogActionMemoryTest extends AbstractAnalogActionTestBase {
                 "            !~ A%n" +
                 "               Set memory IM1 ::: Use default%n");
     }
-    
+
     @Override
     public NamedBean createNewBean(String systemName) {
         return new AnalogMany(systemName, null);
     }
-    
+
     @Override
     public boolean addNewSocket() {
         return false;
     }
-    
+
     @Test
     public void testCtor() {
-        Assert.assertTrue("object exists", _base != null);
-        
+        assertNotNull( _base, "object exists");
+
         AnalogActionMemory action2;
-        Assert.assertNotNull("memory is not null", _memory);
+        assertNotNull( _memory, "memory is not null");
         _memory.setValue(10.2);
-        
+
         action2 = new AnalogActionMemory("IQAA11", null);
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertTrue("Username matches", null == action2.getUserName());
-        Assert.assertEquals("String matches", "Set memory none", action2.getLongDescription());
-        
+        assertNotNull( action2, "object exists");
+        assertNull( action2.getUserName(), "Username matches");
+        assertEquals( "Set memory ''", action2.getLongDescription(), "String matches");
+
         action2 = new AnalogActionMemory("IQAA11", "My memory");
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertTrue("Username matches", "My memory".equals(action2.getUserName()));
-        Assert.assertEquals("String matches", "Set memory none", action2.getLongDescription());
-        
+        assertNotNull( action2, "object exists");
+        assertEquals( "My memory", action2.getUserName(), "Username matches");
+        assertEquals( "Set memory ''", action2.getLongDescription(), "String matches");
+
         action2 = new AnalogActionMemory("IQAA11", null);
-        action2.setMemory(_memory);
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertTrue("Username matches", null == action2.getUserName());
-        Assert.assertEquals("String matches", "Set memory IM1", action2.getLongDescription());
-        
+        action2.getSelectNamedBean().setNamedBean(_memory);
+        assertNotNull( action2, "object exists");
+        assertNull( action2.getUserName(), "Username matches");
+        assertEquals( "Set memory IM1", action2.getLongDescription(), "String matches");
+
         action2 = new AnalogActionMemory("IQAA11", "My memory");
-        action2.setMemory(_memory);
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertTrue("Username matches", "My memory".equals(action2.getUserName()));
-        Assert.assertEquals("String matches", "Set memory IM1", action2.getLongDescription());
-        
-        boolean thrown = false;
-        try {
-            // Illegal system name
-            new AnalogActionMemory("IQA55:12:XY11", null);
-        } catch (IllegalArgumentException ex) {
-            thrown = true;
-        }
-        Assert.assertTrue("Expected exception thrown", thrown);
-        
-        thrown = false;
-        try {
-            // Illegal system name
-            new AnalogActionMemory("IQA55:12:XY11", "A name");
-        } catch (IllegalArgumentException ex) {
-            thrown = true;
-        }
-        Assert.assertTrue("Expected exception thrown", thrown);
+        action2.getSelectNamedBean().setNamedBean(_memory);
+        assertNotNull( action2, "object exists");
+        assertEquals( "My memory", action2.getUserName(), "Username matches");
+        assertEquals( "Set memory IM1", action2.getLongDescription(), "String matches");
+
+        IllegalArgumentException ex = assertThrows( IllegalArgumentException.class, () -> {
+            var t = new AnalogActionMemory("IQA55:12:XY11", null);
+            fail("should have thrown, not cxreated " + t);
+        }, "Illegal system name Expected exception thrown");
+        assertNotNull(ex);
+
+        ex = assertThrows( IllegalArgumentException.class, () -> {
+            var t = new AnalogActionMemory("IQA55:12:XY11", "A name");
+            fail("should have thrown, not cxreated " + t);
+        }, "Illegal system name Expected exception thrown");
+        assertNotNull(ex);
     }
-    
+
     @Test
     public void testAction() throws SocketAlreadyConnectedException, SocketAlreadyConnectedException, JmriException {
         AnalogActionMemory action = (AnalogActionMemory)_base;
         action.setValue(0.0d);
-        Assert.assertTrue("Memory has correct value", 0.0d == (Double)_memory.getValue());
+        assertEquals( 0.0d, (Double)_memory.getValue(), "Memory has correct value");
         action.setValue(1.0d);
-        Assert.assertTrue("Memory has correct value", 1.0d == (Double)_memory.getValue());
-        action.removeMemory();
+        assertEquals( 1.0d, (Double)_memory.getValue(), "Memory has correct value");
+        action.getSelectNamedBean().removeNamedBean();
         action.setValue(2.0d);
-        Assert.assertTrue("Memory has correct value", 1.0d == (Double)_memory.getValue());
+        assertEquals( 1.0d, (Double)_memory.getValue(), "Memory has correct value");
     }
-    
+
     @Test
     public void testMemory() {
         AnalogActionMemory action = (AnalogActionMemory)_base;
-        action.removeMemory();
-        Assert.assertNull("Memory is null", action.getMemory());
-        ((AnalogActionMemory)_base).setMemory(_memory);
-        Assert.assertTrue("Memory matches", _memory == action.getMemory().getBean());
-        
-        action.removeMemory();
-        Assert.assertNull("Memory is null", action.getMemory());
+        action.getSelectNamedBean().removeNamedBean();
+        assertNull( action.getSelectNamedBean().getNamedBean(), "Memory is null");
+        ((AnalogActionMemory)_base).getSelectNamedBean().setNamedBean(_memory);
+        assertSame( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
+        action.getSelectNamedBean().removeNamedBean();
+        assertNull( action.getSelectNamedBean().getNamedBean(), "Memory is null");
         Memory otherMemory = InstanceManager.getDefault(MemoryManager.class).provide("IM99");
-        Assert.assertNotNull("memory is not null", otherMemory);
+        assertNotNull( otherMemory, "memory is not null");
         NamedBeanHandle<Memory> memoryHandle = InstanceManager.getDefault(NamedBeanHandleManager.class)
                 .getNamedBeanHandle(otherMemory.getDisplayName(), otherMemory);
-        ((AnalogActionMemory)_base).setMemory(memoryHandle);
-        Assert.assertTrue("Memory matches", memoryHandle == action.getMemory());
-        Assert.assertTrue("Memory matches", otherMemory == action.getMemory().getBean());
-        
-        action.removeMemory();
-        Assert.assertNull("Memory is null", action.getMemory());
-        action.setMemory(memoryHandle.getName());
-        Assert.assertTrue("Memory matches", memoryHandle == action.getMemory());
-        
-        // Test setMemory with a memory name that doesn't exists
-        action.setMemory("Non existent memory");
-        Assert.assertNull("Memory is null", action.getMemory());
-        JUnitAppender.assertErrorMessage("memory \"Non existent memory\" is not found");
+        ((AnalogActionMemory)_base).getSelectNamedBean().setNamedBean(memoryHandle);
+        assertSame( memoryHandle, action.getSelectNamedBean().getNamedBean(), "Memory matches");
+        assertSame( otherMemory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
+        action.getSelectNamedBean().removeNamedBean();
+        assertNull( action.getSelectNamedBean().getNamedBean(), "Memory is null");
+        action.getSelectNamedBean().setNamedBean(memoryHandle.getName());
+        assertSame( memoryHandle, action.getSelectNamedBean().getNamedBean(), "Memory matches");
+
+        // Test getSelectNamedBean().setNamedBean with a memory name that doesn't exists
+        action.getSelectNamedBean().setNamedBean("Non existent memory");
+        assertNull( action.getSelectNamedBean().getNamedBean(), "Memory is null");
+        JUnitAppender.assertErrorMessage("Memory \"Non existent memory\" is not found");
     }
-    
+
     @Test
     public void testVetoableChange() throws PropertyVetoException {
         // Get some other memory for later use
         Memory otherMemory = InstanceManager.getDefault(MemoryManager.class).provide("IM99");
-        Assert.assertNotNull("Memory is not null", otherMemory);
-        Assert.assertNotEquals("Memory is not equal", _memory, otherMemory);
-        
+        assertNotNull( otherMemory, "Memory is not null");
+        assertNotEquals( _memory, otherMemory, "Memory is not equal");
+
         // Get the expression and set the memory
         AnalogActionMemory action = (AnalogActionMemory)_base;
-        action.setMemory(_memory);
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
-        
+        action.getSelectNamedBean().setNamedBean(_memory);
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
         // Test vetoableChange() for some other propery
         action.vetoableChange(new PropertyChangeEvent(this, "CanSomething", "test", null));
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
-        
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
         // Test vetoableChange() for a string
         action.vetoableChange(new PropertyChangeEvent(this, "CanDelete", "test", null));
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
         action.vetoableChange(new PropertyChangeEvent(this, "DoDelete", "test", null));
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
-        
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
         // Test vetoableChange() for another memory
         action.vetoableChange(new PropertyChangeEvent(this, "CanDelete", otherMemory, null));
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
         action.vetoableChange(new PropertyChangeEvent(this, "DoDelete", otherMemory, null));
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
-        
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+
         // Test vetoableChange() for its own memory
-        boolean thrown = false;
-        try {
-            action.vetoableChange(new PropertyChangeEvent(this, "CanDelete", _memory, null));
-        } catch (PropertyVetoException ex) {
-            thrown = true;
-        }
-        Assert.assertTrue("Expected exception thrown", thrown);
-        
-        Assert.assertEquals("Memory matches", _memory, action.getMemory().getBean());
-        action.vetoableChange(new PropertyChangeEvent(this, "DoDelete", _memory, null));
-        Assert.assertNull("Memory is null", action.getMemory());
+        PropertyVetoException ex = assertThrows( PropertyVetoException.class, () ->
+            action.getSelectNamedBean().vetoableChange(new PropertyChangeEvent(this, "CanDelete", _memory, null)),
+                "Expected exception thrown");
+        assertNotNull(ex);
+
+        assertEquals( _memory, action.getSelectNamedBean().getNamedBean().getBean(), "Memory matches");
+        action.getSelectNamedBean().vetoableChange(new PropertyChangeEvent(this, "DoDelete", _memory, null));
+        assertNull( action.getSelectNamedBean().getNamedBean(), "Memory is null");
     }
-    
+
     @Test
     public void testCategory() {
-        Assert.assertTrue("Category matches", Category.ITEM == _base.getCategory());
+        assertSame( LogixNG_Category.ITEM, _base.getCategory(), "Category matches");
     }
-    
-    @Test
-    public void testIsExternal() {
-        Assert.assertTrue("is external", _base.isExternal());
-    }
-    
+
     @Test
     public void testShortDescription() {
-        Assert.assertEquals("String matches", "Memory", _base.getShortDescription());
+        assertEquals( "Memory", _base.getShortDescription(), "String matches");
     }
-    
+
     @Test
     public void testLongDescription() {
-        Assert.assertEquals("String matches", "Set memory IM1", _base.getLongDescription());
+        assertEquals( "Set memory IM1", _base.getLongDescription(), "String matches");
     }
-    
+
     @Test
     public void testChild() {
-        Assert.assertTrue("Num children is zero", 0 == _base.getChildCount());
-        boolean hasThrown = false;
-        try {
-            _base.getChild(0);
-        } catch (UnsupportedOperationException ex) {
-            hasThrown = true;
-            Assert.assertTrue("Error message is correct", "Not supported.".equals(ex.getMessage()));
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+        assertEquals( 0, _base.getChildCount(), "Num children is zero");
+        UnsupportedOperationException ex = assertThrows( UnsupportedOperationException.class, () ->
+            _base.getChild(0), "Exception is thrown");
+        assertEquals( "Not supported.", ex.getMessage(), "Error message is correct");
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() throws SocketAlreadyConnectedException {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -246,7 +233,7 @@ public class AnalogActionMemoryTest extends AbstractAnalogActionTestBase {
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initMemoryManager();
 //        JUnitUtil.initLogixNGManager();
-        
+
         logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
                 .createLogixNG("A new logix for test");  // NOI18N
         conditionalNG = new DefaultConditionalNGScaffold("IQC1", "A conditionalNG");  // NOI18N;
@@ -254,7 +241,7 @@ public class AnalogActionMemoryTest extends AbstractAnalogActionTestBase {
         conditionalNG.setEnabled(true);
         conditionalNG.setRunDelayed(false);
         logixNG.addConditionalNG(conditionalNG);
-        
+
         DoAnalogAction doAnalogAction = new DoAnalogAction("IQDA321", null);
         MaleSocket maleSocketDoAnalogAction =
                 InstanceManager.getDefault(DigitalActionManager.class)
@@ -267,22 +254,22 @@ public class AnalogActionMemoryTest extends AbstractAnalogActionTestBase {
                 InstanceManager.getDefault(AnalogActionManager.class)
                         .registerAction(analogActionMemory);
         doAnalogAction.getChild(1).connect(maleSocketAnalogActionMemory);
-        analogActionMemory.setMemory(_memory);
+        analogActionMemory.getSelectNamedBean().setNamedBean(_memory);
         _base = analogActionMemory;
         _baseMaleSocket = maleSocketAnalogActionMemory;
-        
-        if (! logixNG.setParentForAllChildren(new ArrayList<>())) throw new RuntimeException();
+
+        assertTrue( logixNG.setParentForAllChildren(new ArrayList<>()));
         logixNG.setEnabled(true);
-        
+
         InstanceManager.getDefault(LogixNG_Manager.class)
                 .activateAllLogixNGs(false, false);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         _base.dispose();
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
         JUnitUtil.tearDown();
     }
-    
+
 }

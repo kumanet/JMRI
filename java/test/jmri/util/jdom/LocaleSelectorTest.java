@@ -4,8 +4,10 @@ import jmri.util.JUnitUtil;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
-import org.junit.Assert;
+
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for the jmri.util.LocaleSelector class.
@@ -16,10 +18,7 @@ public class LocaleSelectorTest {
 
     @Test
     public void testFindDefault() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl" });
 
         Namespace xml = Namespace.XML_NAMESPACE;
         Element el = new Element("foo")
@@ -31,15 +30,12 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "a", result);
+        assertEquals( "a", result, "find default");
     }
 
     @Test
     public void testFindFullCode() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Namespace xml = Namespace.XML_NAMESPACE;
         Element el = new Element("foo")
@@ -61,15 +57,12 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "c", result);
+        assertEquals( "c", result, "find default");
     }
 
     @Test
     public void testFindPartialCode() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Namespace xml = Namespace.XML_NAMESPACE;
         Element el = new Element("foo")
@@ -91,29 +84,23 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "c", result);
+        assertEquals( "c", result, "find default");
     }
 
     @Test
     public void testDefaultAttribute() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Element el = new Element("foo")
                 .setAttribute("temp", "a");
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "a", result);
+        assertEquals( "a", result, "find default");
     }
 
     @Test
     public void testDefaultElement() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Element el = new Element("foo")
                 .addContent(
@@ -122,15 +109,12 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "b", result);
+        assertEquals( "b", result, "find default");
     }
 
     @Test
     public void testFindFullCodeNoAttribute() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Namespace xml = Namespace.XML_NAMESPACE;
         Element el = new Element("foo")
@@ -151,15 +135,12 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "c", result);
+        assertEquals( "c", result, "find default");
     }
 
     @Test
     public void testFindPartialCodeNoAttribute() {
-        LocaleSelector.suffixes
-                = new String[]{
-                    "kl_KL", "kl"
-                };
+        LocaleSelector.setSuffixes( new String[]{"kl_KL", "kl"});
 
         Namespace xml = Namespace.XML_NAMESPACE;
         Element el = new Element("foo")
@@ -180,7 +161,7 @@ public class LocaleSelectorTest {
                 );
 
         String result = LocaleSelector.getAttribute(el, "temp");
-        Assert.assertEquals("find default", "c", result);
+        assertEquals( "c", result, "find default");
     }
 
     @BeforeEach

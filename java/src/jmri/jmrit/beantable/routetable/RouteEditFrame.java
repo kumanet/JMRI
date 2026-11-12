@@ -2,9 +2,6 @@ package jmri.jmrit.beantable.routetable;
 
 import jmri.InstanceManager;
 import jmri.Route;
-import jmri.Sensor;
-import jmri.Turnout;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -25,6 +22,10 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
 
     private final String systemName;
 
+    public RouteEditFrame() {
+        this(Bundle.getMessage("TitleEditRoute"));
+    }
+
     public RouteEditFrame(String systemName) {
         this(Bundle.getMessage("TitleEditRoute"), systemName);
     }
@@ -40,7 +41,7 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
     }
 
     @Override
-    public void initComponents() {
+    public final void initComponents() {
         super.initComponents();
         _systemName.setText(systemName);
         // identify the Route with this name if it already exists
@@ -66,80 +67,9 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
         curRoute.deActivateRoute();
         // get information for this route
         _userName.setText(g.getUserName());
-        // set up Turnout list for this route
-        int setRow = 0;
-        for (int i = _turnoutList.size() - 1; i >= 0; i--) {
-            RouteTurnout turnout = _turnoutList.get(i);
-            String tSysName = turnout.getSysName();
-            if (g.isOutputTurnoutIncluded(tSysName)) {
-                turnout.setIncluded(true);
-                turnout.setState(g.getOutputTurnoutSetState(tSysName));
-                setRow = i;
-            } else {
-                turnout.setIncluded(false);
-                turnout.setState(Turnout.CLOSED);
-            }
-        }
-        setRow -= 1;
-        if (setRow < 0) {
-            setRow = 0;
-        }
-        _routeTurnoutScrollPane.getVerticalScrollBar().setValue(setRow * ROW_HEIGHT);
-        _routeTurnoutModel.fireTableDataChanged();
-        // set up Sensor list for this route
-        for (int i = _sensorList.size() - 1; i >= 0; i--) {
-            RouteSensor sensor = _sensorList.get(i);
-            String tSysName = sensor.getSysName();
-            if (g.isOutputSensorIncluded(tSysName)) {
-                sensor.setIncluded(true);
-                sensor.setState(g.getOutputSensorSetState(tSysName));
-                setRow = i;
-            } else {
-                sensor.setIncluded(false);
-                sensor.setState(Sensor.INACTIVE);
-            }
-        }
-        setRow -= 1;
-        if (setRow < 0) {
-            setRow = 0;
-        }
-        _routeSensorScrollPane.getVerticalScrollBar().setValue(setRow * ROW_HEIGHT);
-        _routeSensorModel.fireTableDataChanged();
-        // get Sound and  Script file names
-        scriptFile.setText(g.getOutputScriptName());
-        soundFile.setText(g.getOutputSoundName());
 
-        // get Turnout Aligned sensor
-        turnoutsAlignedSensor.setSelectedItem(g.getTurnoutsAlgdSensor());
+        setPageContent(g);
 
-        // set up Sensors if there are any
-        Sensor[] temNames = new Sensor[Route.MAX_CONTROL_SENSORS];
-        int[] temModes = new int[Route.MAX_CONTROL_SENSORS];
-        for (int k = 0; k < Route.MAX_CONTROL_SENSORS; k++) {
-            temNames[k] = g.getRouteSensor(k);
-            temModes[k] = g.getRouteSensorMode(k);
-        }
-        sensor1.setSelectedItem(temNames[0]);
-        setSensorModeBox(temModes[0], sensor1mode);
-
-        sensor2.setSelectedItem(temNames[1]);
-        setSensorModeBox(temModes[1], sensor2mode);
-
-        sensor3.setSelectedItem(temNames[2]);
-        setSensorModeBox(temModes[2], sensor3mode);
-
-        // set up Control Turnout if there is one
-        cTurnout.setSelectedItem(g.getCtlTurnout());
-
-        setTurnoutModeBox(g.getControlTurnoutState(), cTurnoutStateBox);
-
-        // set up Lock Control Turnout if there is one
-        cLockTurnout.setSelectedItem(g.getLockCtlTurnout());
-
-        setTurnoutModeBox(g.getLockControlTurnoutState(), cLockTurnoutStateBox);
-
-        // set up additional route specific Delay
-        timeDelay.setValue(g.getRouteCommandDelay());
         // begin with showing all Turnouts
         // set up buttons and notes
         status1.setText(Bundle.getMessage("RouteAddStatusInitial3", Bundle.getMessage("ButtonUpdate")));
@@ -151,8 +81,10 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
 
     @Override
     protected JPanel getButtonPanel() {
-        final JButton cancelEditButton = new JButton(Bundle.getMessage("ButtonCancelEdit", Bundle.getMessage("ButtonEdit"))); // I18N for word sequence "Cancel Edit"
-        final JButton deleteButton = new JButton(Bundle.getMessage("ButtonDelete") + " " + Bundle.getMessage("BeanNameRoute")); // I18N "Delete Route"
+        final JButton cancelEditButton = new JButton( // I18N for word sequence "Cancel Edit"
+            Bundle.getMessage("ButtonCancelEdit", Bundle.getMessage("ButtonEdit")));
+        final JButton deleteButton = new JButton(Bundle.getMessage("ButtonDelete") + " "
+            + Bundle.getMessage("BeanNameRoute")); // I18N "Delete Route"
         final JButton updateButton = new JButton(Bundle.getMessage("ButtonUpdate"));
         final JButton exportButton = new JButton(Bundle.getMessage("ButtonExport"));
         // add Buttons panel
@@ -160,11 +92,11 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
         pb.setLayout(new FlowLayout(FlowLayout.TRAILING));
         // CancelEdit button
         pb.add(cancelEditButton);
-        cancelEditButton.addActionListener(this::cancelPressed);
+        cancelEditButton.addActionListener( e -> cancelEdit());
         cancelEditButton.setToolTipText(Bundle.getMessage("TooltipCancelRoute"));
         // Delete Route button
         pb.add(deleteButton);
-        deleteButton.addActionListener(this::deletePressed);
+        deleteButton.addActionListener( e -> deletePressed());
         deleteButton.setToolTipText(Bundle.getMessage("TooltipDeleteRoute"));
         // Update Route button
         pb.add(updateButton);
@@ -172,7 +104,7 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
         updateButton.setToolTipText(Bundle.getMessage("TooltipUpdateRoute"));
         // Export button
         pb.add(exportButton);
-        exportButton.addActionListener(this::exportButtonPressed);
+        exportButton.addActionListener( e -> exportButtonPressed());
         exportButton.setToolTipText(Bundle.getMessage("TooltipExportRoute"));
 
         // Show the initial buttons, and hide the others
@@ -185,10 +117,8 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
 
     /**
      * Respond to the export button.
-     *
-     * @param e the action event
      */
-    private void exportButtonPressed(ActionEvent e){
+    private void exportButtonPressed(){
         new RouteExportToLogix(_systemName.getText()).export();
         status1.setText(Bundle.getMessage("BeanNameRoute")
                 + "\"" + _systemName.getText() + "\" " +
@@ -201,20 +131,9 @@ public class RouteEditFrame extends AbstractRouteAddEditFrame {
     }
 
     /**
-     * Respond to the CancelEdit button.
-     *
-     * @param e the action event
-     */
-    private void cancelPressed(ActionEvent e) {
-        cancelEdit();
-    }
-
-    /**
      * Respond to the Delete button.
-     *
-     * @param e the action event
      */
-    private void deletePressed(ActionEvent e) {
+    private void deletePressed() {
         // route is already deactivated, just delete it
         routeManager.deleteRoute(curRoute);
 

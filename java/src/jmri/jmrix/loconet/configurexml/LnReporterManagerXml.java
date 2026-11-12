@@ -1,8 +1,6 @@
 package jmri.jmrix.loconet.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring LnReporterManagers.
@@ -29,6 +27,6 @@ public class LnReporterManagerXml extends jmri.managers.configurexml.AbstractRep
         return loadReporters(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(LnReporterManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(LnReporterManagerXml.class);
 
 }

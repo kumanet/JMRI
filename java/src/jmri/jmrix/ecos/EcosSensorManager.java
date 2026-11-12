@@ -18,9 +18,13 @@ import org.slf4j.LoggerFactory;
 public class EcosSensorManager extends jmri.managers.AbstractSensorManager
         implements EcosListener {
 
-    public EcosSensorManager(EcosSystemConnectionMemo memo) {
+    public EcosSensorManager(@Nonnull EcosSystemConnectionMemo memo) {
         super(memo);
         tc = memo.getTrafficController();
+        init();
+    }
+        
+    private void init() {
         // listen for sensor creation
         // connect to the TrafficManager
         tc.addEcosListener(this);
@@ -34,10 +38,10 @@ public class EcosSensorManager extends jmri.managers.AbstractSensorManager
         tc.sendEcosMessage(m, this);
     }
 
-    private EcosTrafficController tc;
+    private final EcosTrafficController tc;
     //The hash table simply holds the object number against the EcosSensor ref.
-    private Hashtable<Integer, EcosSensor> _tecos = new Hashtable<Integer, EcosSensor>();   // stores known Ecos Object ids to DCC
-    private Hashtable<Integer, Integer> _sport = new Hashtable<Integer, Integer>();   // stores known Ecos Object ids to DCC
+    private final Hashtable<Integer, EcosSensor> _tecos = new Hashtable<>();   // stores known Ecos Object ids to DCC
+    private final Hashtable<Integer, Integer> _sport = new Hashtable<>();   // stores known Ecos Object ids to DCC
 
     /**
      * {@inheritDoc}
@@ -79,7 +83,7 @@ public class EcosSensorManager extends jmri.managers.AbstractSensorManager
                         if (start > 0 && end > 0) {
                             String val = lines[i].substring(start, end);
                             int intState = Integer.parseInt(val, 16);
-                            decodeSensorState(ecosObjectId, intState);
+                            decodeSensorState(ecosObjectId, intState, m.getReceivedTime());
                         }
                     }
                     if (lines[i].contains("railcom")) {
@@ -186,7 +190,7 @@ public class EcosSensorManager extends jmri.managers.AbstractSensorManager
         // messages are ignored
     }
 
-    private void decodeSensorState(int object, int intState) {
+    private void decodeSensorState(int object, int intState, long timeNanos) {
         EcosSensor es;
         int k = 1;
         int result;
@@ -203,9 +207,9 @@ public class EcosSensorManager extends jmri.managers.AbstractSensorManager
             sb.append(port);
             es = (EcosSensor) provideSensor(sb.toString());
             if (result == 0) {
-                es.setOwnState(Sensor.INACTIVE);
+                es.setOwnState(Sensor.INACTIVE, timeNanos);
             } else {
-                es.setOwnState(Sensor.ACTIVE);
+                es.setOwnState(Sensor.ACTIVE, timeNanos);
             }
             k = k * 2;
         }
@@ -231,6 +235,12 @@ public class EcosSensorManager extends jmri.managers.AbstractSensorManager
         return validateTrimmedMin1NumberSystemNameFormat(name,locale);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(EcosSensorManager.class);
+    @Override
+    public void dispose() {
+        tc.removeEcosListener(this);
+        super.dispose();
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(EcosSensorManager.class);
 
 }

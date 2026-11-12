@@ -85,7 +85,7 @@ public class SetupExcelProgramFrame extends OperationsFrame {
      *
      */
     protected File selectFile(String directoryName) {
-        JFileChooser fc = new JFileChooser(InstanceManager.getDefault(OperationsManager.class).getFile(directoryName));
+        JFileChooser fc = new jmri.util.swing.JmriJFileChooser(InstanceManager.getDefault(OperationsManager.class).getFile(directoryName));
         fc.setFileFilter(new FileNameExtensionFilter(Bundle.getMessage("ExcelProgramFiles"), "xls", "xlsm")); // NOI18N
         fc.setDialogTitle(Bundle.getMessage("FindDesiredExcelFile"));
         int retVal = fc.showOpenDialog(null);
@@ -96,5 +96,5 @@ public class SetupExcelProgramFrame extends OperationsFrame {
         return null;
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(SetupExcelProgramFrame.class);
+//    private static final Logger log = LoggerFactory.getLogger(SetupExcelProgramFrame.class);
 }

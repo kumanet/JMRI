@@ -18,17 +18,6 @@ public class SRCPTurnoutManager extends jmri.managers.AbstractTurnoutManager {
     }
 
     /**
-     *
-     * @param memo the associated SystemConnectionMemo
-     * @param bus the bus ID configured for this connection
-     * @deprecated since 4.18 use {@link SRCPBusConnectionMemo#getBus()}
-     */
-    @Deprecated
-    public SRCPTurnoutManager(SRCPBusConnectionMemo memo, int bus) {
-        this(memo);
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
@@ -58,7 +47,7 @@ public class SRCPTurnoutManager extends jmri.managers.AbstractTurnoutManager {
     public boolean allowMultipleAdditions(@Nonnull String systemName) {
         return true;
     }
-    
+
     /**
      * Validates to only numeric.
      * {@inheritDoc}
@@ -69,6 +58,6 @@ public class SRCPTurnoutManager extends jmri.managers.AbstractTurnoutManager {
         return validateSystemNameFormatOnlyNumeric(name,locale);
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SRCPTurnout.class);
+    // private static final Logger log = LoggerFactory.getLogger(SRCPTurnout.class);
 
 }

@@ -17,12 +17,13 @@ public class MessageTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new Message(5);
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(MessageTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(MessageTest.class);
 
 }

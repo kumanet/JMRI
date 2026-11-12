@@ -60,7 +60,7 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
     public OutputBits outputBits(){
       return mOutputBits;
     }
- 
+
     // The methods to implement the SerialInterface
 
     @Override
@@ -121,7 +121,7 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
         return false;
     }
 
-    // With the Maple Systems Protocol, output packets are limited to 99 bits.  If there are more than 
+    // With the Maple Systems Protocol, output packets are limited to 99 bits.  If there are more than
     // 99 bits configured, multiple output packets must be sent.  The following cycle through that
     // process.
     private boolean mNeedSend = true;
@@ -247,17 +247,6 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
         sendMessage(m, reply);
     }
 
-    /**
-     * Static function returning the SerialTrafficController instance to use.
-     *
-     * @return The registered SerialTrafficController instance for general use,
-     *         if need be creating one.
-     */
-    @Deprecated
-    static public SerialTrafficController instance() {
-        return null;
-    }
-
     @Override
     protected AbstractMRReply newReply() {
         return new SerialReply();
@@ -361,6 +350,6 @@ public class SerialTrafficController extends AbstractMRNodeTrafficController imp
         return len;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialTrafficController.class);
 
 }

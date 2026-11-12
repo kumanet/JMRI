@@ -3,43 +3,38 @@ package jmri.jmrit.operations.trains.tools;
 import java.awt.Color;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.text.MessageFormat;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-
-import javax.swing.JOptionPane;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
 import jmri.jmrit.XmlFile;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.routes.Route;
-import jmri.jmrit.operations.routes.RouteLocation;
-import jmri.jmrit.operations.routes.RouteManager;
+import jmri.jmrit.operations.routes.*;
 import jmri.jmrit.operations.setup.OperationsSetupXml;
 import jmri.jmrit.operations.setup.Setup;
 import jmri.jmrit.operations.trains.Train;
 import jmri.jmrit.operations.trains.TrainManager;
+import jmri.jmrit.operations.trains.trainbuilder.TrainCommon;
 import jmri.util.ColorUtil;
+import jmri.util.swing.JmriJOptionPane;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
 /**
  * Provides an export to the Timetable feature.
- * 
+ *
  * @author Daniel Boudreau Copyright (C) 2019
- * 
+ *
  * <pre>
  * Copied from TimeTableCsvImport on 11/25/2019
- * 
+ *
  * CSV Record Types. The first field is the record type keyword (not I18N).
  * Most fields are optional.
- * 
+ *
  * "Layout", "layout name", "scale", fastClock, throttles, "metric"
  *            Defaults:  "New Layout", "HO", 4, 0, "No"
  *            Occurs:  Must be first record, occurs once
@@ -116,7 +111,8 @@ public class ExportTimetable extends XmlFile {
             }
             writeFile(defaultOperationsFilename());
         } catch (IOException e) {
-            log.error("Exception while writing the new CSV operations file, may not be complete: {}", e);
+            log.error("Exception while writing the new CSV operations file, may not be complete: {}",
+                    e.getLocalizedMessage());
         }
     }
 
@@ -138,19 +134,17 @@ public class ExportTimetable extends XmlFile {
             loadSchedule(fileOut);
             loadTrains(fileOut);
 
-            JOptionPane.showMessageDialog(null,
-                    MessageFormat.format(Bundle.getMessage("ExportedTimetableToFile"),
-                            new Object[]{defaultOperationsFilename()}),
-                    Bundle.getMessage("ExportComplete"), JOptionPane.INFORMATION_MESSAGE);
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("ExportedTimetableToFile",
+                            defaultOperationsFilename()),
+                    Bundle.getMessage("ExportComplete"), JmriJOptionPane.INFORMATION_MESSAGE);
 
-            fileOut.flush();
-            fileOut.close();
         } catch (IOException e) {
-            log.error("Can not open export timetable CSV file: {}", file.getName());
-            JOptionPane.showMessageDialog(null,
-                    MessageFormat.format(Bundle.getMessage("ExportedTimetableToFile"),
-                            new Object[]{defaultOperationsFilename()}),
-                    Bundle.getMessage("ExportFailed"), JOptionPane.ERROR_MESSAGE);
+            log.error("Can not open export timetable CSV file: {}", e.getLocalizedMessage());
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("ExportedTimetableToFile",
+                            defaultOperationsFilename()),
+                    Bundle.getMessage("ExportFailed"), JmriJOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -224,9 +218,9 @@ public class ExportTimetable extends XmlFile {
      */
     private void loadSchedule(CSVPrinter fileOut) throws IOException {
         // create schedule name based on date and time
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy_MM_dd kk:mm");
-        String scheduleName = simpleDateFormat.format(Calendar.getInstance().getTime());
-
+        LocalDateTime date = LocalDateTime.now();
+        DateTimeFormatter simpleDateFormat = DateTimeFormatter.ofPattern("yyyy_MM_dd kk:mm"); // NOI18N
+        String scheduleName = date.format(simpleDateFormat);
         fileOut.printRecord("Schedule", scheduleName, "Today", "0", "24");
     }
 
@@ -237,14 +231,14 @@ public class ExportTimetable extends XmlFile {
     private void loadTrains(CSVPrinter fileOut) throws IOException {
         int type = 1; // cycle through the 4 train types (chart colors)
         int defaultSpeed = 4;
-        
+
         // the following works pretty good for travel times between 1 and 4 minutes
         if (Setup.getTravelTime() > 0) {
             defaultSpeed = defaultSpeed/Setup.getTravelTime();
         }
 
         for (Train train : InstanceManager.getDefault(TrainManager.class).getTrainsByTimeList()) {
-            if (!train.isBuildEnabled()) {
+            if (!train.isBuildEnabled() || train.getRoute() == null) {
                 continue;
             }
 
@@ -255,7 +249,7 @@ public class ExportTimetable extends XmlFile {
                     defaultSpeed,
                     train.getDepartTimeMinutes(),
                     "0",
-                    train.getComment());
+                    train.getCommentCurrent());
 
             // reset train types
             if (type > 4) {
@@ -274,13 +268,15 @@ public class ExportTimetable extends XmlFile {
                     }
                 }
                 int duration = 0;
-                if ((rl != train.getTrainDepartsRouteLocation() && !rl.getLocation().isStaging())) {
-                    if (train.isBuilt()) {
+                if ((rl != train.getTrainDepartsRouteLocation() &&
+                        rl.getLocation() != null &&
+                        !rl.getLocation().isStaging())) {
+                    // if there's a departure time, use that
+                    if (!rl.getDepartureTimeHourMinutes().isEmpty()) {
+                        duration = TrainCommon.convertStringTime(rl.getDepartureTime()) -
+                                train.getExpectedTravelTimeInMinutes(rl);
+                    } else if (train.isBuilt()) {
                         duration = train.getWorkTimeAtLocation(rl) + rl.getWait();
-                        if (!rl.getDepartureTime().isEmpty() && !train.getExpectedArrivalTime(rl).equals(Train.ALREADY_SERVICED)) {
-                            duration = 60 * Integer.parseInt(rl.getDepartureTimeHour()) 
-                                    + Integer.parseInt(rl.getDepartureTimeMinute()) - train.getExpectedTravelTimeInMinutes(rl);
-                        }
                     } else {
                         duration = rl.getMaxCarMoves() * Setup.getSwitchTime() + rl.getWait();
                     }
@@ -317,6 +313,6 @@ public class ExportTimetable extends XmlFile {
 
     private static String operationsFileName = "ExportOperationsTimetable.csv"; // NOI18N
 
-    private final static Logger log = LoggerFactory.getLogger(ExportTimetable.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExportTimetable.class);
 
 }

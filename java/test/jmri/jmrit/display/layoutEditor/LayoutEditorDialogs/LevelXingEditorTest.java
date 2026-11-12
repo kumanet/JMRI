@@ -1,17 +1,18 @@
 package jmri.jmrit.display.layoutEditor.LayoutEditorDialogs;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+
 import java.awt.geom.Point2D;
 
 import javax.swing.*;
 
-import jmri.jmrit.display.EditorFrameOperator;
 import jmri.jmrit.display.layoutEditor.*;
 import jmri.util.*;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 import jmri.util.swing.JemmyUtil;
 
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+
 import org.netbeans.jemmy.operators.*;
 
 /**
@@ -19,19 +20,19 @@ import org.netbeans.jemmy.operators.*;
  *
  * @author Bob Jacobsen Copyright (C) 2020
  */
+@DisabledIfHeadless
 public class LevelXingEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        new LevelXingEditor(null);
+        LevelXingEditor t = new LevelXingEditor(layoutEditor);
+        Assertions.assertNotNull(t);
     }
 
     @Test
     public void testEditXingDone() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assume.assumeFalse("Ignoring intermittent test", Boolean.getBoolean("jmri.skipTestsRequiringSeparateRunning"));
+        assumeFalse( Boolean.getBoolean("jmri.skipTestsRequiringSeparateRunning"), "Ignoring intermittent test");
 
         createBlocks();
 
@@ -45,14 +46,14 @@ public class LevelXingEditorTest extends LayoutTrackEditorTest {
         JLabelOperator acBlockLabelOperator = new JLabelOperator(jFrameOperator,
                 Bundle.getMessage("Block_ID", "AC"));
         JComboBoxOperator acBlockComboBoxOperator = new JComboBoxOperator(
-                (JComboBox) acBlockLabelOperator.getLabelFor());
+                (JComboBox<?>) acBlockLabelOperator.getLabelFor());
         acBlockComboBoxOperator.selectItem(1);  //TODO:fix hardcoded index
 
         // Select BD block
         JLabelOperator bdBlockLabelOperator = new JLabelOperator(jFrameOperator,
                 Bundle.getMessage("Block_ID", "BD"));
         JComboBoxOperator bdBlockComboBoxOperator = new JComboBoxOperator(
-                (JComboBox) bdBlockLabelOperator.getLabelFor());
+                (JComboBox<?>) bdBlockLabelOperator.getLabelFor());
         bdBlockComboBoxOperator.selectItem(2);  //TODO:fix hardcoded index
 
         // Enable Hide
@@ -93,7 +94,6 @@ public class LevelXingEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testEditXingCancel() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         LevelXingEditor editor = new LevelXingEditor(layoutEditor);
 
@@ -124,7 +124,6 @@ public class LevelXingEditorTest extends LayoutTrackEditorTest {
 
     @Test
     public void testEditXingClose() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         LevelXingEditor editor = new LevelXingEditor(layoutEditor);
 
@@ -137,52 +136,36 @@ public class LevelXingEditorTest extends LayoutTrackEditorTest {
     }
 
 
-    private LayoutEditor layoutEditor = null;
     private LevelXing levelXing = null;
     private LevelXingView levelXingView = null;
 
     @BeforeEach
+    @Override
     public void setUp() {
         super.setUp();
-        JUnitUtil.resetProfileManager();
-        JUnitUtil.initLayoutBlockManager();
-        JUnitUtil.initInternalTurnoutManager();
-        JUnitUtil.initInternalSensorManager();
-        if (!GraphicsEnvironment.isHeadless()) {
 
-            layoutEditor = new LayoutEditor();
-            layoutEditor.setVisible(true);
+        Point2D point = new Point2D.Double(150.0, 100.0);
+        Point2D delta = new Point2D.Double(50.0, 10.0);
 
-            Point2D point = new Point2D.Double(150.0, 100.0);
-            Point2D delta = new Point2D.Double(50.0, 10.0);
+        // Level crossing
+        point = MathUtil.add(point, delta);
+        levelXing = new LevelXing("Level Xing", layoutEditor); // point
+        levelXingView = new LevelXingView(levelXing, point, layoutEditor);
+        layoutEditor.addLayoutTrack(levelXing, levelXingView);
 
-            // Level crossing
-            point = MathUtil.add(point, delta);
-            levelXing = new LevelXing("Level Xing", layoutEditor); // point
-            levelXingView = new LevelXingView(levelXing, point, layoutEditor);
-            layoutEditor.addLayoutTrack(levelXing, levelXingView);
-        }
     }
 
     @AfterEach
+    @Override
     public void tearDown() {
         if (levelXing != null) {
             levelXing.remove();
         }
 
-        if (layoutEditor != null) {
-            EditorFrameOperator efo = new EditorFrameOperator(layoutEditor);
-            efo.closeFrameWithConfirmations();
-        }
-
-        layoutEditor = null;
         levelXing = null;
 
-        JUnitUtil.resetWindows(false, false);
-        JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         super.tearDown();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTrackEditorTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LevelXingEditorTest.class);
 }

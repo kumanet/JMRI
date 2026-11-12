@@ -1,8 +1,6 @@
 package jmri.jmrix.can.cbus.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring CbusLightManagers.
@@ -35,7 +33,7 @@ public class CbusLightManagerXml extends jmri.managers.configurexml.AbstractLigh
         return loadLights(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(CbusLightManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(CbusLightManagerXml.class);
 }
 
 

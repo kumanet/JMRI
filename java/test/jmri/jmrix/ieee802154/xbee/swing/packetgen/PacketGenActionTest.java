@@ -23,19 +23,19 @@ public class PacketGenActionTest {
     }
 
     @Test
-    public void testStringCTor() {
+    public void testPacketGenActionStringCTor() {
         PacketGenAction t = new PacketGenAction("Test Action");
         Assert.assertNotNull("exists",t);
     }
 
     @Test
-    public void testStringMemoCTor() {
+    public void testPacketGenActionStringMemoCTor() {
         PacketGenAction t = new PacketGenAction("Test Action",memo);
         Assert.assertNotNull("exists",t);
     }
 
     @Test
-    public void testMemoCTor() {
+    public void testPacketGenActionMemoCTor() {
         PacketGenAction t = new PacketGenAction(memo);
         Assert.assertNotNull("exists",t);
     }
@@ -55,6 +55,6 @@ public class PacketGenActionTest {
  
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(PacketGenActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(PacketGenActionTest.class);
 
 }

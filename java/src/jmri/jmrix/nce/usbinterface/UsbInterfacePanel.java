@@ -1,24 +1,16 @@
 package jmri.jmrix.nce.usbinterface;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import java.awt.Dimension;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.text.MessageFormat;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import jmri.jmrix.nce.NceBinaryCommand;
-import jmri.jmrix.nce.NceMessage;
-import jmri.jmrix.nce.NceReply;
-import jmri.jmrix.nce.NceSystemConnectionMemo;
-import jmri.jmrix.nce.NceTrafficController;
+
+import javax.swing.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import jmri.jmrix.nce.*;
 
 /**
  * Panel for configuring an NCE USB interface.
@@ -90,6 +82,14 @@ public class UsbInterfacePanel extends jmri.jmrix.nce.swing.NcePanel implements 
         x.append(": ");
         x.append(Bundle.getMessage("TitleUsbInterface"));
         return x.toString();
+    }
+
+    /**
+     * The minimum frame size for font size 16
+     */
+    @Override
+    public Dimension getMinimumDimension() {
+        return new Dimension(300, 200);
     }
 
     @Override
@@ -230,7 +230,7 @@ public class UsbInterfacePanel extends jmri.jmrix.nce.swing.NcePanel implements 
             if (!waitNce()) {
                 return;
             }
-            if (recChar != '!') {
+            if (recChar != NceMessage.NCE_OKAY) {
                 statusText.setText(MessageFormat.format(Bundle.getMessage("StatusUsbErrorCode"), recChars[0]));
             } else {
                 statusText.setText(MessageFormat.format(Bundle.getMessage("StatusSetIdFinished"), setCabId));
@@ -358,6 +358,6 @@ public class UsbInterfacePanel extends jmri.jmrix.nce.swing.NcePanel implements 
         });
     }
 
-    private final static Logger log = LoggerFactory.getLogger(UsbInterfacePanel.class);
+    private static final Logger log = LoggerFactory.getLogger(UsbInterfacePanel.class);
 
 }

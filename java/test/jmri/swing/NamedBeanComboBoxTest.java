@@ -1,9 +1,10 @@
 package jmri.swing;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
-import java.awt.GraphicsEnvironment;
+import com.alexandriasoftware.swing.JInputValidator;
+import com.alexandriasoftware.swing.Validation;
+
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -12,55 +13,50 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JTextField;
 
-import com.alexandriasoftware.swing.JInputValidator;
-import com.alexandriasoftware.swing.Validation;
-
-import org.assertj.swing.edt.GuiActionRunner;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import jmri.InstanceManager;
 import jmri.Manager;
 import jmri.Sensor;
 import jmri.SensorManager;
 import jmri.NamedBean.DisplayOptions;
 import jmri.util.JUnitUtil;
+import jmri.util.ThreadingUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
+import org.junit.jupiter.api.*;
 
 /**
  *
  * @author Bob Jacobsen Copyright (C) 2017
  * @author Randall Wood Copyright (C) 2019
  */
+@DisabledIfHeadless
 public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorSimpleCtor() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        Manager<Sensor> m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m));
+        Manager<Sensor> m = InstanceManager.getDefault(SensorManager.class);
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m));
         assertThat(t).as("exists").isNotNull();
     }
 
     @Test
     public void testSensorFullCtor() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
+        SensorManager m = InstanceManager.getDefault(SensorManager.class);
         m.provideSensor("IS1").setUserName("Sensor 1");
         Sensor s = m.provideSensor("IS2");
         s.setUserName("Sensor 2");
         m.provideSensor("IS3").setUserName("Sensor 3");
 
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m, s, DisplayOptions.DISPLAYNAME));
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m, s, DisplayOptions.DISPLAYNAME));
 
-        assertThat(t).as("exists").isNotNull();
+        Assertions.assertNotNull(t);
         assertThat(t.getSelectedItem()).isEqualTo(s);
         assertThat(t.getSelectedItemUserName()).isEqualTo("Sensor 2");
         assertThat(t.getSelectedItemSystemName()).isEqualTo("IS2");
         // Display name is user name if present
         assertThat(t.getSelectedItemDisplayName()).isEqualTo("Sensor 2");
-        
-        GuiActionRunner.execute(() -> t.setSelectedItem(null));
+
+        ThreadingUtil.runOnGUI(() -> t.setSelectedItem(null));
         assertThat(t.getSelectedItemUserName()).isNull();
         assertThat(t.getSelectedItemSystemName()).isNull();
         assertThat(t.getSelectedItemDisplayName()).isNull();
@@ -68,8 +64,7 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorSelectEntry() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
+        SensorManager m = InstanceManager.getDefault(SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
         Sensor s2 = m.provideSensor("IS2");
@@ -77,13 +72,13 @@ public class NamedBeanComboBoxTest {
         Sensor s3 = m.provideSensor("IS3");
         s3.setUserName("Sensor 3");
 
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> {
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> {
             NamedBeanComboBox<Sensor> b = new NamedBeanComboBox<>(m, s2, DisplayOptions.DISPLAYNAME);
             assertThat(b.getSelectedItem()).isEqualTo(s2);
             b.setSelectedItem(s3);
             return b;
         });
-        assertThat(t).as("exists").isNotNull();
+        Assertions.assertNotNull(t);
 
         assertThat(t.getSelectedItem()).isEqualTo(s3);
         assertThat(t.getSelectedItemUserName()).isEqualTo("Sensor 3");
@@ -93,9 +88,65 @@ public class NamedBeanComboBoxTest {
     }
 
     @Test
-    public void testSensorExcludeSome() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
+    public void testSensorUserNameMixThatCausedProblems() {
+        // add an LS manager
+        ((jmri.managers.ProxySensorManager) InstanceManager.getDefault(SensorManager.class)).getDefaultManager();
+        var lsm = new jmri.jmrix.internal.InternalSensorManager(
+                    new jmri.jmrix.internal.InternalSystemConnectionMemo("L", "LocoNet"));
+        ((jmri.managers.ProxySensorManager) InstanceManager.getDefault(SensorManager.class)).addManager(lsm);
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
+
+        Sensor is101 = InstanceManager.getDefault(SensorManager.class).provideSensor("IS101");
+        is101.setUserName("IS 101");
+        Sensor is102 = InstanceManager.getDefault(SensorManager.class).provideSensor("IS102");
+        is102.setUserName("IS102");
+
+        Sensor clock = InstanceManager.getDefault(SensorManager.class).provideSensor ("ISCLOCKRUNNING");
+
+        Sensor ls101 = InstanceManager.getDefault(SensorManager.class).provideSensor("LS101");
+        ls101.setUserName("LS 101");
+        Sensor ls102 = InstanceManager.getDefault(SensorManager.class).provideSensor("LS102");
+        ls102.setUserName("LS102");
+
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> {
+            NamedBeanComboBox<Sensor> b = new NamedBeanComboBox<>(m, is101, DisplayOptions.DISPLAYNAME);
+            assertThat(b.getSelectedItem()).isEqualTo(is101);
+            b.setSelectedItem(is102);
+            return b;
+        });
+        Assertions.assertNotNull(t);
+
+        assertThat(t.getSelectedItem()).isEqualTo(is102);
+        assertThat(t.getSelectedItemUserName()).isEqualTo("IS102");
+        assertThat(t.getSelectedItemSystemName()).isEqualTo("IS102");
+        // Display name is user name if present
+        assertThat(t.getSelectedItemDisplayName()).isEqualTo("IS102");
+
+        // check that they're all there
+        assertThat(t.getItemCount()).isEqualTo(5);
+
+        ThreadingUtil.runOnGUI(() -> {
+            t.setSelectedIndex(0);
+
+        });
+        assertThat(t.getSelectedItem()).isEqualTo(is102);
+
+        ThreadingUtil.runOnGUI(() -> {
+            t.setSelectedIndex(1);
+
+        });
+        assertThat(t.getSelectedItem()).isEqualTo(is101);
+
+        ThreadingUtil.runOnGUI(() -> {
+            t.setSelectedIndex(4);
+
+        });
+        assertThat(t.getSelectedItem()).isEqualTo(clock);
+    }
+
+    @Test
+    public void testSensorExcludeSome() {
+        SensorManager m = InstanceManager.getDefault(SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
         Sensor s2 = m.provideSensor("IS2");
@@ -105,7 +156,7 @@ public class NamedBeanComboBoxTest {
         Sensor s4 = m.provideSensor("IS4");
         s4.setUserName("Sensor 4");
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             NamedBeanComboBox<Sensor> t = new NamedBeanComboBox<>(m, s2, DisplayOptions.DISPLAYNAME);
 
             assertThat(t.getItemCount()).isEqualTo(4);
@@ -127,12 +178,11 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorChangeDisplayMode() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
+        SensorManager m = InstanceManager.getDefault(SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             NamedBeanComboBox<Sensor> t = new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME);
             assertThat(t).isNotNull();
             JList<Sensor> l = new JList<>(t.getModel());
@@ -150,11 +200,10 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorSetAndDefaultValidate() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        Manager<Sensor> m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m));
-        assertThat(t).isNotNull();
-        
+        Manager<Sensor> m = InstanceManager.getDefault(SensorManager.class);
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m));
+        Assertions.assertNotNull(t);
+
         assertThat(t.isValidatingInput()).isTrue();
 
         t.setValidatingInput(false);
@@ -165,16 +214,15 @@ public class NamedBeanComboBoxTest {
 
     }
 
-    static int countContents;
-    static int countAdded;
-    static int countRemoved;
-    static Manager.ManagerDataEvent<Sensor> lastEvent;
-    
+    private int countContents;
+    private int countAdded;
+    private int countRemoved;
+    private Manager.ManagerDataEvent<Sensor> lastEvent;
+
     @Test
     public void testDataUpdatesForNewDataModel() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
-        SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
-        
+        SensorManager m = InstanceManager.getDefault(SensorManager.class);
+
         Manager.ManagerDataListener<Sensor> listener = new Manager.ManagerDataListener<Sensor>() {
             @Override
             public void contentsChanged(Manager.ManagerDataEvent<Sensor> e) {
@@ -198,65 +246,67 @@ public class NamedBeanComboBoxTest {
         countContents = countAdded = countRemoved = 0;
         lastEvent = null;
 
-        GuiActionRunner.execute(() -> m.provideSensor("IS2"));
-        
+        ThreadingUtil.runOnGUI(() -> m.provideSensor("IS2"));
+
         assertThat(countContents).isEqualTo(0);
         assertThat(countAdded).isEqualTo(1);
         assertThat(countRemoved).isEqualTo(0);
-        
+
+        Assertions.assertNotNull(lastEvent);
         assertThat(lastEvent.getIndex0()).isEqualTo(0);  // new element 0
         assertThat(lastEvent.getIndex1()).isEqualTo(0);
 
         countContents = countAdded = countRemoved = 0;
         lastEvent = null;
 
-        GuiActionRunner.execute(() -> m.provideSensor("IS3"));
-        
+        ThreadingUtil.runOnGUI(() -> m.provideSensor("IS3"));
+
         assertThat(countContents).isEqualTo(0);
         assertThat(countAdded).isEqualTo(1);
         assertThat(countRemoved).isEqualTo(0);
 
+        Assertions.assertNotNull(lastEvent);
         assertThat(lastEvent.getIndex0()).isEqualTo(1);  // new element 1
         assertThat(lastEvent.getIndex1()).isEqualTo(1);
 
         countContents = countAdded = countRemoved = 0;
         lastEvent = null;
 
-        GuiActionRunner.execute(() -> m.provideSensor("IS1"));
-        
+        ThreadingUtil.runOnGUI(() -> m.provideSensor("IS1"));
+
         assertThat(countContents).isEqualTo(0);
         assertThat(countAdded).isEqualTo(1);
         assertThat(countRemoved).isEqualTo(0);
 
+        Assertions.assertNotNull(lastEvent);
         assertThat(lastEvent.getIndex0()).isEqualTo(0);  // new element 0
         assertThat(lastEvent.getIndex1()).isEqualTo(0);
     }
-        
+
     @Test
     public void testSensorAllowEdit() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
         assertThat(m.getNamedBeanSet().isEmpty()).isTrue();
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m));
-        assertThat(t).isNotNull();
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m));
+        Assertions.assertNotNull(t);
         assertThat(t.isAllowNull()).isFalse();
         assertThat(t.getModel().getSize()).isEqualTo(0);
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             t.setDisplayOrder(DisplayOptions.SYSTEMNAME);
             t.setAllowNull(true);
         });
         assertThat(t.isAllowNull()).isTrue();
         assertThat(t.getModel().getSize()).isEqualTo(0);
-        Sensor s1 = GuiActionRunner.execute(() -> m.provideSensor("IS1"));
+        Sensor s1 = ThreadingUtil.runOnGUIwithReturn(() -> m.provideSensor("IS1"));
         assertThat(t.isAllowNull()).isTrue();
         assertThat(t.getModel().getSize()).isEqualTo(2);
         assertThat(t.getItemAt(0)).isNull();
         assertThat(t.getItemAt(1)).isEqualTo(s1);
-        GuiActionRunner.execute(() -> t.setAllowNull(false));
+        ThreadingUtil.runOnGUI(() -> t.setAllowNull(false));
         assertThat(t.isAllowNull()).isFalse();
         assertThat(t.getModel().getSize()).isEqualTo(1);
         assertThat(t.getItemAt(0)).isEqualTo(s1);
-        GuiActionRunner.execute(() -> t.setAllowNull(true));
+        ThreadingUtil.runOnGUI(() -> t.setAllowNull(true));
         assertThat(t.isAllowNull()).isTrue();
         assertThat(t.getModel().getSize()).isEqualTo(2);
         assertThat(t.getItemAt(0)).isNull();
@@ -267,7 +317,6 @@ public class NamedBeanComboBoxTest {
     public void testSensorEditText()
             throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException,
             SecurityException {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
@@ -276,7 +325,7 @@ public class NamedBeanComboBoxTest {
         Sensor s3 = m.provideSensor("IS3");
         s3.setUserName("Sensor 3");
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             NamedBeanComboBox<Sensor> t = new NamedBeanComboBox<>(m);
             t.setDisplayOrder(DisplayOptions.SYSTEMNAME);
             t.setAllowNull(true);
@@ -293,9 +342,8 @@ public class NamedBeanComboBoxTest {
     public void testSensorTestProvidingValidity()
             throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException,
             SecurityException {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> {
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> {
             NamedBeanComboBox<Sensor> b = new NamedBeanComboBox<>(m);
             b.setDisplayOrder(DisplayOptions.USERNAME_SYSTEMNAME);
             b.setAllowNull(true);
@@ -303,15 +351,15 @@ public class NamedBeanComboBoxTest {
             b.setProviding(true);
             return b;
         });
-        assertThat(t).isNotNull();
-        JTextField c = GuiActionRunner.execute(() -> (JTextField) t.getEditor().getEditorComponent());
-        assertThat(c).isNotNull();
+        Assertions.assertNotNull(t);
+        JTextField c = ThreadingUtil.runOnGUIwithReturn(() -> (JTextField) t.getEditor().getEditorComponent());
+        Assertions.assertNotNull(c);
 
         // test with no matching bean and isValidatingInput() == false
         // should always match NONE
         t.setValidatingInput(false);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("");
             c.getInputVerifier().verify(c);
         });
@@ -319,16 +367,17 @@ public class NamedBeanComboBoxTest {
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.NONE);
         assertThat(t.getSelectedItem()).isNull();
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("IS1");
             c.getInputVerifier().verify(c);
         });
         assertThat(c.getText()).isEqualTo("IS1");
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.NONE);
-        Sensor s1 = GuiActionRunner.execute(() -> t.getSelectedItem());
+        Sensor s1 = ThreadingUtil.runOnGUIwithReturn(() -> t.getSelectedItem());
+        Assertions.assertNotNull(s1);
         assertThat(m.getBySystemName("IS1")).isEqualTo(s1);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("K ");
             c.getInputVerifier().verify(c);
         });
@@ -343,7 +392,7 @@ public class NamedBeanComboBoxTest {
         // should match NONE when empty and DANGER otherwise
         t.setValidatingInput(true);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("");
             c.getInputVerifier().verify(c);
         });
@@ -351,16 +400,17 @@ public class NamedBeanComboBoxTest {
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.NONE);
         assertThat(t.getSelectedItem()).isNull();
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("IS1");
             c.getInputVerifier().verify(c);
         });
         assertThat(c.getText()).isEqualTo("IS1");
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.INFORMATION);
-        s1 = GuiActionRunner.execute(() -> t.getSelectedItem());
+        s1 = ThreadingUtil.runOnGUIwithReturn(() -> t.getSelectedItem());
+        Assertions.assertNotNull(s1);
         assertThat(m.getBySystemName("IS1")).isEqualTo(s1);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("K ");
             c.getInputVerifier().verify(c);
         });
@@ -375,7 +425,7 @@ public class NamedBeanComboBoxTest {
         // should always match NONE
         t.setValidatingInput(false);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("");
             c.getInputVerifier().verify(c);
         });
@@ -383,16 +433,17 @@ public class NamedBeanComboBoxTest {
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.NONE);
         assertThat(t.getSelectedItem()).isNull();
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("IS1");
             c.getInputVerifier().verify(c);
         });
         assertThat(c.getText()).isEqualTo("IS1");
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.NONE);
-        s1 = GuiActionRunner.execute(() -> t.getSelectedItem());
+        s1 = ThreadingUtil.runOnGUIwithReturn(() -> t.getSelectedItem());
+        Assertions.assertNotNull(s1);
         assertThat(m.getBySystemName("IS1")).isEqualTo(s1);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("K ");
             c.getInputVerifier().verify(c);
         });
@@ -407,7 +458,7 @@ public class NamedBeanComboBoxTest {
         // should match DANGER with text "K " and NONE otherwise
         t.setValidatingInput(true);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("");
             c.getInputVerifier().verify(c);
         });
@@ -417,16 +468,16 @@ public class NamedBeanComboBoxTest {
 
         t.setSelectedItem(null); // change selection to verify selection changes
         assertThat(t.getSelectedItem()).isNull();
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("IS1");
             c.getInputVerifier().verify(c);
         });
         assertThat(c.getText()).isEqualTo("IS1");
         assertThat(((JInputValidator) c.getInputVerifier()).getValidation().getType()).isEqualTo(Validation.Type.INFORMATION);
-        s1 = GuiActionRunner.execute(() -> t.getSelectedItem());
+        s1 = ThreadingUtil.runOnGUIwithReturn(() -> t.getSelectedItem());
         assertThat(m.getBySystemName("IS1")).isEqualTo(s1);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             c.setText("K ");
             c.getInputVerifier().verify(c);
         });
@@ -439,9 +490,8 @@ public class NamedBeanComboBoxTest {
     public void testSensorTestNonProvidingValidity()
             throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException,
             SecurityException {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> {
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> {
             NamedBeanComboBox<Sensor> b = new NamedBeanComboBox<>(m);
             b.setDisplayOrder(DisplayOptions.USERNAME_SYSTEMNAME);
             b.setAllowNull(true);
@@ -449,15 +499,15 @@ public class NamedBeanComboBoxTest {
             b.setProviding(false);
             return b;
         });
-        assertThat(t).isNotNull();
-        JTextField c = GuiActionRunner.execute(() -> ((JTextField) t.getEditor().getEditorComponent()));
-        assertThat(c).isNotNull();
+        Assertions.assertNotNull(t);
+        JTextField c = ThreadingUtil.runOnGUIwithReturn(() -> ((JTextField) t.getEditor().getEditorComponent()));
+        Assertions.assertNotNull(c);
 
         // test with no matching bean and isValidatingInput() == false
         // should always match NONE
         t.setValidatingInput(false);
 
-        boolean v = GuiActionRunner.execute(() -> {
+        boolean v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("");
             return c.getInputVerifier().verify(c);
         });
@@ -466,7 +516,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("Empty is not selected").isNull();
         assertThat(v).as("Empty is valid").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("IS1");
             return c.getInputVerifier().verify(c);
         });
@@ -475,7 +525,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("IS1 is not selected (not existing/non-validating)").isNull();
         assertThat(v).as("IS1 is valid (not existing/non-validating)").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("K ");
             return c.getInputVerifier().verify(c);
         });
@@ -488,7 +538,7 @@ public class NamedBeanComboBoxTest {
         // should match NONE when empty and WARNING otherwise
         t.setValidatingInput(true);
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("");
             return c.getInputVerifier().verify(c);
         });
@@ -497,7 +547,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("Empty is not selected").isNull();
         assertThat(v).as("Empty is valid").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("IS1");
             return c.getInputVerifier().verify(c);
         });
@@ -506,7 +556,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("IS1 is not selected (not existing/validating)").isNull();
         assertThat(v).as("IS1 is valid (not existing/validating)").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("K ");
             return c.getInputVerifier().verify(c);
         });
@@ -520,7 +570,7 @@ public class NamedBeanComboBoxTest {
         t.setValidatingInput(false);
         Sensor s = m.provide("IS1");
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("");
             return c.getInputVerifier().verify(c);
         });
@@ -529,7 +579,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("Empty is not selected").isNull();
         assertThat(v).as("Empty is valid").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("IS1");
             return c.getInputVerifier().verify(c);
         });
@@ -538,7 +588,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("IS1 is selected (pre-existing)").isEqualTo(s);
         assertThat(v).as("IS1 is valid (pre-existing)").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("K ");
             return c.getInputVerifier().verify(c);
         });
@@ -551,7 +601,7 @@ public class NamedBeanComboBoxTest {
         // should match WARNING with text "K " and NONE otherwise
         t.setValidatingInput(true);
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("");
             return c.getInputVerifier().verify(c);
         });
@@ -561,9 +611,9 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("Empty is not selected").isEqualTo(s);
         assertThat(v).as("Empty is valid").isTrue();
         // change selection to verify selection changes
-        GuiActionRunner.execute(() -> t.setSelectedItem(null));
+        ThreadingUtil.runOnGUI(() -> t.setSelectedItem(null));
         assertThat(t.getSelectedItem()).isNull();
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("IS1");
             return c.getInputVerifier().verify(c);
         });
@@ -572,7 +622,7 @@ public class NamedBeanComboBoxTest {
         assertThat(t.getSelectedItem()).as("IS1 is selected (pre-existing)").isEqualTo(s);
         assertThat(v).as("IS1 is valid (pre-existing)").isTrue();
 
-        v = GuiActionRunner.execute(() -> {
+        v = ThreadingUtil.runOnGUIwithReturn(() -> {
             c.setText("K ");
             return c.getInputVerifier().verify(c);
         });
@@ -584,7 +634,6 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorSetBean() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
@@ -595,7 +644,7 @@ public class NamedBeanComboBoxTest {
         Sensor s4 = m.provideSensor("IS4");
         s4.setUserName("Sensor 4");
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             NamedBeanComboBox<Sensor> t = new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME);
 
             assertThat(t.getSelectedItemDisplayName()).isEqualTo("Sensor 1");
@@ -619,12 +668,11 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testSensorNameChange() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
         Sensor s1 = m.provideSensor("IS1");
 
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME));
-        assertThat(t).isNotNull();
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME));
+        Assertions.assertNotNull(t);
         assertThat(t.getSelectedItemDisplayName()).isEqualTo("IS1");
 
         s1.setUserName("Sensor 1");
@@ -640,17 +688,17 @@ public class NamedBeanComboBoxTest {
         Sensor s1 = m.provideSensor("IS1");
         s1.setUserName("Sensor 1");
 
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME));
-        assertThat(t).isNotNull();
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m, s1, DisplayOptions.DISPLAYNAME));
+        Assertions.assertNotNull(t);
         assertThat(t.getItemCount()).isEqualTo(1);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             Sensor s2 = m.provideSensor("IS2");
             s2.setUserName(null);
         });
         assertThat(t.getItemCount()).isEqualTo(2);
 
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             Sensor s3 = m.provideSensor("IS3");
             s3.setUserName("Sensor 3");
         });
@@ -659,10 +707,9 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testIsProviding() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m));
-        assertThat(t).isNotNull();
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m));
+        Assertions.assertNotNull(t);
         assertThat(t.isProviding()).isTrue();
         t.setProviding(false);
         assertThat(t.isProviding()).isFalse();
@@ -672,19 +719,17 @@ public class NamedBeanComboBoxTest {
 
     @Test
     public void testGetManager() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
-        NamedBeanComboBox<Sensor> t = GuiActionRunner.execute(() -> new NamedBeanComboBox<>(m));
-        assertThat(t).isNotNull();
+        NamedBeanComboBox<Sensor> t = ThreadingUtil.runOnGUIwithReturn(() -> new NamedBeanComboBox<>(m));
+        Assertions.assertNotNull(t);
         assertThat(t.getManager()).as("Manager is as expected").isEqualTo(m);
     }
 
     @Test
     public void testDispose() {
-        assumeThat(GraphicsEnvironment.isHeadless()).isFalse();
         SensorManager m = InstanceManager.getDefault(jmri.SensorManager.class);
         assertThat(m.getPropertyChangeListeners().length).as("Manager has no listeners").isEqualTo(0);
-        GuiActionRunner.execute(() -> {
+        ThreadingUtil.runOnGUI(() -> {
             NamedBeanComboBox<Sensor> t = new NamedBeanComboBox<>(m);
             assertThat(m.getPropertyChangeListeners().length).as("Manager has two listeners").isEqualTo(2);
             t.dispose();
@@ -703,6 +748,6 @@ public class NamedBeanComboBoxTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(NamedBeanComboBoxTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(NamedBeanComboBoxTest.class);
 
 }

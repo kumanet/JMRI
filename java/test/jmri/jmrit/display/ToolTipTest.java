@@ -13,7 +13,7 @@ public class ToolTipTest {
 
     @Test
     public void testCTor() {
-        ToolTip t = new ToolTip("Test",0,0);
+        ToolTip t = new ToolTip("Test",0,0,null);
         Assert.assertNotNull("exists",t);
     }
 
@@ -27,6 +27,6 @@ public class ToolTipTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ToolTipTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ToolTipTest.class);
 
 }

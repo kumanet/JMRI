@@ -106,7 +106,7 @@ public class TripleTurnoutSignalHead extends DoubleTurnoutSignalHead {
     }
 
     @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         if (super.isTurnoutUsed(t)) {
             return true;
         }
@@ -122,5 +122,5 @@ public class TripleTurnoutSignalHead extends DoubleTurnoutSignalHead {
     @Override
     void readOutput() { }
 
-    private final static Logger log = LoggerFactory.getLogger(TripleTurnoutSignalHead.class);
+    private static final Logger log = LoggerFactory.getLogger(TripleTurnoutSignalHead.class);
 }

@@ -1,12 +1,12 @@
 package jmri.jmrit.logixng.implementation.configurexml;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.configurexml.JmriConfigureXmlException;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.DefaultMaleStringActionSocket;
@@ -25,7 +25,7 @@ import org.jdom2.Element;
 public class DefaultStringActionManagerXml extends AbstractManagerXml {
 
     private final Map<String, Class<?>> xmlClasses = new HashMap<>();
-    
+
     public DefaultStringActionManagerXml() {
     }
 
@@ -43,14 +43,14 @@ public class DefaultStringActionManagerXml extends AbstractManagerXml {
         if (tm != null) {
             if (tm.getNamedBeanSet().isEmpty()) return null;
             for (MaleStringActionSocket action : tm.getNamedBeanSet()) {
-                log.debug("action system name is " + action.getSystemName());  // NOI18N
+                log.debug("action system name is {}", action.getSystemName());  // NOI18N
 //                log.error("action system name is " + action.getSystemName() + ", " + action.getLongDescription());  // NOI18N
                 try {
                     List<Element> elements = new ArrayList<>();
                     // The male socket may be embedded in other male sockets
                     MaleStringActionSocket a = action;
+                    elements.add(storeMaleSocket(a));
                     while (!(a instanceof DefaultMaleStringActionSocket)) {
-                        elements.add(storeMaleSocket(a));
                         a = (MaleStringActionSocket) a.getObject();
                     }
                     Element e = jmri.configurexml.ConfigXmlManager.elementFromObject(a.getObject());
@@ -59,7 +59,7 @@ public class DefaultStringActionManagerXml extends AbstractManagerXml {
 //                        e.addContent(storeMaleSocket(a));
                         actions.addContent(e);
                     } else {
-                        throw new RuntimeException("Cannot load xml configurator for " + a.getObject().getClass().getName());
+                        throw new JmriUncheckedException("Cannot load xml configurator for " + a.getObject().getClass().getName());
                     }
                 } catch (RuntimeException e) {
                     log.error("Error storing action: {}", e, e);
@@ -105,26 +105,27 @@ public class DefaultStringActionManagerXml extends AbstractManagerXml {
      * @param actions Element containing the StringActionBean elements to load.
      */
     public void loadActions(Element actions) {
-        
+
         List<Element> actionList = actions.getChildren();  // NOI18N
-        log.debug("Found " + actionList.size() + " actions");  // NOI18N
+        log.debug("Found {} actions", actionList.size() );  // NOI18N
 
         for (int i = 0; i < actionList.size(); i++) {
-            
+
             String className = actionList.get(i).getAttribute("class").getValue();
 //            log.error("className: " + className);
-            
+
             Class<?> clazz = xmlClasses.get(className);
-            
+
             if (clazz == null) {
                 try {
+                    className = jmri.configurexml.ConfigXmlManager.currentClassName(className);
                     clazz = Class.forName(className);
                     xmlClasses.put(className, clazz);
                 } catch (ClassNotFoundException ex) {
-                    log.error("cannot load class " + className, ex);
+                    log.error("cannot load class {}", className, ex);
                 }
             }
-            
+
             if (clazz != null) {
                 Constructor<?> c = null;
                 try {
@@ -132,18 +133,18 @@ public class DefaultStringActionManagerXml extends AbstractManagerXml {
                 } catch (NoSuchMethodException | SecurityException ex) {
                     log.error("cannot create constructor", ex);
                 }
-                
+
                 if (c != null) {
                     try {
                         AbstractNamedBeanManagerConfigXML o = (AbstractNamedBeanManagerConfigXML)c.newInstance();
-                        
+
                         MaleSocket oldLastItem = InstanceManager.getDefault(StringActionManager.class).getLastRegisteredMaleSocket();
                         o.load(actionList.get(i), null);
-                        
+
                         // Load male socket data if a new bean has been registered
                         MaleSocket newLastItem = InstanceManager.getDefault(StringActionManager.class).getLastRegisteredMaleSocket();
                         if (newLastItem != oldLastItem) loadMaleSocket(actionList.get(i), newLastItem);
-                        else throw new RuntimeException("No new bean has been added. This class: "+getClass().getName());
+                        else throw new JmriUncheckedException("No new bean has been added. This class: "+getClass().getName());
                     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                         log.error("cannot create object", ex);
                     } catch (JmriConfigureXmlException ex) {
@@ -190,5 +191,5 @@ public class DefaultStringActionManagerXml extends AbstractManagerXml {
         return InstanceManager.getDefault(jmri.jmrit.logixng.StringActionManager.class).getXMLOrder();
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultStringActionManagerXml.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultStringActionManagerXml.class);
 }

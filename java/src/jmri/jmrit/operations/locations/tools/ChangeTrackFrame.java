@@ -2,7 +2,6 @@ package jmri.jmrit.operations.locations.tools;
 
 import java.awt.Dimension;
 import java.awt.GridBagLayout;
-import java.text.MessageFormat;
 
 import javax.swing.*;
 
@@ -12,8 +11,9 @@ import org.slf4j.LoggerFactory;
 import jmri.jmrit.operations.OperationsFrame;
 import jmri.jmrit.operations.OperationsXml;
 import jmri.jmrit.operations.locations.Track;
-import jmri.jmrit.operations.locations.TrackEditFrame;
+import jmri.jmrit.operations.locations.gui.TrackEditFrame;
 import jmri.jmrit.operations.setup.Control;
+import jmri.jmrit.operations.setup.Setup;
 
 /**
  * Action to change the type of track. Track types are Spurs, Yards,
@@ -53,7 +53,7 @@ class ChangeTrackFrame extends OperationsFrame {
         // row 1a
         JPanel p1 = new JPanel();
         p1.setLayout(new GridBagLayout());
-        p1.setBorder(BorderFactory.createTitledBorder(MessageFormat.format(Bundle.getMessage("TrackType"), new Object[]{trackName})));
+        p1.setBorder(BorderFactory.createTitledBorder(Bundle.getMessage("TrackType", trackName)));
         addItem(p1, spurRadioButton, 0, 0);
         addItem(p1, yardRadioButton, 1, 0);
         addItem(p1, interchangeRadioButton, 2, 0);
@@ -96,6 +96,9 @@ class ChangeTrackFrame extends OperationsFrame {
             } else if (interchangeRadioButton.isSelected() && !_track.isInterchange()) {
                 changeTrack(Track.INTERCHANGE);
             }
+            if (Setup.isCloseWindowOnSaveEnabled()) {
+                dispose();
+            }
         }
     }
 
@@ -107,5 +110,5 @@ class ChangeTrackFrame extends OperationsFrame {
         dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ChangeTrackFrame.class);
+    private static final Logger log = LoggerFactory.getLogger(ChangeTrackFrame.class);
 }

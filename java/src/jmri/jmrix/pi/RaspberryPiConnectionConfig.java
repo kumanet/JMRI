@@ -1,14 +1,5 @@
 package jmri.jmrix.pi;
 
-import java.awt.GraphicsEnvironment;
-import java.awt.event.ActionEvent;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.util.Date;
-import javax.swing.JOptionPane;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Handle configuring a Raspberry Pi layout connection.
  * <p>
@@ -22,7 +13,6 @@ public class RaspberryPiConnectionConfig extends jmri.jmrix.AbstractConnectionCo
 
     private boolean disabled = false;
     private RaspberryPiAdapter adapter = null;
-    private Date GPIOMessageShown = null;
 
     /**
      * Ctor for an object being created during load process; Swing init is
@@ -82,9 +72,9 @@ public class RaspberryPiConnectionConfig extends jmri.jmrix.AbstractConnectionCo
             if (adapter.getSystemConnectionMemo() != null) {
                 systemPrefixField.setText(adapter.getSystemConnectionMemo().getSystemPrefix());
                 connectionNameField.setText(adapter.getSystemConnectionMemo().getUserName());
-                NUMOPTIONS = NUMOPTIONS + 2;
+                increaseNumOptions(2);
             }
-            addStandardDetails(adapter, false, NUMOPTIONS);
+            addStandardDetails(adapter, false, getNumOptions());
             init = false;
             checkInitDone();
         }
@@ -97,17 +87,6 @@ public class RaspberryPiConnectionConfig extends jmri.jmrix.AbstractConnectionCo
     protected void setInstance() {
         if (adapter == null) {
             adapter = new RaspberryPiAdapter();
-        }
-        if (adapter.getGPIOController() == null) {
-            // don't show more than once every 30 seconds
-            if (!GraphicsEnvironment.isHeadless()
-                    && (this.GPIOMessageShown == null || ((new Date().getTime() - this.GPIOMessageShown.getTime()) / 1000 % 60) > 30)) {
-                JOptionPane.showMessageDialog(this._details,
-                        Bundle.getMessage("NoGpioControllerMessage"),
-                        Bundle.getMessage("NoGpioControllerTitle"),
-                        JOptionPane.ERROR_MESSAGE);
-                this.GPIOMessageShown = new Date();
-            }
         }
     }
 
@@ -153,6 +132,6 @@ public class RaspberryPiConnectionConfig extends jmri.jmrix.AbstractConnectionCo
         this.disabled = disable;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RaspberryPiConnectionConfig.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RaspberryPiConnectionConfig.class);
 
 }

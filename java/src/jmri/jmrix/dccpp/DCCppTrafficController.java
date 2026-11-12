@@ -22,15 +22,26 @@ import org.slf4j.LoggerFactory;
  * Based on XNetTrafficController by Bob Jacobsen and Paul Bender
  */
 public abstract class DCCppTrafficController extends AbstractMRTrafficController implements DCCppInterface {
-
+    
+    public int startUpDelay = 1500; //in ms, will be overridden by config option
+    public volatile boolean anyReceived = false;  //will be turned on as soon as any incoming traffic seen
+    
     @Override
     protected void transmitLoop() {
-        log.debug("Don't start sending for 1.5 seconds to avoid Arduino restart");
-        try {
-            Thread.sleep(1500);
-        } catch (InterruptedException ignore) {
-            Thread.currentThread().interrupt();
+        int totalDelay = 0;
+        int loopDelay = 100;
+        log.debug("Transmit loop paused for up to {}ms to avoid Arduino restart", startUpDelay);
+        while (!anyReceived && (totalDelay <= startUpDelay)) {
+            try {
+                Thread.sleep(loopDelay);
+            } catch (InterruptedException ignore) {
+                log.debug("Transmit loop pause interrupted");
+                Thread.currentThread().interrupt();
+                break; // Breaks the while loop
+            }
+            totalDelay += loopDelay;
         }
+        log.debug("Transmit loop resumed after {}ms", totalDelay);
         super.transmitLoop();
     }
 
@@ -99,6 +110,9 @@ public abstract class DCCppTrafficController extends AbstractMRTrafficController
         if (!(m instanceof DCCppReply)){
             return;
         }
+        //note if any incoming data received, will be used to release send queue
+        this.anyReceived = true;
+
         try {
             // NOTE: For now, just forward ALL messages without filtering
             ((DCCppListener) client).message((DCCppReply) m);
@@ -213,7 +227,7 @@ public abstract class DCCppTrafficController extends AbstractMRTrafficController
 
     /**
      * Has to be available, even though it doesn't do anything
-     * on DCC++.
+     * on DCC-EX.
      */
     @Override
     protected AbstractMRMessage enterProgMode() {
@@ -248,7 +262,7 @@ public abstract class DCCppTrafficController extends AbstractMRTrafficController
     }
 
     @Override
-    // endOfMessage() not really used in DCC++ .. it's handled in the Packetizer.
+    // endOfMessage() not really used in DCC-EX .. it's handled in the Packetizer.
     protected boolean endOfMessage(AbstractMRReply msg) {
         return msg.getElement(msg.getNumDataElements() - 1) == '>';
     }
@@ -367,6 +381,6 @@ public abstract class DCCppTrafficController extends AbstractMRTrafficController
         return _TurnoutReplyCache;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppTrafficController.class);
 
 }

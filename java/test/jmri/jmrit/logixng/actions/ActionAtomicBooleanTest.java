@@ -1,5 +1,14 @@
 package jmri.jmrit.logixng.actions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -7,17 +16,15 @@ import jmri.InstanceManager;
 import jmri.NamedBean;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.DefaultConditionalNGScaffold;
-import jmri.jmrit.logixng.implementation.DefaultSymbolTable;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test ActionAtomicBoolean
- * 
+ *
  * @author Daniel Bergqvist 2018
  */
 public class ActionAtomicBooleanTest extends AbstractDigitalActionTestBase {
@@ -26,28 +33,28 @@ public class ActionAtomicBooleanTest extends AbstractDigitalActionTestBase {
     private ConditionalNG conditionalNG;
     private AtomicBoolean atomicBoolean;
     private ActionAtomicBoolean actionAtomicBoolean;
-    
-    
+
+
     @Override
     public ConditionalNG getConditionalNG() {
         return conditionalNG;
     }
-    
+
     @Override
     public LogixNG getLogixNG() {
         return logixNG;
     }
-    
+
     @Override
     public MaleSocket getConnectableChild() {
         return null;
     }
-    
+
     @Override
     public String getExpectedPrintedTree() {
         return String.format("Set the atomic boolean to true ::: Use default%n");
     }
-    
+
     @Override
     public String getExpectedPrintedTreeFromRoot() {
         return String.format(
@@ -56,144 +63,125 @@ public class ActionAtomicBooleanTest extends AbstractDigitalActionTestBase {
                 "      ! A%n" +
                 "         Set the atomic boolean to true ::: Use default%n");
     }
-    
+
     @Override
     public NamedBean createNewBean(String systemName) {
         return new ActionAtomicBoolean(systemName, null);
     }
-    
+
     @Override
     public boolean addNewSocket() {
         return false;
     }
-    
+
     @Test
     public void testCtor() {
-        Assert.assertTrue("object exists", _base != null);
-        
+        assertNotNull( _base, "object exists");
+
         ActionAtomicBoolean action2;
-        Assert.assertNotNull("atomicBoolean is not null", atomicBoolean);
+        assertNotNull( atomicBoolean, "atomicBoolean is not null");
         atomicBoolean.set(true);
-        
+
         action2 = new ActionAtomicBoolean("IQDA321", null);
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertNull("Username matches", action2.getUserName());
-        Assert.assertEquals("String matches", "Set the atomic boolean to false", action2.getLongDescription());
-        
+        assertNotNull( action2, "object exists");
+        assertNull( action2.getUserName(), "Username matches");
+        assertEquals( "Set the atomic boolean to false",
+                action2.getLongDescription(), "String matches");
+
         action2 = new ActionAtomicBoolean("IQDA321", "My atomicBoolean");
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertEquals("Username matches", "My atomicBoolean", action2.getUserName());
-        Assert.assertEquals("String matches", "Set the atomic boolean to false", action2.getLongDescription());
-        
+        assertNotNull( action2, "object exists");
+        assertEquals( "My atomicBoolean", action2.getUserName(), "Username matches");
+        assertEquals( "Set the atomic boolean to false",
+                action2.getLongDescription(), "String matches");
+
         action2 = new ActionAtomicBoolean("IQDA321", null);
         action2.setAtomicBoolean(atomicBoolean);
-        Assert.assertTrue("atomic boolean is correct", atomicBoolean == action2.getAtomicBoolean());
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertNull("Username matches", action2.getUserName());
-        Assert.assertEquals("String matches", "Set the atomic boolean to false", action2.getLongDescription());
-        
+        assertSame( atomicBoolean, action2.getAtomicBoolean(), "atomic boolean is correct");
+        assertNotNull( action2, "object exists");
+        assertNull( action2.getUserName(), "Username matches");
+        assertEquals( "Set the atomic boolean to false",
+                action2.getLongDescription(), "String matches");
+
         AtomicBoolean ab = new AtomicBoolean();
         action2 = new ActionAtomicBoolean("IQDA321", "My atomicBoolean");
         action2.setAtomicBoolean(ab);
-        Assert.assertTrue("atomic boolean is correct", ab == action2.getAtomicBoolean());
-        Assert.assertNotNull("object exists", action2);
-        Assert.assertEquals("Username matches", "My atomicBoolean", action2.getUserName());
-        Assert.assertEquals("String matches", "Set the atomic boolean to false", action2.getLongDescription());
-        
-        boolean thrown = false;
-        try {
-            // Illegal system name
-            new ActionAtomicBoolean("IQA55:12:XY11", null);
-        } catch (IllegalArgumentException ex) {
-            thrown = true;
-        }
-        Assert.assertTrue("Expected exception thrown", thrown);
-        
-        thrown = false;
-        try {
-            // Illegal system name
-            new ActionAtomicBoolean("IQA55:12:XY11", "A name");
-        } catch (IllegalArgumentException ex) {
-            thrown = true;
-        }
-        Assert.assertTrue("Expected exception thrown", thrown);
-        
+        assertSame( ab, action2.getAtomicBoolean(), "atomic boolean is correct");
+        assertNotNull( action2, "object exists");
+        assertEquals( "My atomicBoolean", action2.getUserName(), "Username matches");
+        assertEquals( "Set the atomic boolean to false", action2.getLongDescription(), "String matches");
+
+        IllegalArgumentException ex = assertThrows( IllegalArgumentException.class, () -> {
+            var t = new ActionAtomicBoolean("IQA55:12:XY11", null);
+            fail("should have thrown, created " + t);
+        }, "Illegal system name Expected exception thrown");
+        assertNotNull(ex);
+
+        ex = assertThrows( IllegalArgumentException.class, () -> {
+            var t = new ActionAtomicBoolean("IQA55:12:XY11", "A name");
+            fail("should have thrown, created " + t);
+        }, "Illegal system name Expected exception thrown");
+        assertNotNull(ex);
+
         // Test setup(). This method doesn't do anything, but execute it for coverage.
         _base.setup();
     }
-    
+
     @Test
     public void testGetChild() {
-        Assert.assertTrue("getChildCount() returns 0", 0 == actionAtomicBoolean.getChildCount());
-        
-        boolean hasThrown = false;
-        try {
-            actionAtomicBoolean.getChild(0);
-        } catch (UnsupportedOperationException ex) {
-            hasThrown = true;
-            Assert.assertEquals("Error message is correct", "Not supported.", ex.getMessage());
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+        assertEquals( 0, actionAtomicBoolean.getChildCount(), "getChildCount() returns 0");
+
+        UnsupportedOperationException ex = assertThrows( UnsupportedOperationException.class, () ->
+            actionAtomicBoolean.getChild(0), "Exception is thrown");
+        assertEquals( "Not supported.", ex.getMessage(), "Error message is correct");
     }
-    
+
     @Test
     public void testAction() throws SocketAlreadyConnectedException {
         // Set new value to true
         actionAtomicBoolean.setNewValue(true);
-        Assert.assertTrue("new value is true", actionAtomicBoolean.getNewValue());
+        assertTrue( actionAtomicBoolean.getNewValue(), "new value is true");
         // Set the atomic boolean
         atomicBoolean.set(false);
         // The atomic boolean should be false
-        Assert.assertFalse("atomicBoolean is false",atomicBoolean.get());
+        assertFalse( atomicBoolean.get(), "atomicBoolean is false");
         // Execute the conditional
         conditionalNG.execute();
         // The action should now be executed so the atomic boolean should be true
-        Assert.assertTrue("atomicBoolean is true",atomicBoolean.get());
-        
+        assertTrue( atomicBoolean.get(), "atomicBoolean is true");
+
         // Set new value to false
         actionAtomicBoolean.setNewValue(false);
-        Assert.assertFalse("new value is false", actionAtomicBoolean.getNewValue());
+        assertFalse( actionAtomicBoolean.getNewValue(), "new value is false");
         // Execute the conditional
         conditionalNG.execute();
         // The action should now be executed so the atomic boolean should be true
-        Assert.assertFalse("atomicBoolean is false",atomicBoolean.get());
+        assertFalse( atomicBoolean.get(), "atomicBoolean is false");
     }
-    
+
     @Test
     public void testCategory() {
-        Assert.assertTrue("Category matches", Category.OTHER == _base.getCategory());
+        assertSame( LogixNG_Category.OTHER, _base.getCategory(), "Category matches");
     }
-    
-    @Test
-    public void testIsExternal() {
-        Assert.assertTrue("is external", _base.isExternal());
-    }
-    
+
     @Test
     public void testShortDescription() {
-        Assert.assertEquals("String matches", "Atomic boolean", _base.getShortDescription());
+        assertEquals( "Atomic boolean", _base.getShortDescription(), "String matches");
     }
-    
+
     @Test
     public void testLongDescription() {
-        Assert.assertEquals("String matches", "Set the atomic boolean to true", _base.getLongDescription());
+        assertEquals( "Set the atomic boolean to true", _base.getLongDescription(), "String matches");
     }
-    
+
     @Test
     public void testChild() {
-        Assert.assertTrue("Num children is zero", 0 == _base.getChildCount());
-        boolean hasThrown = false;
-        try {
-            _base.getChild(0);
-        } catch (UnsupportedOperationException ex) {
-            hasThrown = true;
-            Assert.assertTrue("Error message is correct", "Not supported.".equals(ex.getMessage()));
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+        assertEquals( 0, _base.getChildCount(), "Num children is zero");
+        UnsupportedOperationException ex = assertThrows( UnsupportedOperationException.class, () ->
+            _base.getChild(0), "Exception is thrown");
+        assertEquals( "Not supported.", ex.getMessage(), "Error message is correct");
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() throws SocketAlreadyConnectedException {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -202,10 +190,10 @@ public class ActionAtomicBooleanTest extends AbstractDigitalActionTestBase {
         JUnitUtil.initInternalSensorManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initLogixNGManager();
-        
-        _category = Category.ITEM;
+
+        _category = LogixNG_Category.ITEM;
         _isExternal = true;
-        
+
         atomicBoolean = new AtomicBoolean(false);
         logixNG = InstanceManager.getDefault(LogixNG_Manager.class).createLogixNG("A logixNG");
         conditionalNG = new DefaultConditionalNGScaffold("IQC1", "A conditionalNG");  // NOI18N;
@@ -217,18 +205,20 @@ public class ActionAtomicBooleanTest extends AbstractDigitalActionTestBase {
         MaleSocket socket =
                 InstanceManager.getDefault(DigitalActionManager.class).registerAction(actionAtomicBoolean);
         conditionalNG.getChild(0).connect(socket);
-        
+
         _base = actionAtomicBoolean;
         _baseMaleSocket = socket;
-        
-        if (! logixNG.setParentForAllChildren(new ArrayList<>())) throw new RuntimeException();
+
+        assertTrue( logixNG.setParentForAllChildren(new ArrayList<>()));
+        logixNG.activate();
         logixNG.setEnabled(true);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
+
 }

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  */
 public class QuantumCvMgrImporter {
 
-    private final static Logger log = LoggerFactory.getLogger(QuantumCvMgrImporter.class);
+    private static final Logger log = LoggerFactory.getLogger(QuantumCvMgrImporter.class);
     private static final String SEARCH_STRING = "^CV([0-9.]+)=([0-9.]+)\\s*(//)?\\s*(.*)$";
 
     public QuantumCvMgrImporter(File file, CvTableModel cvModel) throws IOException {
@@ -70,7 +70,7 @@ public class QuantumCvMgrImporter {
             }
             fileReader.close();
         } catch (IOException e) {
-            log.error("Error reading file: {}", e);
+            log.error("Error reading file", e);
         }
     }
 

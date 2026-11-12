@@ -7,10 +7,15 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.annotation.CheckReturnValue;
+
 import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 import jmri.jmrit.XmlFile;
 import jmri.jmrit.revhistory.FileHistory;
 import jmri.util.FileUtil;
+
 import org.jdom2.Attribute;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -34,7 +39,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
      * See the <a href="package-summary.html#schema">Schema versioning
      * discussion</a>. Also controls the stylesheet file version.
      */
-    static final public String schemaVersion = "-4-19-2";
+    public static final String schemaVersion = "-5-5-5";
 
     public ConfigXmlManager() {
     }
@@ -88,7 +93,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
      * @return name of the ConfigureXml class in newer package or of superseding
      *         class
      */
-    static public String currentClassName(String name) {
+    public static String currentClassName(String name) {
         return InstanceManager.getDefault(ClassMigrationManager.class).getClassName(name);
     }
 
@@ -264,6 +269,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         }
     }
 
+    @CheckReturnValue
     protected boolean addConfigStore(Element root) {
         boolean result = true;
         List<Map.Entry<Object, Integer>> l = new ArrayList<>(clist.entrySet());
@@ -284,6 +290,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         return result;
     }
 
+    @CheckReturnValue
     protected boolean addToolsStore(Element root) {
         boolean result = true;
         for (Object o : tlist) {
@@ -301,6 +308,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         return result;
     }
 
+    @CheckReturnValue
     protected boolean addUserStore(Element root) {
         boolean result = true;
         for (Object o : ulist) {
@@ -327,13 +335,18 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         }
     }
 
-    protected void includeHistory(Element root) {
+    protected void includeHistory(Element root, File file) {
         // add history to end of document
         if (InstanceManager.getNullableDefault(FileHistory.class) != null) {
-            root.addContent(jmri.jmrit.revhistory.configurexml.FileHistoryXml.storeDirectly(InstanceManager.getDefault(FileHistory.class)));
+            var historyElement = jmri.jmrit.revhistory.configurexml.FileHistoryXml.storeDirectly(
+                    InstanceManager.getDefault(FileHistory.class), file.getPath());
+            if (historyElement != null) {
+                root.addContent(historyElement);
+            }
         }
     }
 
+    @CheckReturnValue
     protected boolean finalStore(Element root, File file) {
         try {
             // Document doc = newDocument(root, dtdLocation+"layout-config-"+dtdVersion+".dtd");
@@ -367,30 +380,6 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
 
     /** {@inheritDoc} */
     @Override
-    public boolean storeAll(File file) {
-        boolean result = true;
-        Element root = initStore();
-        if (!addConfigStore(root)) {
-            result = false;
-        }
-        if (!addToolsStore(root)) {
-            result = false;
-        }
-        if (!addUserStore(root)) {
-            result = false;
-        }
-        addConfigStore(root);
-        addToolsStore(root);
-        addUserStore(root);
-        includeHistory(root);
-        if (!finalStore(root, file)) {
-            result = false;
-        }
-        return result;
-    }
-
-    /** {@inheritDoc} */
-    @Override
     public void storePrefs() {
         storePrefs(prefsFile);
     }
@@ -401,7 +390,10 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         synchronized (this) {
             Element root = initStore();
             addPrefsStore(root);
-            finalStore(root, file);
+            boolean result = finalStore(root, file);
+            if (!result) {
+                log.error("storePrefs failed to store:{}",file);
+            }
         }
     }
 
@@ -411,7 +403,10 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         synchronized (this) {
             Element root = initStore();
             addUserPrefsStore(root);
-            finalStore(root, file);
+            boolean result = finalStore(root, file);
+            if (!result) {
+                log.error("storeUserPrefs failed to store:{}",file);
+            }
         }
     }
 
@@ -430,13 +425,14 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
 
     /** {@inheritDoc} */
     @Override
+    @CheckReturnValue
     public boolean storeConfig(File file) {
         boolean result = true;
         Element root = initStore();
         if (!addConfigStore(root)) {
             result = false;
         }
-        includeHistory(root);
+        includeHistory(root, file);
         if (!finalStore(root, file)) {
             result = false;
         }
@@ -445,6 +441,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
 
     /** {@inheritDoc} */
     @Override
+    @CheckReturnValue
     public boolean storeUser(File file) {
         boolean result = true;
         Element root = initStore();
@@ -454,7 +451,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
         if (!addUserStore(root)) {
             result = false;
         }
-        includeHistory(root);
+        includeHistory(root, file);
         if (!finalStore(root, file)) {
             result = false;
         }
@@ -464,17 +461,15 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
     /** {@inheritDoc} */
     @Override
     public boolean makeBackup(File file) {
-        return makeBackupFile(defaultBackupDirectory, file);
+        return makeBackupFile(FileUtil.getUserFilesPath() + "backupPanels", file);
     }
-
-    String defaultBackupDirectory = FileUtil.getUserFilesPath() + "backupPanels";
 
     /**
      *
      * @param o The object to get an XML representation of
      * @return An XML element representing o
      */
-    static public Element elementFromObject(Object o) {
+    public static Element elementFromObject(Object o) {
         return ConfigXmlManager.elementFromObject(o, true);
     }
 
@@ -485,13 +480,13 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
      *               be per-node
      * @return An XML element representing object
      */
-    static public Element elementFromObject(Object object, boolean shared) {
+    public static Element elementFromObject(Object object, boolean shared) {
         String aName = adapterName(object);
         log.debug("store using {}", aName);
         XmlAdapter adapter = null;
         try {
             adapter = (XmlAdapter) Class.forName(adapterName(object)).getDeclaredConstructor().newInstance();
-        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException 
+        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException
                     | NoSuchMethodException | java.lang.reflect.InvocationTargetException ex) {
             log.error("Cannot load configuration adapter for {}", object.getClass().getName(), ex);
         }
@@ -572,18 +567,18 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
     @Override
     public boolean load(URL url, boolean registerDeferred) throws JmriConfigureXmlException {
         log.trace("starting load({}, {})", url, registerDeferred);
-        
+
         // we do the actual load on the Swing thread in case it changes visible windows
         Boolean retval = jmri.util.ThreadingUtil.runOnGUIwithReturn(() -> {
-            try { 
+            try {
                 Boolean ret = loadOnSwingThread(url, registerDeferred);
                 return ret;
             } catch (Exception e) {
                 log.trace("  ending load() via JmriConfigureXmlException");
-                throw new RuntimeException(e);
+                throw new JmriUncheckedException(e);
             }
         });
-        
+
         log.trace("  ending load({}, {} with {})", url, registerDeferred, retval);
         return retval;
     }
@@ -722,7 +717,8 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
                     included = jmri.jmrit.revhistory.configurexml.FileHistoryXml.loadFileHistory(filehistory);
                 }
             }
-            r.addOperation((result ? "Load OK" : "Load with errors"), url.getFile(), included);
+            String friendlyName = url.getFile().replaceAll("%20", " ");
+            r.addOperation((result ? "Load OK" : "Load with errors"), friendlyName, included);
         } else {
             log.info("Not recording file history");
         }
@@ -737,6 +733,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
 
     /** {@inheritDoc} */
     @Override
+    @CheckReturnValue
     public boolean loadDeferred(URL url) {
         boolean result = true;
         // Now process the load-later list
@@ -817,7 +814,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
      * @param exception   Any exception being handled in the processing, may be
      *                    null
      */
-    static public void creationErrorEncountered(
+    public static void creationErrorEncountered(
             XmlAdapter adapter,
             String operation,
             String description,
@@ -855,7 +852,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
      * @param exception   Any exception being handled in the processing, may be
      *                    null
      */
-    static public void storingErrorEncountered(
+    public static void storingErrorEncountered(
             XmlAdapter adapter,
             String operation,
             String description,
@@ -878,7 +875,7 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
 
     private static ErrorHandler handler = new ErrorHandler();
 
-    static public void setErrorHandler(ErrorHandler handler) {
+    public static void setErrorHandler(ErrorHandler handler) {
         ConfigXmlManager.handler = handler;
     }
 
@@ -890,6 +887,6 @@ public class ConfigXmlManager extends jmri.jmrit.XmlFile
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(ConfigXmlManager.class);
+    private static final Logger log = LoggerFactory.getLogger(ConfigXmlManager.class);
 
 }

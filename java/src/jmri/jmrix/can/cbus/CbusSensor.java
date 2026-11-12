@@ -19,6 +19,12 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
     private CbusAddress addrActive;    // go to active state
     private CbusAddress addrInactive;  // go to inactive state
 
+    /**
+     * Create a new CbusSensor.
+     * @param prefix Hardware connection system prefix, excluding the S for Sensor..
+     * @param address String form of {@link CbusAddress}
+     * @param tc System Traffic Controller.
+     */
     public CbusSensor(String prefix, String address, TrafficController tc) {
         super(prefix + "S" + address);
         this.tc = tc;
@@ -28,9 +34,7 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
     private final TrafficController tc;
 
     /**
-     * Common initialization for both constructors.
-     * <p>
-     *
+     * Common initialization for constructors.
      */
     private void init(String address) {
         // build local addresses
@@ -58,18 +62,20 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
                 log.error("Can't parse CbusSensor system name: {}", address);
                 return;
         }
-        // connect
-        addTc(tc);
+        // connect, through the connection's dispatcher, which offers this bean
+        // only the frames of its own addresses
+        CbusBeanDispatcher.add(tc, this, addrActive, addrInactive);
     }
 
     /**
      * Request an update on status by sending CBUS request message to active address.
+     * Sends a query message using the active Sensor address.
+     * e.g. for a CBUS address "-7;+5", the query will go to event 7.
      * {@inheritDoc}
      */
     @Override
     public void requestUpdateFromLayout() {
-        CanMessage m;
-        m = addrActive.makeMessage(tc.getCanid());
+        CanMessage m = addrActive.makeMessage(tc.getCanid());
         int opc = CbusMessage.getOpcode(m);
         if (CbusOpCodes.isShortEvent(opc)) {
             m.setOpCode(CbusConstants.CBUS_ASRQ);
@@ -78,7 +84,7 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
             m.setOpCode(CbusConstants.CBUS_AREQ);
         }
         CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
-        tc.sendCanMessage(m, this);
+        CbusBeanDispatcher.send(tc, m, this);
     }
 
     /**
@@ -107,7 +113,7 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
                 return;
         }
         CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
-        tc.sendCanMessage(m, this);
+        CbusBeanDispatcher.send(tc, m, this);
     }
     
     /**
@@ -189,11 +195,11 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
             return;
         }
         // convert response events to normal
-        f = CbusMessage.opcRangeToStl(f);
-        if (addrActive.match(f)) {
-            setOwnState(!getInverted() ? Sensor.ACTIVE : Sensor.INACTIVE);
-        } else if (addrInactive.match(f)) {
-            setOwnState(!getInverted() ? Sensor.INACTIVE : Sensor.ACTIVE);
+        CanReply opcf = CbusMessage.opcRangeToStl(f);
+        if (addrActive.match(opcf)) {
+            setOwnState(!getInverted() ? Sensor.ACTIVE : Sensor.INACTIVE, f.getReceivedTime());
+        } else if (addrInactive.match(opcf)) {
+            setOwnState(!getInverted() ? Sensor.INACTIVE : Sensor.ACTIVE, f.getReceivedTime());
         }
     }
     
@@ -202,10 +208,10 @@ public class CbusSensor extends AbstractSensor implements CanListener, CbusEvent
      */
     @Override
     public void dispose() {
-        tc.removeCanListener(this);
+        CbusBeanDispatcher.remove(tc, this);
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CbusSensor.class);
+    private static final Logger log = LoggerFactory.getLogger(CbusSensor.class);
 
 }

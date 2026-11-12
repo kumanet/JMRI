@@ -79,6 +79,7 @@ public class AcelaSystemConnectionMemo extends DefaultSystemConnectionMemo imple
      * Configure the common managers for Acela connections. This puts the
      * common manager config in one place.
      */
+    @Override
     public void configureManagers() {
 
         InstanceManager.setLightManager(getLightManager());
@@ -87,7 +88,6 @@ public class AcelaSystemConnectionMemo extends DefaultSystemConnectionMemo imple
         getTrafficController().setSensorManager(getSensorManager());
 
         InstanceManager.setTurnoutManager(getTurnoutManager());
-        getTrafficController().setTurnoutManager(getTurnoutManager());
 
         register(); // registers general type
     }
@@ -96,21 +96,21 @@ public class AcelaSystemConnectionMemo extends DefaultSystemConnectionMemo imple
         if (getDisabled()) {
             return null;
         }
-        return (AcelaTurnoutManager) classObjectMap.computeIfAbsent(TurnoutManager.class, (Class c) -> new AcelaTurnoutManager(this));
+        return (AcelaTurnoutManager) classObjectMap.computeIfAbsent(TurnoutManager.class, (Class<?> c) -> new AcelaTurnoutManager(this));
     }
 
     public AcelaSensorManager getSensorManager() {
         if (getDisabled()) {
             return null;
         }
-        return (AcelaSensorManager) classObjectMap.computeIfAbsent(SensorManager.class,(Class c) -> new AcelaSensorManager(this));
+        return (AcelaSensorManager) classObjectMap.computeIfAbsent(SensorManager.class,(Class<?> c) -> new AcelaSensorManager(this));
     }
 
     public AcelaLightManager getLightManager() {
         if (getDisabled()) {
             return null;
         }
-        return (AcelaLightManager) classObjectMap.computeIfAbsent(LightManager.class,(Class c) -> new AcelaLightManager(this));
+        return (AcelaLightManager) classObjectMap.computeIfAbsent(LightManager.class,(Class<?> c) -> new AcelaLightManager(this));
     }
 
     @Override
@@ -133,6 +133,6 @@ public class AcelaSystemConnectionMemo extends DefaultSystemConnectionMemo imple
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AcelaSystemConnectionMemo.class);
+    private static final Logger log = LoggerFactory.getLogger(AcelaSystemConnectionMemo.class);
 
 }

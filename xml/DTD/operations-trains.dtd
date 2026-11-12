@@ -12,7 +12,7 @@
 <!-- FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License  -->
 <!-- for more details.                                                      -->
 
-<!ELEMENT operations-config (trains | options | schedules | trainScheduleOptions | automations)*>
+<!ELEMENT operations-config (trains | options | schedules | manualBuilds | trainScheduleOptions | automations | automationOptions)*>
 
 <!ELEMENT options (trainOptions | conductorOptions | rowColorOptions | trainEditOptions | scripts | manifestCreator 
 | switchlistCreator)*>
@@ -21,6 +21,7 @@
 <!ELEMENT rowColorOptions EMPTY>
 <!ELEMENT trainEditOptions EMPTY>
 <!ELEMENT trainScheduleOptions EMPTY>
+<!ELEMENT automationOptions EMPTY>
 
 <!ATTLIST trainOptions buildReport		(true | false) "false">
 <!ATTLIST trainOptions printPreview 	(true | false) "false">
@@ -36,6 +37,7 @@
 <!ATTLIST rowColorOptions rowColorBuilt 		CDATA #IMPLIED>
 <!ATTLIST rowColorOptions rowColorTrainEnRoute 	CDATA #IMPLIED>
 <!ATTLIST rowColorOptions rowColorTerminated 	CDATA #IMPLIED>
+<!ATTLIST rowColorOptions rowColorReset		 	CDATA #IMPLIED>
 
 <!ATTLIST trainScheduleOptions activeId		CDATA #IMPLIED>
 
@@ -47,7 +49,7 @@
 <!ELEMENT terminate EMPTY>
 
 <!ELEMENT trains (train)*>
-<!ELEMENT train (rowColor | route | types | carLoads | carRoads | carOwners |scripts | railRoad | manifestLogo)*>
+<!ELEMENT train (rowColor | route | types | carLoads | carRoads | cabooseRoads| locoRoads| carOwners |scripts | railRoad | manifestLogo)*>
 
 <!ELEMENT rowColor EMPTY>
 <!ELEMENT route (skips)*>
@@ -59,7 +61,10 @@
 <!ELEMENT carLoads (carLoad)*>
 <!ELEMENT carLoad EMPTY>
 <!ELEMENT carRoads (carRoad)*>
+<!ELEMENT cabooseRoads (carRoad)*>
+<!ELEMENT locoRoads (locoRoad)*>
 <!ELEMENT carRoad EMPTY>
+<!ELEMENT locoRoad EMPTY>
 <!ELEMENT carOwners (carOwner)*>
 <!ELEMENT carOwner EMPTY>
 <!ELEMENT scripts (startUp | shutDown | build | afterBuild | move | terminate)*>
@@ -80,15 +85,21 @@
 <!ELEMENT schedules (schedule)*>
 <!ELEMENT schedule EMPTY>
 
+<!ELEMENT manualBuilds (manualBuild)*>
+<!ELEMENT manualBuild (mbItem)*>
+
 <!ATTLIST train id					CDATA #REQUIRED>          
-<!ATTLIST train name				CDATA #IMPLIED>
+<!ATTLIST train name				CDATA #REQUIRED>
 <!ATTLIST train description			CDATA #IMPLIED>       
 <!ATTLIST train route				CDATA #IMPLIED> 
 <!ATTLIST train routeId				CDATA #IMPLIED> 
 <!ATTLIST train carTypes			CDATA #IMPLIED> 
 <!ATTLIST train carRoadOperation	CDATA #IMPLIED>
 <!ATTLIST train carRoadOption		CDATA #IMPLIED>
+<!ATTLIST train cabooseRoadOption	CDATA #IMPLIED>
+<!ATTLIST train locoRoadOption		CDATA #IMPLIED>
 <!ATTLIST train carRoads			CDATA #IMPLIED>
+<!ATTLIST train locoRoads			CDATA #IMPLIED>
 <!ATTLIST train carLoadOption		CDATA #IMPLIED>
 <!ATTLIST train carLoads			CDATA #IMPLIED>
 <!ATTLIST train carOwnerOption		CDATA #IMPLIED>
@@ -117,7 +128,7 @@
 <!ATTLIST train showTimes			(true | false) "true">
 <!ATTLIST train buildFailedMessage	CDATA #IMPLIED>
 <!ATTLIST train switchListStatus	CDATA #IMPLIED>
-<!ATTLIST train mrStatus                CDATA #IMPLIED>
+<!ATTLIST train mrStatus            CDATA #IMPLIED>
 <!ATTLIST train status				CDATA #IMPLIED>
 <!ATTLIST train current				CDATA #IMPLIED>
 <!ATTLIST train departureTrack		CDATA #IMPLIED>
@@ -138,13 +149,15 @@
 <!ATTLIST train leg2End				CDATA #IMPLIED>
 <!ATTLIST train leg3End				CDATA #IMPLIED>
 <!ATTLIST train comment				CDATA #IMPLIED>
+<!ATTLIST train commentTermination	CDATA #IMPLIED>
 <!ATTLIST train serviceAll			CDATA #IMPLIED>
 <!ATTLIST train sendCustomStaging	CDATA #IMPLIED>
 <!ATTLIST train buildConsist		CDATA #IMPLIED>
 <!ATTLIST train TerminationDate		CDATA #IMPLIED>
 <!ATTLIST train RequestedCars		CDATA #IMPLIED>
 <!ATTLIST train statusCode			CDATA #IMPLIED>
-<!ATTLIST train oldStatusCode			CDATA #IMPLIED>
+<!ATTLIST train oldStatusCode		CDATA #IMPLIED>
+<!ATTLIST train departDay			CDATA #IMPLIED>
 
 <!ATTLIST rowColor name				CDATA #IMPLIED>
 <!ATTLIST rowColor resetRowColor	CDATA #IMPLIED>
@@ -153,6 +166,7 @@
 <!ATTLIST carLoad name				CDATA #IMPLIED>
 <!ATTLIST carRoad name				CDATA #IMPLIED>
 <!ATTLIST carOwner name				CDATA #IMPLIED>
+<!ATTLIST locoRoad name				CDATA #IMPLIED>
 
 <!ATTLIST build name				CDATA #IMPLIED>
 <!ATTLIST afterBuild name			CDATA #IMPLIED>
@@ -182,16 +196,15 @@
 <!ELEMENT messageOk EMPTY>
 <!ELEMENT messageFail EMPTY>
 
-
 <!ATTLIST automation id				CDATA #REQUIRED>
 <!ATTLIST automation name			CDATA #REQUIRED>
 <!ATTLIST automation comment		CDATA #REQUIRED>
-<!ATTLIST automation currentItem	CDATA #REQUIRED>
+<!ATTLIST automation currentItem	CDATA #IMPLIED>
 
 <!ATTLIST item id					CDATA #REQUIRED>          
-<!ATTLIST item sequenceId			CDATA #IMPLIED>
-<!ATTLIST item name					CDATA #IMPLIED>
-<!ATTLIST item actionCode			CDATA #IMPLIED>
+<!ATTLIST item sequenceId			CDATA #REQUIRED>
+<!ATTLIST item name					CDATA #REQUIRED>
+<!ATTLIST item actionCode			CDATA #REQUIRED>
 <!ATTLIST item trainId				CDATA #IMPLIED>
 <!ATTLIST item routeLocationId		CDATA #IMPLIED>
 <!ATTLIST item automationId			CDATA #IMPLIED>
@@ -204,4 +217,27 @@
 
 <!ATTLIST messageOk message			CDATA #IMPLIED>
 <!ATTLIST messageFail message		CDATA #IMPLIED>
+
+<!ATTLIST automationOptions automationStartupId		CDATA #IMPLIED>
+
+<!ATTLIST manualBuild id			CDATA #REQUIRED>          
+<!ATTLIST manualBuild name			CDATA #IMPLIED>
+<!ATTLIST manualBuild comment		CDATA #IMPLIED>
+<!ATTLIST manualBuild trainId		CDATA #IMPLIED>
+
+<!ELEMENT mbItem EMPTY>
+
+<!ATTLIST mbItem id					CDATA #REQUIRED>          
+<!ATTLIST mbItem sequenceId			CDATA #REQUIRED>
+<!ATTLIST mbItem type				CDATA #IMPLIED>
+<!ATTLIST mbItem road				CDATA #IMPLIED>
+<!ATTLIST mbItem load				CDATA #IMPLIED>
+<!ATTLIST mbItem count				CDATA #IMPLIED>
+<!ATTLIST mbItem trainScheduleId	CDATA #IMPLIED>
+<!ATTLIST mbItem routeLocationId	CDATA #IMPLIED>
+<!ATTLIST mbItem destinationId		CDATA #IMPLIED>
+<!ATTLIST mbItem destTrackId		CDATA #IMPLIED>
+<!ATTLIST mbItem fail				(true | false) "false">
+<!ATTLIST mbItem warn				(true | false) "false">
+<!ATTLIST mbItem remove				(true | false) "false">
 

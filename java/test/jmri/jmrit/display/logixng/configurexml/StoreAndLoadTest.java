@@ -1,8 +1,8 @@
 package jmri.jmrit.display.logixng.configurexml;
 
-import java.awt.GraphicsEnvironment;
-
-import jmri.jmrit.logixng.actions.IfThenElse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.beans.PropertyVetoException;
 import java.io.*;
@@ -10,14 +10,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import jmri.*;
+import jmri.jmrit.display.logixng.ActionAudioIcon;
+import jmri.jmrit.display.logixng.ActionLayoutTurnout;
 import jmri.jmrit.display.logixng.ActionPositionable;
+import jmri.jmrit.display.logixng.ActionPositionableByClass;
 import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.actions.IfThenElse;
+import jmri.jmrit.logixng.actions.DigitalMany;
 import jmri.jmrit.logixng.expressions.And;
 import jmri.jmrit.logixng.util.LogixNG_Thread;
 import jmri.util.*;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.junit.*;
+
+import org.junit.jupiter.api.*;
 
 /**
  * Creates a LogixNG with all actions and expressions to test store and load.
@@ -30,8 +37,8 @@ import org.junit.*;
 public class StoreAndLoadTest {
 
     @Test
-    public void testLogixNGs() throws PropertyVetoException, Exception {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+    @DisabledIfHeadless
+    public void testLogixNGs() throws PropertyVetoException, SocketAlreadyConnectedException, IOException, JmriException {
 
         LogixNG_Manager logixNG_Manager = InstanceManager.getDefault(LogixNG_Manager.class);
         ConditionalNG_Manager conditionalNGManager = InstanceManager.getDefault(ConditionalNG_Manager.class);
@@ -84,15 +91,43 @@ public class StoreAndLoadTest {
         maleSocket = digitalExpressionManager.registerExpression(expressionSlotUsage);
         and.getChild(2).connect(maleSocket);
 */
+        DigitalMany digitalMany = new DigitalMany(digitalActionManager.getAutoSystemName(), null);
+        digitalMany.setComment("A comment");
+        maleSocket = digitalActionManager.registerAction(digitalMany);
+        ifThenElse.getChild(1).connect(maleSocket);
+
+        int index = 0;
+        ActionAudioIcon actionAudioIcon = new ActionAudioIcon(digitalActionManager.getAutoSystemName(), null);
+        actionAudioIcon.setComment("A comment");
+        maleSocket = digitalActionManager.registerAction(actionAudioIcon);
+        digitalMany.getChild(index++).connect(maleSocket);
+
+        actionAudioIcon = new ActionAudioIcon(digitalActionManager.getAutoSystemName(), null);
+        actionAudioIcon.setComment("A comment");
+        actionAudioIcon.setOperation(ActionAudioIcon.Operation.Play);
+        maleSocket = digitalActionManager.registerAction(actionAudioIcon);
+        digitalMany.getChild(index++).connect(maleSocket);
+
+        actionAudioIcon = new ActionAudioIcon(digitalActionManager.getAutoSystemName(), null);
+        actionAudioIcon.setComment("A comment");
+        actionAudioIcon.setOperation(ActionAudioIcon.Operation.Stop);
+        maleSocket = digitalActionManager.registerAction(actionAudioIcon);
+        digitalMany.getChild(index++).connect(maleSocket);
+
+        ActionLayoutTurnout actionLayoutTurnout = new ActionLayoutTurnout(digitalActionManager.getAutoSystemName(), null);
+        actionLayoutTurnout.setComment("A comment");
+        maleSocket = digitalActionManager.registerAction(actionLayoutTurnout);
+        digitalMany.getChild(index++).connect(maleSocket);
+
         ActionPositionable actionPositionable = new ActionPositionable(digitalActionManager.getAutoSystemName(), null);
         actionPositionable.setComment("A comment");
         maleSocket = digitalActionManager.registerAction(actionPositionable);
-        ifThenElse.getChild(1).connect(maleSocket);
+        digitalMany.getChild(index++).connect(maleSocket);
 
-//        ActionClearSlots actionClearSlots = new ActionClearSlots(digitalActionManager.getAutoSystemName(), null, null);
-//        actionClearSlots.setComment("A comment");
-//        maleSocket = digitalActionManager.registerAction(actionClearSlots);
-//        ifThenElse.getChild(2).connect(maleSocket);
+        ActionPositionableByClass actionPositionableByClass = new ActionPositionableByClass(digitalActionManager.getAutoSystemName(), null);
+        actionPositionableByClass.setComment("A comment");
+        maleSocket = digitalActionManager.registerAction(actionPositionableByClass);
+        digitalMany.getChild(index++).connect(maleSocket);
 
 /*
         if (1==1) {
@@ -143,8 +178,8 @@ public class StoreAndLoadTest {
             FileUtil.createDirectory(FileUtil.getUserFilesPath() + "temp");
             File firstFile = new File(FileUtil.getUserFilesPath() + "temp/" + "LogixNG_temp.xml");
             File secondFile = new File(FileUtil.getUserFilesPath() + "temp/" + "LogixNG.xml");
-            log.info("Temporary first file: %s%n", firstFile.getAbsoluteFile());
-            log.info("Temporary second file: %s%n", secondFile.getAbsoluteFile());
+            log.info("Temporary first file: {}", firstFile.getAbsoluteFile());
+            log.info("Temporary second file: {}", secondFile.getAbsoluteFile());
 
             final String treeIndent = "   ";
             StringWriter stringWriter = new StringWriter();
@@ -154,10 +189,7 @@ public class StoreAndLoadTest {
 
             boolean results = cm.storeUser(firstFile);
             log.debug(results ? "store was successful" : "store failed");
-            if (!results) {
-                log.error("Failed to store panel");
-                throw new RuntimeException("Failed to store panel");
-            }
+            assertTrue( results, "Failed to store panel");
 
             // Add the header comment to the xml file
             addHeader(firstFile, secondFile);
@@ -187,10 +219,10 @@ public class StoreAndLoadTest {
                 digitalExpressionManager.deleteDigitalExpression(aDigitalExpression);
             }
 
-            Assert.assertEquals(0, logixNG_Manager.getNamedBeanSet().size());
-            Assert.assertEquals(0, conditionalNGManager.getNamedBeanSet().size());
-            Assert.assertEquals(0, digitalActionManager.getNamedBeanSet().size());
-            Assert.assertEquals(0, digitalExpressionManager.getNamedBeanSet().size());
+            assertEquals(0, logixNG_Manager.getNamedBeanSet().size());
+            assertEquals(0, conditionalNGManager.getNamedBeanSet().size());
+            assertEquals(0, digitalActionManager.getNamedBeanSet().size());
+            assertEquals(0, digitalExpressionManager.getNamedBeanSet().size());
 
             LogixNG_Thread.stopAllLogixNGThreads();
             LogixNG_Thread.assertLogixNGThreadNotRunning();
@@ -219,8 +251,7 @@ public class StoreAndLoadTest {
             results = cm.load(secondFile);
             log.debug(results ? "load was successful" : "store failed");
             if (results) {
-                if (! logixNG_Manager.resolveAllTrees(new ArrayList<>())) throw new RuntimeException();
-                if (! logixNG_Manager.setupAllLogixNGs(new ArrayList<>())) throw new RuntimeException();
+                logixNG_Manager.setupAllLogixNGs();
 
                 stringWriter = new StringWriter();
                 printWriter = new PrintWriter(stringWriter);
@@ -245,12 +276,10 @@ public class StoreAndLoadTest {
 */
 //                    log.error(conditionalNGManager.getBySystemName(originalTree).getChild(0).getConnectedSocket().getSystemName());
 
-                    Assert.fail("tree has changed");
-//                    throw new RuntimeException("tree has changed");
+                    fail("tree has changed");
                 }
             } else {
-                Assert.fail("Failed to load panel");
-//                throw new RuntimeException("Failed to load panel");
+                fail("Failed to load panel");
             }
         }
     }
@@ -285,7 +314,7 @@ public class StoreAndLoadTest {
     }
 
 
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -304,7 +333,7 @@ public class StoreAndLoadTest {
 //        JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         // JUnitAppender.clearBacklog();    // REMOVE THIS!!!
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
@@ -313,6 +342,6 @@ public class StoreAndLoadTest {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StoreAndLoadTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StoreAndLoadTest.class);
 
 }

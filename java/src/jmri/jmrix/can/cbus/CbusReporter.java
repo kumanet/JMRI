@@ -7,9 +7,6 @@ import jmri.implementation.AbstractRailComReporter;
 import jmri.jmrix.can.*;
 import jmri.util.ThreadingUtil;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Extend jmri.AbstractRailComReporter for CBUS controls.
  * <hr>
@@ -24,10 +21,10 @@ import org.slf4j.LoggerFactory;
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
  * <p>
  *
- * CBUS Reporters can accept 
+ * CBUS Reporters can accept
  * 5-byte unique Classic RFID on DDES or ACDAT OPCs,
  * CANRC522 / CANRCOM DDES OPCs.
- * 
+ *
  * @author Mark Riddoch Copyright (C) 2015
  * @author Steve Young Copyright (c) 2019, 2020
  *
@@ -35,32 +32,29 @@ import org.slf4j.LoggerFactory;
 public class CbusReporter extends AbstractRailComReporter implements CanListener {
 
     private final int _number;
-    private final TrafficController tc; // can be removed when former constructor removed
     private final CanSystemConnectionMemo _memo;
-    
+
+
     /**
-     * Create a new CbusReporter.
-     * @param number reporter address number.
-     * @param tco CAN Traffic controller.
-     * @param prefix system prefix.
-     * @deprecated since 4.21.3; use CbusReporter(String,memo,prefix) instead.
-     */
-    @Deprecated
-    public CbusReporter(int number, TrafficController tco, String prefix) {  // a human-readable Reporter number must be specified!
-        super(prefix + "R" + number);  // can't use prefix here, as still in construction
-        _number = number;
-        // At construction, register for messages
-        tc = tco;
-        addTc(tc);
-        _memo = null;
-        log.debug("Added new reporter {}R{}", prefix, number);
-        log.warn("Deprecated Constructor - Please use CbusReporter(String,CanSystemConnectionMemo,String) ");
-    }
-    
-    /**
-     * Create a new CbusReporter.
+     * Should all CbusReporters clear themselves after a timeout?
      * <p>
-     * 
+     * Default behavior is to not timeout; this is public access
+     * so it can be updated from a script
+     */
+    public static boolean eraseOnTimeoutAll = false;
+
+    /**
+     * Should this CbusReporter clear itself after a timeout?
+     * <p>
+     * Default behavior is to not timeout; this is public access
+     * so it can be updated from a script
+     */
+    public boolean eraseOnTimeoutThisReporter = false;
+
+    /**
+     * Create a new CbusReporter.
+     *
+     *
      * @param address Reporter address, currently in String number format. No system prefix or type letter.
      * @param memo System connection.
      */
@@ -68,15 +62,25 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         super(memo.getSystemPrefix() + "R" + address);  // can't use prefix here, as still in construction
         _number = Integer.parseInt(  address);
         _memo = memo;
-        // At construction, register for messages
-        tc = memo.getTrafficController(); // can be removed when former constructor removed
-        addTc(memo.getTrafficController());
+        // At construction, don't register for messages; they're sent via the CbusReporterManager
+        // tc = memo.getTrafficController(); // can be removed when former constructor removed
+        // addTc(memo.getTrafficController());
         log.debug("Added new reporter {}R{}", memo.getSystemPrefix(), address);
     }
 
     /**
-     * Set the CbusReporter State.
+     * {@inheritDoc}
      * <p>
+     * CBUS hardware does not send exit reports; it relies on timeout clearing.
+     */
+    @Override
+    public boolean hasExitReports() {
+        return false;
+    }
+
+    /**
+     * Set the CbusReporter State.
+     *
      * May also provide / update a CBUS Sensor State, depending on property.
      * {@inheritDoc}
      */
@@ -84,9 +88,9 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
     public void setState(int s) {
         super.setState(s);
         if ( getMaintainSensor() ) {
-            SensorManager sm = (SensorManager) _memo.get(SensorManager.class);
+            SensorManager sm = _memo.get(SensorManager.class);
             sm.provide("+"+_number).setCommandedState( s==IdTag.SEEN ? Sensor.ACTIVE : Sensor.INACTIVE );
-        }        
+        }
     }
 
     /**
@@ -96,7 +100,7 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
     @Override
     public void notify(IdTag id){
         if ( this.getCurrentReport()!=null && id!=null ){
-            super.notify(null); // 
+            super.notify(null); //
         }
         super.notify(id);
     }
@@ -122,18 +126,30 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         if ( m.getOpCode() != CbusConstants.CBUS_DDES && m.getOpCode() != CbusConstants.CBUS_ACDAT) {
             return;
         }
-        if ((m.getElement(1) << 8) + m.getElement(2) == _number) { // correct reporter number
-            if (m.getOpCode() == CbusConstants.CBUS_DDES && !getCbusReporterType().equals(CbusReporterManager.CBUS_REPORTER_TYPE_CLASSIC)  ) {
+
+        if (((m.getElement(1) << 8) + m.getElement(2)) == _number) { // correct reporter number, for us
+            if (getCbusReporterType().equals(CbusReporterManager.CBUS_REPORTER_TYPE_CLASSIC)) {
+                // Classic 5 byte unique RFID tag on DDES or ACDAT, the tag
+                // bytes are opaque data and must not be inspected for a type.
+                classicRFIDReport(m);
+            } else if (m.getOpCode() == CbusConstants.CBUS_DDES) {
+                // self-describing DDES, CANRC522 or CANRCOM
                 ddesReport(m);
             } else {
+                // ACDAT is always a 5 byte tag
                 classicRFIDReport(m);
             }
         }
     }
-    
+
+    /**
+     * Process a self-describing DDES from a CANRC522 or CANRCOM.
+     * The least significant bit of the first data byte selects the format.
+     * @param m the DDES frame
+     */
     private void ddesReport(CanReply m) {
         int least_significant_bit = m.getElement(3) & 1;
-        if ( least_significant_bit ==0 ) {
+        if ( least_significant_bit == 0 ) {
             canRc522Report(m);
         } else {
             canRcomReport(m);
@@ -147,7 +163,7 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         notify(tag);
         startTimeout(tag);
     }
-    
+
     // no DCC address correction to allow full 0-65535 range of tags on rolling stock
     private void canRc522Report(CanReply m){
         String tagId = String.valueOf((m.getElement(4)<<8)+ m.getElement(5));
@@ -158,23 +174,149 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         notify(tag);
         startTimeout(tag);
     }
-    
-    // DCC address correction 0-10239 range
+
+
+
     private void canRcomReport(CanReply m) {
-        int railcom_id = (m.getElement(3)>>4);
-        log.warn("CANRCOM support still in development.");
-        log.info("{} detected RailCom ID {}",this,railcom_id);
+
+        var locoAddress = parseAddress(m);
+        
+        int speed = m.getElement(6)&0x7F;
+        if ((m.getElement(6)&0x80) == 0) {
+            speed = -1;  // data unavailable
+        }
+        
+        int flags = m.getElement(7);
+        
+        RailCom.Orientation orientation;
+        switch (flags&0x03) {
+            case 2:
+                orientation = RailCom.Orientation.EAST;
+                break;
+            case 1:
+                orientation = RailCom.Orientation.WEST;
+                break;
+            case 0:
+                orientation = RailCom.Orientation.UNKNOWN;
+                break;
+            default:
+                log.warn("Unexpected orientation code 3");
+                orientation = RailCom.Orientation.UNKNOWN;
+                break;
+        }
+        
+        RailCom.Direction direction;
+        switch ((flags>>2)&0x03) {
+            case 1:
+                direction = RailCom.Direction.FORWARD;
+                break;
+            case 2:
+                direction = RailCom.Direction.BACKWARD;
+                break;
+            case 0:
+                direction = RailCom.Direction.UNKNOWN;
+                break;
+            default:
+                log.warn("Unexpected direction code 3");
+                direction = RailCom.Direction.UNKNOWN;
+                break;
+        }
+        
+        RailCom.Motion motion;
+        switch ((flags>>4)&0x03) {
+            case 1:
+                motion = RailCom.Motion.STATIONARY;
+                log.debug("Setting speed to zero because known to be not moving");
+                speed = 0;
+                break;
+            case 2:
+                motion = RailCom.Motion.MOVING;
+                break;
+            case 0:
+                motion = RailCom.Motion.UNKNOWN;
+                break;
+            default:
+                log.warn("Unexpected motion code 3");
+                motion = RailCom.Motion.UNKNOWN;
+                break;
+        }
+        
+        RailCom.QoS qos;
+        switch ((flags>>6)&0x03) {
+            case 1:
+                qos = RailCom.QoS.POOR;
+                break;
+            case 2:
+                qos = RailCom.QoS.GOOD;
+                break;
+            case 0:
+                qos = RailCom.QoS.UNKNOWN;
+                break;
+            default:
+                log.warn("Unexpected QoS code 3");
+                qos = RailCom.QoS.UNKNOWN;
+                break;
+        }
+        
+        // RailComManager looked up when needed, not cached in a static field at class load,
+        // which could refer to a manager no longer registered with the InstanceManager.
+        var idTag = InstanceManager.getDefault(RailComManager.class).provideIdTag(""+locoAddress.getNumber());
+        var tag = (RailCom)idTag;
+        
+        tag.setDccAddress(locoAddress);
+        tag.setActualSpeed(speed);
+        tag.setOrientation(orientation);
+        tag.setDirection(direction);
+        tag.setMotion(motion);
+        tag.setQoS(qos);
+
+        notify(tag);
+        startTimeout(tag);
     }
 
+    DccLocoAddress parseAddress(CanReply m) {  // package access for testing
+        int dccTypeInt = m.getElement(4)&0xC0;
+        int dccNumber;
+        int b4 = m.getElement(4) & 0x3F;  // excludes high "type" bits
+        int b5 = m.getElement(5);
+        LocoAddress.Protocol dccType;
+        boolean isConsist;
+        switch (dccTypeInt) {
+            default:
+            case 0xC0:
+                dccNumber = (b4<<8) | b5;
+                dccType = LocoAddress.Protocol.DCC_LONG;
+                isConsist = false;
+                break;
+            case 0x00:
+                dccNumber = b5;
+                dccType = LocoAddress.Protocol.DCC_SHORT;
+                isConsist = false;
+                break;
+            case 0x40:
+                dccNumber = b5&0x7F;  // remove direction bit
+                dccType = LocoAddress.Protocol.DCC_SHORT;
+                isConsist = true;
+                break;
+            case 0x80:
+                int decUpper = (b4 << 1) | ((b5>>7)&0x01); // BCD upper value
+                dccNumber = decUpper*100 + (b5&0x7F);
+                dccType = LocoAddress.Protocol.DCC_LONG;
+                isConsist = true;
+                break;                
+        }
+        return new DccLocoAddress(dccNumber, dccType, isConsist);
+    }
+    
     private String toClassicTag(int b1, int b2, int b3, int b4, int b5) {
         return String.format("%02X", b1) + String.format("%02X", b2) + String.format("%02X", b3)
             + String.format("%02X", b4) + String.format("%02X", b5);
     }
-    
+
     /**
      * Get the Reporter Listener format type.
      * <p>
-     * Defaults to Classic RfID, 5 byte unique. 
+     * Defaults to Classic RfID, 5 byte unique.
      * @return reporter format type.
      */
     @Nonnull
@@ -182,7 +324,7 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         Object returnVal = getProperty(CbusReporterManager.CBUS_REPORTER_DESCRIPTOR_KEY);
         return (returnVal==null ? CbusReporterManager.CBUS_DEFAULT_REPORTER_TYPE : returnVal.toString());
     }
-    
+
     /**
      * Get if the Reporter should provide / update a CBUS Sensor, following Reporter Status.
      * <p>
@@ -193,28 +335,38 @@ public class CbusReporter extends AbstractRailComReporter implements CanListener
         Boolean returnVal = (Boolean) getProperty(CbusReporterManager.CBUS_MAINTAIN_SENSOR_DESCRIPTOR_KEY);
         return (returnVal==null ? false : returnVal);
     }
-    
+
     // delay can be set to non-null memo when older constructor fully deprecated.
     private void startTimeout(IdTag tag){
+        // only timeout when enabled
+        if (! eraseOnTimeoutAll && ! eraseOnTimeoutThisReporter) return;
+
         int delay = (_memo==null ? 2000 : ((CbusReporterManager)_memo.get(jmri.ReporterManager.class)).getTimeout() );
+        // a later read restarts the timeout, also when it is the same tag again
+        final int generation = ++timeoutGeneration;
         ThreadingUtil.runOnLayoutDelayed( () -> {
-            if (!disposed && getCurrentReport() == tag) {
+            if (!disposed && generation == timeoutGeneration && getCurrentReport() == tag) {
                 notify(null);
             }
         },delay);
     }
-    
+
+    /**
+     * Counts the reads that started a timeout; only the timeout of the last
+     * read can clear the report. Used on the layout thread.
+     */
+    private int timeoutGeneration = 0;
+
     private boolean disposed = false;
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
     public void dispose() {
         disposed = true;
-        tc.removeCanListener(this);
         super.dispose();
     }
 
-    private static final Logger log = LoggerFactory.getLogger(CbusReporter.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusReporter.class);
 }

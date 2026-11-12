@@ -1,18 +1,16 @@
 package jmri.jmrit.logixng.implementation;
 
-import java.util.Locale;
-import java.util.Map;
-
-import static jmri.NamedBean.UNKNOWN;
+import java.util.*;
 
 import javax.annotation.Nonnull;
+import javax.swing.JOptionPane;
 
-import jmri.InstanceManager;
-import jmri.JmriException;
-import jmri.Manager;
+import jmri.*;
 import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.Module;
+import jmri.jmrit.logixng.Stack;
 import jmri.jmrit.logixng.util.LogixNG_Thread;
-import jmri.util.*;
+import jmri.util.ThreadingUtil;
 
 /**
  * The default implementation of ConditionalNG.
@@ -28,6 +26,7 @@ public class DefaultConditionalNG extends AbstractBase
     private String _socketSystemName = null;
     private final FemaleDigitalActionSocket _femaleSocket;
     private boolean _enabled = true;
+    private boolean _executeAtStartup = true;
     private final ExecuteLock _executeLock = new ExecuteLock();
     private boolean _runDelayed = true;
     private final Stack _stack = new DefaultStack();
@@ -122,8 +121,10 @@ public class DefaultConditionalNG extends AbstractBase
     /** {@inheritDoc} */
     @Override
     public void execute() {
-        if (_executeLock.once()) {
-            runOnLogixNG_Thread(new ExecuteTask(this, _executeLock, null), true);
+        if (_executeAtStartup || !getLogixNG().isStartup()) {
+            if (_executeLock.once()) {
+                runOnLogixNG_Thread(new ExecuteTask(this, _executeLock, null), true);
+            }
         }
     }
 
@@ -141,16 +142,137 @@ public class DefaultConditionalNG extends AbstractBase
         runOnLogixNG_Thread(() -> {internalExecute(this, socket);}, true);
     }
 
+    /**
+     * Executes a LogixNG Module.
+     * @param module      The module to be executed
+     * @param parameters  The parameters
+     * @throws IllegalArgumentException when needed
+     */
+    public static void executeModule(Module module, Map<String, Object> parameters)
+            throws IllegalArgumentException {
+
+        if (module == null) {
+            throw new IllegalArgumentException("The parameter \"module\" is null");
+        }
+        if (!(module.getRootSocket() instanceof DefaultFemaleDigitalActionSocket)) {
+            throw new IllegalArgumentException("The module " + module.getDisplayName() + " is not a DigitalActionModule");
+        }
+        if (parameters == null) {
+            throw new IllegalArgumentException("The parameter \"parameters\" is null");
+        }
+
+        LogixNG_Thread thread = LogixNG_Thread.getThread(LogixNG_Thread.DEFAULT_LOGIXNG_THREAD);
+        ConditionalNG conditionalNG = new DefaultConditionalNG("IQC0000000", null);
+        InternalFemaleSocket socket = new InternalFemaleSocket(conditionalNG, module, parameters);
+        thread.runOnLogixNGEventually(() -> { internalExecute(conditionalNG, socket); });
+    }
+
+    private static class InternalFemaleSocket extends DefaultFemaleDigitalActionSocket {
+
+        private final ConditionalNG _conditionalNG;
+        private final Module _module;
+        private final Map<String, Object> _parameters;
+
+        public InternalFemaleSocket(ConditionalNG conditionalNG, Module module, Map<String, Object> parameters) {
+            super(null, new FemaleSocketListener(){
+                @Override
+                public void connected(FemaleSocket socket) {
+                    // Do nothing
+                }
+
+                @Override
+                public void disconnected(FemaleSocket socket) {
+                    // Do nothing
+                }
+            }, "A");
+            _conditionalNG = conditionalNG;
+            _module = module;
+            _parameters = parameters;
+        }
+
+        @Override
+        public void execute() throws JmriException {
+            FemaleSocket socket = _module.getRootSocket();
+            if (!(socket instanceof DefaultFemaleDigitalActionSocket)) {
+                throw new IllegalArgumentException("The module " + _module.getDisplayName() + " is not a DigitalActionModule");
+            }
+
+            synchronized(this) {
+                SymbolTable oldSymbolTable = _conditionalNG.getSymbolTable();
+                DefaultSymbolTable newSymbolTable = new DefaultSymbolTable(_conditionalNG);
+                List<Module.ParameterData> _parameterData = new ArrayList<>();
+                for (Module.Parameter p : _module.getParameters()) {
+                    _parameterData.add(new Module.ParameterData(
+                            p.getName(), SymbolTable.InitialValueType.None, "",
+                            Module.ReturnValueType.None, ""));
+                }
+                newSymbolTable.createSymbols(_conditionalNG.getSymbolTable(), _parameterData);
+                for (var entry : _parameters.entrySet()) {
+                    newSymbolTable.setValue(entry.getKey(), entry.getValue());
+                }
+                _conditionalNG.setSymbolTable(newSymbolTable);
+
+                ((DefaultFemaleDigitalActionSocket)socket).execute();
+                _conditionalNG.setSymbolTable(oldSymbolTable);
+            }
+        }
+    }
+
     private static void internalExecute(ConditionalNG conditionalNG, FemaleDigitalActionSocket femaleSocket) {
         if (conditionalNG.isEnabled()) {
             DefaultSymbolTable newSymbolTable = new DefaultSymbolTable(conditionalNG);
 
             try {
+                conditionalNG.setCurrentConditionalNG(conditionalNG);
+
                 conditionalNG.setSymbolTable(newSymbolTable);
+
+                LogixNG logixNG = conditionalNG.getLogixNG();
+                InlineLogixNG inlineLogixNG = null;
+                if (logixNG != null) {
+                    inlineLogixNG = logixNG.getInlineLogixNG();
+                }
+                if (inlineLogixNG != null) {
+                    List<SymbolTable.VariableData> localVariables = new ArrayList<>();
+                    localVariables.add(new SymbolTable.VariableData(
+                            "__InlineLogixNG__", SymbolTable.InitialValueType.String,
+                            inlineLogixNG.getNameString()));
+//                    localVariables.add(new SymbolTable.VariableData(
+//                            "__PositionableId__", SymbolTable.InitialValueType.String,
+//                            inlineLogixNG.getId()));
+                    localVariables.add(new SymbolTable.VariableData(
+                            "__Editor__", SymbolTable.InitialValueType.String,
+                            inlineLogixNG.getEditorName()));
+                    newSymbolTable.createSymbols(localVariables);
+                }
+
                 if (femaleSocket != null) {
                     femaleSocket.execute();
                 } else {
                     conditionalNG.getFemaleSocket().execute();
+                }
+            } catch (AbortConditionalNG_IgnoreException | ReturnException | ExitException e) {
+                // A AbortConditionalNG_IgnoreException should be ignored.
+                // A Return action in a ConditionalNG causes a ReturnException so this is okay.
+                // An Exit action in a ConditionalNG causes a ExitException so this is okay.
+            } catch (ValidationErrorException e) {
+                ThreadingUtil.runOnGUI(()->
+                        JOptionPane.showMessageDialog(null,
+                                e.getMessage(),
+                                Bundle.getMessage("LogixNG_ValidationError"),
+                                JOptionPane.ERROR_MESSAGE)
+                );
+            } catch (PassThruException e) {
+                // This happens due to a a Break action or a Continue action that isn't handled.
+                log.info("ConditionalNG {} was aborted during execute: {}",
+                        conditionalNG.getSystemName(), e.getCause(), e.getCause());
+            } catch (AbortConditionalNGExecutionException e) {
+                if (InstanceManager.getDefault(LogixNGPreferences.class).getShowSystemNameInException()) {
+                    log.warn("ConditionalNG {} was aborted during execute in the item {}: {}",
+                            conditionalNG.getSystemName(), e.getMaleSocket().getSystemName(), e.getCause(), e.getCause());
+                } else {
+                    log.warn("ConditionalNG {} was aborted during execute: {}",
+                            conditionalNG.getSystemName(), e.getCause(), e.getCause());
                 }
             } catch (JmriException | RuntimeException e) {
 //                LoggingUtil.warnOnce(log, "ConditionalNG {} got an exception during execute: {}",
@@ -182,6 +304,20 @@ public class DefaultConditionalNG extends AbstractBase
             }
         }
 
+    }
+
+    /**
+     * Set the current ConditionalNG.
+     * @param conditionalNG the current ConditionalNG
+     */
+    @Override
+    public void setCurrentConditionalNG(ConditionalNG conditionalNG) {
+        if (this != conditionalNG) {
+            throw new UnsupportedOperationException("The new conditionalNG must be the same as myself");
+        }
+        for (Module m : InstanceManager.getDefault(ModuleManager.class).getNamedBeanSet()) {
+            m.setCurrentConditionalNG(conditionalNG);
+        }
     }
 
     /** {@inheritDoc} */
@@ -262,10 +398,6 @@ public class DefaultConditionalNG extends AbstractBase
     }
 
     @Override
-    public boolean isExternal() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
     public void setSocketSystemName(String systemName) {
         if ((systemName == null) || (!systemName.equals(_socketSystemName))) {
             _femaleSocket.disconnect();
@@ -273,13 +405,14 @@ public class DefaultConditionalNG extends AbstractBase
         _socketSystemName = systemName;
     }
 
+    @Override
     public String getSocketSystemName() {
         return _socketSystemName;
     }
 
     /** {@inheritDoc} */
     @Override
-    final public void setup() {
+    public final void setup() {
         if (!_femaleSocket.isConnected()
                 || !_femaleSocket.getConnectedSocket().getSystemName()
                         .equals(_socketSystemName)) {
@@ -295,11 +428,11 @@ public class DefaultConditionalNG extends AbstractBase
                         _femaleSocket.connect(maleSocket);
                         maleSocket.setup();
                     } else {
-                        log.error("digital action is not found: " + _socketSystemName);
+                        log.error("digital action is not found: {}", _socketSystemName);
                     }
                 } catch (SocketAlreadyConnectedException ex) {
                     // This shouldn't happen and is a runtime error if it does.
-                    throw new RuntimeException("socket is already connected");
+                    throw new JmriUncheckedException("socket is already connected");
                 }
             }
         } else {
@@ -309,7 +442,7 @@ public class DefaultConditionalNG extends AbstractBase
 
     /** {@inheritDoc} */
     @Override
-    final public void disposeMe() {
+    public final void disposeMe() {
         _femaleSocket.dispose();
     }
 
@@ -321,7 +454,9 @@ public class DefaultConditionalNG extends AbstractBase
             LogixNG logixNG = getLogixNG();
             if ((logixNG != null) && logixNG.isActive()) {
                 registerListeners();
-                execute();
+                if (_executeAtStartup) {
+                    execute();
+                }
             }
         } else {
             unregisterListeners();
@@ -336,14 +471,32 @@ public class DefaultConditionalNG extends AbstractBase
 
     /** {@inheritDoc} */
     @Override
-    public void registerListenersForThisClass() {
-        // Do nothing
+    public void setExecuteAtStartup(boolean value) {
+        _executeAtStartup = value;
     }
 
     /** {@inheritDoc} */
     @Override
-    public void unregisterListenersForThisClass() {
-        // Do nothing
+    public boolean isExecuteAtStartup() {
+        return _executeAtStartup;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public synchronized boolean isListenersRegistered() {
+        return _listenersAreRegistered;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public synchronized void registerListenersForThisClass() {
+        _listenersAreRegistered = true;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public synchronized void unregisterListenersForThisClass() {
+        _listenersAreRegistered = false;
     }
 
     @Override
@@ -351,6 +504,11 @@ public class DefaultConditionalNG extends AbstractBase
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalNG.class);
+    @Override
+    public boolean existsInTree() {
+        return true;
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalNG.class);
 
 }

@@ -91,7 +91,7 @@ public class TurnoutSignalMastXml
             m = (TurnoutSignalMast) InstanceManager.getDefault(jmri.SignalMastManager.class)
                     .provideCustomSignalMast(sys, TurnoutSignalMast.class);
         } catch (JmriException e) {
-            log.error("Failed to load TurnoutSignalMast {}: {}", sys, e);
+            log.error("Failed to load TurnoutSignalMast {}", sys, e);
             return false;
         }
 
@@ -146,5 +146,5 @@ public class TurnoutSignalMastXml
         return true;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TurnoutSignalMastXml.class);
+    private static final Logger log = LoggerFactory.getLogger(TurnoutSignalMastXml.class);
 }

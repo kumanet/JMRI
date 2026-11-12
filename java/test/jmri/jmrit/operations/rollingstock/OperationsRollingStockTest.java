@@ -1,6 +1,7 @@
 package jmri.jmrit.operations.rollingstock;
 
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import jmri.InstanceManager;
@@ -70,22 +71,29 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         e.setAttribute(Xml.DATE, "2015/05/15 15:15:15");
         e.setAttribute(Xml.SELECTED, Xml.FALSE);
         e.setAttribute(Xml.LAST_LOCATION_ID, "TESTLASTLOCATION");
+        e.setAttribute(Xml.LAST_TRACK_ID, "TESTLASTTRACK");
         e.setAttribute(Xml.TRAIN, "TESTTRAIN");
+        e.setAttribute(Xml.TRAIN_ID, "TESTTRAINID");
+        e.setAttribute(Xml.LAST_TRAIN_ID, "TESTLASTTRAINID");
         e.setAttribute(Xml.OWNER, "TESTOWNER");
         e.setAttribute(Xml.VALUE, "TESTVALUE");
         e.setAttribute(Xml.RFID, "12345");
         e.setAttribute(Xml.LOC_UNKNOWN, Xml.FALSE);
         e.setAttribute(Xml.OUT_OF_SERVICE, Xml.FALSE);
         e.setAttribute(Xml.BLOCKING, "5");
+        e.setAttribute(Xml.CLONE, Xml.FALSE);
         e.setAttribute(Xml.COMMENT, "Test Comment");
-        try {
+        e.setAttribute(Xml.PICKUP_TIME, "TESTPICKUPTIME");
+        e.setAttribute(Xml.SETOUT_TIME, "TESTSETOUTTIME");
+        e.setAttribute(Xml.DIVISION_ID, "TESTDIVISIONID");
+        e.setAttribute("wait", "6");
+
+        Assertions.assertDoesNotThrow( () ->  {
             Car rs1 = new Car(e);
             Assert.assertNotNull("Xml Element Constructor", rs1);
-        } catch (java.lang.NullPointerException npe) {
-            Assert.fail("Null Pointer Exception while executing Xml Element Constructor");
-        }
+            Assert.assertEquals("Tag 12345", "ID12345", rs1.getRfid() );
+        }, "Exception while executing Xml Element Constructor");
 
-        jmri.util.JUnitAppender.assertErrorMessage("Tag 12345 not found");
     }
 
     // test creation
@@ -99,11 +107,11 @@ public class OperationsRollingStockTest extends OperationsTestCase {
 
         rs1.setTypeName("TESTTYPE");
         rs1.setLength("TESTLENGTH");
-        rs1.setColor("TESTCOLOR");
+        rs1.setColorName("TESTCOLOR");
         rs1.setWeight("TESTWEIGHT");
         rs1.setWeightTons("TESTWEIGHTTONS");
         rs1.setBuilt("TESTBUILT");
-        rs1.setOwner("TESTOWNER");
+        rs1.setOwnerName("TESTOWNER");
         rs1.setComment("TESTCOMMENT");
         // make sure the ID tags exist before we
         // try to add it to a car.
@@ -116,13 +124,13 @@ public class OperationsRollingStockTest extends OperationsTestCase {
         /* Also need to test location length */
         Assert.assertEquals("Car Length", "TESTLENGTH", rs1.getLength());
 
-        Assert.assertEquals("Car Color", "TESTCOLOR", rs1.getColor());
+        Assert.assertEquals("Car Color", "TESTCOLOR", rs1.getColorName());
         /* More appropriate Weight tests below */
         Assert.assertEquals("Car Weight", "TESTWEIGHT", rs1.getWeight());
         Assert.assertEquals("Car WeightTons", "TESTWEIGHTTONS", rs1.getWeightTons());
 
         Assert.assertEquals("Car Built", "TESTBUILT", rs1.getBuilt());
-        Assert.assertEquals("Car Owner", "TESTOWNER", rs1.getOwner());
+        Assert.assertEquals("Car Owner", "TESTOWNER", rs1.getOwnerName());
         Assert.assertEquals("Car Comment", "TESTCOMMENT", rs1.getComment());
         Assert.assertEquals("Car Rfid", "IDTESTRFID", rs1.getRfid());
         Assert.assertEquals("Car Moves", 5, rs1.getMoves());

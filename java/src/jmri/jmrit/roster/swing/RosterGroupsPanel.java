@@ -15,11 +15,11 @@ import java.awt.event.ItemListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
+
 import javax.swing.DropMode;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
@@ -43,6 +43,7 @@ import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
+
 import jmri.jmrit.roster.FullBackupExportAction;
 import jmri.jmrit.roster.FullBackupImportAction;
 import jmri.jmrit.roster.Roster;
@@ -52,9 +53,8 @@ import jmri.util.FileUtil;
 import jmri.util.IterableEnumeration;
 import jmri.util.datatransfer.RosterEntrySelection;
 import jmri.util.swing.JmriAbstractAction;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.WindowInterface;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A JPanel that lists Roster Groups
@@ -195,14 +195,14 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
         if (action != null) {
             if (newWindowMenuItemAction == null) {
                 MenuActionListener ml = new MenuActionListener();
-                JMenuItem mi = new JMenuItem(ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle").getString("MenuOpenInNewWindow"));
+                JMenuItem mi = new JMenuItem(ResourceBundle.getBundle("jmri.jmrit.Bundle").getString("MenuOpenInNewWindow"));
                 mi.addActionListener(ml);
                 mi.setActionCommand("newWindow");
                 groupsMenu.insert(mi, 0);
                 groupsMenu.insert(new JSeparator(), 1);
                 // create the menu item twice because a menu item can only
                 // be attached to a single menu
-                mi = new JMenuItem(ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle").getString("MenuOpenInNewWindow"));
+                mi = new JMenuItem(ResourceBundle.getBundle("jmri.jmrit.Bundle").getString("MenuOpenInNewWindow"));
                 mi.addActionListener(ml);
                 mi.setActionCommand("newWindow");
                 allEntriesMenu.insert(mi, 0);
@@ -229,7 +229,6 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
         return newWindowMenuItemAction;
     }
 
-    @SuppressWarnings("unchecked")
     private void setSelectionToGroup(String group) {
         _tree.removeTreeSelectionListener(_TSL);
         if (group == null || group.equals(Roster.ALLENTRIES) || group.equals("")) {
@@ -397,6 +396,7 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
         for (String g : Roster.getDefault().getRosterGroupList()) {
             root.add(new DefaultMutableTreeNode(g));
         }
+        root.add(new DefaultMutableTreeNode(Roster.NOGROUP));
     }
 
     // allow private classes to fire property change events as the RGP
@@ -427,10 +427,10 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
                 } else if (e.getActionCommand().equals("newWindow") && newWindowMenuItemAction != null) {
                     newWindowMenuItemAction.actionPerformed(e);
                 } else {
-                    JOptionPane.showMessageDialog((JComponent) e.getSource(),
+                    JmriJOptionPane.showMessageDialog((JComponent) e.getSource(),
                             ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle").getString("NotImplemented"),
                             ResourceBundle.getBundle("jmri.jmrit.roster.JmritRosterBundle").getString("NotImplemented"),
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                 }
             }
         }
@@ -505,7 +505,16 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
         public boolean canImport(JComponent c, DataFlavor[] transferFlavors) {
             for (DataFlavor flavor : transferFlavors) {
                 if (RosterEntrySelection.rosterEntryFlavor.equals(flavor)) {
-                    return true;
+                    if (c instanceof JTree && ((JTree) c).getDropLocation() != null && ((JTree) c).getDropLocation().getPath() != null) {
+                        var target = ((JTree) c).getDropLocation().getPath().getLastPathComponent().toString();
+                        if (Roster.ALLENTRIES.equals(target) || Roster.NOGROUP.equals(target) ) {
+                            return false;
+                        } else {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -524,7 +533,7 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
             if (p != null) {
                 TreePath g = new TreePath(_model.getPathToRoot(_groups));
                 // drag onto existing user defined group, but not onto current selection
-                if (g.isDescendant(p) && !p.isDescendant(g) 
+                if (g.isDescendant(p) && !p.isDescendant(g)
                     && ( (c instanceof JTree) && !p.isDescendant(((JTree)c).getSelectionPath()))
                     ) {
                     try {
@@ -536,7 +545,7 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
                         Roster.getDefault().writeRoster();
                         setSelectedRosterGroup(p.getLastPathComponent().toString());
                     } catch (java.awt.datatransfer.UnsupportedFlavorException | java.io.IOException | RuntimeException e) {
-                        log.warn("Exception dragging RosterEntries onto RosterGroups: {}", e);
+                        log.warn("Exception dragging RosterEntries onto RosterGroups", e);
                     }
                 }
             } else {
@@ -545,14 +554,14 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
                     a.setParameter("RosterEntries", RosterEntrySelection.getRosterEntries(t));
                     a.actionPerformed(null);
                 } catch (java.awt.datatransfer.UnsupportedFlavorException | java.io.IOException | RuntimeException e) {
-                    log.warn("Exception creating RosterGroups from selection: {}", e);
+                    log.warn("Exception creating RosterGroups from selection", e);
                 }
             }
             return false;
         }
     }
 
-    static public class TreeCellRenderer extends DefaultTreeCellRenderer {
+    public static class TreeCellRenderer extends DefaultTreeCellRenderer {
 
     }
 
@@ -586,7 +595,7 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
 
         @Override
         public void treeWillExpand(TreeExpansionEvent e) throws ExpandVetoException {
-            log.debug("Selected rows ", _tree.getSelectionRows());
+            log.debug("Selected rows {}", _tree.getSelectionRows());
         }
 
         @Override
@@ -597,7 +606,7 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
         }
     }
 
-    static public class TreeUI extends BasicTreeUI {
+    public static class TreeUI extends BasicTreeUI {
 
         @Override
         public void paint(Graphics g, JComponent c) {
@@ -634,6 +643,6 @@ public class RosterGroupsPanel extends JPanel implements RosterGroupSelector {
             // do nothing - don't paint vertical lines.
         }
     }
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(RosterGroupsPanel.class);
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RosterGroupsPanel.class);
 }

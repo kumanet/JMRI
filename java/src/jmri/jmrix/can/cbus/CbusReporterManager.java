@@ -6,11 +6,12 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import jmri.*;
+import jmri.jmrix.can.CanListener;
+import jmri.jmrix.can.CanMessage;
+import jmri.jmrix.can.CanMutableFrame;
+import jmri.jmrix.can.CanReply;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.managers.AbstractReporterManager;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implement ReporterManager for CAN CBUS systems.
@@ -23,12 +24,15 @@ import org.slf4j.LoggerFactory;
  * @author Mark Riddoch Copyright (C) 2015
  * @author Steve Young Copyright (C) 2019
  */
-public class CbusReporterManager extends AbstractReporterManager {
+public class CbusReporterManager extends AbstractReporterManager implements CanListener {
 
     public CbusReporterManager(CanSystemConnectionMemo memo) {
         super(memo);
+
+        // At construction, register for messages to auto create CbusReporters
+        addTc(memo.getTrafficController());
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -42,7 +46,8 @@ public class CbusReporterManager extends AbstractReporterManager {
      * {@inheritDoc}
      */
     @Override
-    protected Reporter createNewReporter(@Nonnull String systemName, String userName) {
+    @Nonnull
+    protected Reporter createNewReporter(@Nonnull String systemName, String userName) throws IllegalArgumentException {
         log.debug("ReporterManager create new CbusReporter: {}", systemName);
         String addr = systemName.substring(getSystemNamePrefix().length());
         Reporter t = new CbusReporter(addr, getMemo());
@@ -82,7 +87,7 @@ public class CbusReporterManager extends AbstractReporterManager {
         log.debug("Valid system name: {}", systemName);
         return NameValidity.VALID;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -98,8 +103,8 @@ public class CbusReporterManager extends AbstractReporterManager {
     public String getEntryToolTip() {
         return Bundle.getMessage("AddReporterEntryToolTip");
     }
-    
-    /** 
+
+    /**
      * Validates to only numeric system names.
      * {@inheritDoc}
      */
@@ -108,23 +113,23 @@ public class CbusReporterManager extends AbstractReporterManager {
     public String validateSystemNameFormat(@Nonnull String name, @Nonnull java.util.Locale locale) throws jmri.NamedBean.BadSystemNameException {
         return validateSystemNameFormatOnlyNumeric(name,locale);
     }
-    
-    protected final static String CBUS_REPORTER_DESCRIPTOR_KEY = "CBUS Reporter Type"; // NOI18N
-    
-    protected final static String CBUS_REPORTER_TYPE_CLASSIC = "Classic RFID"; // NOI18N
-    
-    protected final static String CBUS_REPORTER_TYPE_DDES_DESCRIBING = "CANRC522 / CANRCOM"; // NOI18N
-    
-    protected final static String[] CBUS_REPORTER_TYPES = {
+
+    protected static final String CBUS_REPORTER_DESCRIPTOR_KEY = "CBUS Reporter Type"; // NOI18N
+
+    protected static final String CBUS_REPORTER_TYPE_CLASSIC = "Classic RFID"; // NOI18N
+
+    protected static final String CBUS_REPORTER_TYPE_DDES_DESCRIBING = "CANRC522 / CANRCOM"; // NOI18N
+
+    static final String[] CBUS_REPORTER_TYPES = {
         CBUS_REPORTER_TYPE_CLASSIC,CBUS_REPORTER_TYPE_DDES_DESCRIBING};
-    
-    protected final static String[] CBUS_REPORTER_TYPE_TIPS = {
+
+    static final String[] CBUS_REPORTER_TYPE_TIPS = {
         "DDES / ACDAT 5 byte unique tag.","DDES self-describing ( Writeable CANRC522 / Railcom )"}; // NOI18N
-    
-    protected final static String CBUS_DEFAULT_REPORTER_TYPE = CBUS_REPORTER_TYPES[0];
-    
-    protected final static String CBUS_MAINTAIN_SENSOR_DESCRIPTOR_KEY = "Maintain CBUS Sensor"; // NOI18N
-    
+
+    protected static final String CBUS_DEFAULT_REPORTER_TYPE = CBUS_REPORTER_TYPES[0];
+
+    protected static final String CBUS_MAINTAIN_SENSOR_DESCRIPTOR_KEY = "Maintain CBUS Sensor"; // NOI18N
+
     @Override
     @Nonnull
     public List<NamedBeanPropertyDescriptor<?>> getKnownBeanProperties() {
@@ -153,9 +158,9 @@ public class CbusReporterManager extends AbstractReporterManager {
         });
         return l;
     }
-    
+
     private int _timeout=2000; // same default as TimeoutReporter
-    
+
     /**
      * Set the Reporter timeout.
      * @param timeout time in milliseconds that CbusReporters stay at IdTag.SEEN after hearing an ID Tag.
@@ -163,7 +168,7 @@ public class CbusReporterManager extends AbstractReporterManager {
     public void setTimeout(int timeout){
         _timeout = timeout;
     }
-    
+
     /**
      * Get the Reporter Timeout.
      * @return milliseconds for CbusReporters to return to IdTag.UNSEEN
@@ -172,6 +177,69 @@ public class CbusReporterManager extends AbstractReporterManager {
         return _timeout;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(CbusReporterManager.class);
+    /**
+     * Parse incoming reply to see if it is interesting to a Reporter, 
+     * and if it is make sure that reporter exists.
+     */
+    private CbusReporter processFrame(CanMutableFrame m) {
+        // see if this is a RailCom message from CBus
+        if ( m.extendedOrRtr() ) {
+            return null;
+        }
+        if ( m.getElement(0) != CbusConstants.CBUS_DDES && m.getElement(0) != CbusConstants.CBUS_ACDAT) {
+            return null;
+        }
+        // here an DDES (RFID or RailCom) or ACATmessage, extract device number & check for existing CBusReporter
+        var device = (m.getElement(1) << 8) + m.getElement(2);
+        var systemName = ""+device;
+
+        // create if it doesn't exist.
+        boolean isNewReporter = ( getBySystemName(makeSystemName(systemName, false)) == null );
+        var reporter = provideReporter(systemName);
+
+        // The Reporter type ( Classic RFID or self-describing CANRC522 / CANRCOM )
+        // defaults to Classic RFID and can be set by the user in the Reporter Table.
+        // A Reporter created by a DDES which looks like a CANRCOM RailCom report
+        // is set to the self-describing type, so RailCom works without configuration.
+        // An existing Reporter is never switched on the content of a frame,
+        // as the data bytes of a Classic 5 byte RFID tag can take any value,
+        // which previously caused Classic RFID Reporters to be switched
+        // to the RailCom type, overriding the user setting.
+        if ( isNewReporter && m.getElement(0) == CbusConstants.CBUS_DDES
+            && ( m.getElement(3) & 0x0F ) == 0x01 ) {
+            reporter.setProperty(CBUS_REPORTER_DESCRIPTOR_KEY,CBUS_REPORTER_TYPE_DDES_DESCRIBING);
+        }
+
+        return (CbusReporter)reporter;
+    }
+    
+    @Override
+    public void reply(CanReply m) {
+        var reporter = processFrame(m);
+        if (reporter!= null) {
+            reporter.reply(m);
+        }
+    }
+    
+    @Override  
+    public void message(CanMessage m) {
+        var reporter = processFrame(m);
+        if (reporter!= null) {
+            reporter.message(m);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void dispose() {
+        if (getMemo().getTrafficController() != null) { // not all tests provide a TrafficController
+            getMemo().getTrafficController().removeCanListener(this);
+        }
+        super.dispose();
+    }    
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusReporterManager.class);
 
 }

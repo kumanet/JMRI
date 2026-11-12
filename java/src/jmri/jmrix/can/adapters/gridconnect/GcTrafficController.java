@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  * Traffic controller for the GridConnect protocol.
  * <p>
  * GridConnect uses messages transmitted as an ASCII string of up to 24
- * characters of the form: :ShhhhNd0d1d2d3d4d5d6d7; 
+ * characters of the form: :ShhhhNd0d1d2d3d4d5d6d7;
  * <p>
  * The S indicates a standard
  * CAN frame hhhh is the two byte header (11 useful bits) N or R indicates a
@@ -48,7 +48,12 @@ public class GcTrafficController extends TrafficController {
      */
     @Override
     protected void forwardReply(AbstractMRListener client, AbstractMRReply r) {
-        ((CanListener) client).reply((CanReply) r);
+        if (r != null) {
+            ((CanListener) client).reply((CanReply) r);
+        } else {
+            // null shouldn't happen, but we've seen it; try to track if down
+            log.error("Found unexpected null message", new Exception("traceback") );
+        }
     }
 
     // Current state
@@ -86,7 +91,7 @@ public class GcTrafficController extends TrafficController {
      */
     @Override
     public void sendCanMessage(CanMessage m, CanListener reply) {
-        log.debug("GcTrafficController sendCanMessage() {}", m.toString());
+        log.debug("GcTrafficController sendCanMessage() {}", m);
         sendMessage(m, reply);
     }
 
@@ -96,7 +101,7 @@ public class GcTrafficController extends TrafficController {
      */
     @Override
     public void sendCanReply(CanReply r, CanListener reply) {
-        log.debug("TrafficController sendCanReply() {}", r.toString());
+        log.debug("TrafficController sendCanReply() {}", r);
         notifyReply(r, reply);
     }
 
@@ -109,7 +114,7 @@ public class GcTrafficController extends TrafficController {
     }
 
     /**
-     * Determine how much many bytes the entire message will take, 
+     * Determine how much many bytes the entire message will take,
      * including space for header and trailer.
      *
      * @param m The message to be sent
@@ -127,8 +132,7 @@ public class GcTrafficController extends TrafficController {
     @Override
     protected AbstractMRMessage newMessage() {
         log.debug("New GridConnectMessage created");
-        GridConnectMessage msg = new GridConnectMessage();
-        return msg;
+        return new GridConnectMessage();
     }
 
     /**
@@ -137,15 +141,16 @@ public class GcTrafficController extends TrafficController {
      */
     @Override
     public CanReply decodeFromHardware(AbstractMRReply m) {
-        GridConnectReply gc = new GridConnectReply();
         log.debug("Decoding from hardware");
-        try {
+        // no throwaway GridConnectReply is allocated for every incoming frame
+        GridConnectReply gc;
+        if (m instanceof GridConnectReply) {
             gc = (GridConnectReply) m;
-        } catch(java.lang.ClassCastException cce){
+        } else {
             log.error("{} cannot cast to a GridConnectReply",m);
+            gc = new GridConnectReply();
         }
-        CanReply ret = gc.createReply();
-        return ret;
+        return gc.createReply();
     }
 
     /**
@@ -155,9 +160,7 @@ public class GcTrafficController extends TrafficController {
     @Override
     public AbstractMRMessage encodeForHardware(CanMessage m) {
         //log.debug("Encoding for hardware");
-        GridConnectMessage ret = new GridConnectMessage(m);
-
-        return ret;
+        return new GridConnectMessage(m);
     }
 
     /**
@@ -167,8 +170,7 @@ public class GcTrafficController extends TrafficController {
     @Override
     protected AbstractMRReply newReply() {
         log.debug("New GridConnectReply created");
-        GridConnectReply reply = new GridConnectReply();
-        return reply;
+        return new GridConnectReply();
     }
 
     /*
@@ -187,7 +189,7 @@ public class GcTrafficController extends TrafficController {
     /**
      * Detect if the reply buffer ends with ";".
      * @param r Reply
-     * @return true if contais end, else false.
+     * @return true if contains end, else false.
      */
     boolean endNormalReply(AbstractMRReply r) {
         int num = r.getNumDataElements() - 1;
@@ -225,6 +227,14 @@ public class GcTrafficController extends TrafficController {
                 while (char1 != ':') {
                     char1 = readByteProtected(istream);
                 }
+            } else if (char1 == ':') {
+                // Start of a new frame before the end of the current one,
+                // the end of the current frame ( ';' ) has been lost, eg. a serial overrun.
+                // Discard the partial frame and restart with this ':' so that the
+                // two frames are not merged into one corrupt frame.
+                log.warn("Incomplete frame discarded: {}", msg);
+                msg.flush();
+                i = 0;
             }
             //if (log.isDebugEnabled()) log.debug("char: "+(char1&0xFF)+" i: "+i);
             // if there was a timeout, flush any char received and start over
@@ -248,5 +258,5 @@ public class GcTrafficController extends TrafficController {
 
     private int gcState;
 
-    private final static Logger log = LoggerFactory.getLogger(GcTrafficController.class);
+    private static final Logger log = LoggerFactory.getLogger(GcTrafficController.class);
 }

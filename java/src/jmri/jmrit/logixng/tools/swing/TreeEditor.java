@@ -22,31 +22,49 @@ import jmri.jmrit.logixng.swing.SwingConfiguratorInterface;
 import jmri.jmrit.logixng.swing.SwingTools;
 import jmri.jmrit.logixng.util.LogixNG_Thread;
 import jmri.jmrit.logixng.util.parser.swing.FunctionsHelpDialog;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.ThreadingUtil;
-import jmri.util.swing.JComboBoxUtil;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 
 /**
  * Base class for LogixNG editors
- * 
+ *
  * @author Daniel Bergqvist 2020
  */
 public class TreeEditor extends TreeViewer {
-    
+
     // Enums used to configure TreeEditor
     public enum EnableClipboard { EnableClipboard, DisableClipboard }
     public enum EnableRootRemoveCutCopy { EnableRootRemoveCutCopy, DisableRootRemoveCutCopy }
     public enum EnableRootPopup { EnableRootPopup, DisableRootPopup }
     public enum EnableExecuteEvaluate { EnableExecuteEvaluate, DisableExecuteEvaluate }
-    
-    
+    public enum EnableChangeUsernameForRoot { EnableChangeUsername, DisableChangeUsername }
+
+
+    private static final String ACTION_COMMAND_RENAME_SOCKET = "rename_socket";
+    private static final String ACTION_COMMAND_REMOVE = "remove";
+    private static final String ACTION_COMMAND_EDIT = "edit";
+    private static final String ACTION_COMMAND_CUT = "cut";
+    private static final String ACTION_COMMAND_COPY = "copy";
+    private static final String ACTION_COMMAND_PASTE = "paste";
+    private static final String ACTION_COMMAND_PASTE_COPY = "pasteCopy";
+    private static final String ACTION_COMMAND_ENABLE = "enable";
+    private static final String ACTION_COMMAND_DISABLE = "disable";
+    private static final String ACTION_COMMAND_LOCK = "lock";
+    private static final String ACTION_COMMAND_UNLOCK = "unlock";
+    private static final String ACTION_COMMAND_LOCAL_VARIABLES = "local_variables";
+    private static final String ACTION_COMMAND_CHANGE_USERNAME = "change_username";
+    private static final String ACTION_COMMAND_EXECUTE_EVALUATE = "execute_evaluate";
+//    private static final String ACTION_COMMAND_EXPAND_TREE = "expandTree";
+
+    // There should only be one clipboard editor open at any time so this is static.
+    // This field must only be accessed on the GUI thread.
+    private static ClipboardEditor _clipboardEditor = null;
+
     private final LogixNGPreferences _prefs = InstanceManager.getDefault(LogixNGPreferences.class);
-    
-    ClipboardEditor _clipboardEditor = null;
-    
+
     private JDialog _renameSocketDialog = null;
-    private JDialog _selectItemTypeDialog = null;
     private JDialog _addItemDialog = null;
     private JDialog _editActionExpressionDialog = null;
     private JDialog _editLocalVariablesDialog = null;
@@ -55,40 +73,31 @@ public class TreeEditor extends TreeViewer {
     private final JTextField _systemName = new JTextField(20);
     private final JTextField _addUserName = new JTextField(20);
     private final JTextField _usernameField = new JTextField(50);
-    
+
     protected boolean _showReminder = false;
-    
-    private final Comparator<SwingConfiguratorInterface> _swingConfiguratorComboBoxComparator
-            = (SwingConfiguratorInterface o1, SwingConfiguratorInterface o2) -> o1.toString().compareTo(o2.toString());
-    
-    private final SortedComboBoxModel<SwingConfiguratorInterface> _swingConfiguratorComboBoxModel
-            = new SortedComboBoxModel<>(_swingConfiguratorComboBoxComparator);
-    
-    private final JComboBox<Category> _categoryComboBox = new JComboBox<>();
-    private final JComboBox<SwingConfiguratorInterface> _swingConfiguratorComboBox = new JComboBox<>(_swingConfiguratorComboBoxModel);
+    private boolean _lockPopupMenu = false;
+
     private final JLabel _renameSocketLabel = new JLabel(Bundle.getMessage("SocketName") + ":");  // NOI18N
     private final JCheckBox _autoSystemName = new JCheckBox(Bundle.getMessage("LabelAutoSysName"));   // NOI18N
     private final JLabel _sysNameLabel = new JLabel(Bundle.getMessage("SystemName") + ":");  // NOI18N
     private final JLabel _userNameLabel = new JLabel(Bundle.getMessage("UserName") + ":");   // NOI18N
-    private final String _systemNameAuto = this.getClass().getName() + ".AutoSystemName";             // NOI18N
-    private final JLabel _categoryLabel = new JLabel(Bundle.getMessage("Category") + ":");  // NOI18N
-    private final JLabel _typeLabel = new JLabel(Bundle.getMessage("Type") + ":");   // NOI18N
+    private final String _systemNameAuto = getClassName() + ".AutoSystemName";             // NOI18N
     private JButton _create;
     private JButton _edit;
-    
+
     private SwingConfiguratorInterface _addSwingConfiguratorInterface;
     private SwingConfiguratorInterface _addSwingConfiguratorInterfaceMaleSocket;
     private SwingConfiguratorInterface _editSwingConfiguratorInterface;
     private final List<Map.Entry<SwingConfiguratorInterface, Base>> _swingConfiguratorInterfaceList = new ArrayList<>();
-    
+
     private LocalVariableTableModel _localVariableTableModel;
-    
+
     private final boolean _enableClipboard;
     private final boolean _disableRootRemoveCutCopy;
     private final boolean _disableRootPopup;
     private final boolean _enableExecuteEvaluate;
-    
-    
+    private final boolean _enableChangeUsernameForRoot;
+
     /**
      * Construct a TreeEditor.
      *
@@ -98,28 +107,31 @@ public class TreeEditor extends TreeViewer {
      *                                 cut and copy be enabled or disabled?
      * @param enableRootPopup          should the popup menu be disabled for root?
      * @param enableExecuteEvaluate    should the popup menu show execute/evaluate?
+     * @param enableChangeUsername     should the popup menu show change user name for the root socket?
      */
     public TreeEditor(
             @Nonnull FemaleSocket femaleRootSocket,
             EnableClipboard enableClipboard,
             EnableRootRemoveCutCopy enableRootRemoveCutCopy,
             EnableRootPopup enableRootPopup,
-            EnableExecuteEvaluate enableExecuteEvaluate) {
-        
+            EnableExecuteEvaluate enableExecuteEvaluate,
+            EnableChangeUsernameForRoot enableChangeUsername) {
+
         super(femaleRootSocket);
         _enableClipboard = enableClipboard == EnableClipboard.EnableClipboard;
         _disableRootRemoveCutCopy = enableRootRemoveCutCopy == EnableRootRemoveCutCopy.DisableRootRemoveCutCopy;
         _disableRootPopup = enableRootPopup == EnableRootPopup.DisableRootPopup;
         _enableExecuteEvaluate = enableExecuteEvaluate == EnableExecuteEvaluate.EnableExecuteEvaluate;
+        _enableChangeUsernameForRoot = enableChangeUsername == EnableChangeUsernameForRoot.EnableChangeUsername;
     }
-    
+
     @Override
-    final public void initComponents() {
+    public final void initComponents() {
         super.initComponents();
-        
+
         // The menu is created in parent class TreeViewer
         JMenuBar menuBar = getJMenuBar();
-        
+
         JMenu toolsMenu = new JMenu(Bundle.getMessage("MenuTools"));
         if (_enableClipboard) {
             JMenuItem openClipboardItem = new JMenuItem(Bundle.getMessage("MenuOpenClipboard"));
@@ -128,31 +140,181 @@ public class TreeEditor extends TreeViewer {
             });
             toolsMenu.add(openClipboardItem);
         }
+        addExtraItemsToToolsMenu(toolsMenu);
         menuBar.add(toolsMenu);
-        
-        
-        PopupMenu popup = new PopupMenu();
-        popup.init();
-/*        
-        // The JTree can get big, so allow it to scroll
-        JScrollPane scrollpane = new JScrollPane(tree);
 
-        // create panel
-        JPanel pPanel = new JPanel();
-        pPanel.setLayout(new BoxLayout(pPanel, BoxLayout.Y_AXIS));
-        
-        // Display it all in a window and make the window appear
-        pPanel.add(scrollpane, "Center");
+        JTree tree = _treePane._tree;
 
-        // add panels
-        getContentPane().setLayout(new BoxLayout(getContentPane(), BoxLayout.Y_AXIS));
-        getContentPane().add(pPanel);
-        
-//        initMinimumSize(new Dimension(panelWidth700, panelHeight500));
-*/        
+        tree.addKeyListener(new KeyListener(){
+            @Override
+            public void keyTyped(KeyEvent e) {
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getModifiersEx() == Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()) {
+                    if (e.getKeyCode() == 'R') {    // Remove
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isConnected()) {
+                                removeItem((FemaleSocket) path.getLastPathComponent(), path);
+                            }
+                        }
+                    }
+                    if (e.getKeyCode() == 'E') {    // Edit
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isConnected()) {
+                                editItem(femaleSocket, path);
+                            }
+                        }
+                    }
+                    if (e.getKeyCode() == 'N') {    // New
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isConnected()) {
+                                return;
+                            }
+                            if (parentIsSystem(femaleSocket) && abortEditAboutSystem(femaleSocket.getParent())) {
+                                return;
+                            }
+                            Rectangle rect = tree.getPathBounds(path);
+                            openPopupMenu(tree, path, rect.x, rect.y, true);
+                        }
+                    }
+                    if (e.getKeyCode() == 'D') {    // Disable
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isConnected()) {
+                                doIt(ACTION_COMMAND_DISABLE, femaleSocket, path);
+                            }
+                        }
+                    }
+                }
+                if (e.getModifiersEx() == Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() + InputEvent.SHIFT_DOWN_MASK) {
+                    if (e.getKeyCode() == 'V') {    // Paste copy
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (!femaleSocket.isConnected()) {
+                                pasteCopy((FemaleSocket) path.getLastPathComponent(), path);
+                            }
+                        }
+                    }
+                    if (e.getKeyCode() == 'D') {    // Enable
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isConnected()) {
+                                doIt(ACTION_COMMAND_ENABLE, femaleSocket, path);
+                            }
+                        }
+                    }
+                }
+
+                for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
+                    if (e.getKeyCode() == oper.getKeyCode()
+                            && e.getModifiersEx() == oper.getModifiers()) {
+
+                        TreePath path = tree.getSelectionPath();
+                        if (path != null) {
+                            FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                            if (femaleSocket.isSocketOperationAllowed(oper) && !parentIsLocked(femaleSocket)) {
+                                doIt(oper.name(), femaleSocket, path);
+                            }
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+            }
+        });
+
+        var mask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        tree.getActionMap().put(tree.getInputMap().get(KeyStroke.getKeyStroke(KeyEvent.VK_X, mask)), new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                TreePath path = tree.getSelectionPath();
+                if (path != null) {
+                    cutItem((FemaleSocket) path.getLastPathComponent(), path);
+                }
+            }
+        });
+
+        tree.getActionMap().put(tree.getInputMap().get(KeyStroke.getKeyStroke(KeyEvent.VK_C, mask)), new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                TreePath path = tree.getSelectionPath();
+                if (path != null) {
+                    copyItem((FemaleSocket) path.getLastPathComponent());
+                }
+            }
+        });
+
+        tree.getActionMap().put(tree.getInputMap().get(KeyStroke.getKeyStroke(KeyEvent.VK_V, mask)), new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                TreePath path = tree.getSelectionPath();
+                if (path != null) {
+                    pasteItem((FemaleSocket) path.getLastPathComponent(), path);
+                }
+            }
+        });
+
+
+        tree.addMouseListener(
+                new MouseAdapter() {
+                    // On Windows, the popup is opened on mousePressed,
+                    // on some other OS, the popup is opened on mouseReleased
+
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        if (e.isPopupTrigger()) {
+                            openPopupMenu(tree, tree.getClosestPathForLocation(e.getX(), e.getY()), e.getX(), e.getY(), false);
+                        }
+                    }
+
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        if (e.isPopupTrigger()) {
+                            openPopupMenu(tree, tree.getClosestPathForLocation(e.getX(), e.getY()), e.getX(), e.getY(), false);
+                        }
+                    }
+                }
+        );
     }
 
-    final public void openClipboard() {
+    /**
+     * Adds extra menu items to the tools menu.
+     * This method is used for sub classes.
+     * @param toolsMenu the tools menu
+     */
+    protected void addExtraItemsToToolsMenu(JMenu toolsMenu) {
+    }
+
+    private void openPopupMenu(JTree tree, TreePath path, int x, int y, boolean onlyAddItems) {
+        if (isPopupMenuLocked()) return;
+
+        if (path != null) {
+            // Check that the user has clicked on a row.
+            Rectangle rect = tree.getPathBounds(path);
+            if ((y >= rect.y) && (y <= rect.y + rect.height)) {
+                // Select the row the user clicked on
+                tree.setSelectionPath(path);
+
+                FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
+                new PopupMenu(x, y, femaleSocket, path, onlyAddItems);
+            }
+        }
+    }
+
+    public static void openClipboard() {
         if (_clipboardEditor == null) {
             _clipboardEditor = new ClipboardEditor();
             _clipboardEditor.initComponents();
@@ -169,8 +331,11 @@ public class TreeEditor extends TreeViewer {
             _clipboardEditor.setVisible(true);
         }
     }
-    
-    
+
+    private static String getClassName() {
+        return jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName();
+    }
+
     /**
      * Run the thread action on either the ConditionalNG thread or the
      * GUI thread.
@@ -182,7 +347,7 @@ public class TreeEditor extends TreeViewer {
      */
     private void runOnConditionalNGThreadOrGUIThreadEventually(
             ConditionalNG conditionalNG, ThreadingUtil.ThreadAction ta) {
-        
+
         if (conditionalNG != null) {
             LogixNG_Thread thread = conditionalNG.getCurrentThread();
             thread.runOnLogixNGEventually(ta);
@@ -191,21 +356,41 @@ public class TreeEditor extends TreeViewer {
             ta.run();
         }
     }
-    
-    
+
+    /**
+     * When a pop-up action is selected that opens a dialog, the popup menu is locked until the
+     * dialog is closed.
+     * @return true if the popup menu is locked.
+     */
+    protected final boolean isPopupMenuLocked() {
+        if (_lockPopupMenu) {
+            JmriJOptionPane.showMessageDialog(this,
+                    Bundle.getMessage("TreeEditor_PopupLockMessage"),
+                    Bundle.getMessage("TreeEditor_PopupLockTitle"),
+                    JmriJOptionPane.INFORMATION_MESSAGE);
+        }
+        return _lockPopupMenu;
+    }
+
+    protected final void setPopupMenuLock(boolean lock) {
+        _lockPopupMenu = lock;
+    }
+
+
     /**
      * Respond to the Add menu choice in the popup menu.
      *
      * @param femaleSocket the female socket
      * @param path the path to the item the user has clicked on
      */
-    final protected void renameSocketPressed(FemaleSocket femaleSocket, TreePath path) {
-        _renameSocketDialog  = new JDialog(
+    protected final void renameSocketPressed(FemaleSocket femaleSocket, TreePath path) {
+        setPopupMenuLock(true);
+        _renameSocketDialog = new JDialog(
                 this,
                 Bundle.getMessage(
                         "RenameSocketDialogTitle",
                         femaleSocket.getLongDescription()),
-                true);
+                false);
 //        _renameSocketDialog.addHelpMenu(
 //                "package.jmri.jmrit.logixng.tools.swing.ConditionalNGAddEdit", true);     // NOI18N
         _renameSocketDialog.setLocation(50, 30);
@@ -230,10 +415,10 @@ public class TreeEditor extends TreeViewer {
         c.fill = java.awt.GridBagConstraints.HORIZONTAL;  // text field will expand
         p.add(_socketNameTextField, c);
         _socketNameTextField.setText(femaleSocket.getName());
-        
+
         contentPanel.add(p);
 
-        // set up create and cancel buttons
+        // set up Create and Cancel buttons
         JPanel panel5 = new JPanel();
         panel5.setLayout(new FlowLayout());
         // Cancel
@@ -242,8 +427,7 @@ public class TreeEditor extends TreeViewer {
         cancel.addActionListener((ActionEvent e) -> {
             cancelRenameSocketPressed(null);
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("CancelRenameLogixNGButtonHint"));      // NOI18N
 
         _renameSocketDialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -266,154 +450,23 @@ public class TreeEditor extends TreeViewer {
                     l.treeNodesChanged(tme);
                 }
                 _treePane._tree.updateUI();
+                setPopupMenuLock(false);
             } else {
-                JOptionPane.showMessageDialog(null,
+                JmriJOptionPane.showMessageDialog(null,
                         Bundle.getMessage("ValidateFemaleSocketMessage", _socketNameTextField.getText()),
                         Bundle.getMessage("ValidateFemaleSocketTitle"),
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
             }
         });
-        
+
         contentPanel.add(panel5);
-        
+
 //        _renameSocketDialog.setLocationRelativeTo(component);
         _renameSocketDialog.setLocationRelativeTo(null);
         _renameSocketDialog.pack();
         _renameSocketDialog.setVisible(true);
     }
-    
-    
-    /**
-     * Respond to the Add menu choice in the popup menu.
-     *
-     * @param femaleSocket the female socket
-     * @param path the path to the item the user has clicked on
-     */
-    final protected void addPressed(FemaleSocket femaleSocket, TreePath path) {
-        
-        Map<Category, List<Class<? extends Base>>> connectableClasses =
-                femaleSocket.getConnectableClasses();
-        
-        _categoryComboBox.removeAllItems();
-        List<Category> list = new ArrayList<>(connectableClasses.keySet());
-        Collections.sort(list);
-        for (Category item : list) {
-            _categoryComboBox.addItem(item);
-        }
-        JComboBoxUtil.setupComboBoxMaxRows(_categoryComboBox);
-        
-        for (ItemListener l : _categoryComboBox.getItemListeners()) {
-            _categoryComboBox.removeItemListener(l);
-        }
-        
-        _categoryComboBox.addItemListener((ItemEvent e) -> {
-            Category category = _categoryComboBox.getItemAt(_categoryComboBox.getSelectedIndex());
-            _swingConfiguratorComboBox.removeAllItems();
-            List<Class<? extends Base>> classes = connectableClasses.get(category);
-            if (classes != null) {
-                for (Class<? extends Base> clazz : classes) {
-                    SwingConfiguratorInterface sci = SwingTools.getSwingConfiguratorForClass(clazz);
-                    if (sci != null) {
-                        _swingConfiguratorComboBox.addItem(sci);
-                    } else {
-                        log.error("Class {} has no swing configurator interface", clazz.getName());
-                    }
-                }
-                JComboBoxUtil.setupComboBoxMaxRows(_swingConfiguratorComboBox);
-            }
-        });
-        
-        // Ensure the type combo box gets updated
-        _categoryComboBox.setSelectedIndex(-1);
-        if (_categoryComboBox.getItemCount() > 0) {
-            _categoryComboBox.setSelectedIndex(0);
-        }
-        
-        
-        _selectItemTypeDialog  = new JDialog(
-                this,
-                Bundle.getMessage(
-                        "AddMaleSocketDialogTitle",
-                        femaleSocket.getLongDescription()),
-                true);
-//        selectItemTypeFrame.addHelpMenu(
-//                "package.jmri.jmrit.logixng.tools.swing.ConditionalNGAddEdit", true);     // NOI18N
-        _selectItemTypeDialog.setLocation(50, 30);
-        Container contentPanel = _selectItemTypeDialog.getContentPane();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
 
-        JPanel p;
-        p = new JPanel();
-//        p.setLayout(new FlowLayout());
-        p.setLayout(new java.awt.GridBagLayout());
-        java.awt.GridBagConstraints c = new java.awt.GridBagConstraints();
-        c.gridwidth = 1;
-        c.gridheight = 1;
-        c.gridx = 0;
-        c.gridy = 0;
-        c.anchor = java.awt.GridBagConstraints.EAST;
-        p.add(_categoryLabel, c);
-        c.gridy = 1;
-        p.add(_typeLabel, c);
-        c.gridx = 1;
-        c.gridy = 0;
-        c.anchor = java.awt.GridBagConstraints.WEST;
-        c.weightx = 1.0;
-        c.fill = java.awt.GridBagConstraints.HORIZONTAL;  // text field will expand
-        p.add(_categoryComboBox, c);
-        c.gridy = 1;
-        p.add(_swingConfiguratorComboBox, c);
-        
-        _categoryComboBox.setToolTipText(Bundle.getMessage("CategoryNamesHint"));    // NOI18N
-        _swingConfiguratorComboBox.setToolTipText(Bundle.getMessage("TypeNamesHint"));   // NOI18N
-        contentPanel.add(p);
-        // set up message
-        JPanel panel3 = new JPanel();
-        panel3.setLayout(new BoxLayout(panel3, BoxLayout.Y_AXIS));
-        
-        contentPanel.add(panel3);
-
-        // set up create and cancel buttons
-        JPanel panel5 = new JPanel();
-        panel5.setLayout(new FlowLayout());
-        // Cancel
-        JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
-        panel5.add(cancel);
-        cancel.addActionListener((ActionEvent e) -> {
-            cancelAddPressed(null);
-        });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
-
-        _selectItemTypeDialog.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
-                cancelAddPressed(null);
-            }
-        });
-
-        _create = new JButton(Bundle.getMessage("ButtonCreate"));  // NOI18N
-        panel5.add(_create);
-        _create.addActionListener((ActionEvent e) -> {
-            cancelAddPressed(null);
-            
-            SwingConfiguratorInterface swingConfiguratorInterface =
-                    _swingConfiguratorComboBox.getItemAt(_swingConfiguratorComboBox.getSelectedIndex());
-//            System.err.format("swingConfiguratorInterface: %s%n", swingConfiguratorInterface.getClass().getName());
-            createAddFrame(femaleSocket, path, swingConfiguratorInterface);
-        });
-        
-        contentPanel.add(panel5);
-
-        _autoSystemName.addItemListener((ItemEvent e) -> {
-            autoSystemName();
-        });
-//        addLogixNGFrame.setLocationRelativeTo(component);
-        _selectItemTypeDialog.setLocationRelativeTo(null);
-        _selectItemTypeDialog.pack();
-        _selectItemTypeDialog.setVisible(true);
-    }
-    
     /**
      * Respond to the Add menu choice in the popup menu.
      *
@@ -421,7 +474,7 @@ public class TreeEditor extends TreeViewer {
      * @param swingConfiguratorInterface the swing configurator used to configure the new class
      * @param path the path to the item the user has clicked on
      */
-    final protected void createAddFrame(FemaleSocket femaleSocket, TreePath path,
+    protected final void createAddFrame(FemaleSocket femaleSocket, TreePath path,
             SwingConfiguratorInterface swingConfiguratorInterface) {
         // possible change
         _showReminder = true;
@@ -433,28 +486,30 @@ public class TreeEditor extends TreeViewer {
             _create = new JButton(Bundle.getMessage("ButtonCreate"));  // NOI18N
             _create.addActionListener((ActionEvent e) -> {
                 _treePane._femaleRootSocket.unregisterListeners();
-                
+
                 runOnConditionalNGThreadOrGUIThreadEventually(
                         _treePane._femaleRootSocket.getConditionalNG(),
                         () -> {
-                    
+
                     List<String> errorMessages = new ArrayList<>();
-                    
+
                     boolean isValid = true;
-                    
+
                     if (!_prefs.getShowSystemUserNames()
                             || (_systemName.getText().isEmpty() && _autoSystemName.isSelected())) {
                         _systemName.setText(_addSwingConfiguratorInterface.getAutoSystemName());
                     }
-                    
+
+                    checkAndAdjustSystemName();
+
                     if (_addSwingConfiguratorInterface.getManager()
                             .validSystemNameFormat(_systemName.getText()) != Manager.NameValidity.VALID) {
                         isValid = false;
                         errorMessages.add(Bundle.getMessage("InvalidSystemName", _systemName.getText()));
                     }
-                    
+
                     isValid &= _addSwingConfiguratorInterface.validate(errorMessages);
-                    
+
                     if (isValid) {
                         MaleSocket socket;
                         if (_addUserName.getText().isEmpty()) {
@@ -470,13 +525,13 @@ public class TreeEditor extends TreeViewer {
                         try {
                             femaleSocket.connect(socket);
                         } catch (SocketAlreadyConnectedException ex) {
-                            throw new RuntimeException(ex);
+                            throw new JmriUncheckedException(ex);
                         }
-                        
+
                         femaleSocket.forEntireTree((Base b) -> {
                             b.addPropertyChangeListener(_treePane);
                         });
-                        
+
                         ThreadingUtil.runOnGUIEventually(() -> {
                             _addSwingConfiguratorInterface.dispose();
                             _addItemDialog.dispose();
@@ -496,16 +551,17 @@ public class TreeEditor extends TreeViewer {
                                 prefMgr.setCheckboxPreferenceState(_systemNameAuto, _autoSystemName.isSelected());
                             });
                         });
+                        setPopupMenuLock(false);
                     } else {
                         StringBuilder errorMsg = new StringBuilder();
                         for (String s : errorMessages) {
                             if (errorMsg.length() > 0) errorMsg.append("<br>");
                             errorMsg.append(s);
                         }
-                        JOptionPane.showMessageDialog(null,
+                        JmriJOptionPane.showMessageDialog(null,
                                 Bundle.getMessage("ValidateErrorMessage", errorMsg),
                                 Bundle.getMessage("ValidateErrorTitle"),
-                                JOptionPane.ERROR_MESSAGE);
+                                JmriJOptionPane.ERROR_MESSAGE);
                     }
                     ThreadingUtil.runOnGUIEventually(() -> {
                         if (_treePane._femaleRootSocket.isActive()) {
@@ -515,11 +571,38 @@ public class TreeEditor extends TreeViewer {
                 });
             });
             _create.setToolTipText(Bundle.getMessage("CreateButtonHint"));  // NOI18N
-            
+
             if (_addSwingConfiguratorInterface != null) {
                 makeAddEditFrame(true, femaleSocket, _create, commentStr);
             }
         }
+    }
+
+    /**
+     * Check the system name format.  Add prefix and/or $ as neeeded.
+     */
+    void checkAndAdjustSystemName() {
+        if (_autoSystemName.isSelected()) {
+            return;
+        }
+
+        var sName = _systemName.getText().trim();
+        var prefix = _addSwingConfiguratorInterface.getManager().getSubSystemNamePrefix();
+
+        if (!sName.isEmpty() && !sName.startsWith(prefix)) {
+            var isNumber = sName.matches("^\\d+$");
+            var hasDollar = sName.startsWith("$");
+
+            var newName = new StringBuilder(prefix);
+            if (!isNumber && !hasDollar) {
+                newName.append("$");
+            }
+            newName.append(sName);
+            sName = newName.toString();
+        }
+
+        _systemName.setText(sName);
+        return;
     }
 
     /**
@@ -528,25 +611,28 @@ public class TreeEditor extends TreeViewer {
      * @param femaleSocket the female socket
      * @param path the path to the item the user has clicked on
      */
-    final protected void editPressed(FemaleSocket femaleSocket, TreePath path) {
+    protected final void editPressed(FemaleSocket femaleSocket, TreePath path) {
+        setPopupMenuLock(true);
+
         // possible change
         _showReminder = true;
         // make an Edit Frame
         if (_editActionExpressionDialog == null) {
-            MutableObject<String> commentStr = new MutableObject<>();
-            
+            Base object = femaleSocket.getConnectedSocket().getObject();
+            MutableObject<String> commentStr = new MutableObject<>(object.getComment());
+
             // Edit ConditionalNG
             _edit = new JButton(Bundle.getMessage("ButtonOK"));  // NOI18N
             _edit.addActionListener((ActionEvent e) -> {
-                
+
                 runOnConditionalNGThreadOrGUIThreadEventually(
                         _treePane._femaleRootSocket.getConditionalNG(),
                         () -> {
-                            
+
                     List<String> errorMessages = new ArrayList<>();
-                    
+
                     boolean isValid = true;
-                    
+
                     if (_editSwingConfiguratorInterface.getManager() != null) {
                         if (_editSwingConfiguratorInterface.getManager()
                                 .validSystemNameFormat(_systemName.getText()) != Manager.NameValidity.VALID) {
@@ -556,14 +642,22 @@ public class TreeEditor extends TreeViewer {
                     } else {
                         log.debug("_editSwingConfiguratorInterface.getManager() returns null");
                     }
-                    
+
                     isValid &= _editSwingConfiguratorInterface.validate(errorMessages);
-                    
-                    if (isValid) {
+
+                    boolean canClose = true;
+                    for (Map.Entry<SwingConfiguratorInterface, Base> entry : _swingConfiguratorInterfaceList) {
+                        if (!entry.getKey().canClose()) {
+                            canClose = false;
+                            break;
+                        }
+                    }
+
+                    if (isValid && canClose) {
                         ThreadingUtil.runOnGUIEventually(() -> {
                             femaleSocket.unregisterListeners();
-                            
-                            Base object = femaleSocket.getConnectedSocket().getObject();
+
+//                            Base object = femaleSocket.getConnectedSocket().getObject();
                             if (_addUserName.getText().isEmpty()) {
                                 ((NamedBean)object).setUserName(null);
                             } else {
@@ -584,29 +678,30 @@ public class TreeEditor extends TreeViewer {
                             _editActionExpressionDialog.dispose();
                             _editActionExpressionDialog = null;
                             _treePane._tree.updateUI();
-                            
+
 //                            if (femaleSocket.isActive()) femaleSocket.registerListeners();
                             if (_treePane._femaleRootSocket.isActive()) {
                                 _treePane._femaleRootSocket.registerListeners();
                             }
                         });
-                    } else {
+                        setPopupMenuLock(false);
+                    } else if (!isValid) {
                         StringBuilder errorMsg = new StringBuilder();
                         for (String s : errorMessages) {
                             if (errorMsg.length() > 0) errorMsg.append("<br>");
                             errorMsg.append(s);
                         }
                         ThreadingUtil.runOnGUIEventually(() -> {
-                            JOptionPane.showMessageDialog(null,
+                            JmriJOptionPane.showMessageDialog(null,
                                     Bundle.getMessage("ValidateErrorMessage", errorMsg),
                                     Bundle.getMessage("ValidateErrorTitle"),
-                                    JOptionPane.ERROR_MESSAGE);
+                                    JmriJOptionPane.ERROR_MESSAGE);
                         });
                     }
                 });
             });
             _edit.setToolTipText(Bundle.getMessage("EditButtonHint"));  // NOI18N
-            
+
             makeAddEditFrame(false, femaleSocket, _edit, commentStr);
         }
     }
@@ -619,21 +714,26 @@ public class TreeEditor extends TreeViewer {
      * @param button a button to add to the dialog
      * @param commentStr the new comment
      */
-    final protected void makeAddEditFrame(
+    protected final void makeAddEditFrame(
             boolean addOrEdit,
             FemaleSocket femaleSocket,
             JButton button,
             MutableObject<String> commentStr) {
-        
-        JDialog frame  = new JDialog(
+
+        JDialog dialog  = new JDialog(
                 this,
                 Bundle.getMessage(
                         addOrEdit ? "AddMaleSocketDialogTitle" : "EditMaleSocketDialogTitle",
                         femaleSocket.getLongDescription()),
-                true);
+                false);
 //        frame.addHelpMenu(
 //                "package.jmri.jmrit.logixng.tools.swing.ConditionalNGAddEdit", true);     // NOI18N
-        Container contentPanel = frame.getContentPane();
+
+//        Container contentPanel = dialog.getContentPane();
+
+        JPanel contentPanel = new JPanel();
+        var scrollPane = new javax.swing.JScrollPane(contentPanel);
+        dialog.getContentPane().add(scrollPane);
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
 
         JPanel p;
@@ -668,7 +768,7 @@ public class TreeEditor extends TreeViewer {
                 c.gridy = 0;
                 p.add(_autoSystemName, c);
             }
-            
+
             if (addOrEdit) {
                 _systemName.setToolTipText(Bundle.getMessage("SystemNameHint",
                         _addSwingConfiguratorInterface.getExampleSystemName()));
@@ -679,7 +779,7 @@ public class TreeEditor extends TreeViewer {
             c.gridy = 0;
         }
         contentPanel.add(p);
-        
+
         if (femaleSocket.isConnected()) {
             _systemName.setText(femaleSocket.getConnectedSocket().getSystemName());
             _systemName.setEnabled(false);
@@ -689,17 +789,17 @@ public class TreeEditor extends TreeViewer {
             _systemName.setEnabled(true);
             _addUserName.setText("");
         }
-        
+
         // set up message
         JPanel panel3 = new JPanel();
         panel3.setLayout(new BoxLayout(panel3, BoxLayout.Y_AXIS));
-        
+
         // set up create and cancel buttons
         JPanel panel5 = new JPanel();
-        panel5.setLayout(new FlowLayout());
-        
+        panel5.setLayout(new jmri.util.swing.WrapLayout());
+
         Base object = null;
-        
+
         // Get panel for the item
         _swingConfiguratorInterfaceList.clear();
         List<JPanel> panels = new ArrayList<>();
@@ -715,8 +815,15 @@ public class TreeEditor extends TreeViewer {
             if (object != null) {
                 _editSwingConfiguratorInterface =
                         SwingTools.getSwingConfiguratorForClass(object.getClass());
+                _editSwingConfiguratorInterface.setJDialog(dialog);
                 panels.add(_editSwingConfiguratorInterface.getConfigPanel(object, panel5));
                 _swingConfiguratorInterfaceList.add(new HashMap.SimpleEntry<>(_editSwingConfiguratorInterface, object));
+
+                dialog.setTitle(Bundle.getMessage(
+                        addOrEdit ? "AddMaleSocketDialogTitleWithType" : "EditMaleSocketDialogTitleWithType",
+                        femaleSocket.getLongDescription(),
+                        _editSwingConfiguratorInterface.toString())
+                );
             } else {
                 // 'object' should be an action or expression but is null
                 JPanel panel = new JPanel();
@@ -729,9 +836,18 @@ public class TreeEditor extends TreeViewer {
                     _addSwingConfiguratorInterface.getManager().getMaleSocketClass();
             _addSwingConfiguratorInterfaceMaleSocket =
                     SwingTools.getSwingConfiguratorForClass(maleSocketClass);
+
+            _addSwingConfiguratorInterfaceMaleSocket.setJDialog(dialog);
             panels.add(_addSwingConfiguratorInterfaceMaleSocket.getConfigPanel(panel5));
-            
+
+            _addSwingConfiguratorInterface.setJDialog(dialog);
             panels.add(_addSwingConfiguratorInterface.getConfigPanel(panel5));
+
+            dialog.setTitle(Bundle.getMessage(
+                    addOrEdit ? "AddMaleSocketDialogTitleWithType" : "EditMaleSocketDialogTitleWithType",
+                    femaleSocket.getLongDescription(),
+                    _addSwingConfiguratorInterface.toString())
+            );
         }
         JPanel panel34 = new JPanel();
         panel34.setLayout(new BoxLayout(panel34, BoxLayout.Y_AXIS));
@@ -744,7 +860,7 @@ public class TreeEditor extends TreeViewer {
         }
         panel3.add(panel34);
         contentPanel.add(panel3);
-        
+
         // Edit comment
         JButton editComment = new JButton(Bundle.getMessage("ButtonEditComment"));    // NOI18N
         panel5.add(editComment);
@@ -771,12 +887,11 @@ public class TreeEditor extends TreeViewer {
                 cancelEditPressed(null);
             }
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-        cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
 
         panel5.add(button);
 
-        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
                 if (addOrEdit) {
@@ -793,36 +908,41 @@ public class TreeEditor extends TreeViewer {
             autoSystemName();
         });
 //        addLogixNGFrame.setLocationRelativeTo(component);
-        frame.pack();
-        frame.setLocationRelativeTo(null);
-        
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+
+        dialog.getRootPane().setDefaultButton(button);
+
         if (addOrEdit) {
-            _addItemDialog = frame;
+            _addItemDialog = dialog;
         } else {
-            _editActionExpressionDialog = frame;
+            _editActionExpressionDialog = dialog;
         }
-        
+
         _autoSystemName.setSelected(true);
         InstanceManager.getOptionalDefault(UserPreferencesManager.class).ifPresent((prefMgr) -> {
             _autoSystemName.setSelected(prefMgr.getCheckboxPreferenceState(_systemNameAuto, true));
         });
-        
-        frame.setVisible(true);
+
+        _systemName.setEnabled(addOrEdit);
+
+        dialog.setVisible(true);
     }
-    
+
     /**
      * Respond to the Local Variables menu choice in the popup menu.
      *
      * @param femaleSocket the female socket
      * @param path the path to the item the user has clicked on
      */
-    final protected void editLocalVariables(FemaleSocket femaleSocket, TreePath path) {
+    protected final void editLocalVariables(FemaleSocket femaleSocket, TreePath path) {
         // possible change
         _showReminder = true;
+        setPopupMenuLock(true);
         // make an Edit Frame
         if (_editLocalVariablesDialog == null) {
             MaleSocket maleSocket = femaleSocket.getConnectedSocket();
-            
+
             // Edit ConditionalNG
             _edit = new JButton(Bundle.getMessage("ButtonOK"));  // NOI18N
             _edit.addActionListener((ActionEvent e) -> {
@@ -838,21 +958,21 @@ public class TreeEditor extends TreeViewer {
                         hasErrors = true;
                     }
                 }
-                
+
                 if (hasErrors) {
                     StringBuilder errorMsg = new StringBuilder();
                     for (String s : errorMessages) {
                         if (errorMsg.length() > 0) errorMsg.append("<br>");
                         errorMsg.append(s);
                     }
-                    JOptionPane.showMessageDialog(null,
+                    JmriJOptionPane.showMessageDialog(null,
                             Bundle.getMessage("ValidateErrorMessage", errorMsg),
                             Bundle.getMessage("ValidateErrorTitle"),
-                            JOptionPane.ERROR_MESSAGE);
-                    
+                            JmriJOptionPane.ERROR_MESSAGE);
+
                 } else {
                     _treePane._femaleRootSocket.unregisterListeners();
-                    
+
                     runOnConditionalNGThreadOrGUIThreadEventually(
                             _treePane._femaleRootSocket.getConditionalNG(),
                             () -> {
@@ -877,25 +997,25 @@ public class TreeEditor extends TreeViewer {
                             }
                             _treePane._tree.updateUI();
                         });
+                        setPopupMenuLock(false);
                     });
                 }
             });
 //            _edit.setToolTipText(Bundle.getMessage("EditButtonHint"));  // NOI18N
-            
+
 //            makeAddEditFrame(false, femaleSocket, _editSwingConfiguratorInterface, _edit);  // NOI18N
-            
+
             _editLocalVariablesDialog = new JDialog(
                     this,
                     Bundle.getMessage(
                             "EditLocalVariablesDialogTitle",
                             femaleSocket.getLongDescription()),
-                    true);
+                    false);
     //        frame.addHelpMenu(
     //                "package.jmri.jmrit.logixng.tools.swing.ConditionalNGAddEdit", true);     // NOI18N
             Container contentPanel = _editLocalVariablesDialog.getContentPane();
             contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-            
-            JPanel tablePanel = new JPanel();
+
             JTable table = new JTable();
             _localVariableTableModel = new LocalVariableTableModel(maleSocket);
             table.setModel(_localVariableTableModel);
@@ -910,13 +1030,12 @@ public class TreeEditor extends TreeViewer {
             _localVariableTableModel.setColumnForMenu(table);
             JScrollPane scrollpane = new JScrollPane(table);
             scrollpane.setPreferredSize(new Dimension(400, 200));
-            tablePanel.add(scrollpane, BorderLayout.CENTER);
-            contentPanel.add(tablePanel);
-            
+            contentPanel.add(scrollpane);
+
             // set up create and cancel buttons
             JPanel buttonPanel = new JPanel();
             buttonPanel.setLayout(new FlowLayout());
-            
+
             // Function help
             JButton showFunctionHelp = new JButton(Bundle.getMessage("ButtonFunctionHelp"));    // NOI18N
             buttonPanel.add(showFunctionHelp);
@@ -924,14 +1043,14 @@ public class TreeEditor extends TreeViewer {
                 InstanceManager.getDefault(FunctionsHelpDialog.class).showDialog();
             });
 //            showFunctionHelp.setToolTipText("FunctionHelpButtonHint");      // NOI18N
-            
+
             // Add local variable
             JButton add = new JButton(Bundle.getMessage("TableAddVariable"));
             buttonPanel.add(add);
             add.addActionListener((ActionEvent e) -> {
                 _localVariableTableModel.add();
             });
-            
+
             // Cancel
             JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
             buttonPanel.add(cancel);
@@ -939,30 +1058,32 @@ public class TreeEditor extends TreeViewer {
                 _editLocalVariablesDialog.setVisible(false);
                 _editLocalVariablesDialog.dispose();
                 _editLocalVariablesDialog = null;
+                setPopupMenuLock(false);
             });
-    //        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-            cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
-            
+            cancel.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
+
             buttonPanel.add(_edit);
-            
+            _editLocalVariablesDialog.getRootPane().setDefaultButton(_edit);
+
             _editLocalVariablesDialog.addWindowListener(new java.awt.event.WindowAdapter() {
                 @Override
                 public void windowClosing(java.awt.event.WindowEvent e) {
                     _editLocalVariablesDialog.setVisible(false);
                     _editLocalVariablesDialog.dispose();
                     _editLocalVariablesDialog = null;
+                    setPopupMenuLock(false);
                 }
             });
-            
+
             contentPanel.add(buttonPanel);
-            
+
             _autoSystemName.addItemListener((ItemEvent e) -> {
                 autoSystemName();
             });
     //        addLogixNGFrame.setLocationRelativeTo(component);
             _editLocalVariablesDialog.pack();
             _editLocalVariablesDialog.setLocationRelativeTo(null);
-            
+
             _editLocalVariablesDialog.setVisible(true);
         }
     }
@@ -973,39 +1094,40 @@ public class TreeEditor extends TreeViewer {
      * @param femaleSocket the female socket
      * @param path the path to the item the user has clicked on
      */
-    final protected void changeUsername(FemaleSocket femaleSocket, TreePath path) {
+    protected final void changeUsername(FemaleSocket femaleSocket, TreePath path) {
         // possible change
         _showReminder = true;
+        setPopupMenuLock(true);
         // make an Edit Frame
         if (_changeUsernameDialog == null) {
             MaleSocket maleSocket = femaleSocket.getConnectedSocket();
-            
+
             // Edit ConditionalNG
             _edit = new JButton(Bundle.getMessage("ButtonOK"));  // NOI18N
             _edit.addActionListener((ActionEvent e) -> {
-                
+
                 boolean hasErrors = false;
                 if (hasErrors) {
                     String errorMsg = "";
-                    JOptionPane.showMessageDialog(null,
+                    JmriJOptionPane.showMessageDialog(null,
                             Bundle.getMessage("ValidateErrorMessage", errorMsg),
                             Bundle.getMessage("ValidateErrorTitle"),
-                            JOptionPane.ERROR_MESSAGE);
-                    
+                            JmriJOptionPane.ERROR_MESSAGE);
+
                 } else {
                     _treePane._femaleRootSocket.unregisterListeners();
-                    
+
                     runOnConditionalNGThreadOrGUIThreadEventually(
                             _treePane._femaleRootSocket.getConditionalNG(),
                             () -> {
-                        
+
                         String username = _usernameField.getText();
                         if (username.equals("")) username = null;
-                        
+
                         // Only change user name if it's changed
                         if (((username == null) && (maleSocket.getUserName() != null))
                                 || ((username != null) && !username.equals(maleSocket.getUserName()))) {
-                            
+
                             if (username != null) {
                                 NamedBean nB = maleSocket.getManager().getByUserName(username);
                                 if (nB != null) {
@@ -1013,26 +1135,26 @@ public class TreeEditor extends TreeViewer {
                                     ThreadingUtil.runOnGUIEventually(() -> {
                                         log.error("User name is not unique {}", uname);
                                         String msg = Bundle.getMessage("WarningUserName", new Object[]{("" + uname)});
-                                        JOptionPane.showMessageDialog(null, msg,
+                                        JmriJOptionPane.showMessageDialog(null, msg,
                                                 Bundle.getMessage("WarningTitle"),
-                                                JOptionPane.ERROR_MESSAGE);
+                                                JmriJOptionPane.ERROR_MESSAGE);
                                     });
                                     username = null;
                                 }
                             }
-                            
+
                             maleSocket.setUserName(username);
-                            
+
                             MaleSocket m = maleSocket;
                             while (! (m instanceof NamedBean)) m = (MaleSocket) m.getObject();
-                            
+
                             NamedBeanHandleManager nbMan = InstanceManager.getDefault(NamedBeanHandleManager.class);
                             if (nbMan.inUse(maleSocket.getSystemName(), (NamedBean)m)) {
                                 String msg = Bundle.getMessage("UpdateToUserName", new Object[]{maleSocket.getManager().getBeanTypeHandled(), username, maleSocket.getSystemName()});
-                                int optionPane = JOptionPane.showConfirmDialog(null,
+                                int optionPane = JmriJOptionPane.showConfirmDialog(null,
                                         msg, Bundle.getMessage("UpdateToUserNameTitle"),
-                                        JOptionPane.YES_NO_OPTION);
-                                if (optionPane == JOptionPane.YES_OPTION) {
+                                        JmriJOptionPane.YES_NO_OPTION);
+                                if (optionPane == JmriJOptionPane.YES_OPTION) {
                                     //This will update the bean reference from the systemName to the userName
                                     try {
                                         nbMan.updateBeanFromSystemToUser((NamedBean)m);
@@ -1043,7 +1165,7 @@ public class TreeEditor extends TreeViewer {
                                 }
                             }
                         }
-                        
+
                         ThreadingUtil.runOnGUIEventually(() -> {
                             if (_treePane._femaleRootSocket.isActive()) {
                                 _treePane._femaleRootSocket.registerListeners();
@@ -1059,36 +1181,37 @@ public class TreeEditor extends TreeViewer {
                             }
                             _treePane._tree.updateUI();
                         });
+                        setPopupMenuLock(false);
                     });
                 }
             });
 //            _edit.setToolTipText(Bundle.getMessage("EditButtonHint"));  // NOI18N
-            
+
 //            makeAddEditFrame(false, femaleSocket, _editSwingConfiguratorInterface, _edit);  // NOI18N
-            
+
             _changeUsernameDialog = new JDialog(
                     this,
                     Bundle.getMessage(
                             "EditLocalVariablesDialogTitle",
                             femaleSocket.getLongDescription()),
-                    true);
+                    false);
     //        frame.addHelpMenu(
     //                "package.jmri.jmrit.logixng.tools.swing.ConditionalNGAddEdit", true);     // NOI18N
             Container contentPanel = _changeUsernameDialog.getContentPane();
             contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-            
+
 //            JPanel tablePanel = new JPanel();
-            
+
             JLabel usernameLabel = new JLabel("Username");
             _usernameField.setText(maleSocket.getUserName());
-            
+
             contentPanel.add(usernameLabel);
             contentPanel.add(_usernameField);
-            
+
             // set up create and cancel buttons
             JPanel buttonPanel = new JPanel();
             buttonPanel.setLayout(new FlowLayout());
-            
+
             // Cancel
             JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
             buttonPanel.add(cancel);
@@ -1096,30 +1219,32 @@ public class TreeEditor extends TreeViewer {
                 _changeUsernameDialog.setVisible(false);
                 _changeUsernameDialog.dispose();
                 _changeUsernameDialog = null;
+                setPopupMenuLock(false);
             });
-    //        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
-            cancel.setToolTipText("CancelLogixButtonHint");      // NOI18N
-            
+            cancel.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
+
             buttonPanel.add(_edit);
-            
+            _changeUsernameDialog.getRootPane().setDefaultButton(_edit);
+
             _changeUsernameDialog.addWindowListener(new java.awt.event.WindowAdapter() {
                 @Override
                 public void windowClosing(java.awt.event.WindowEvent e) {
                     _changeUsernameDialog.setVisible(false);
                     _changeUsernameDialog.dispose();
                     _changeUsernameDialog = null;
+                    setPopupMenuLock(false);
                 }
             });
-            
+
             contentPanel.add(buttonPanel);
-            
+
             _autoSystemName.addItemListener((ItemEvent e) -> {
                 autoSystemName();
             });
     //        addLogixNGFrame.setLocationRelativeTo(component);
             _changeUsernameDialog.pack();
             _changeUsernameDialog.setLocationRelativeTo(null);
-            
+
             _changeUsernameDialog.setVisible(true);
         }
     }
@@ -1128,7 +1253,7 @@ public class TreeEditor extends TreeViewer {
      * Enable/disable fields for data entry when user selects to have system
      * name automatically generated.
      */
-    final protected void autoSystemName() {
+    protected final void autoSystemName() {
         if (_autoSystemName.isSelected()) {
             _systemName.setEnabled(false);
             _sysNameLabel.setEnabled(false);
@@ -1145,13 +1270,14 @@ public class TreeEditor extends TreeViewer {
      *
      * @param e The event heard
      */
-    final protected void cancelRenameSocketPressed(ActionEvent e) {
+    protected final void cancelRenameSocketPressed(ActionEvent e) {
         _renameSocketDialog.setVisible(false);
         _renameSocketDialog.dispose();
         _renameSocketDialog = null;
+        setPopupMenuLock(false);
         this.setVisible(true);
     }
-    
+
     /**
      * Respond to the Cancel button in Add ConditionalNG window.
      * <p>
@@ -1159,26 +1285,12 @@ public class TreeEditor extends TreeViewer {
      *
      * @param e The event heard
      */
-    final protected void cancelAddPressed(ActionEvent e) {
-        _selectItemTypeDialog.setVisible(false);
-        _selectItemTypeDialog.dispose();
-        _selectItemTypeDialog = null;
-//        _inCopyMode = false;
-        this.setVisible(true);
-    }
-    
-    /**
-     * Respond to the Cancel button in Add ConditionalNG window.
-     * <p>
-     * Note: Also get there if the user closes the Add ConditionalNG window.
-     *
-     * @param e The event heard
-     */
-    final protected void cancelCreateItem(ActionEvent e) {
+    protected final void cancelCreateItem(ActionEvent e) {
         _addItemDialog.setVisible(false);
         _addSwingConfiguratorInterface.dispose();
         _addItemDialog.dispose();
         _addItemDialog = null;
+        setPopupMenuLock(false);
 //        _inCopyMode = false;
         this.setVisible(true);
     }
@@ -1191,100 +1303,450 @@ public class TreeEditor extends TreeViewer {
      *
      * @param e The event heard
      */
-    final protected void cancelEditPressed(ActionEvent e) {
+    protected final void cancelEditPressed(ActionEvent e) {
+        for (Map.Entry<SwingConfiguratorInterface, Base> entry : _swingConfiguratorInterfaceList) {
+            // Abort if we cannot close the dialog
+            if (!entry.getKey().canClose()) return;
+        }
+
         _editActionExpressionDialog.setVisible(false);
-//        _editSwingConfiguratorInterface.dispose();
+
         for (Map.Entry<SwingConfiguratorInterface, Base> entry : _swingConfiguratorInterfaceList) {
             entry.getKey().dispose();
-//            entry.getKey().updateObject(entry.getValue());
-//        for (SwingConfiguratorInterface swi : _swingConfiguratorInterfaceList) {
-//            swi.dispose();
         }
         _editActionExpressionDialog.dispose();
         _editActionExpressionDialog = null;
-//        _inCopyMode = false;
+        setPopupMenuLock(false);
         this.setVisible(true);
     }
-    
-    
+
+
     protected void executeEvaluate(SwingConfiguratorInterface swi, MaleSocket maleSocket) {
         swi.executeEvaluate(maleSocket);
     }
-    
-    
-    
-    private static final class SortedComboBoxModel<E> extends DefaultComboBoxModel<E> {
 
-        private final Comparator<E> comparator;
+    private boolean itemIsSystem(FemaleSocket femaleSocket) {
+        return (femaleSocket.isConnected())
+                && femaleSocket.getConnectedSocket().isSystem();
+    }
 
-        /*
-         *  Create an empty model that will use the specified Comparator
-         */
-        public SortedComboBoxModel(@Nonnull Comparator<E> comparator) {
-            super();
-            this.comparator = comparator;
+    private boolean parentIsSystem(FemaleSocket femaleSocket) {
+        Base parent = femaleSocket.getParent();
+        while ((parent != null) && !(femaleSocket.getParent() instanceof MaleSocket)) {
+            parent = parent.getParent();
+        }
+        return (parent != null) && ((MaleSocket)parent).isSystem();
+    }
+
+    /**
+     * Asks the user if edit a system node.
+     * @return true if not edit system node, else return false
+     */
+    private boolean abortEditAboutSystem(Base b) {
+        int result = JmriJOptionPane.showConfirmDialog(
+                this,
+                Bundle.getMessage("TreeEditor_ChangeSystemNode"),
+                b.getLongDescription(),
+                JmriJOptionPane.YES_NO_OPTION);
+
+        return ( result != JmriJOptionPane.YES_OPTION );
+    }
+
+    private void editItem(FemaleSocket femaleSocket, TreePath path) {
+        if (itemIsSystem(femaleSocket) && abortEditAboutSystem(femaleSocket.getConnectedSocket())) {
+            return;
+        }
+        editPressed(femaleSocket, path);
+    }
+
+    private void removeItem(FemaleSocket femaleSocket, TreePath path) {
+        if ((parentIsSystem(femaleSocket) || itemIsSystem(femaleSocket)) && abortEditAboutSystem(femaleSocket.getConnectedSocket())) {
+            return;
+        }
+        DeleteBeanWorker worker = new DeleteBeanWorker(femaleSocket, path);
+        worker.execute();
+    }
+
+    private void cutItem(FemaleSocket femaleSocket, TreePath path) {
+        if ((parentIsSystem(femaleSocket) || itemIsSystem(femaleSocket)) && abortEditAboutSystem(femaleSocket.getConnectedSocket())) {
+            return;
         }
 
-        @Override
-        public void addElement(E element) {
-            insertElementAt(element, 0);
-        }
+        if (femaleSocket.isConnected()) {
+            _treePane._femaleRootSocket.unregisterListeners();
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public void insertElementAt(E element, int index) {
-            int size = getSize();
-
-            //  Determine where to insert element to keep model in sorted order
-            int i = 0;
-            for (; i < size; i++) {
-                E o = getElementAt(i);
-
-                if (comparator.compare(o, element) > 0) {
-                    break;
+            runOnConditionalNGThreadOrGUIThreadEventually(
+                    _treePane._femaleRootSocket.getConditionalNG(),
+                    () -> {
+                Clipboard clipboard =
+                        InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
+                List<String> errors = new ArrayList<>();
+                MaleSocket maleSocket = femaleSocket.getConnectedSocket();
+                femaleSocket.disconnect();
+                if (!clipboard.add(maleSocket, errors)) {
+                    JmriJOptionPane.showMessageDialog(this,
+                            String.join("<br>", errors),
+                            Bundle.getMessage("TitleError"),
+                            JmriJOptionPane.ERROR_MESSAGE);
                 }
-            }
-
-            super.insertElementAt(element, i);
-
-            //  Select an element when it is added to the beginning of the model
-            if (i == 0 && element != null) {
-                setSelectedItem(element);
-            }
+                ThreadingUtil.runOnGUIEventually(() -> {
+                    maleSocket.forEntireTree((Base b) -> {
+                        b.removePropertyChangeListener(_treePane);
+                        if (_clipboardEditor != null) {
+                            b.addPropertyChangeListener(_clipboardEditor._treePane);
+                        }
+                    });
+                    _treePane._femaleRootSocket.registerListeners();
+                    _treePane.updateTree(femaleSocket, path.getPath());
+                });
+            });
+        } else {
+            log.error("_currentFemaleSocket is not connected");
         }
     }
-    
-    
-    protected class PopupMenu extends JPopupMenu implements ActionListener {
-        
-        private static final String ACTION_COMMAND_RENAME_SOCKET = "rename_socket";
-        private static final String ACTION_COMMAND_ADD = "add";
-        private static final String ACTION_COMMAND_REMOVE = "remove";
-        private static final String ACTION_COMMAND_EDIT = "edit";
-        private static final String ACTION_COMMAND_CUT = "cut";
-        private static final String ACTION_COMMAND_COPY = "copy";
-        private static final String ACTION_COMMAND_PASTE = "paste";
-        private static final String ACTION_COMMAND_ENABLE = "enable";
-        private static final String ACTION_COMMAND_DISABLE = "disable";
-        private static final String ACTION_COMMAND_LOCK = "lock";
-        private static final String ACTION_COMMAND_UNLOCK = "unlock";
-        private static final String ACTION_COMMAND_LOCAL_VARIABLES = "local_variables";
-        private static final String ACTION_COMMAND_CHANGE_USERNAME = "change_username";
-        private static final String ACTION_COMMAND_EXECUTE_EVALUATE = "execute_evaluate";
-//        private static final String ACTION_COMMAND_EXPAND_TREE = "expandTree";
-        
+
+    private void copyItem(FemaleSocket femaleSocket) {
+        if ((parentIsSystem(femaleSocket) || itemIsSystem(femaleSocket)) && abortEditAboutSystem(femaleSocket.getConnectedSocket())) {
+            return;
+        }
+
+        if (femaleSocket.isConnected()) {
+           _treePane._femaleRootSocket.unregisterListeners();
+
+           runOnConditionalNGThreadOrGUIThreadEventually(
+                   _treePane._femaleRootSocket.getConditionalNG(),
+                   () -> {
+               Clipboard clipboard =
+                       InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
+               Map<String, String> systemNames = new HashMap<>();
+               Map<String, String> userNames = new HashMap<>();
+               MaleSocket maleSocket = null;
+               try {
+                   maleSocket = (MaleSocket) femaleSocket
+                           .getConnectedSocket()
+                           .getDeepCopy(systemNames, userNames);
+                   List<String> errors = new ArrayList<>();
+                   if (!clipboard.add(
+                           maleSocket,
+                           errors)) {
+                       JmriJOptionPane.showMessageDialog(this,
+                               String.join("<br>", errors),
+                               Bundle.getMessage("TitleError"),
+                               JmriJOptionPane.ERROR_MESSAGE);
+                   }
+               } catch (JmriException ex) {
+                   log.error("getDeepCopy thrown exception: {}", ex, ex);
+                   ThreadingUtil.runOnGUIEventually(() -> {
+                       JmriJOptionPane.showMessageDialog(null,
+                               "An exception has occured: "+ex.getMessage(),
+                               "An error has occured",
+                               JmriJOptionPane.ERROR_MESSAGE);
+                   });
+               }
+               if (maleSocket != null) {
+                   MaleSocket socket = maleSocket;
+                   ThreadingUtil.runOnGUIEventually(() -> {
+                       socket.forEntireTree((Base b) -> {
+                           if (_clipboardEditor != null) {
+                               b.addPropertyChangeListener(_clipboardEditor._treePane);
+                           }
+                       });
+                   });
+               }
+           });
+
+           _treePane._femaleRootSocket.registerListeners();
+       } else {
+           log.error("_currentFemaleSocket is not connected");
+       }
+    }
+
+    private void pasteItem(FemaleSocket femaleSocket, TreePath path) {
+        if (parentIsSystem(femaleSocket) && abortEditAboutSystem(femaleSocket.getParent())) {
+            return;
+        }
+
+        if (! femaleSocket.isConnected()) {
+            _treePane._femaleRootSocket.unregisterListeners();
+
+            runOnConditionalNGThreadOrGUIThreadEventually(
+                    _treePane._femaleRootSocket.getConditionalNG(),
+                    () -> {
+                Clipboard clipboard =
+                        InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
+                try {
+                    if (clipboard.getTopItem() == null) {
+                        return;
+                    }
+                    if (!femaleSocket.isCompatible(clipboard.getTopItem())) {
+                        log.error("Top item on clipboard is not compatible with the female socket");
+                        return;
+                    }
+                    femaleSocket.connect(clipboard.fetchTopItem());
+                    List<String> errors = new ArrayList<>();
+                    if (!femaleSocket.setParentForAllChildren(errors)) {
+                        JmriJOptionPane.showMessageDialog(this,
+                                String.join("<br>", errors),
+                                Bundle.getMessage("TitleError"),
+                                JmriJOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (SocketAlreadyConnectedException ex) {
+                    log.error("item cannot be connected", ex);
+                }
+                ThreadingUtil.runOnGUIEventually(() -> {
+                    _treePane._femaleRootSocket.forEntireTree((Base b) -> {
+                        // Remove the listener if it is already
+                        // added so we don't end up with duplicate
+                        // listeners.
+                        b.removePropertyChangeListener(_treePane);
+                        b.addPropertyChangeListener(_treePane);
+                    });
+                    _treePane._femaleRootSocket.registerListeners();
+                    _treePane.updateTree(femaleSocket, path.getPath());
+                });
+            });
+        } else {
+            log.error("_currentFemaleSocket is connected");
+        }
+    }
+
+    private void pasteCopy(FemaleSocket femaleSocket, TreePath path) {
+        if (parentIsSystem(femaleSocket) && abortEditAboutSystem(femaleSocket.getParent())) {
+            return;
+        }
+
+        if (! femaleSocket.isConnected()) {
+            _treePane._femaleRootSocket.unregisterListeners();
+
+            runOnConditionalNGThreadOrGUIThreadEventually(
+                    _treePane._femaleRootSocket.getConditionalNG(),
+                    () -> {
+                Clipboard clipboard =
+                        InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
+
+                if (clipboard.getTopItem() == null) {
+                    return;
+                }
+                if (!femaleSocket.isCompatible(clipboard.getTopItem())) {
+                    log.error("Top item on clipboard is not compatible with the female socket");
+                    return;
+                }
+                Map<String, String> systemNames = new HashMap<>();
+                Map<String, String> userNames = new HashMap<>();
+                MaleSocket maleSocket = null;
+                try {
+                    maleSocket = (MaleSocket) clipboard.getTopItem()
+                            .getDeepCopy(systemNames, userNames);
+                } catch (JmriException ex) {
+                    log.error("getDeepCopy thrown exception: {}", ex, ex);
+                    ThreadingUtil.runOnGUIEventually(() -> {
+                        JmriJOptionPane.showMessageDialog(null,
+                                "An exception has occured: "+ex.getMessage(),
+                                "An error has occured",
+                                JmriJOptionPane.ERROR_MESSAGE);
+                    });
+                }
+                if (maleSocket != null) {
+                    try {
+                        femaleSocket.connect(maleSocket);
+                        List<String> errors = new ArrayList<>();
+                        if (!femaleSocket.setParentForAllChildren(errors)) {
+                            JmriJOptionPane.showMessageDialog(this,
+                                    String.join("<br>", errors),
+                                    Bundle.getMessage("TitleError"),
+                                    JmriJOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (SocketAlreadyConnectedException ex) {
+                        log.error("item cannot be connected", ex);
+                    }
+                    ThreadingUtil.runOnGUIEventually(() -> {
+                        _treePane._femaleRootSocket.forEntireTree((Base b) -> {
+                            // Remove the listener if it is already
+                            // added so we don't end up with duplicate
+                            // listeners.
+                            b.removePropertyChangeListener(_treePane);
+                            b.addPropertyChangeListener(_treePane);
+                        });
+                        _treePane._femaleRootSocket.registerListeners();
+                        _treePane.updateTree(femaleSocket, path.getPath());
+                    });
+                }
+            });
+        } else {
+            log.error("_currentFemaleSocket is connected");
+        }
+    }
+
+    private void doIt(String command, FemaleSocket femaleSocket, TreePath path) {
+        Base parent = femaleSocket.getParent();
+        while ((parent != null) && !(femaleSocket.getParent() instanceof MaleSocket)) {
+            parent = parent.getParent();
+        }
+        boolean parentIsSystem = (parent != null) && ((MaleSocket)parent).isSystem();
+        boolean itemIsSystem = itemIsSystem(femaleSocket);
+
+        switch (command) {
+            case ACTION_COMMAND_RENAME_SOCKET:
+                if (parentIsSystem && abortEditAboutSystem(femaleSocket.getParent())) break;
+                renameSocketPressed(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_EDIT:
+                editItem(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_REMOVE:
+                removeItem(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_CUT:
+                cutItem(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_COPY:
+                copyItem(femaleSocket);
+                break;
+
+            case ACTION_COMMAND_PASTE:
+                pasteItem(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_PASTE_COPY:
+                pasteCopy(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_ENABLE:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+
+                femaleSocket.getConnectedSocket().setEnabled(true);
+                runOnConditionalNGThreadOrGUIThreadEventually(
+                        _treePane._femaleRootSocket.getConditionalNG(),
+                        () -> {
+                    ThreadingUtil.runOnGUIEventually(() -> {
+                        _treePane._femaleRootSocket.unregisterListeners();
+                        _treePane.updateTree(femaleSocket, path.getPath());
+                        _treePane._femaleRootSocket.registerListeners();
+                    });
+                });
+                break;
+
+            case ACTION_COMMAND_DISABLE:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+
+                femaleSocket.getConnectedSocket().setEnabled(false);
+                runOnConditionalNGThreadOrGUIThreadEventually(
+                        _treePane._femaleRootSocket.getConditionalNG(),
+                        () -> {
+                    ThreadingUtil.runOnGUIEventually(() -> {
+                        _treePane._femaleRootSocket.unregisterListeners();
+                        _treePane.updateTree(femaleSocket, path.getPath());
+                        _treePane._femaleRootSocket.registerListeners();
+                    });
+                });
+                break;
+
+            case ACTION_COMMAND_LOCK:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+
+                femaleSocket.forEntireTree((item) -> {
+                    if (item instanceof MaleSocket) {
+                        ((MaleSocket)item).setLocked(true);
+                    }
+                });
+                _treePane.updateTree(femaleSocket, path.getPath());
+                break;
+
+            case ACTION_COMMAND_UNLOCK:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+
+                femaleSocket.forEntireTree((item) -> {
+                    if (item instanceof MaleSocket) {
+                        ((MaleSocket)item).setLocked(false);
+                    }
+                });
+                _treePane.updateTree(femaleSocket, path.getPath());
+                break;
+
+            case ACTION_COMMAND_LOCAL_VARIABLES:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+                editLocalVariables(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_CHANGE_USERNAME:
+                if (itemIsSystem && abortEditAboutSystem(femaleSocket.getConnectedSocket())) break;
+                changeUsername(femaleSocket, path);
+                break;
+
+            case ACTION_COMMAND_EXECUTE_EVALUATE:
+                Base object = femaleSocket.getConnectedSocket();
+                if (object == null) throw new NullPointerException("object is null");
+                while (object instanceof MaleSocket) {
+                    object = ((MaleSocket)object).getObject();
+                }
+                SwingConfiguratorInterface swi =
+                        SwingTools.getSwingConfiguratorForClass(object.getClass());
+                executeEvaluate(swi, femaleSocket.getConnectedSocket());
+                break;
+
+/*
+            case ACTION_COMMAND_EXPAND_TREE:
+                // jtree expand sub tree
+                // https://stackoverflow.com/questions/15210979/how-do-i-auto-expand-a-jtree-when-setting-a-new-treemodel
+                // https://www.tutorialspoint.com/how-to-expand-jtree-row-to-display-all-the-nodes-and-child-nodes-in-java
+                // To expand all rows, do this:
+                for (int i = 0; i < tree.getRowCount(); i++) {
+                    tree.expandRow(i);
+                }
+
+                tree.expandPath(_currentPath);
+                tree.updateUI();
+                break;
+*/
+            default:
+                // Check if the action is a female socket operation
+                if (!checkFemaleSocketOperation(femaleSocket, parentIsSystem, itemIsSystem, command)) {
+                    log.error("e.getActionCommand() returns unknown value {}", command);
+                }
+        }
+    }
+
+    private boolean checkFemaleSocketOperation(
+            FemaleSocket femaleSocket,
+            boolean parentIsSystem,
+            boolean itemIsSystem,
+            String command) {
+
+        for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
+            if (oper.name().equals(command)) {
+                if ((parentIsSystem || itemIsSystem) && abortEditAboutSystem(femaleSocket.getParent())) return true;
+                femaleSocket.doSocketOperation(oper);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean parentIsLocked(FemaleSocket femaleSocket) {
+        Base parent = femaleSocket.getParent();
+        while ((parent != null) && !(parent instanceof MaleSocket)) {
+            parent = parent.getParent();
+        }
+        return (parent != null) && ((MaleSocket)parent).isLocked();
+    }
+
+    protected final class PopupMenu extends JPopupMenu implements ActionListener {
+
         private final JTree _tree;
 //        private final FemaleSocketTreeModel _model;
-        private FemaleSocket _currentFemaleSocket;
-        private TreePath _currentPath;
-        
+        private final FemaleSocket _currentFemaleSocket;
+        private final TreePath _currentPath;
+
         private JMenuItem menuItemRenameSocket;
-        private JMenuItem menuItemAdd;
         private JMenuItem menuItemRemove;
-        private JMenuItem menuItemEdit;
         private JMenuItem menuItemCut;
         private JMenuItem menuItemCopy;
         private JMenuItem menuItemPaste;
+        private JMenuItem menuItemPasteCopy;
         private final Map<FemaleSocketOperation, JMenuItem> menuItemFemaleSocketOperation
                 = new HashMap<>();
         private JMenuItem menuItemEnable;
@@ -1295,562 +1757,355 @@ public class TreeEditor extends TreeViewer {
         private JMenuItem menuItemChangeUsername;
         private JMenuItem menuItemExecuteEvaluate;
 //        private JMenuItem menuItemExpandTree;
-        
-        PopupMenu() {
+
+        private final boolean _isConnected;
+        private final boolean _canConnectFromClipboard;
+        private final boolean _disableForRoot;
+        private final boolean _isLocked;
+        private final boolean _parentIsLocked;
+
+
+        PopupMenu(int x, int y, FemaleSocket femaleSocket, TreePath path, boolean onlyAddItems) {
+
             if (_treePane._tree == null) throw new IllegalArgumentException("_tree is null");
+
             _tree = _treePane._tree;
-        }
-        
-        private void init() {
-            menuItemRenameSocket = new JMenuItem(Bundle.getMessage("PopupMenuRenameSocket"));
-            menuItemRenameSocket.addActionListener(this);
-            menuItemRenameSocket.setActionCommand(ACTION_COMMAND_RENAME_SOCKET);
-            add(menuItemRenameSocket);
-            addSeparator();
-            menuItemAdd = new JMenuItem(Bundle.getMessage("PopupMenuAdd"));
-            menuItemAdd.addActionListener(this);
-            menuItemAdd.setActionCommand(ACTION_COMMAND_ADD);
-            add(menuItemAdd);
-            addSeparator();
-            menuItemEdit = new JMenuItem(Bundle.getMessage("PopupMenuEdit"));
-            menuItemEdit.addActionListener(this);
-            menuItemEdit.setActionCommand(ACTION_COMMAND_EDIT);
-            add(menuItemEdit);
-            menuItemRemove = new JMenuItem(Bundle.getMessage("PopupMenuRemove"));
-            menuItemRemove.addActionListener(this);
-            menuItemRemove.setActionCommand(ACTION_COMMAND_REMOVE);
-            add(menuItemRemove);
-            addSeparator();
-            menuItemCut = new JMenuItem(Bundle.getMessage("PopupMenuCut"));
-            menuItemCut.addActionListener(this);
-            menuItemCut.setActionCommand(ACTION_COMMAND_CUT);
-            add(menuItemCut);
-            menuItemCopy = new JMenuItem(Bundle.getMessage("PopupMenuCopy"));
-            menuItemCopy.addActionListener(this);
-            menuItemCopy.setActionCommand(ACTION_COMMAND_COPY);
-            add(menuItemCopy);
-            menuItemPaste = new JMenuItem(Bundle.getMessage("PopupMenuPaste"));
-            menuItemPaste.addActionListener(this);
-            menuItemPaste.setActionCommand(ACTION_COMMAND_PASTE);
-            add(menuItemPaste);
-            addSeparator();
-            
-            for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
-                JMenuItem menuItem = new JMenuItem(oper.toString());
-                menuItem.addActionListener(this);
-                menuItem.setActionCommand(oper.name());
-                add(menuItem);
-                menuItemFemaleSocketOperation.put(oper, menuItem);
-            }
-            
-            addSeparator();
-            menuItemEnable = new JMenuItem(Bundle.getMessage("PopupMenuEnable"));
-            menuItemEnable.addActionListener(this);
-            menuItemEnable.setActionCommand(ACTION_COMMAND_ENABLE);
-            add(menuItemEnable);
-            menuItemDisable = new JMenuItem(Bundle.getMessage("PopupMenuDisable"));
-            menuItemDisable.addActionListener(this);
-            menuItemDisable.setActionCommand(ACTION_COMMAND_DISABLE);
-            add(menuItemDisable);
-            menuItemLock = new JMenuItem(Bundle.getMessage("PopupMenuLock"));
-            menuItemLock.addActionListener(this);
-            menuItemLock.setActionCommand(ACTION_COMMAND_LOCK);
-            add(menuItemLock);
-            menuItemUnlock = new JMenuItem(Bundle.getMessage("PopupMenuUnlock"));
-            menuItemUnlock.addActionListener(this);
-            menuItemUnlock.setActionCommand(ACTION_COMMAND_UNLOCK);
-            add(menuItemUnlock);
-            
-            addSeparator();
-            menuItemLocalVariables = new JMenuItem(Bundle.getMessage("PopupMenuLocalVariables"));
-            menuItemLocalVariables.addActionListener(this);
-            menuItemLocalVariables.setActionCommand(ACTION_COMMAND_LOCAL_VARIABLES);
-            add(menuItemLocalVariables);
-            
-            addSeparator();
-            menuItemChangeUsername = new JMenuItem(Bundle.getMessage("PopupMenuChangeUsername"));
-            menuItemChangeUsername.addActionListener(this);
-            menuItemChangeUsername.setActionCommand(ACTION_COMMAND_CHANGE_USERNAME);
-            add(menuItemChangeUsername);
-            
-            if (_enableExecuteEvaluate) {
-                addSeparator();
-                menuItemExecuteEvaluate = new JMenuItem();  // The text is set later
-                menuItemExecuteEvaluate.addActionListener(this);
-                menuItemExecuteEvaluate.setActionCommand(ACTION_COMMAND_EXECUTE_EVALUATE);
-                add(menuItemExecuteEvaluate);
-            }
-/*            
-            addSeparator();
-            menuItemExpandTree = new JMenuItem(Bundle.getMessage("PopupMenuExpandTree"));
-            menuItemExpandTree.addActionListener(this);
-            menuItemExpandTree.setActionCommand(ACTION_COMMAND_EXPAND_TREE);
-            add(menuItemExpandTree);
-*/            
-            setOpaque(true);
-            setLightWeightPopupEnabled(true);
-            
-            final PopupMenu popupMenu = this;
-            
-            _tree.addMouseListener(
-                    new MouseAdapter() {
-                        
-                        // On Windows, the popup is opened on mousePressed,
-                        // on some other OS, the popup is opened on mouseReleased
-                        
-                        @Override
-                        public void mousePressed(MouseEvent e) {
-                            openPopupMenu(e);
-                        }
-                        
-                        @Override
-                        public void mouseReleased(MouseEvent e) {
-                            openPopupMenu(e);
-                        }
-                        
-                        private void openPopupMenu(MouseEvent e) {
-                            if (e.isPopupTrigger() && !popupMenu.isVisible()) {
-                                // Get the row the user has clicked on
-                                TreePath path = _tree.getClosestPathForLocation(e.getX(), e.getY());
-                                if (path != null) {
-                                    // Check that the user has clicked on a row.
-                                    Rectangle rect = _tree.getPathBounds(path);
-                                    if ((e.getY() >= rect.y) && (e.getY() <= rect.y + rect.height)) {
-                                        FemaleSocket femaleSocket = (FemaleSocket) path.getLastPathComponent();
-                                        showPopup(e.getX(), e.getY(), femaleSocket, path);
-                                    }
-                                }
-                            }
-                        }
-                    }
-            );
-        }
-        
-        private void showPopup(int x, int y, FemaleSocket femaleSocket, TreePath path) {
+
             _currentFemaleSocket = femaleSocket;
             _currentPath = path;
-            
+            _isConnected = femaleSocket.isConnected();
+
             Clipboard clipboard = InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
-            
+
             MaleSocket topItem = clipboard.getTopItem();
-            
-            boolean isConnected = femaleSocket.isConnected();
-            boolean canConnectFromClipboard =
+
+            _canConnectFromClipboard =
                     topItem != null
                     && femaleSocket.isCompatible(topItem)
                     && !femaleSocket.isAncestor(topItem);
-            
-            if (_disableRootPopup
-                    && (_currentFemaleSocket == _treePane._femaleRootSocket)) {
-                JOptionPane.showMessageDialog(null,
-                        Bundle.getMessage("TreeEditor_RootHasNoPopupMenu"),
-                        Bundle.getMessage("TreeEditor_Info"),
-                        JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            boolean disableForRoot = _disableRootRemoveCutCopy
+
+            _disableForRoot = _disableRootRemoveCutCopy
                     && (_currentFemaleSocket == _treePane._femaleRootSocket);
-            
-            boolean isLocked = isConnected && femaleSocket.getConnectedSocket().isLocked();
-            
-            Base parent = femaleSocket.getParent();
-            while ((parent != null) && !(parent instanceof MaleSocket)) {
-                parent = parent.getParent();
-            }
-            boolean parentIsLocked = (parent != null) && ((MaleSocket)parent).isLocked();
-            
-            menuItemAdd.setEnabled(!isConnected && !parentIsLocked);
-            menuItemRemove.setEnabled(isConnected && !isLocked && !parentIsLocked && !disableForRoot);
-            menuItemEdit.setEnabled(isConnected && !isLocked);
-            menuItemCut.setEnabled(isConnected && !isLocked && !parentIsLocked && !disableForRoot);
-            menuItemCopy.setEnabled(isConnected && !disableForRoot);
-            menuItemPaste.setEnabled(!isConnected && !parentIsLocked && canConnectFromClipboard);
-            
-            if (isConnected && !disableForRoot) {
-                menuItemEnable.setEnabled(!femaleSocket.getConnectedSocket().isEnabled() && !isLocked);
-                menuItemDisable.setEnabled(femaleSocket.getConnectedSocket().isEnabled() && !isLocked);
+
+            _isLocked = _isConnected && femaleSocket.getConnectedSocket().isLocked();
+
+            _parentIsLocked = parentIsLocked(femaleSocket);
+
+            if (onlyAddItems) {
+                addNewItemTypes(this);
             } else {
-                menuItemEnable.setEnabled(false);
-                menuItemDisable.setEnabled(false);
-            }
-            
-            for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
-                JMenuItem menuItem = menuItemFemaleSocketOperation.get(oper);
-                menuItem.setEnabled(femaleSocket.isSocketOperationAllowed(oper) && !parentIsLocked);
-            }
-            
-            AtomicBoolean isAnyLocked = new AtomicBoolean(false);
-            AtomicBoolean isAnyUnlocked = new AtomicBoolean(false);
-            
-            _currentFemaleSocket.forEntireTree((item) -> {
-                if (item instanceof MaleSocket) {
-                    isAnyLocked.set(isAnyLocked.get() || ((MaleSocket)item).isLocked());
-                    isAnyUnlocked.set(isAnyUnlocked.get() || !((MaleSocket)item).isLocked());
+                if (_disableRootPopup
+                        && (_currentFemaleSocket == _treePane._femaleRootSocket)) {
+                    JmriJOptionPane.showMessageDialog(null,
+                            Bundle.getMessage("TreeEditor_RootHasNoPopupMenu"),
+                            Bundle.getMessage("TreeEditor_Info"),
+                            JmriJOptionPane.ERROR_MESSAGE);
+                    return;
                 }
-            });
-            menuItemLock.setEnabled(isAnyUnlocked.get());
-            menuItemUnlock.setEnabled(isAnyLocked.get());
-            
-            menuItemLocalVariables.setEnabled(femaleSocket.isConnected() && !isLocked);
-            
-            menuItemChangeUsername.setEnabled(femaleSocket.isConnected() && !isLocked);
-            
-            if (_enableExecuteEvaluate) {
-                menuItemExecuteEvaluate.setEnabled(femaleSocket.isConnected());
-                
-                if (femaleSocket.isConnected()) {
-                    Base object = _currentFemaleSocket.getConnectedSocket();
-                    if (object == null) throw new NullPointerException("object is null");
-                    while (object instanceof MaleSocket) {
-                        object = ((MaleSocket)object).getObject();
+
+                menuItemRenameSocket = new JMenuItem(Bundle.getMessage("PopupMenuRenameSocket"));
+                menuItemRenameSocket.addActionListener(this);
+                menuItemRenameSocket.setActionCommand(ACTION_COMMAND_RENAME_SOCKET);
+                add(menuItemRenameSocket);
+                addSeparator();
+
+                if (!_isConnected && !_parentIsLocked) {
+                    JMenu addMenu = new JMenu(Bundle.getMessage("PopupMenuAdd"));
+//                    addMenu.setMnemonic(KeyEvent.VK_F);
+//                    addMenu.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                    addNewItemTypes(addMenu);
+                    add(addMenu);
+                }
+
+                if (_isConnected && !_isLocked) {
+                    JMenuItem menuItemEdit = new JMenuItem(Bundle.getMessage("PopupMenuEdit"));
+                    menuItemEdit.addActionListener(this);
+                    menuItemEdit.setActionCommand(ACTION_COMMAND_EDIT);
+                    menuItemEdit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                    add(menuItemEdit);
+                }
+                addSeparator();
+                menuItemRemove = new JMenuItem(Bundle.getMessage("PopupMenuRemove"));
+                menuItemRemove.addActionListener(this);
+                menuItemRemove.setActionCommand(ACTION_COMMAND_REMOVE);
+                menuItemRemove.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                add(menuItemRemove);
+                addSeparator();
+                menuItemCut = new JMenuItem(Bundle.getMessage("PopupMenuCut"));
+                menuItemCut.addActionListener(this);
+                menuItemCut.setActionCommand(ACTION_COMMAND_CUT);
+                menuItemCut.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                add(menuItemCut);
+                menuItemCopy = new JMenuItem(Bundle.getMessage("PopupMenuCopy"));
+                menuItemCopy.addActionListener(this);
+                menuItemCopy.setActionCommand(ACTION_COMMAND_COPY);
+                menuItemCopy.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                add(menuItemCopy);
+                menuItemPaste = new JMenuItem(Bundle.getMessage("PopupMenuPaste"));
+                menuItemPaste.addActionListener(this);
+                menuItemPaste.setActionCommand(ACTION_COMMAND_PASTE);
+                menuItemPaste.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                add(menuItemPaste);
+                menuItemPasteCopy = new JMenuItem(Bundle.getMessage("PopupMenuPasteCopy"));
+                menuItemPasteCopy.addActionListener(this);
+                menuItemPasteCopy.setActionCommand(ACTION_COMMAND_PASTE_COPY);
+                menuItemPasteCopy.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V,
+                        Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() + InputEvent.SHIFT_DOWN_MASK));
+                add(menuItemPasteCopy);
+                addSeparator();
+
+                for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
+                    JMenuItem menuItem = new JMenuItem(oper.toString());
+                    menuItem.addActionListener(this);
+                    menuItem.setActionCommand(oper.name());
+                    add(menuItem);
+                    menuItemFemaleSocketOperation.put(oper, menuItem);
+                    if (oper.hasKey()) {
+                        menuItem.setAccelerator(KeyStroke.getKeyStroke(
+                                oper.getKeyCode(), oper.getModifiers()));
                     }
-                    menuItemExecuteEvaluate.setText(
-                            SwingTools.getSwingConfiguratorForClass(object.getClass())
-                                    .getExecuteEvaluateMenuText());
+                }
+
+                addSeparator();
+                menuItemEnable = new JMenuItem(Bundle.getMessage("PopupMenuEnable"));
+                menuItemEnable.addActionListener(this);
+                menuItemEnable.setActionCommand(ACTION_COMMAND_ENABLE);
+                menuItemEnable.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D,
+                        Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() + InputEvent.SHIFT_DOWN_MASK));
+                add(menuItemEnable);
+                menuItemDisable = new JMenuItem(Bundle.getMessage("PopupMenuDisable"));
+                menuItemDisable.addActionListener(this);
+                menuItemDisable.setActionCommand(ACTION_COMMAND_DISABLE);
+                menuItemDisable.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D,
+                        Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+                add(menuItemDisable);
+                menuItemLock = new JMenuItem(Bundle.getMessage("PopupMenuLock"));
+                menuItemLock.addActionListener(this);
+                menuItemLock.setActionCommand(ACTION_COMMAND_LOCK);
+                add(menuItemLock);
+                menuItemUnlock = new JMenuItem(Bundle.getMessage("PopupMenuUnlock"));
+                menuItemUnlock.addActionListener(this);
+                menuItemUnlock.setActionCommand(ACTION_COMMAND_UNLOCK);
+                add(menuItemUnlock);
+
+                addSeparator();
+                menuItemLocalVariables = new JMenuItem(Bundle.getMessage("PopupMenuLocalVariables"));
+                menuItemLocalVariables.addActionListener(this);
+                menuItemLocalVariables.setActionCommand(ACTION_COMMAND_LOCAL_VARIABLES);
+                add(menuItemLocalVariables);
+
+                addSeparator();
+                menuItemChangeUsername = new JMenuItem(Bundle.getMessage("PopupMenuChangeUsername"));
+                menuItemChangeUsername.addActionListener(this);
+                menuItemChangeUsername.setActionCommand(ACTION_COMMAND_CHANGE_USERNAME);
+                add(menuItemChangeUsername);
+
+                if (_enableExecuteEvaluate) {
+                    addSeparator();
+                    menuItemExecuteEvaluate = new JMenuItem();  // The text is set later
+                    menuItemExecuteEvaluate.addActionListener(this);
+                    menuItemExecuteEvaluate.setActionCommand(ACTION_COMMAND_EXECUTE_EVALUATE);
+                    add(menuItemExecuteEvaluate);
+                }
+    /*
+                addSeparator();
+                menuItemExpandTree = new JMenuItem(Bundle.getMessage("PopupMenuExpandTree"));
+                menuItemExpandTree.addActionListener(this);
+                menuItemExpandTree.setActionCommand(ACTION_COMMAND_EXPAND_TREE);
+                add(menuItemExpandTree);
+    */
+                setOpaque(true);
+                setLightWeightPopupEnabled(true);
+
+                menuItemRemove.setEnabled(_isConnected && !_isLocked && !_parentIsLocked && !_disableForRoot);
+                menuItemCut.setEnabled(_isConnected && !_isLocked && !_parentIsLocked && !_disableForRoot);
+                menuItemCopy.setEnabled(_isConnected && !_disableForRoot);
+                menuItemPaste.setEnabled(!_isConnected && !_parentIsLocked && _canConnectFromClipboard);
+                menuItemPasteCopy.setEnabled(!_isConnected && !_parentIsLocked && _canConnectFromClipboard);
+
+                if (_isConnected && !_disableForRoot) {
+                    menuItemEnable.setEnabled(!femaleSocket.getConnectedSocket().isEnabled() && !_isLocked);
+                    menuItemDisable.setEnabled(femaleSocket.getConnectedSocket().isEnabled() && !_isLocked);
+                } else {
+                    menuItemEnable.setEnabled(false);
+                    menuItemDisable.setEnabled(false);
+                }
+
+                for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
+                    JMenuItem menuItem = menuItemFemaleSocketOperation.get(oper);
+                    menuItem.setEnabled(femaleSocket.isSocketOperationAllowed(oper) && !_parentIsLocked);
+                }
+
+                AtomicBoolean isAnyLocked = new AtomicBoolean(false);
+                AtomicBoolean isAnyUnlocked = new AtomicBoolean(false);
+
+                _currentFemaleSocket.forEntireTree((item) -> {
+                    if (item instanceof MaleSocket) {
+                        isAnyLocked.set(isAnyLocked.get() || ((MaleSocket)item).isLocked());
+                        isAnyUnlocked.set(isAnyUnlocked.get() || !((MaleSocket)item).isLocked());
+                    }
+                });
+                menuItemLock.setEnabled(isAnyUnlocked.get());
+                menuItemUnlock.setEnabled(isAnyLocked.get());
+
+                menuItemLocalVariables.setEnabled(
+                        femaleSocket.isConnected()
+                        && femaleSocket.getConnectedSocket().isSupportingLocalVariables()
+                        && !_isLocked);
+
+                menuItemChangeUsername.setEnabled(
+                        femaleSocket.isConnected()
+                                && !_isLocked
+                                && (_enableChangeUsernameForRoot
+                                        || (_currentFemaleSocket != _treePane._femaleRootSocket)));
+
+                if (_enableExecuteEvaluate) {
+                    menuItemExecuteEvaluate.setEnabled(femaleSocket.isConnected());
+
+                    if (femaleSocket.isConnected()) {
+                        Base object = _currentFemaleSocket.getConnectedSocket();
+                        if (object == null) throw new NullPointerException("object is null");
+                        while (object instanceof MaleSocket) {
+                            object = ((MaleSocket)object).getObject();
+                        }
+                        menuItemExecuteEvaluate.setText(
+                                SwingTools.getSwingConfiguratorForClass(object.getClass())
+                                        .getExecuteEvaluateMenuText());
+                    }
                 }
             }
-            
+
             show(_tree, x, y);
         }
 
-        /**
-         * Asks the user if edit a system node.
-         * @return true if not edit system node, else return false
-         */
-        private boolean abortEditAboutSystem(Base b) {
-            int result = JOptionPane.showConfirmDialog(
-                    this,
-                    Bundle.getMessage("TreeEditor_ChangeSystemNode"),
-                    b.getLongDescription(),
-                    JOptionPane.YES_NO_OPTION);
-            
-            return result == JOptionPane.NO_OPTION;
+        private void addNewItemTypes(Container container) {
+            Map<Category, List<Class<? extends Base>>> connectableClasses =
+                    _currentFemaleSocket.getConnectableClasses();
+            List<Category> list = new ArrayList<>(connectableClasses.keySet());
+            Collections.sort(list);
+            for (Category category : list) {
+                List<SwingConfiguratorInterface> sciList = new ArrayList<>();
+                List<Class<? extends Base>> classes = connectableClasses.get(category);
+                if (classes != null && !classes.isEmpty()) {
+                    for (Class<? extends Base> clazz : classes) {
+                        SwingConfiguratorInterface sci = SwingTools.getSwingConfiguratorForClass(clazz);
+                        if (sci != null) {
+                            sciList.add(sci);
+                        } else {
+                            log.error("Class {} has no swing configurator interface", clazz.getName());
+                        }
+                    }
+                }
+
+                Collections.sort(sciList);
+
+                JMenu categoryMenu = new JMenu(category.toString());
+                for (SwingConfiguratorInterface sci : sciList) {
+                    JMenuItem item = new JMenuItem(sci.toString());
+                    item.addActionListener((e) -> {
+                        createAddFrame(_currentFemaleSocket, _currentPath, sci);
+                    });
+                    categoryMenu.add(item);
+                }
+                container.add(categoryMenu);
+            }
         }
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            Base parent = _currentFemaleSocket.getParent();
-            while ((parent != null) && !(_currentFemaleSocket.getParent() instanceof MaleSocket)) {
-                parent = parent.getParent();
-            }
-            boolean parentIsSystem = (parent != null) && ((MaleSocket)parent).isSystem();
-            boolean itemIsSystem = (_currentFemaleSocket.isConnected())
-                    && _currentFemaleSocket.getConnectedSocket().isSystem();
-            
-            switch (e.getActionCommand()) {
-                case ACTION_COMMAND_RENAME_SOCKET:
-                    if (parentIsSystem && abortEditAboutSystem(_currentFemaleSocket.getParent())) break;
-                    renameSocketPressed(_currentFemaleSocket, _currentPath);
-                    break;
-                    
-                case ACTION_COMMAND_ADD:
-                    if (parentIsSystem && abortEditAboutSystem(_currentFemaleSocket.getParent())) break;
-                    addPressed(_currentFemaleSocket, _currentPath);
-                    break;
-                    
-                case ACTION_COMMAND_EDIT:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    editPressed(_currentFemaleSocket, _currentPath);
-                    break;
-                    
-                case ACTION_COMMAND_REMOVE:
-                    if ((parentIsSystem || itemIsSystem) && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    DeleteBeanWorker worker = new DeleteBeanWorker(_currentFemaleSocket, _currentPath);
-                    worker.execute();
-                    break;
-                    
-                case ACTION_COMMAND_CUT:
-                    if ((parentIsSystem || itemIsSystem) && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    if (_currentFemaleSocket.isConnected()) {
-                        _treePane._femaleRootSocket.unregisterListeners();
-                        
-                        runOnConditionalNGThreadOrGUIThreadEventually(
-                                _treePane._femaleRootSocket.getConditionalNG(),
-                                () -> {
-                            Clipboard clipboard =
-                                    InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
-                            List<String> errors = new ArrayList<>();
-                            MaleSocket maleSocket = _currentFemaleSocket.getConnectedSocket();
-                            _currentFemaleSocket.disconnect();
-                            if (!clipboard.add(maleSocket, errors)) {
-                                JOptionPane.showMessageDialog(this,
-                                        String.join("<br>", errors),
-                                        Bundle.getMessage("TitleError"),
-                                        JOptionPane.ERROR_MESSAGE);
-                            }
-                            ThreadingUtil.runOnGUIEventually(() -> {
-                                _treePane._femaleRootSocket.registerListeners();
-                                _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                            });
-                        });
-                   } else {
-                        log.error("_currentFemaleSocket is not connected");
-                    }
-                    break;
-                    
-                case ACTION_COMMAND_COPY:
-                    if ((parentIsSystem || itemIsSystem) && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    if (_currentFemaleSocket.isConnected()) {
-                        _treePane._femaleRootSocket.unregisterListeners();
-                        
-                        runOnConditionalNGThreadOrGUIThreadEventually(
-                                _treePane._femaleRootSocket.getConditionalNG(),
-                                () -> {
-                            Clipboard clipboard =
-                                    InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
-                            Map<String, String> systemNames = new HashMap<>();
-                            Map<String, String> userNames = new HashMap<>();
-                            try {
-                                List<String> errors = new ArrayList<>();
-                                if (!clipboard.add(
-                                        (MaleSocket) _currentFemaleSocket.getConnectedSocket().getDeepCopy(systemNames, userNames),
-                                        errors)) {
-                                    JOptionPane.showMessageDialog(this,
-                                            String.join("<br>", errors),
-                                            Bundle.getMessage("TitleError"),
-                                            JOptionPane.ERROR_MESSAGE);
-                                }
-                            } catch (JmriException ex) {
-                                log.error("getDeepCopy thrown exception: {}", ex, ex);
-                                ThreadingUtil.runOnGUIEventually(() -> {
-                                    JOptionPane.showMessageDialog(null,
-                                            "An exception has occured: "+ex.getMessage(),
-                                            "An error has occured",
-                                            JOptionPane.ERROR_MESSAGE);
-                                });
-                            }
-                        });
-                        
-                        _treePane._femaleRootSocket.registerListeners();
-                    } else {
-                        log.error("_currentFemaleSocket is not connected");
-                    }
-                    break;
-                    
-                case ACTION_COMMAND_PASTE:
-                    if (parentIsSystem && abortEditAboutSystem(_currentFemaleSocket.getParent())) break;
-                    
-                    if (! _currentFemaleSocket.isConnected()) {
-                        _treePane._femaleRootSocket.unregisterListeners();
-                        
-                        runOnConditionalNGThreadOrGUIThreadEventually(
-                                _treePane._femaleRootSocket.getConditionalNG(),
-                                () -> {
-                            Clipboard clipboard =
-                                    InstanceManager.getDefault(LogixNG_Manager.class).getClipboard();
-                            try {
-                                _currentFemaleSocket.connect(clipboard.fetchTopItem());
-                                List<String> errors = new ArrayList<>();
-                                if (!_currentFemaleSocket.setParentForAllChildren(errors)) {
-                                    JOptionPane.showMessageDialog(this,
-                                            String.join("<br>", errors),
-                                            Bundle.getMessage("TitleError"),
-                                            JOptionPane.ERROR_MESSAGE);
-                                }
-                            } catch (SocketAlreadyConnectedException ex) {
-                                log.error("item cannot be connected", ex);
-                            }
-                            ThreadingUtil.runOnGUIEventually(() -> {
-                                _treePane._femaleRootSocket.registerListeners();
-                                _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                            });
-                        });
-                    } else {
-                        log.error("_currentFemaleSocket is connected");
-                    }
-                    break;
-                    
-                case ACTION_COMMAND_ENABLE:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    _currentFemaleSocket.getConnectedSocket().setEnabled(true);
-                    runOnConditionalNGThreadOrGUIThreadEventually(
-                            _treePane._femaleRootSocket.getConditionalNG(),
-                            () -> {
-                        ThreadingUtil.runOnGUIEventually(() -> {
-                            _treePane._femaleRootSocket.unregisterListeners();
-                            _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                            _treePane._femaleRootSocket.registerListeners();
-                        });
-                    });
-                    break;
-                    
-                case ACTION_COMMAND_DISABLE:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    _currentFemaleSocket.getConnectedSocket().setEnabled(false);
-                    runOnConditionalNGThreadOrGUIThreadEventually(
-                            _treePane._femaleRootSocket.getConditionalNG(),
-                            () -> {
-                        ThreadingUtil.runOnGUIEventually(() -> {
-                            _treePane._femaleRootSocket.unregisterListeners();
-                            _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                            _treePane._femaleRootSocket.registerListeners();
-                        });
-                    });
-                    break;
-                    
-                case ACTION_COMMAND_LOCK:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    _currentFemaleSocket.forEntireTree((item) -> {
-                        if (item instanceof MaleSocket) {
-                            ((MaleSocket)item).setLocked(true);
-                        }
-                    });
-                    _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                    break;
-                    
-                case ACTION_COMMAND_UNLOCK:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    
-                    _currentFemaleSocket.forEntireTree((item) -> {
-                        if (item instanceof MaleSocket) {
-                            ((MaleSocket)item).setLocked(false);
-                        }
-                    });
-                    _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
-                    break;
-                    
-                case ACTION_COMMAND_LOCAL_VARIABLES:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    editLocalVariables(_currentFemaleSocket, _currentPath);
-                    break;
-                    
-                case ACTION_COMMAND_CHANGE_USERNAME:
-                    if (itemIsSystem && abortEditAboutSystem(_currentFemaleSocket.getConnectedSocket())) break;
-                    changeUsername(_currentFemaleSocket, _currentPath);
-                    break;
-                    
-                case ACTION_COMMAND_EXECUTE_EVALUATE:
-                    Base object = _currentFemaleSocket.getConnectedSocket();
-                    if (object == null) throw new NullPointerException("object is null");
-                    while (object instanceof MaleSocket) {
-                        object = ((MaleSocket)object).getObject();
-                    }
-                    SwingConfiguratorInterface swi =
-                            SwingTools.getSwingConfiguratorForClass(object.getClass());
-                    executeEvaluate(swi, _currentFemaleSocket.getConnectedSocket());
-                    break;
-                    
-/*                    
-                case ACTION_COMMAND_EXPAND_TREE:
-                    // jtree expand sub tree
-                    // https://stackoverflow.com/questions/15210979/how-do-i-auto-expand-a-jtree-when-setting-a-new-treemodel
-                    // https://www.tutorialspoint.com/how-to-expand-jtree-row-to-display-all-the-nodes-and-child-nodes-in-java
-                    // To expand all rows, do this:
-                    for (int i = 0; i < tree.getRowCount(); i++) {
-                        tree.expandRow(i);
-                    }
-                    
-                    tree.expandPath(_currentPath);
-                    tree.updateUI();
-                    break;
-*/                    
-                default:
-                    // Check if the action is a female socket operation
-                    if (! checkFemaleSocketOperation(_currentFemaleSocket, parentIsSystem, itemIsSystem, e.getActionCommand())) {
-                        log.error("e.getActionCommand() returns unknown value {}", e.getActionCommand());
-                    }
-            }
+            doIt(e.getActionCommand(), _currentFemaleSocket, _currentPath);
         }
-        
-        private boolean checkFemaleSocketOperation(
-                FemaleSocket femaleSocket,
-                boolean parentIsSystem,
-                boolean itemIsSystem,
-                String command) {
-            
-            for (FemaleSocketOperation oper : FemaleSocketOperation.values()) {
-                if (oper.name().equals(command)) {
-                    if ((parentIsSystem || itemIsSystem) && abortEditAboutSystem(femaleSocket.getParent())) return true;
-                    femaleSocket.doSocketOperation(oper);
-                    return true;
-                }
-            }
-            return false;
-        }
+
     }
-    
-    
+
+
     // This class is copied from BeanTableDataModel
-    private class DeleteBeanWorker extends SwingWorker<Void, Void> {
-        
+    protected class DeleteBeanWorker extends SwingWorker<Void, Void> {
+
         private final FemaleSocket _currentFemaleSocket;
         private final TreePath _currentPath;
-        MaleSocket _maleSocket;
-        
+        private final MaleSocket _maleSocket;
+        private final boolean _deleteOnlyChildren;
+        private final String _deleteQuestion;
+
         public DeleteBeanWorker(FemaleSocket currentFemaleSocket, TreePath currentPath) {
+            this(currentFemaleSocket, currentPath, false, null);
+        }
+
+        public DeleteBeanWorker(
+                FemaleSocket currentFemaleSocket,
+                TreePath currentPath,
+                boolean deleteOnlyChildren,
+                String deleteQuestion) {
             _currentFemaleSocket = currentFemaleSocket;
             _currentPath = currentPath;
             _maleSocket = _currentFemaleSocket.getConnectedSocket();
+            _deleteOnlyChildren = deleteOnlyChildren;
+            _deleteQuestion = deleteQuestion;
         }
-        
+
         public int getDisplayDeleteMsg() {
-            return InstanceManager.getDefault(UserPreferencesManager.class).getMultipleChoiceOption(TreeEditor.class.getName(), "deleteInUse");
+            return InstanceManager.getDefault(UserPreferencesManager.class).getMultipleChoiceOption(getClassName(), "deleteInUse");
         }
-        
+
         public void setDisplayDeleteMsg(int boo) {
-            InstanceManager.getDefault(UserPreferencesManager.class).setMultipleChoiceOption(TreeEditor.class.getName(), "deleteInUse", boo);
+            InstanceManager.getDefault(UserPreferencesManager.class).setMultipleChoiceOption(getClassName(), "deleteInUse", boo);
         }
-        
-        private void findAllChilds(FemaleSocket femaleSocket, List<Map.Entry<FemaleSocket, MaleSocket>> sockets) {
-            if (!femaleSocket.isConnected()) return;
-            MaleSocket maleSocket = femaleSocket.getConnectedSocket();
-            sockets.add(new HashMap.SimpleEntry<>(femaleSocket, maleSocket));
-            for (int i=0; i < maleSocket.getChildCount(); i++) {
-                findAllChilds(maleSocket.getChild(i), sockets);
-            }
-        }
-        
-        public void doDelete(List<Map.Entry<FemaleSocket, MaleSocket>> sockets) {
-            for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                try {
-                    FemaleSocket femaleSocket = entry.getKey();
-                    femaleSocket.disconnect();
-                    
-                    MaleSocket maleSocket = entry.getValue();
-                    maleSocket.getManager().deleteBean(maleSocket, "DoDelete");
-                } catch (PropertyVetoException e) {
-                    //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
-                    log.error(e.getMessage());
+
+        public void doDelete() {
+            _treePane._femaleRootSocket.unregisterListeners();
+            try {
+                if (_deleteOnlyChildren) {
+                    _maleSocket.getManager().deleteChildren(_maleSocket, "DoDelete");
+                } else {
+                    _currentFemaleSocket.disconnect();
+                    _maleSocket.getManager().deleteBean(_maleSocket, "DoDelete");
+                }
+            } catch (PropertyVetoException e) {
+                //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+                log.error("Unexpected doDelete failure for {}, {}", _maleSocket, e.getMessage() );
+            } finally {
+                if (_treePane._femaleRootSocket.isActive()) {
+                    _treePane._femaleRootSocket.registerListeners();
                 }
             }
         }
-        
+
         /**
          * {@inheritDoc}
          */
         @Override
         public Void doInBackground() {
-            _treePane._femaleRootSocket.unregisterListeners();
-            
-            List<Map.Entry<FemaleSocket, MaleSocket>> sockets = new ArrayList<>();
-            
-            findAllChilds(_currentFemaleSocket, sockets);
-            
             StringBuilder message = new StringBuilder();
             try {
-                for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                    entry.getValue().getManager().deleteBean(_maleSocket, "CanDelete");  // NOI18N
+                if (_deleteOnlyChildren) {
+                    _maleSocket.getManager().deleteChildren(_maleSocket, "CanDelete");
+                } else {
+                    _maleSocket.getManager().deleteBean(_maleSocket, "CanDelete");  // NOI18N
                 }
             } catch (PropertyVetoException e) {
                 if (e.getPropertyChangeEvent().getPropertyName().equals("DoNotDelete")) { // NOI18N
-                    log.warn(e.getMessage());
-                    message.append(Bundle.getMessage("VetoDeleteBean", ((NamedBean)_maleSocket.getObject()).getBeanType(), ((NamedBean)_maleSocket.getObject()).getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME), e.getMessage()));
-                    JOptionPane.showMessageDialog(null, message.toString(),
+                    log.warn("Do not Delete {}, {}", _maleSocket, e.getMessage());
+                    message.append(Bundle.getMessage(
+                            "VetoDeleteBean",
+                            ((NamedBean)_maleSocket.getObject()).getBeanType(),
+                            ((NamedBean)_maleSocket.getObject()).getDisplayName(
+                                    NamedBean.DisplayOptions.USERNAME_SYSTEMNAME),
+                            e.getMessage()));
+                    JmriJOptionPane.showMessageDialog(null, message.toString(),
                             Bundle.getMessage("WarningTitle"),
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return null;
                 }
                 message.append(e.getMessage());
             }
-            int count = _maleSocket.getListenerRefs().size();
+            List<String> listenerRefs = new ArrayList<>();
+            _maleSocket.getListenerRefsIncludingChildren(listenerRefs);
+            int count = listenerRefs.size();
             log.debug("Delete with {}", count);
-            if (getDisplayDeleteMsg() == 0x02 && message.toString().isEmpty()) {
-                doDelete(sockets);
+            if (getDisplayDeleteMsg() == 0x02 && message.toString().isEmpty()
+                    && _deleteQuestion == null) {
+                doDelete();
             } else {
                 final JDialog dialog = new JDialog();
                 dialog.setTitle(Bundle.getMessage("WarningTitle"));
@@ -1859,26 +2114,31 @@ public class TreeEditor extends TreeViewer {
                 container.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
                 if (count > 0) { // warn of listeners attached before delete
-                    
-                    String prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
-                    JLabel question = new JLabel(Bundle.getMessage(prompt, ((NamedBean)_maleSocket.getObject()).getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME)));
-                    question.setAlignmentX(Component.CENTER_ALIGNMENT);
-                    container.add(question);
-                    
-                    ArrayList<String> listenerRefs = new ArrayList<>();
-                    
-                    for (Map.Entry<FemaleSocket, MaleSocket> entry : sockets) {
-                        listenerRefs.addAll(entry.getValue().getListenerRefs());
+                    JLabel questionLabel;
+                    if (_deleteQuestion != null) {
+                        questionLabel = new JLabel(_deleteQuestion);
+                    } else {
+                        String prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
+                        questionLabel = new JLabel(Bundle.getMessage(
+                                prompt,
+                                ((NamedBean)_maleSocket.getObject())
+                                        .getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME)));
                     }
-                    
-                    if (listenerRefs.size() > 0) {
+                    questionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                    container.add(questionLabel);
+
+                    ArrayList<String> tempListenerRefs = new ArrayList<>();
+
+                    tempListenerRefs.addAll(listenerRefs);
+
+                    if (!tempListenerRefs.isEmpty()) {
                         ArrayList<String> listeners = new ArrayList<>();
-                        for (int i = 0; i < listenerRefs.size(); i++) {
-                            if (!listeners.contains(listenerRefs.get(i))) {
-                                listeners.add(listenerRefs.get(i));
+                        for (int i = 0; i < tempListenerRefs.size(); i++) {
+                            if (!listeners.contains(tempListenerRefs.get(i))) {
+                                listeners.add(tempListenerRefs.get(i));
                             }
                         }
-                        
+
                         message.append("<br>");
                         message.append(Bundle.getMessage("ReminderInUse", count));
                         message.append("<ul>");
@@ -1888,7 +2148,7 @@ public class TreeEditor extends TreeViewer {
                             message.append("</li>");
                         }
                         message.append("</ul>");
-                        
+
                         JEditorPane pane = new JEditorPane();
                         pane.setContentType("text/html");
                         pane.setText("<html>" + message.toString() + "</html>");
@@ -1897,18 +2157,23 @@ public class TreeEditor extends TreeViewer {
                         container.add(jScrollPane);
                     }
                 } else {
-                    String prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
-                    String msg = MessageFormat.format(Bundle.getMessage(prompt),
-                            new Object[]{_maleSocket.getSystemName()});
-                    JLabel question = new JLabel(msg);
-                    question.setAlignmentX(Component.CENTER_ALIGNMENT);
-                    container.add(question);
+                    JLabel questionLabel;
+                    if (_deleteQuestion != null) {
+                        questionLabel = new JLabel(_deleteQuestion);
+                    } else {
+                        String prompt = _maleSocket.getChildCount() > 0 ? "DeleteWithChildrenPrompt" : "DeletePrompt";
+                        String msg = MessageFormat.format(Bundle.getMessage(prompt),
+                                new Object[]{_maleSocket.getSystemName()});
+                        questionLabel = new JLabel(msg);
+                    }
+                    questionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                    container.add(questionLabel);
                 }
-                
+
                 final JCheckBox remember = new JCheckBox(Bundle.getMessage("MessageRememberSetting"));
                 remember.setFont(remember.getFont().deriveFont(10f));
                 remember.setAlignmentX(Component.CENTER_ALIGNMENT);
-                
+
                 JButton yesButton = new JButton(Bundle.getMessage("ButtonYes"));
                 JButton noButton = new JButton(Bundle.getMessage("ButtonNo"));
                 JPanel button = new JPanel();
@@ -1916,21 +2181,23 @@ public class TreeEditor extends TreeViewer {
                 button.add(yesButton);
                 button.add(noButton);
                 container.add(button);
-                
+
                 noButton.addActionListener((ActionEvent e) -> {
                     //there is no point in remembering this the user will never be
                     //able to delete a bean!
                     dialog.dispose();
                 });
-                
+
                 yesButton.addActionListener((ActionEvent e) -> {
-                    if (remember.isSelected()) {
+                    if (remember.isSelected() && _deleteQuestion == null) {
                         setDisplayDeleteMsg(0x02);
                     }
-                    doDelete(sockets);
+                    doDelete();
                     dialog.dispose();
                 });
-                container.add(remember);
+                if (_deleteQuestion == null) {
+                    container.add(remember);
+                }
                 container.setAlignmentX(Component.CENTER_ALIGNMENT);
                 container.setAlignmentY(Component.CENTER_ALIGNMENT);
                 dialog.getContentPane().add(container);
@@ -1941,12 +2208,9 @@ public class TreeEditor extends TreeViewer {
                 dialog.setModal(true);
                 dialog.setVisible(true);
             }
-            if (_treePane._femaleRootSocket.isActive()) {
-                _treePane._femaleRootSocket.registerListeners();
-            }
             return null;
         }
-        
+
         /**
          * {@inheritDoc} Minimal implementation to catch and log errors
          */
@@ -1960,9 +2224,9 @@ public class TreeEditor extends TreeViewer {
             _treePane.updateTree(_currentFemaleSocket, _currentPath.getPath());
         }
     }
-    
-    
-    
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TreeEditor.class);
+
+
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TreeEditor.class);
 
 }

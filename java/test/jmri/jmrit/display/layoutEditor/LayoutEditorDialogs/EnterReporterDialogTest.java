@@ -1,17 +1,16 @@
 package jmri.jmrit.display.layoutEditor.LayoutEditorDialogs;
 
-import java.awt.GraphicsEnvironment;
 import java.awt.geom.Rectangle2D;
+
 import javax.swing.JTextField;
 
 import jmri.jmrit.display.EditorFrameOperator;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
-import jmri.util.JUnitAppender;
-import jmri.util.JUnitUtil;
-import jmri.util.junit.rules.RetryRule;
+import jmri.util.*;
 import jmri.util.swing.JemmyUtil;
-import org.junit.*;
-import org.junit.rules.Timeout;
+
+import org.junit.jupiter.api.*;
+
 import org.netbeans.jemmy.operators.JButtonOperator;
 import org.netbeans.jemmy.operators.JFrameOperator;
 import org.netbeans.jemmy.operators.JLabelOperator;
@@ -22,59 +21,20 @@ import org.netbeans.jemmy.operators.JTextFieldOperator;
  *
  * @author George Warner Copyright (C) 2019
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class EnterReporterDialogTest {
-
-    private static LayoutEditor layoutEditor = null;
-    private static EnterReporterDialog enterReporterDialog = null;
-
-    @Rule
-    public Timeout globalTimeout = Timeout.seconds(10); // 10 second timeout for methods in this test class.
-
-    @Rule    // allow 2 retries of intermittent tests
-    public RetryRule retryRule = new RetryRule(2); // allow 2 retries
-
-    /*
-     * This is called before each test
-     */
-    @Before
-    public void setUp() {
-        JUnitUtil.setUp();
-        if (!GraphicsEnvironment.isHeadless()) {
-            layoutEditor = new LayoutEditor();
-            enterReporterDialog = new EnterReporterDialog(layoutEditor);
-            layoutEditor.setPanelBounds(new Rectangle2D.Double(0, 0, 640, 480));
-            layoutEditor.setVisible(true);
-        }
-    }
-
-    /*
-     * This is called after each test
-     */
-    @After
-    public void tearDown() {
-        if (!GraphicsEnvironment.isHeadless()) {
-            EditorFrameOperator efo = new EditorFrameOperator(layoutEditor);
-            efo.closeFrameWithConfirmations();
-            layoutEditor = null;
-            enterReporterDialog = null;
-        }
-        JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
-        JUnitUtil.tearDown();
-    }
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertNotNull("layoutEditor exists", layoutEditor);
-        Assert.assertNotNull("EnterReporterDialog exists", enterReporterDialog);
+
+        Assertions.assertNotNull(layoutEditor, "layoutEditor exists");
+        Assertions.assertNotNull(enterReporterDialog, "EnterReporterDialog exists");
     }
 
     @Test
     public void testEnterReporterCanceled() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        enterReporterDialog.enterReporter(150, 200);
+        ThreadingUtil.runOnGUI(() -> enterReporterDialog.enterReporter(150, 200) );
         JFrameOperator jFrameOperator = new JFrameOperator(Bundle.getMessage("AddReporter"));
 
         // cancel the dialog
@@ -84,9 +44,8 @@ public class EnterReporterDialogTest {
 
     @Test
     public void testEnterReporter() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        enterReporterDialog.enterReporter(150, 200);
+        ThreadingUtil.runOnGUI(() -> enterReporterDialog.enterReporter(150, 200) );
         JFrameOperator jFrameOperator = new JFrameOperator(Bundle.getMessage("AddReporter"));
 
         // Try to press Add New Label button with reporter name blank... should get an error dialog
@@ -112,7 +71,7 @@ public class EnterReporterDialogTest {
         JUnitAppender.assertErrorMessage("Invalid system name for Reporter: System name must start with \"IR\".");
         jFrameOperator.waitClosed();    // make sure the dialog actually closed
 
-        enterReporterDialog.enterReporter(150, 200);
+        ThreadingUtil.runOnGUI(() -> enterReporterDialog.enterReporter(150, 200) );
         jFrameOperator = new JFrameOperator(Bundle.getMessage("AddReporter"));
 
         // ok, now set the reporter name to an valid (starts with IB) value
@@ -161,4 +120,38 @@ public class EnterReporterDialogTest {
         addNewLabelButtonOperator.doClick();
         jFrameOperator.waitClosed();    // make sure the dialog actually closed
     }
+
+    private LayoutEditor layoutEditor = null;
+    private EnterReporterDialog enterReporterDialog = null;
+
+    /*
+     * This is called before each test
+     */
+    @BeforeEach
+    public void setUp() {
+        JUnitUtil.setUp();
+
+        layoutEditor = new LayoutEditor();
+        enterReporterDialog = new EnterReporterDialog(layoutEditor);
+        layoutEditor.setPanelBounds(new Rectangle2D.Double(0, 0, 640, 480));
+        ThreadingUtil.runOnGUI(() -> layoutEditor.setVisible(true) );
+
+    }
+
+    /*
+     * This is called after each test
+     */
+    @AfterEach
+    public void tearDown() {
+
+        EditorFrameOperator efo = new EditorFrameOperator(layoutEditor);
+        efo.closeFrameWithConfirmations();
+        layoutEditor = null;
+        enterReporterDialog = null;
+
+        JUnitUtil.deregisterBlockManagerShutdownTask();
+        EditorFrameOperator.clearEditorFrameOperatorThreads();
+        JUnitUtil.tearDown();
+    }
+
 }

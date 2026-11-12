@@ -4,6 +4,8 @@ import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.awt.event.*;
+import java.util.Objects;
 
 import jmri.InstanceManager;
 import jmri.UserPreferencesManager;
@@ -11,24 +13,24 @@ import jmri.jmrix.loconet.*;
 import jmri.jmrix.loconet.uhlenbrock.LncvDevice;
 import jmri.jmrix.loconet.uhlenbrock.LncvMessageContents;
 import jmri.swing.JTablePersistenceManager;
+import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Frame for discovery and display of LocoNet LNCV boards.
  * Derived from xbee node config. Verified with Digikeijs DR5033 hardware.
- *
+ * <p>
  * Some of the message formats used in this class are Copyright Uhlenbrock.de
  * and used with permission as part of the JMRI project. That permission does
  * not extend to uses in other software products. If you wish to use this code,
  * algorithm or these message formats outside of JMRI, please contact Uhlenbrock.
- *
+ * <p>
  * Buttons in table row allows to add roster entry for device, and switch to the
  * DecoderPro ops mode programmer.
  *
- * @author Egbert Broerse Copyright (C) 2021
+ * @author Egbert Broerse Copyright (C) 2021, 2022
  */
 public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements LocoNetListener {
 
@@ -62,6 +64,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
     protected int val;
     boolean writeConfirmed = false;
     private final String rawDataCheck = this.getClass().getName() + ".RawData"; // NOI18N
+    private final String dontWarnOnClose = this.getClass().getName() + ".DontWarnOnClose"; // NOI18N
     private UserPreferencesManager pm;
     private transient TableRowSorter<LncvProgTableModel> sorter;
     private LncvDevicesManager lncvdm;
@@ -100,6 +103,21 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         add(initDirectPanel()); // starts hidden, to set bits in Direct Mode only
         add(initStatusPanel()); // positioned after ButtonPanel so to keep it simple also delayed
         // creation of table must wait for memo + tc to be available, see initComponents(memo) next
+
+        // only way to get notice of the tool being closed, as a JPanel is silently embedded in some JFrame
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) {
+                Component comp = e.getChanged();
+                if (comp instanceof JmriJFrame) {
+                    JmriJFrame toolFrame = (JmriJFrame) comp;
+                    if ((Objects.equals(toolFrame.getTitle(), this.getTitle()) &&
+                            !toolFrame.isVisible())) { // it was closed/hidden a moment ago
+                        handleCloseEvent();
+                        log.debug("Component hidden: {}", comp);
+                    }
+                }
+            }
+        });
     }
 
     @Override
@@ -154,16 +172,12 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         tablePanel.setLayout(new BoxLayout(tablePanel, BoxLayout.Y_AXIS));
         tablePanel.add(tableScrollPane, BorderLayout.CENTER);
 
-        // this does not fill the full width, why?
-//        JSplitPane holder = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
-//                tablePanel, getMonitorPanel());
-//        holder.setMinimumSize(new Dimension(1000, 400));
-//        holder.setPreferredSize(new Dimension(1000, 400));
-//        holder.setDividerSize(8);
-//        holder.setOneTouchExpandable(true);
-//        add(holder, BorderLayout.LINE_START);
-        add(tablePanel);
-        add(getMonitorPanel());
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tablePanel, getMonitorPanel());
+        splitPane.setOneTouchExpandable(true);
+        splitPane.setAlignmentX(Component.CENTER_ALIGNMENT);
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
+        add(splitPane);
+
         rawCheckBox.setSelected(pm.getSimplePreferenceState(rawDataCheck));
     }
 
@@ -195,7 +209,8 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
     protected JPanel initButtonPanel() {
         // Set up buttons and entry fields
         JPanel panel4 = new JPanel();
-        panel4.setLayout(new FlowLayout());
+        panel4.setLayout(new BoxLayout(panel4, BoxLayout.X_AXIS));
+        panel4.add(Box.createHorizontalGlue()); // this will expand/contract
 
         JPanel panel41 = new JPanel();
         panel41.setLayout(new BoxLayout(panel41, BoxLayout.PAGE_AXIS));
@@ -214,7 +229,8 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
 
         JPanel panel42 = new JPanel();
         panel42.setLayout(new BoxLayout(panel42, BoxLayout.PAGE_AXIS));
-        JPanel panel421 = new JPanel();
+
+        JPanel panel421 = new JPanel(); // default FlowLayout
         panel421.add(articleFieldLabel);
         // entry field (decimal)
         articleField.setToolTipText(Bundle.getMessage("TipModuleArticleField"));
@@ -227,6 +243,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         addressField.setText("1");
         panel422.add(addressField);
         panel42.add(panel422);
+
         panel42.add(directCheckBox);
         directCheckBox.addActionListener(e -> directActionPerformed());
         directCheckBox.setToolTipText(Bundle.getMessage("TipDirectMode"));
@@ -237,36 +254,43 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         panel43.setBorder(panel43Border);
         panel43.setLayout(new BoxLayout(panel43, BoxLayout.LINE_AXIS));
 
-        JPanel panel431 = new JPanel();
+        JPanel panel431 = new JPanel(); // labels
         panel431.setLayout(new BoxLayout(panel431, BoxLayout.PAGE_AXIS));
-        JPanel panel4311 = new JPanel();
-        panel4311.add(cvFieldLabel);
-        // entry field (decimal) for CV number to read/write
+        cvFieldLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        cvFieldLabel.setMinimumSize(new Dimension(60, new JTextField("X").getHeight() + 5));
+        panel431.add(cvFieldLabel);
         //cvField.setToolTipText(Bundle.getMessage("TipModuleCvField"));
-        cvField.setText("0");
-        panel4311.add(cvField);
-        panel431.add(panel4311);
-
-        JPanel panel4312 = new JPanel();
-        panel4312.add(valueFieldLabel);
-        // entry field (decimal) for CV value
-        //valueField.setToolTipText(Bundle.getMessage("TipModuleValueField"));
-        valueField.setText("1");
-        panel4312.add(valueField);
-        panel431.add(panel4312);
+        valueFieldLabel.setMinimumSize(new Dimension(60, new JTextField("X").getHeight() + 5));
+        valueFieldLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        panel431.add(valueFieldLabel);
         panel43.add(panel431);
 
-        JPanel panel432 = new JPanel();
+        JPanel panel432 = new JPanel(); // entry fields
+        panel432.setMaximumSize(new Dimension(50, 50));
+        panel432.setPreferredSize(new Dimension(50, 50));
+        panel432.setMinimumSize(new Dimension(50, 50));
         panel432.setLayout(new BoxLayout(panel432, BoxLayout.PAGE_AXIS));
-        panel432.add(readButton);
+        cvField.setText("0");
+        panel432.add(cvField); // entry field (decimal) for CV value
+        //valueField.setToolTipText(Bundle.getMessage("TipModuleValueField"));
+        valueField.setText("1");
+        panel432.add(valueField); // entry field (decimal) for CV number to read/write
+        panel43.add(panel432);
+
+        JPanel panel433 = new JPanel(); // read/write buttons
+        panel433.setLayout(new BoxLayout(panel433, BoxLayout.PAGE_AXIS));
+        panel433.add(readButton);
         readButton.setEnabled(false);
         readButton.addActionListener(e -> readButtonActionPerformed());
 
-        panel432.add(writeButton);
+        panel433.add(writeButton);
         writeButton.setEnabled(false);
         writeButton.addActionListener(e -> writeButtonActionPerformed());
-        panel43.add(panel432);
+        panel43.add(panel433);
         panel4.add(panel43);
+
+        panel4.add(Box.createHorizontalGlue()); // this will expand/contract
+        panel4.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         return panel4;
     }
@@ -277,17 +301,16 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
     protected JPanel initStatusPanel() {
         JPanel panel2 = new JPanel();
         panel2.setLayout(new BoxLayout(panel2, BoxLayout.PAGE_AXIS));
-        JPanel panel21 = new JPanel();
-        panel21.setLayout(new FlowLayout());
 
         statusText1.setText("   ");
         statusText1.setHorizontalAlignment(JLabel.CENTER);
-        panel21.add(statusText1);
-        panel2.add(panel21);
+        panel2.add(statusText1);
 
         statusText2.setText("   ");
         statusText2.setHorizontalAlignment(JLabel.CENTER);
         panel2.add(statusText2);
+
+        panel2.setAlignmentX(Component.CENTER_ALIGNMENT);
         return panel2;
     }
 
@@ -321,7 +344,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         articleField.setEditable(false);
         addressField.setEditable(false);
         art = -1;
-        if (!articleField.getText().equals("")) {
+        if (!articleField.getText().isEmpty()) {
             try {
                 art = inDomain(articleField.getText(), 9999);
             } catch (NumberFormatException e) {
@@ -332,12 +355,12 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         Object[] dialogBoxButtonOptions = {
                 Bundle.getMessage("ButtonProceed"),
                 Bundle.getMessage("ButtonCancel")};
-        int userReply = JOptionPane.showOptionDialog(this.getParent(),
+        int userReply = JmriJOptionPane.showOptionDialog(this.getParent(),
                 Bundle.getMessage("DialogAllWarning"),
                 Bundle.getMessage("WarningTitle"),
-                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE,
+                JmriJOptionPane.DEFAULT_OPTION, JmriJOptionPane.QUESTION_MESSAGE,
                 null, dialogBoxButtonOptions, dialogBoxButtonOptions[1]);
-        if (userReply != 0) {
+        if (userReply != 0 ) { // not array position 0 ButtonProceed
             return;
         }
         statusText1.setText(Bundle.getMessage("FeedBackStartAllProg"));
@@ -348,6 +371,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         statusText1.setText(Bundle.getMessage("FeedBackStartAllProg"));
         allProgButton.setText(Bundle.getMessage("ButtonStopAllProg"));
         allProgRunning = true;
+        log.debug("AllProgRunning=TRUE, allProgButtonActionPerformed ready");
     }
 
     // MODULEPROG button
@@ -363,13 +387,13 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
             statusText1.setText(Bundle.getMessage("FeedBackDirectRunning"));
             return;
         }
-        if (articleField.getText().equals("")) {
+        if (articleField.getText().isEmpty()) {
             statusText1.setText(Bundle.getMessage("FeedBackEnterArticle"));
             articleField.setBackground(Color.RED);
             modProgButton.setSelected(false);
             return;
         }
-        if (addressField.getText().equals("")) {
+        if (addressField.getText().isEmpty()) {
             statusText1.setText(Bundle.getMessage("FeedBackEnterAddress"));
             addressField.setBackground(Color.RED);
             modProgButton.setSelected(false);
@@ -395,7 +419,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
             }
             return;
         }
-        if ((!articleField.getText().equals("")) && (!addressField.getText().equals(""))) {
+        if ((!articleField.getText().isEmpty()) && (!addressField.getText().isEmpty())) {
             try {
                 art = inDomain(articleField.getText(), 9999);
                 adr = inDomain(addressField.getText(), 65535); // goes in d5-d6 as module address
@@ -426,7 +450,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         if ((sArt != null) && (addressField.getText() != null) && (cvField.getText() != null)) {
             try {
                 art = inDomain(sArt, 9999); // limited according to Uhlenbrock info
-                adr = inDomain(addressField.getText(), 65535); // used as address for reply
+                adr = inDomain(addressField.getText(), 65535); // used as address for monitor reply
                 cv = inDomain(cvField.getText(), 9999); // decimal entry
                 memo.getLnTrafficController().sendLocoNetMessage(LncvMessageContents.createCvReadRequest(art, adr, cv));
             } catch (NumberFormatException e) {
@@ -438,7 +462,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
             return;
         }
         // stop and inform user
-        statusText1.setText(Bundle.getMessage("FeedBackRead"));
+        statusText1.setText(Bundle.getMessage("FeedBackRead", "LNCV"));
     }
 
     // WriteCV button
@@ -474,7 +498,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
             return;
         }
         // stop and inform user
-        statusText1.setText(Bundle.getMessage("FeedBackWrite"));
+        statusText1.setText(Bundle.getMessage("FeedBackWrite", "LNCV"));
         // LACK reply will be received separately
         // if (received) {
         //      writeConfirmed = true;
@@ -603,7 +627,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         //log.debug("LncvProgPane heard message {}", m.toMonitorString());
         if (LncvMessageContents.isSupportedLncvMessage(m)) {
             // raw data, to display
-            String raw = (rawCheckBox.isSelected() ? ("[" + m.toString() + "] ") : "");
+            String raw = (rawCheckBox.isSelected() ? ("[" + m + "] ") : "");
             // format the message text, expect it to provide consistent \n after each line
             String formatted = m.toMonitorString(memo.getSystemPrefix());
             // copy the formatted data
@@ -633,8 +657,9 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         if (LncvMessageContents.extractMessageType(m) == LncvMessageContents.LncvCommand.LNCV_READ) {
             reply += Bundle.getMessage("LNCV_READ_MOD_MONITOR", (moduleProgRunning == -1 ? "ALL" : moduleProgRunning)) + "\n";
         }
-        if (LncvMessageContents.extractMessageType(m) == LncvMessageContents.LncvCommand.LNCV_READ_REPLY) {
-            // it's a LNCV ReadReply message, decode contents:
+        if ((LncvMessageContents.extractMessageType(m) == LncvMessageContents.LncvCommand.LNCV_READ_REPLY) ||
+                (LncvMessageContents.extractMessageType(m) == LncvMessageContents.LncvCommand.LNCV_READ_REPLY2)) {
+            // it's an LNCV ReadReply message, decode contents:
             LncvMessageContents contents = new LncvMessageContents(m);
             int msgArt = contents.getLncvArticleNum();
             int msgAdr = moduleProgRunning;
@@ -648,7 +673,8 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
                     + Bundle.getMessage("LabelCv") + msgCv + " "
                     + Bundle.getMessage("LabelValue")+ msgVal + "\n";
             reply += foundMod;
-            // store Module in list using write reply is handled by loconet.LncvDevicesManager
+            log.debug("ReadReply={}", reply);
+            // storing a Module in the list using the (first) write reply is handled by loconet.LncvDevicesManager
 
             // enter returned CV in CVnum field
             cvField.setText(msgCv + "");
@@ -665,13 +691,15 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
             memo.getLncvDevicesManager().firePropertyChange("DeviceListChanged", true, false);
         }
 
-        if (reply != null) {
+        if (reply != null) { // we fool allProgFinished (copied from LNSV2 class)
             allProgFinished(null);
         }
     }
 
-    /*
+    /**
      * AllProg Session callback.
+     *
+     * @param error feedback from Finish process
      */
     public void allProgFinished(String error) {
         if (error != null) {
@@ -679,9 +707,64 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
              statusText2.setText(Bundle.getMessage("FeedBackDiscoverFail"));
         } else {
             synchronized (this) {
-                statusText2.setText(Bundle.getMessage("FeedBackDiscoverSuccess", lncvdm.getDeviceCount()));
+                if (lncvdm.getDeviceCount() == 1) {
+                    statusText2.setText(Bundle.getMessage("FeedBackDiscoverSuccessOne"));
+                } else {
+                    statusText2.setText(Bundle.getMessage("FeedBackDiscoverSuccess", lncvdm.getDeviceCount()));
+                }
                 result.setText(reply);
             }
+        }
+    }
+
+    /**
+     * Give user feedback on closing of any open programming sessions when tool window is closed.
+     * @see #dispose() for actual closing of sessions
+     */
+    public void handleCloseEvent() {
+        //log.debug("handleCloseEvent() called in LncvProgPane");
+        if (allProgRunning || moduleProgRunning > 0) {
+            // adds a Don't remember again checkbox and stores setting in pm
+            // show dialog
+            if (pm != null && !pm.getSimplePreferenceState(dontWarnOnClose)) {
+                final JDialog dialog = new JDialog();
+                dialog.setTitle(Bundle.getMessage("ReminderTitle"));
+                dialog.setLocationRelativeTo(null);
+                dialog.setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
+                JPanel container = new JPanel();
+                container.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+                container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
+
+                JLabel question = new JLabel(Bundle.getMessage("DialogRunningWarning"), JLabel.CENTER);
+                question.setAlignmentX(Component.CENTER_ALIGNMENT);
+                container.add(question);
+
+                JButton okButton = new JButton(Bundle.getMessage("ButtonOK"));
+                JPanel buttons = new JPanel();
+                buttons.setAlignmentX(Component.CENTER_ALIGNMENT);
+                buttons.add(okButton);
+                container.add(buttons);
+
+                final JCheckBox remember = new JCheckBox(Bundle.getMessage("DontRemind"));
+                remember.setAlignmentX(Component.CENTER_ALIGNMENT);
+                remember.setFont(remember.getFont().deriveFont(10f));
+                container.add(remember);
+
+                okButton.addActionListener(e -> {
+                    if ((remember.isSelected()) && (pm != null)) {
+                        pm.setSimplePreferenceState(dontWarnOnClose, remember.isSelected());
+                    }
+                    dialog.dispose();
+                });
+
+
+                dialog.getContentPane().add(container);
+                dialog.pack();
+                dialog.setModal(true);
+                dialog.setVisible(true);
+            }
+
+            // dispose will take care of actually stopping any open prog session
         }
     }
 
@@ -698,6 +781,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         if (pm != null) {
             pm.setSimplePreferenceState(rawDataCheck, rawCheckBox.isSelected());
         }
+        // prevent closing LNCV tool with programming session left open on module(s).
         if (moduleProgRunning >= 0) {
             modProgButtonActionPerformed();
         }
@@ -741,7 +825,7 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
     }
 
     protected void setCvFields(int cvNum, int cvVal) {
-        cvField.setText(""+cvNum);
+        cvField.setText("" + cvNum);
         if (cvVal > -1) {
             valueField.setText("" + cvVal);
         } else {
@@ -762,6 +846,6 @@ public class LncvProgPane extends jmri.jmrix.loconet.swing.LnPanel implements Lo
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LncvProgPane.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LncvProgPane.class);
 
 }

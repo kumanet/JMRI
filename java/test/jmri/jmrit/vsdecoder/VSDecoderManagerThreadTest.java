@@ -26,9 +26,10 @@ public class VSDecoderManagerThreadTest {
 
     @AfterEach
     public void tearDown() {
+        JUnitUtil.removeMatchingThreads("VSDecoderManagerThread");
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(VSDecoderManagerThreadTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(VSDecoderManagerThreadTest.class);
 
 }

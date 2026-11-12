@@ -29,9 +29,10 @@ public class CbusCabSignalManagerTest {
 
     @AfterEach
     public void tearDown() {
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusCabSignalManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusCabSignalManagerTest.class);
 
 }

@@ -1,12 +1,11 @@
 package jmri.configurexml;
 
 import java.awt.event.ActionEvent;
+
 import javax.swing.JFileChooser;
-import javax.swing.JOptionPane;
-import jmri.ConfigureManager;
-import jmri.InstanceManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import jmri.*;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Store the JMRI user-level information as XML.
@@ -31,6 +30,11 @@ public class StoreXmlUserAction extends StoreXmlConfigAction {
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (! InstanceManager.getDefault(PermissionManager.class)
+                .ensureAtLeastPermission(LoadAndStorePermissionOwner.STORE_XML_FILE_PERMISSION,
+                        BooleanPermission.BooleanValue.TRUE)) {
+            return;
+        }
         JFileChooser userFileChooser = getUserFileChooser();
         userFileChooser.setDialogType(javax.swing.JFileChooser.SAVE_DIALOG);
         userFileChooser.setApproveButtonText(Bundle.getMessage("ButtonSave"));  // NOI18N
@@ -46,22 +50,26 @@ public class StoreXmlUserAction extends StoreXmlConfigAction {
         if (cm == null) {
             log.error("Failed to make backup due to unable to get default configure manager");  // NOI18N
         } else {
-            cm.makeBackup(file);
-            // and finally store
-            boolean results = cm.storeUser(file);
-            log.debug(results ? "store was successful" : "store failed");  // NOI18N
+            boolean results = cm.makeBackup(file);
             if (!results) {
-                JOptionPane.showMessageDialog(null,
+                JmriJOptionPane.showMessageDialog(null,
+                        Bundle.getMessage("BackupError", file.getPath())
+                            + System.lineSeparator() + Bundle.getMessage("ConsoleWindowHasInfo"),
+                        Bundle.getMessage("BackupError", ""),
+                        JmriJOptionPane.ERROR_MESSAGE);
+            }
+            // and finally store
+            results = cm.storeUser(file);
+            log.debug("store {}", results ? "was successful" : "failed");  // NOI18N
+            if (!results) {
+                JmriJOptionPane.showMessageDialog(null,
                         Bundle.getMessage("StoreHasErrors") + "\n"  // NOI18N
                         + Bundle.getMessage("StoreIncomplete") + "\n"  // NOI18N
                         + Bundle.getMessage("ConsoleWindowHasInfo"),  // NOI18N
-                        Bundle.getMessage("StoreError"), JOptionPane.ERROR_MESSAGE);  // NOI18N
-            } else {
-                InstanceManager.getDefault(jmri.jmrit.display.EditorManager.class).setChanged(false);
+                        Bundle.getMessage("StoreError"), JmriJOptionPane.ERROR_MESSAGE);  // NOI18N
             }
         }
     }
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(StoreXmlUserAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StoreXmlUserAction.class);
 }

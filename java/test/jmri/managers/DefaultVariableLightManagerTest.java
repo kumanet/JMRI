@@ -1,12 +1,15 @@
 package jmri.managers;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import jmri.*;
 import jmri.implementation.AbstractVariableLight;
 import jmri.util.JUnitUtil;
-import org.junit.Assert;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,11 +33,13 @@ public class DefaultVariableLightManagerTest {
     public void testRegister() {
         // create
         VariableLight t = newVariableLight("L11", "mine");
-        
+
         VariableLightManager l = InstanceManager.getDefault(VariableLightManager.class);
-        
-        Assert.assertThrows(UnsupportedOperationException.class, () -> l.register(t));
-        Assert.assertThrows(UnsupportedOperationException.class, () -> l.deregister(t));
+
+        UnsupportedOperationException ex = assertThrows(UnsupportedOperationException.class, () -> l.register(t));
+        assertNotNull(ex);
+        ex = assertThrows(UnsupportedOperationException.class, () -> l.deregister(t));
+        assertNotNull(ex);
     }
 
     @Test
@@ -46,23 +51,23 @@ public class DefaultVariableLightManagerTest {
         Light light = new MyLight("IL1");
         InstanceManager.getDefault(LightManager.class).register(light);
         VariableLight variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL1");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
         // Check that we can deregister light without problem
         InstanceManager.getDefault(LightManager.class).deregister(light);
         variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL1");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
         // When this light is created, the VariableLightManager is created.
         Light light2 = new MyLight("IL2");
         InstanceManager.getDefault(LightManager.class).register(light2);
         variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL2");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
         // Check that we can deregister light without problem
         InstanceManager.getDefault(LightManager.class).deregister(light);
         variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL2");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
     }
 
     @Test
@@ -70,26 +75,26 @@ public class DefaultVariableLightManagerTest {
         // Test that the VariableLightManager registers variable lights.
 
         // When this light is created, the VariableLightManager isn't created yet.
-        Light variableLight = new MyVariableLight("IL1", "MyLight");
+        Light variableLight = new MyVariableLight("IL101", "MyLight");
         InstanceManager.getDefault(LightManager.class).register(variableLight);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL1");
-        Assert.assertNotNull("variable light exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL101");
+        assertNotNull( variableLight, "variable light exists in VariableLightManager");
 
         // Check that we can deregister light and that it get deregstered from VariableLightManager as well
         InstanceManager.getDefault(LightManager.class).deregister(variableLight);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL1");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL101");
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
         // When this light is created, the VariableLightManager is created.
-        Light variableLight2 = new MyVariableLight("IL2", "MyLight");
+        Light variableLight2 = new MyVariableLight("IL201", "MyLight");
         InstanceManager.getDefault(LightManager.class).register(variableLight2);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL2");
-        Assert.assertNotNull("variable light exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL201");
+        assertNotNull( variableLight, "variable light exists in VariableLightManager");
 
         // Check that we can deregister light and that it get deregstered from VariableLightManager as well
         InstanceManager.getDefault(LightManager.class).deregister(variableLight2);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL2");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getBySystemName("IL2901");
+        assertNull( variableLight, "light does not exists in VariableLightManager");
     }
 
     @Test
@@ -100,22 +105,22 @@ public class DefaultVariableLightManagerTest {
         Light light = new MyLight("IL1");
         InstanceManager.getDefault(LightManager.class).register(light);
         VariableLight variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A light");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
         // Check that we can deregister light without problem
         InstanceManager.getDefault(LightManager.class).deregister(light);
         variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A light");
-        Assert.assertNull("light does not exists in VariableLightManager", variableLight);
+        assertNull( variableLight, "light does not exists in VariableLightManager");
 
-        Light variableLight2 = new MyVariableLight("IL2", "A variable light");
+        Light variableLight2 = new MyVariableLight("IL2", "A variable light 2 DVLMT");
         InstanceManager.getDefault(LightManager.class).register(variableLight2);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A variable light");
-        Assert.assertNotNull("variableLight exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A variable light 2 DVLMT");
+        assertNotNull( variableLight, "variableLight exists in VariableLightManager");
 
         // Check that we can deregister variableLight and that it get deregstered from VariableLightManager as well
         InstanceManager.getDefault(LightManager.class).deregister(variableLight2);
-        variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A variable light");
-        Assert.assertNull("variableLight does not exists in VariableLightManager", variableLight);
+        variableLight = InstanceManager.getDefault(VariableLightManager.class).getByUserName("A variable light 2 DVLMT");
+        assertNull( variableLight, "variableLight does not exists in VariableLightManager");
     }
 
     @BeforeEach
@@ -126,25 +131,33 @@ public class DefaultVariableLightManagerTest {
 
     @AfterEach
     public void tearDown() {
+        // kill timebase created by variable light
+        var timebase = InstanceManager.getNullableDefault(jmri.Timebase.class);
+        if (timebase != null) {
+            timebase.setRun(false);
+            for (var listener : timebase.getMinuteChangeListeners()) {
+                timebase.removeMinuteChangeListener(listener);
+            }
+        }
+
         JUnitUtil.tearDown();
     }
 
 
 
-    private class MyLight extends jmri.implementation.AbstractLight {
+    private static class MyLight extends jmri.implementation.AbstractLight {
 
-        public MyLight(String systemName) {
+        private MyLight(String systemName) {
             super(systemName);
         }
 
     }
 
-
-    private class MyVariableLight extends AbstractVariableLight {
+    private static class MyVariableLight extends AbstractVariableLight {
 
         double _value = 0.0;
 
-        public MyVariableLight(String sys, String userName) {
+        private MyVariableLight(String sys, String userName) {
             super(sys, userName);
         }
 
@@ -187,7 +200,7 @@ public class DefaultVariableLightManagerTest {
         protected void sendIntensity(double intensity) {
             // Do nothing
         }
-        
+
         @Override
         protected void sendOnOffCommand(int newState) {
             // Do nothing
@@ -195,6 +208,6 @@ public class DefaultVariableLightManagerTest {
     }
 
 
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProxyVariableLightManagerTest.class);
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProxyVariableLightManagerTest.class);
 
 }

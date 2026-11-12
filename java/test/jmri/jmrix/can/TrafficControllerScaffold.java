@@ -1,11 +1,11 @@
 package jmri.jmrix.can;
 
+import java.util.List;
 import java.util.Vector;
+
 import jmri.jmrix.AbstractMRListener;
 import jmri.jmrix.AbstractMRMessage;
 import jmri.jmrix.AbstractMRReply;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stands in for the can.TrafficController class
@@ -15,18 +15,6 @@ import org.slf4j.LoggerFactory;
 public class TrafficControllerScaffold extends TrafficController {
 
     public TrafficControllerScaffold() {
-    }
-
-    static protected TrafficControllerScaffold self = null;
-
-    static public TrafficControllerScaffold instance() {
-        if (self == null) {
-            if (log.isDebugEnabled()) {
-                log.debug("creating a new TrafficControllerScaffold object");
-            }
-            self = new TrafficControllerScaffold();
-        }
-        return self;
     }
 
     // non-functional dummy
@@ -75,14 +63,12 @@ public class TrafficControllerScaffold extends TrafficController {
     /**
      * record messages sent, provide access for making sure they are OK
      */
-    public Vector<CanMessage> outbound = new Vector<CanMessage>();  // public OK here, so long as this is a test class
-    public Vector<CanReply> inbound = new Vector<CanReply>();  // public OK here, so long as this is a test class
+    public Vector<CanMessage> outbound = new Vector<>();  // public OK here, so long as this is a test class
+    public Vector<CanReply> inbound = new Vector<>();  // public OK here, so long as this is a test class
 
     @Override
     public void sendCanMessage(CanMessage m, CanListener l) {
-        if (log.isDebugEnabled()) {
-            log.debug("sendCanMessage [{}]", m);
-        }
+        log.debug("sendCanMessage [{}]", m);
         // save a copy
         outbound.addElement(m);
         mLastSender = l;
@@ -90,11 +76,34 @@ public class TrafficControllerScaffold extends TrafficController {
 
     @Override
     public void sendCanReply(CanReply r, CanListener l) {
-        if (log.isDebugEnabled()) {
-            log.debug("sendCanReply [{}]", r);
-        }
+        log.debug("sendCanReply [{}]", r);
         // save a copy
         inbound.addElement(r);
+    }
+
+    /**
+     * Act as a connection that has just written a message: give it its sent
+     * time and tell its sent listener, as a real traffic controller does.
+     * Messages are only recorded in {@link #outbound}, never written, until
+     * this is called.
+     *
+     * @param m         the message, usually one from {@link #outbound}
+     * @param timeNanos when it was written, on the System.nanoTime() scale
+     */
+    public void markWritten(CanMessage m, long timeNanos) {
+        messageSent(m, timeNanos);
+    }
+
+    public void sendToListeners(CanReply r) {
+        for ( AbstractMRListener listener : cmdListeners ) {
+            ((CanListener) listener).reply(r);
+        }
+    }
+
+    public void sendToListeners(CanMessage m) {
+        for ( AbstractMRListener listener : cmdListeners ) {
+            ((CanListener) listener).message(m);
+        }
     }
 
     /*
@@ -104,6 +113,14 @@ public class TrafficControllerScaffold extends TrafficController {
         return cmdListeners.size();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TrafficControllerScaffold.class);
+    /**
+     * Get List of Listeners.
+     * @return List of CAN Listeners.
+     */
+    public List<AbstractMRListener> getListeners() {
+        return cmdListeners;
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrafficControllerScaffold.class);
 
 }

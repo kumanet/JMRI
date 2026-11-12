@@ -3,7 +3,10 @@ package jmri.managers;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+
 import jmri.Conditional;
 import jmri.ConditionalManager;
 import jmri.InstanceManager;
@@ -12,8 +15,6 @@ import jmri.implementation.DefaultConditional;
 import jmri.implementation.SensorGroupConditional;
 import jmri.jmrit.sensorgroup.SensorGroupFrame;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Basic Implementation of a ConditionalManager.
@@ -65,14 +66,13 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      */
     @Override
     public Conditional createNewConditional(String systemName, String userName) {
-        Conditional c = null;
 
         // Check system name
         if (systemName == null || systemName.length() < 1) {
             log.error("createNewConditional: systemName is null or empty");
             return null;
         }
-        c = getBySystemName(systemName);
+        Conditional c = getBySystemName(systemName);
         if (c != null) {
             return null;        // Conditional already exists
         }
@@ -123,12 +123,30 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      * The 3 route patterns deal with Route Logix names that end with a number,
      * such as Logix RTX123 with Conditional RTX1231T.
      */
-    private static final String[] PATTERNS = {
-        "(.*?)(C\\d+$)",               // Standard IX
-        "(.*?)([1-9]{1}[ALT]$)",       // LRoute/Route, 1-9
-        "(.*?)([0-9]{2}[ALT]$)",       // LRoute/Route, 10-99
-        "(.*?)([0-9]{3}[ALT]$)"        // LRoute/Route, 100-999
+    private static final Pattern[] PATTERNS = {
+        Pattern.compile("(.*?)(C\\d+$)"),               // Standard IX
+        Pattern.compile("(.*?)([1-9]{1}[ALT]$)"),       // LRoute/Route, 1-9
+        Pattern.compile("(.*?)([0-9]{2}[ALT]$)"),       // LRoute/Route, 10-99
+        Pattern.compile("(.*?)([0-9]{3}[ALT]$)")        // LRoute/Route, 100-999
     };
+
+    /**
+     * Parent Logix of Conditionals whose system names do not match the
+     * patterns above, as found by scanning all the Logixes. An entry is
+     * checked each time it is used, since Logixes and their Conditionals can
+     * change without this manager being told. Package-private for testing.
+     */
+    final Map<String, Logix> nonStandardParents = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Only Conditionals with non-standard system names are remembered here.
+     */
+    @Override
+    public void forgetParentLogix(Logix x) {
+        nonStandardParents.values().removeIf(lgx -> lgx == x);
+    }
 
     /**
      * Parses the Conditional system name to get the parent Logix system name,
@@ -140,14 +158,14 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      * @return the parent Logix or null
      */
     @Override
+    @CheckForNull
     public Logix getParentLogix(String name) {
         if (name == null || name.length() < 4) {
             return null;
         }
 
         // Check for standard names
-        for (String pattern : PATTERNS) {
-            Pattern r = Pattern.compile(pattern);
+        for (Pattern r : PATTERNS) {
             Matcher m = r.matcher(name);
             if (m.find()) {
                 Logix lgx = InstanceManager.getDefault(jmri.LogixManager.class).getBySystemName(m.group(1));
@@ -158,17 +176,34 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
             }
         }
 
-        // Now try non-standard names using a brute force scan
+        // Now try non-standard names, first the Logix found last time
         jmri.LogixManager logixManager = InstanceManager.getDefault(jmri.LogixManager.class);
+        Logix found = nonStandardParents.get(name);
+        if (found != null) {
+            if (logixManager.getBySystemName(found.getSystemName()) == found && hasConditional(found, name)) {
+                return found;
+            }
+            nonStandardParents.remove(name);
+        }
+
+        // then using a brute force scan
         for (Logix lgx : logixManager.getNamedBeanSet()) {
-            for (int i = 0; i < lgx.getNumConditionals(); i++) {
-                String cdlName = lgx.getConditionalByNumberOrder(i);
-                if (cdlName.equals(name)) {
-                    return lgx;
-                }
+            if (hasConditional(lgx, name)) {
+                nonStandardParents.put(name, lgx);
+                return lgx;
             }
         }
         return null;
+    }
+
+    private static boolean hasConditional(Logix lgx, String name) {
+        for (int i = 0; i < lgx.getNumConditionals(); i++) {
+            String cdlName = lgx.getConditionalByNumberOrder(i);
+            if (cdlName.equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -191,10 +226,10 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      * @return null if no match found
      */
     @Override
-    public Conditional getConditional(Logix x, String name) {
-        Conditional c = null;
+    @CheckForNull
+    public Conditional getConditional(@CheckForNull Logix x, String name) {
         if (x != null) {
-            c = getByUserName(x, name);
+            Conditional c = getByUserName(x, name);
             if (c != null) {
                 return c;
             }
@@ -203,6 +238,7 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
     }
 
     @Override
+    @CheckForNull
     public Conditional getConditional(String name) {
         Conditional c = getBySystemName(name);
         if (c == null) {
@@ -217,6 +253,7 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      * @return the conditional or null when not found or a duplicate
      */
     @Override
+    @CheckForNull
     public Conditional getByUserName(String key) {
         if (key == null) {
             return null;
@@ -239,7 +276,8 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
     }
 
     @Override
-    public Conditional getByUserName(Logix x, String key) {
+    @CheckForNull
+    public Conditional getByUserName(@CheckForNull Logix x, @Nonnull String key) {
         if (x == null) {
             return null;
         }
@@ -256,6 +294,7 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
     }
 
     @Override
+    @CheckForNull
     public Conditional getBySystemName(String name) {
         if (name == null) {
             return null;
@@ -265,7 +304,6 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
             return null;
         }
         return lgx.getConditional(name);
-//@        return (Conditional) _tsys.get(name);
     }
 
     /**
@@ -282,31 +320,6 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
         for (int i = 0; i < x.getNumConditionals(); i++) {
             nameList.add(x.getConditionalByNumberOrder(i));
         }
-        return nameList;
-    }
-
-    /**
-     * Get a list of all Conditional system names
-     * Overrides the bean method
-     * @since 4.7.4
-     * @deprecated 4.11.5 - use direct access via
-     *                  {@link #getNamedBeanSet}
-     * @return a list of conditional system names regardless of parent Logix
-     */
-    @Deprecated // 4.11.5
-    @Override
-    @Nonnull
-    public List<String> getSystemNameList() {
-        jmri.util.LoggingUtil.deprecationWarning(log, "getSystemNameList");
-        List<String> nameList = new ArrayList<>();
-
-        jmri.LogixManager logixManager = InstanceManager.getDefault(jmri.LogixManager.class);
-        for (Logix lgx : logixManager.getNamedBeanSet()) {
-            for (int i = 0; i < lgx.getNumConditionals(); i++) {
-                nameList.add(lgx.getConditionalByNumberOrder(i));
-            }
-        }
-        Collections.sort(nameList);
         return nameList;
     }
 
@@ -331,16 +344,6 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
             }
         }
         return Collections.unmodifiableSortedSet(conditionals);
-    }
-
-    /**
-     *
-     * @return the default instance of the DefaultConditionalManager
-     * @deprecated since 4.17.3; use {@link jmri.InstanceManager#getDefault(java.lang.Class)} instead
-     */
-    @Deprecated
-    static public DefaultConditionalManager instance() {
-        return InstanceManager.getDefault(DefaultConditionalManager.class);
     }
 
     @Override
@@ -384,11 +387,11 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      */
     @Override
     public void addWhereUsed(String target, String reference) {
-        if (target == null || target.equals("")) {
+        if (target == null || target.isEmpty()) {
             log.error("Invalid target name for addWhereUsed");
             return;
         }
-        if (reference == null || reference.equals("")) {
+        if (reference == null || reference.isEmpty()) {
             log.error("Invalid reference name for addWhereUsed");
             return;
         }
@@ -414,7 +417,7 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      */
     @Override
     public ArrayList<String> getWhereUsed(String target) {
-        if (target == null || target.equals("")) {
+        if (target == null || target.isEmpty()) {
             log.error("Invalid target name for getWhereUsed");
             return null;
         }
@@ -429,11 +432,11 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
      */
     @Override
     public void removeWhereUsed(String target, String reference) {
-        if (target == null || target.equals("")) {
+        if (target == null || target.isEmpty()) {
             log.error("Invalid target name for removeWhereUsed");
             return;
         }
-        if (reference == null || reference.equals("")) {
+        if (reference == null || reference.isEmpty()) {
             log.error("Invalid reference name for removeWhereUsed");
             return;
         }
@@ -441,7 +444,7 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
         if (conditionalWhereUsed.containsKey(target)) {
             ArrayList<?> refList = conditionalWhereUsed.get(target);
             refList.remove(reference);
-            if (refList.size() == 0) {
+            if (refList.isEmpty()) {
                 conditionalWhereUsed.remove(target);
             }
         }
@@ -485,5 +488,5 @@ public class DefaultConditionalManager extends AbstractManager<Conditional>
         return targetList;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DefaultConditionalManager.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalManager.class);
 }

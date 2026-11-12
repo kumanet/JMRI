@@ -6,9 +6,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
 
-import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
 import jmri.*;
@@ -22,9 +20,6 @@ import jmri.util.ThreadingUtil;
 
 import jmri.util.prefs.JmriPreferencesActionFactory;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import apps.util.Log4JUtil;
 
 /**
@@ -36,19 +31,18 @@ import apps.util.Log4JUtil;
  * There are a series of steps in the configuration:
  * <dl>
  * <dt>preInit<dd>Initialize log4j, invoked from the main()
- * <dt>ctor<dd>
+ * <dt>ctor<dd>Construct the basic application object
  * </dl>
  *
  * @author Bob Jacobsen Copyright 2009, 2010
  */
 public abstract class AppsBase {
 
-    private final static String CONFIG_FILENAME = System.getProperty("org.jmri.Apps.configFilename", "/JmriConfig3.xml");
+    private static final String CONFIG_FILENAME = System.getProperty("org.jmri.Apps.configFilename", "/JmriConfig3.xml");
     protected boolean configOK;
     protected boolean configDeferredLoadOK;
     protected boolean preferenceFileExists;
     static boolean preInit = false;
-    private final static Logger log = LoggerFactory.getLogger(AppsBase.class);
 
     /**
      * Initial actions before frame is created, invoked in the applications
@@ -60,7 +54,9 @@ public abstract class AppsBase {
      *
      * @param applicationName The application name as presented to the user
      */
-    static public void preInit(String applicationName) {
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification="Info String always needs to be evaluated")
+    public static void preInit(String applicationName) {
         Log4JUtil.initLogging();
 
         try {
@@ -115,18 +111,12 @@ public abstract class AppsBase {
         // all loaded, initialize objects as necessary
         InstanceManager.getDefault(jmri.LogixManager.class).activateAllLogixs();
         InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class).initializeLayoutBlockPaths();
-        
+
         jmri.jmrit.logixng.LogixNG_Manager logixNG_Manager =
                 InstanceManager.getDefault(jmri.jmrit.logixng.LogixNG_Manager.class);
-        java.util.List<String> errors = new ArrayList<>();
-        if (!logixNG_Manager.setupAllLogixNGs(errors)) {
-            for (String s : errors) log.error(s);
-            JOptionPane.showMessageDialog(null,
-                    "<html>"+String.join("<br>", errors)+"</html>",
-                    Bundle.getMessage("TitleError"),
-                    JOptionPane.ERROR_MESSAGE);
-        }
-        if (InstanceManager.getDefault(LogixNGPreferences.class).getStartLogixNGOnStartup()) {
+        logixNG_Manager.setupAllLogixNGs();
+        if (InstanceManager.getDefault(LogixNGPreferences.class).getStartLogixNGOnStartup()
+                && InstanceManager.getDefault(jmri.jmrit.logixng.LogixNG_Manager.class).isStartLogixNGsOnLoad()) {
             logixNG_Manager.activateAllLogixNGs();
         }
     }
@@ -140,6 +130,8 @@ public abstract class AppsBase {
     protected void configureProfile() {
         String profileFilename;
         FileUtil.createDirectory(FileUtil.getPreferencesPath());
+        // Load permission manager
+        InstanceManager.getDefault(PermissionManager.class);
         // Needs to be declared final as we might need to
         // refer to this on the Swing thread
         File profileFile;
@@ -163,7 +155,7 @@ public abstract class AppsBase {
             try {
                 if (ProfileManager.getDefault().migrateToProfiles(getConfigFileName())) { // migration or first use
                     // GUI should show message here
-                    log.info(Bundle.getMessage("ConfigMigratedToProfile"));
+                    log.info("Migrated {}",Bundle.getMessage("ConfigMigratedToProfile"));
                 }
             } catch (IOException | IllegalArgumentException ex) {
                 // GUI should show message here
@@ -173,9 +165,6 @@ public abstract class AppsBase {
         try {
             // GUI should use ProfileManagerDialog.getStartingProfile here
             if (ProfileManager.getStartingProfile() != null) {
-                // Manually setting the configFilename property since calling
-                // Apps.setConfigFilename() does not reset the system property
-                System.setProperty("org.jmri.Apps.configFilename", Profile.CONFIG_FILENAME);
                 Profile profile = ProfileManager.getDefault().getActiveProfile();
                 if (profile != null) {
                     log.info("Starting with profile {}", profile.getId());
@@ -204,7 +193,8 @@ public abstract class AppsBase {
 
     protected void installManagers() {
         // record startup
-        InstanceManager.getDefault(FileHistory.class).addOperation("app", Application.getApplicationName(), null);
+        String appString = String.format("%s (v%s)", Application.getApplicationName(), Version.getCanonicalVersion());
+        InstanceManager.getDefault(FileHistory.class).addOperation("app", appString, null);
 
         // install the abstract action model that allows items to be added to the, both
         // CreateButton and Perform Action Model use a common Abstract class
@@ -241,12 +231,15 @@ public abstract class AppsBase {
         }
         if (sharedConfig != null) {
             file = sharedConfig;
+            log.trace("Try preferences from sharedConfig {}", file.getPath());
         } else if (!new File(getConfigFileName()).isAbsolute()) {
             // must be relative, but we want it to
             // be relative to the preferences directory
             file = new File(FileUtil.getUserFilesPath() + getConfigFileName());
+            log.trace("Try references from getUserFilesPath {}", file.getPath());
         } else {
             file = new File(getConfigFileName());
+            log.trace("Try references from getConfigFileName {}", file.getPath());
         }
         // don't try to load if doesn't exist, but mark as not OK
         if (!file.exists()) {
@@ -255,6 +248,7 @@ public abstract class AppsBase {
             log.info("No pre-existing config file found, searched for '{}'", file.getPath());
             return;
         }
+        log.debug("Found preferences file '{}'", file.getPath());
         preferenceFileExists = true;
 
         // ensure the UserPreferencesManager has loaded. Done on GUI
@@ -330,14 +324,6 @@ public abstract class AppsBase {
     }
 
     /**
-     * @deprecated for removal since 4.17.2 without replacement
-     */
-    @Deprecated
-    protected void installShutDownManager() {
-        // nothing to do
-    }
-
-    /**
      * Final actions before releasing control of the application to the user,
      * invoked explicitly after object has been constructed in main().
      */
@@ -364,7 +350,7 @@ public abstract class AppsBase {
      * @param def  Default value if no other is provided
      * @param args Argument array from the main routine
      */
-    static protected void setConfigFilename(String def, String[] args) {
+    protected static void setConfigFilename(String def, String[] args) {
         // skip if org.jmri.Apps.configFilename is set
         if (System.getProperty("org.jmri.Apps.configFilename") != null) {
             return;
@@ -388,14 +374,14 @@ public abstract class AppsBase {
     }
 
     // We will use the value stored in the system property
-    static public String getConfigFileName() {
+    public static String getConfigFileName() {
         if (System.getProperty("org.jmri.Apps.configFilename") != null) {
             return System.getProperty("org.jmri.Apps.configFilename");
         }
         return CONFIG_FILENAME;
     }
 
-    static protected void setJmriSystemProperty(String key, String value) {
+    protected static void setJmriSystemProperty(String key, String value) {
         try {
             String current = System.getProperty("org.jmri.Apps." + key);
             if (current == null) {
@@ -404,20 +390,19 @@ public abstract class AppsBase {
                 log.warn("JMRI property {} already set to {}, skipping reset to {}", key, current, value);
             }
         } catch (Exception e) {
-            log.error("Unable to set JMRI property {} to {}due to exception: {}", key, value, e);
+            log.error("Unable to set JMRI property {} to {}due to exception", key, value, e);
         }
     }
 
     /**
      * The application decided to quit, handle that.
      *
-     * @return true if successfully ran all shutdown tasks and can quit; false
-     *         otherwise
+     * @return always returns false
      */
-    static public boolean handleQuit() {
+    public static boolean handleQuit() {
         log.debug("Start handleQuit");
         try {
-            return InstanceManager.getDefault(jmri.ShutDownManager.class).shutdown();
+            InstanceManager.getDefault(jmri.ShutDownManager.class).shutdown();
         } catch (Exception e) {
             log.error("Continuing after error in handleQuit", e);
         }
@@ -426,19 +411,15 @@ public abstract class AppsBase {
 
     /**
      * The application decided to restart, handle that.
-     *
-     * @return true if successfully ran all shutdown tasks and can quit; false
-     *         otherwise
      */
-    static public boolean handleRestart() {
+    public static void handleRestart() {
         log.debug("Start handleRestart");
         try {
-            return InstanceManager.getDefault(jmri.ShutDownManager.class).restart();
+            InstanceManager.getDefault(jmri.ShutDownManager.class).restart();
         } catch (Exception e) {
             log.error("Continuing after error in handleRestart", e);
         }
-        return false;
     }
 
-
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AppsBase.class);
 }

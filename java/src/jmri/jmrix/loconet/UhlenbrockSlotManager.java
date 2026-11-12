@@ -54,13 +54,19 @@ public class UhlenbrockSlotManager extends SlotManager {
         super(tc);
     }
 
+    /*
+     * NUM_SLOTS fixed for Uhlenbrock
+     */
+    // private final int NUM_SLOTS = 128;
     /**
      * Provide Uhlenbrock-specific slot implementation
+     * @param initialize - not used by Uhlenbrock
      */
     @Override
-    protected void loadSlots() {
+    protected void loadSlots(boolean initialize) {
         // initialize slot array
-        for (int i = 0; i < NUM_SLOTS; i++) {
+        // TODO does UhlenBrock support extended slots?
+        for (int i = 0; i < getNumSlots(); i++) {
             _slots[i] = new UhlenbrockSlot(i);
         }
     }
@@ -113,7 +119,7 @@ public class UhlenbrockSlotManager extends SlotManager {
         }
 
         // see if message for Intellibox_I and -II functions F9 thru F128
-        if (m.getOpCode() == LnConstants.RE_OPC_IB2_SPECIAL && m.getElement(1) == LnConstants.RE_IB2_SPECIAL_FUNCS_TOKEN) {
+        if (m.getOpCode() == LnConstants.OPC_EXP_SLOT_MOVE_RE_OPC_IB2_SPECIAL && m.getElement(1) == LnConstants.RE_IB2_SPECIAL_FUNCS_TOKEN) {
             UhlenbrockSlot slot = (UhlenbrockSlot) slot(m.getElement(2));
             slot.iBfunctionMessage(m);
         }
@@ -340,6 +346,28 @@ public class UhlenbrockSlotManager extends SlotManager {
         return m;
     }
 
+    /**
+     * This is overridden solely to shorten the delay to 2 seconds
+     */
+    @Override
+    protected void restartEndOfProgrammingTimer() {
+        final int delay = 2000;
+        if (mProgEndSequence) {
+            if (mPowerTimer == null) {
+                mPowerTimer = new javax.swing.Timer(delay, new java.awt.event.ActionListener() {
+                    @Override
+                    public void actionPerformed(java.awt.event.ActionEvent e) {
+                        doEndOfProgramming();
+                    }
+                });
+            }
+            mPowerTimer.stop();
+            mPowerTimer.setInitialDelay(delay);
+            mPowerTimer.setRepeats(false);
+            mPowerTimer.start();
+        }
+    }
+
     // internal method to remember who's using the programmer
     // Note: Overridden in order to also call the startIBComPT method
     @Override
@@ -354,9 +382,10 @@ public class UhlenbrockSlotManager extends SlotManager {
     synchronized protected void doEndOfProgramming() {
         log.debug("Uhlenbrock doEndOfProgramming");
         tc.sendLocoNetMessage(stopIBComPT());
+        super.doEndOfProgramming();
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(UhlenbrockSlotManager.class);
+    private static final Logger log = LoggerFactory.getLogger(UhlenbrockSlotManager.class);
 
 }

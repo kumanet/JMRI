@@ -1,8 +1,6 @@
 package jmri.jmrit.operations;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 
 import org.jdom2.JDOMException;
 import org.slf4j.Logger;
@@ -34,7 +32,7 @@ public abstract class OperationsXml extends XmlFile {
         try {
             writeFile(getDefaultOperationsFilename());
         } catch (IOException e) {
-            log.error("Exception while writing operation file, may not be complete: {}", e.getMessage());
+            log.error("Exception while writing operation file, may not be complete: {}", e.getLocalizedMessage());
         }
     }
 
@@ -42,8 +40,12 @@ public abstract class OperationsXml extends XmlFile {
         try {
             readFile(getDefaultOperationsFilename());
         } catch (IOException | JDOMException e) {
-            log.error("Exception during operations file reading", e);
+            log.error("Exception during operations file reading: {}", e.getLocalizedMessage());
         }
+    }
+    
+    protected File createFile(String fullPathName) {
+        return createFile(fullPathName, false); // no backup
     }
 
     protected File createFile(String fullPathName, boolean backupFile) {
@@ -69,9 +71,24 @@ public abstract class OperationsXml extends XmlFile {
                 file = new File(fullPathName);
             }
         } catch (IOException e) {
-            log.error("Exception while creating operations file, may not be complete: {}", e.getMessage());
+            log.error("Exception while creating operations file, may not be complete: {}", e.getLocalizedMessage());
         }
         return file;
+    }
+    
+    protected void createDirectory(String fullPathName) {
+        if (!checkFile(fullPathName)) {
+            File file = new File(fullPathName);
+            File parentDir = file.getParentFile();
+            if (!parentDir.exists()) {
+                if (!parentDir.mkdir()) {
+                    log.error("Directory wasn't created");
+                }
+            }
+            if (file.mkdirs()) {
+                log.debug("Directory created {}", fullPathName);
+            }
+        }
     }
 
     protected void writeFile(String filename) throws FileNotFoundException, IOException {
@@ -151,29 +168,6 @@ public abstract class OperationsXml extends XmlFile {
 
     private static String fileLocation = FileUtil.getUserFilesPath();
 
-
-    /**
-     * Convert xml string comment to standard string format one character at a
-     * time, except when {@literal <?p?>} is found. In that case, insert a \n
-     * and skip over those characters.
-     *
-     * @param comment input xml comment string
-     * @return output string converted to standard format
-     */
-    @Deprecated
-    public static String convertFromXmlComment(String comment) {
-        StringBuilder buf = new StringBuilder();
-        for (int k = 0; k < comment.length(); k++) {
-            if (comment.startsWith("<?p?>", k)) { // NOI18N
-                buf.append("\n"); // NOI18N
-                k = k + 4;
-            } else {
-                buf.append(comment.substring(k, k + 1));
-            }
-        }
-        return buf.toString();
-    }
-
     /**
      * Checks name for the file control characters:
      *
@@ -216,6 +210,6 @@ public abstract class OperationsXml extends XmlFile {
                 || InstanceManager.getDefault(TrainManagerXml.class).isDirty();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OperationsXml.class);
+    private static final Logger log = LoggerFactory.getLogger(OperationsXml.class);
 
 }

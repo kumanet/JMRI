@@ -1,9 +1,12 @@
 package jmri.jmrit.ussctc;
 
-import jmri.util.JUnitUtil;
-import jmri.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Assert;
+import jmri.*;
+import jmri.util.JUnitUtil;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -15,47 +18,47 @@ public class VetoedBellTest {
 
     @Test
     public void testConstruction() {
-        new VetoedBell("veto Sensor", new PhysicalBell("Bell output"));
+        assertNotNull( new VetoedBell("veto Sensor", new PhysicalBell("Bell output")));
     }
  
-    @Test 
+    @Test
     public void testBellStrokeAllowed() throws JmriException {
-        rung = false;
-        Bell bell = new Bell(){
-            @Override
-            public void ring() {
-                rung = true;
-            }
-        };
+        assertNotNull(veto);
         veto.setState(Sensor.INACTIVE);
         
-        Bell vbell = new VetoedBell("veto Sensor", bell);
+        Bell vbell = new VetoedBell("veto Sensor", new BellScaffold());
         vbell.ring();
         
-        Assert.assertTrue(rung);
+        assertTrue(rung);
     }
     
-    @Test 
+    @Test
     public void testBellStrokeNotAllowed() throws JmriException  {
-        rung = false;
-        Bell bell = new Bell(){
-            @Override
-            public void ring() {
-                rung = true;
-            }
-        };
+        assertNotNull(veto);
         veto.setState(Sensor.ACTIVE);
         
-        Bell vbell = new VetoedBell("veto Sensor", bell);
+        Bell vbell = new VetoedBell("veto Sensor", new BellScaffold());
         vbell.ring();
         
-        Assert.assertTrue(!rung);
+        assertFalse(rung);
     }
-    
-    boolean rung;
-    Sensor veto;
-    Turnout bellTurnout;
-    
+
+    private boolean rung;
+    private Sensor veto = null;
+    private Turnout bellTurnout = null;
+
+    private class BellScaffold implements Bell {
+
+        BellScaffold(){
+            rung = false;
+        }
+
+        @Override
+        public void ring() {
+            rung = true;
+        }
+    }
+
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();

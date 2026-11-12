@@ -14,8 +14,7 @@ import jmri.Sensor;
 import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.palette.IndicatorItemPanel;
 import jmri.jmrit.logix.OBlock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.ThreadingUtil;
 
 /**
  * An icon to display the status of a track segment in a block.
@@ -156,9 +155,9 @@ public class IndicatorTrackIcon extends PositionableIcon
             block.addPropertyChangeListener(this, namedOccBlock.getName(), "Indicator Track");
             setStatus(block, block.getState());
             displayState(_status);
-            setToolTip(new ToolTip(block.getDescription(), 0, 0));
+            setToolTip(new ToolTip(block.getDescription(), 0, 0, this));
         } else {
-            setToolTip(new ToolTip(null, 0, 0));
+            setToolTip(new ToolTip(null, 0, 0, this));
         }
     }
 
@@ -210,7 +209,7 @@ public class IndicatorTrackIcon extends PositionableIcon
     @Override
     public void setStatus(int state) {
         _status = _pathUtil.getStatus(state);
-    }
+     }
 
     /*
      * Place icon by its bean state name
@@ -219,7 +218,7 @@ public class IndicatorTrackIcon extends PositionableIcon
         log.debug("set \"{}\" icon= {}", name, icon);
         _iconMap.put(name, icon);
         if (_status.equals(name)) {
-            setIcon(icon);            
+            setIcon(icon);
         }
     }
 
@@ -229,6 +228,9 @@ public class IndicatorTrackIcon extends PositionableIcon
 
     @Override
     public int maxHeight() {
+        if (_iconMap == null) {
+            return 0;
+        }
         int max = 0;
         for (NamedIcon namedIcon : _iconMap.values()) {
             max = Math.max(namedIcon.getIconHeight(), max);
@@ -238,6 +240,9 @@ public class IndicatorTrackIcon extends PositionableIcon
 
     @Override
     public int maxWidth() {
+        if (_iconMap == null) {
+            return 0;
+        }
         int max = 0;
         for (NamedIcon namedIcon : _iconMap.values()) {
             max = Math.max(namedIcon.getIconWidth(), max);
@@ -276,21 +281,23 @@ public class IndicatorTrackIcon extends PositionableIcon
     private void setStatus(OBlock block, int state) {
         _status = _pathUtil.getStatus(block, state);
         if ((state & (OBlock.OCCUPIED | OBlock.RUNNING)) != 0) {
-            // It is rather unpleasant that the following needs to be done in a try-catch, but exceptions have been observed
-            try {
+            // _pathUtil.setLocoIcon must run on GUI. LocoLabel ctor causes editor to draw a graphic
+            ThreadingUtil.runOnGUIEventually(() -> {
                 _pathUtil.setLocoIcon(block, getLocation(), getSize(), _editor);
-            } catch (Exception e) {
-                // Rare. Observed in tests from add(Component comp, Component comp) in Editor.TargetPane
-                // as "java.lang.IllegalArgumentException: illegal component position"
-                log.error("setStatus on indicator track icon failed  {}", e);
-            }
+                repaint();
+            });
         }
-        repaint();
         if ((block.getState() & OBlock.OUT_OF_SERVICE) != 0) {
             setControlling(false);
         } else {
             setControlling(true);
         }
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_IndicatorTrackIcon");
     }
 
     @Override
@@ -324,7 +331,7 @@ public class IndicatorTrackIcon extends PositionableIcon
         }
         updateSize();
     }
-    
+
     @Override
     public void rotate(int deg) {
         super.rotate(deg);
@@ -420,6 +427,6 @@ public class IndicatorTrackIcon extends PositionableIcon
         return null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(IndicatorTrackIcon.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IndicatorTrackIcon.class);
 
 }

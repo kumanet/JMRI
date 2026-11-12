@@ -2,7 +2,7 @@ package jmri.jmrix.dccpp;
 
 /**
  * DCCppListener provides the call-back interface for notification when a new
- * DCC++ message arrives from the layout.
+ * DCC-EX message arrives from the layout.
  * <p>
  * Note that the DCCppListener implementation cannot assume that messages will be
  * returned in any particular thread. We may eventually revisit this, as
@@ -20,22 +20,22 @@ public interface DCCppListener extends jmri.jmrix.AbstractMRListener {
 
     /**
      * Member function that will be invoked by a DCCppInterface implementation to
-     * forward a DCC++ message from the layout.
+     * forward a DCC-EX message from the layout.
      *
-     * @param msg The received DCC++ message. Note that this same object may be
+     * @param msg The received DCC-EX message. Note that this same object may be
      *            presented to multiple users. It should not be modified here.
      */
-    public void message(DCCppReply msg);
+    void message(DCCppReply msg);
 
     /**
      * Member function that will be invoked by a DCCppInterface implementation to
-     * forward a DCC++ message sent to the layout. Normally, this function will
+     * forward a DCC-EX message sent to the layout. Normally, this function will
      * do nothing.
      *
-     * @param msg The received DCC++ message. Note that this same object may be
+     * @param msg The received DCC-EX message. Note that this same object may be
      *            presented to multiple users. It should not be modified here.
      */
-    public void message(DCCppMessage msg);
+    void message(DCCppMessage msg);
 
     /**
      * Member function invoked by an DCCppInterface implementation to notify a
@@ -43,7 +43,7 @@ public interface DCCppListener extends jmri.jmrix.AbstractMRListener {
      * queue.
      * @param msg the message that timed out.
      */
-    public void notifyTimeout(DCCppMessage msg);
+    void notifyTimeout(DCCppMessage msg);
 
 }
 

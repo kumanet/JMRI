@@ -90,7 +90,7 @@ public class Sound {
             log.error("Unable to open {}", url);
         }
     }
-    
+
     private Clip openClip() {
         Clip newClip = null;
         try {
@@ -115,10 +115,10 @@ public class Sound {
         } catch (UnsupportedAudioFileException ex) {
             log.error("{} is not a recognised audio format", url);
         }
-        
+
         return newClip;
     }
-    
+
     /**
      * Set if the clip be closed automatically.
      * @param autoClose true if closed automatically
@@ -126,7 +126,7 @@ public class Sound {
     public void setAutoClose(boolean autoClose) {
         this.autoClose = autoClose;
     }
-    
+
     /**
      * Get if the clip is closed automatically.
      * @return true if closed automatically
@@ -134,7 +134,7 @@ public class Sound {
     public boolean getAutoClose() {
         return autoClose;
     }
-    
+
     /**
      * Closes the sound.
      */
@@ -150,32 +150,26 @@ public class Sound {
             });
         }
     }
-    
-    /** {@inheritDoc} */
-    @Override
-    @SuppressWarnings("deprecation") // finalize deprecated in Java 9, but not yet removed
-    public void finalize() throws Throwable {
-        try {
-            if (!streaming) {
-                clipRef.updateAndGet(clip -> {
-                    if (clip != null) {
-                        clip.close();
-                    }
-                    return null;
-                });
-            }
-        } finally {
-            super.finalize();
-        }
-    }
-    
+
     /**
      * Play the sound once.
      */
     public void play() {
+        play(false);
+    }
+
+    /**
+     * Play the sound once.
+     * @param autoClose true if auto close clip, false otherwise. Only
+     *                  valid for clips. For streams, autoClose is ignored.
+     */
+    public void play(boolean autoClose) {
+        streamingStop = false;
         if (streaming) {
             Runnable streamSound = new StreamingSound(this.url);
             Thread tStream = jmri.util.ThreadingUtil.newThread(streamSound);
+            String path = url.getPath();
+            tStream.setName("Play " + path.substring(path.lastIndexOf('/') + 1));
             tStream.start();
         } else {
             clipRef.updateAndGet(clip -> {
@@ -183,6 +177,13 @@ public class Sound {
                     clip = openClip();
                 }
                 if (clip != null) {
+                    if (autoClose) {
+                        clip.addLineListener((event) -> {
+                            if (event.getType() == LineEvent.Type.STOP) {
+                                event.getLine().close();
+                            }
+                        });
+                    }
                     clip.start();
                 }
                 return clip;
@@ -205,9 +206,12 @@ public class Sound {
      * @param count the number of times to loop
      */
     public void loop(int count) {
+        streamingStop = false;
         if (streaming) {
             Runnable streamSound = new StreamingSound(this.url, count);
             Thread tStream = jmri.util.ThreadingUtil.newThread(streamSound);
+            String path = url.getPath();
+            tStream.setName("Loop " + path.substring(path.lastIndexOf('/') + 1) );
             tStream.start();
         } else {
             clipRef.updateAndGet(clip -> {
@@ -277,13 +281,27 @@ public class Sound {
             line.open(format);
         } catch (LineUnavailableException ex) {
             // Handle the error.
-            log.error("error opening line: {}", ex);
+            log.error("error opening line", ex);
             return;
         }
         line.start();
-        // write(byte[] b, int off, int len) 
+        // write(byte[] b, int off, int len)
         line.write(wavData, 0, wavData.length);
 
+    }
+
+    /**
+     * Dispose this sound.
+     */
+    public void dispose() {
+        if (!streaming) {
+            clipRef.updateAndGet(clip -> {
+                if (clip != null) {
+                    clip.close();
+                }
+                return null;
+            });
+        }
     }
 
     public static class WavBuffer {
@@ -345,7 +363,7 @@ public class Sound {
 
     public class StreamingSound implements Runnable {
 
-        private final URL url;
+        private final URL localUrl;
         private AudioInputStream stream = null;
         private AudioFormat format = null;
         private SourceDataLine line = null;
@@ -372,19 +390,19 @@ public class Sound {
          * @param count the number of times to loop
          */
         public StreamingSound(URL url, int count) {
-            this.url = url;
+            this.localUrl = url;
             this.count = count;
         }
 
         /** {@inheritDoc} */
         @Override
         public void run() {
-            // Note: some of the following is based on code from 
+            // Note: some of the following is based on code from
             //      "Killer Game Programming in Java" by A. Davidson.
             // Set up the audio input stream from the sound file
             try {
                 // link an audio stream to the sampled sound's file
-                stream = AudioSystem.getAudioInputStream(url);
+                stream = AudioSystem.getAudioInputStream(localUrl);
                 format = stream.getFormat();
                 log.debug("Audio format: {}", format);
                 // convert ULAW/ALAW formats to PCM format
@@ -410,7 +428,7 @@ public class Sound {
                 log.error("IOException {}", e.getMessage());
                 return;
             }
-            streamingStop = false;
+
             if (streamingSensor == null) {
                 streamingSensor = jmri.InstanceManager.sensorManagerInstance().provideSensor("ISSOUNDSTREAMING");
             }
@@ -436,12 +454,14 @@ public class Sound {
                 }
             }
             if (streamingStop) {
-                line.close();
+                if ( line != null ) {
+                    line.close();
+                }
                 setSensor(jmri.Sensor.INACTIVE);
                 return;
             }
             // Read  the sound file in chunks of bytes into buffer, and
-            //   pass them on through the SourceDataLine 
+            //   pass them on through the SourceDataLine
             int numRead;
             byte[] buffer = new byte[line.getBufferSize()];
             log.debug("streaming sound buffer size = {}", line.getBufferSize());
@@ -449,7 +469,7 @@ public class Sound {
             // read and play chunks of the audio
             try {
                 if (stream.markSupported()) stream.mark(Integer.MAX_VALUE);
-                
+
                 int i=0;
                 while (!streamingStop && ((i++ < count) || (count == Clip.LOOP_CONTINUOUSLY))) {
                     int offset;
@@ -464,7 +484,7 @@ public class Sound {
                     } else {
                         stream.close();
                         try {
-                            stream = AudioSystem.getAudioInputStream(url);
+                            stream = AudioSystem.getAudioInputStream(localUrl);
                         } catch (UnsupportedAudioFileException e) {
                             log.error("AudioFileException {}", e.getMessage());
                             closeLine();
@@ -495,12 +515,13 @@ public class Sound {
                 try {
                     streamingSensor.setState(mode);
                 } catch (jmri.JmriException ex) {
-                    log.error("Exception while setting ISSOUNDSTREAMING sensor {} to {}", streamingSensor.getDisplayName(), mode);
+                    log.error("Exception while setting ISSOUNDSTREAMING sensor {} to {}",
+                        streamingSensor.getDisplayName(), mode);
                 }
             }
         }
 
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Sound.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Sound.class);
 }

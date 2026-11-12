@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.concurrent.GuardedBy;
 
 /**
- * Extend jmri.AbstractSensor for DCC++ layouts.
+ * Extend jmri.AbstractSensor for DCC-EX layouts.
  *
  * @author Paul Bender Copyright (C) 2003-2010
  * @author Mark Underwood Copyright (C) 2015
@@ -19,7 +19,7 @@ public class DCCppSensor extends AbstractSensor implements DCCppListener {
 
     private boolean statusRequested = false;
 
-    private int address; // NOTE: For DCC++ this is the Base Station index #
+    private int address; // NOTE: For DCC-EX this is the Base Station index #
     //private int baseaddress; /* The result of integer division of the 
     // sensor address by 8 */
 
@@ -68,13 +68,13 @@ public class DCCppSensor extends AbstractSensor implements DCCppListener {
     }
 
     /**
-     * request an update on status by sending a DCC++ message
+     * request an update on status by sending a DCC-EX message
      */
     @Override
     public void requestUpdateFromLayout() {
         // Yeah... this isn't really supported.  Yet.
         //
-        // To do this, we send an DCC++ Accessory Decoder Information 
+        // To do this, we send an DCC-EX Accessory Decoder Information 
         // Request.
         // The generated message works for Feedback modules and turnouts 
         // with feedback, but the address passed is translated as though it 
@@ -120,21 +120,19 @@ public class DCCppSensor extends AbstractSensor implements DCCppListener {
             log.debug("Sensor Def Reply received: '{}'", l);
             if (l.getSensorDefNumInt() == address) {
                 log.debug("Def Message for sensor {} (Pin {})", systemName, address);
-                pin = l.getSensorDefPinInt();
-                pullup = l.getSensorDefPullupBool();
-                setOwnState(Sensor.UNKNOWN);
-                // For reference set NamedBean properties for the pin # and pullup
-                setProperty("Pin", pin);
-                setProperty("Pullup", pullup);
+                setOwnState(Sensor.UNKNOWN, l.getReceivedTime());
+                l.getProperties().forEach((key, value) -> {
+                    this.setProperty(key, value); //copy the defining properties from message to sensor
+                });
             }
         } else if (l.isSensorReply() && (l.getSensorNumInt() == address)) {
                 log.debug("Message for sensor {} (Pin {})", systemName, address);
             if (l.getSensorIsActive()) {
-                setOwnState(_inverted ? Sensor.INACTIVE : Sensor.ACTIVE);
+                setOwnState(_inverted ? Sensor.INACTIVE : Sensor.ACTIVE, l.getReceivedTime());
             } else if (l.getSensorIsInactive()){
-                setOwnState(_inverted ? Sensor.ACTIVE : Sensor.INACTIVE);
+                setOwnState(_inverted ? Sensor.ACTIVE : Sensor.INACTIVE, l.getReceivedTime());
             } else {
-                setOwnState(Sensor.UNKNOWN);
+                setOwnState(Sensor.UNKNOWN, l.getReceivedTime());
             }
         }
     }
@@ -177,6 +175,6 @@ public class DCCppSensor extends AbstractSensor implements DCCppListener {
         return(0);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppSensor.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppSensor.class);
 
 }

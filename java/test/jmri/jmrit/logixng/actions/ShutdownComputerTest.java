@@ -1,23 +1,26 @@
 package jmri.jmrit.logixng.actions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
 
 import jmri.*;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.DefaultConditionalNGScaffold;
-import jmri.jmrit.logixng.implementation.DefaultSymbolTable;
 import jmri.managers.DefaultShutDownManager;
 import jmri.util.*;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test ShutdownComputer
- * 
+ *
  * @author Daniel Bergqvist 2018
  */
 public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
@@ -26,27 +29,27 @@ public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
     private ConditionalNG conditionalNG;
     private ShutdownComputer actionShutdownComputer;
     private MockShutDownManager mockShutDownManager;
-    
+
     @Override
     public ConditionalNG getConditionalNG() {
         return conditionalNG;
     }
-    
+
     @Override
     public LogixNG getLogixNG() {
         return logixNG;
     }
-    
+
     @Override
     public MaleSocket getConnectableChild() {
         return null;
     }
-    
+
     @Override
     public String getExpectedPrintedTree() {
         return String.format("Shutdown JMRI/computer: Shut down JMRI ::: Use default%n");
     }
-    
+
     @Override
     public String getExpectedPrintedTreeFromRoot() {
         return String.format(
@@ -55,89 +58,70 @@ public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
                 "      ! A%n" +
                 "         Shutdown JMRI/computer: Shut down JMRI ::: Use default%n");
     }
-    
+
     @Override
     public NamedBean createNewBean(String systemName) {
         return new ShutdownComputer(systemName, null);
     }
-    
+
     @Override
     public boolean addNewSocket() {
         return false;
     }
-    
+
     @Test
     public void testCtor() {
-        Assert.assertNotNull("exists", new ShutdownComputer("IQDA321", null));
+        assertNotNull( new ShutdownComputer("IQDA321", null), "exists");
     }
-    
+
     @Test
     public void testGetChild() {
-        Assert.assertTrue("getChildCount() returns 0", 0 == actionShutdownComputer.getChildCount());
-        
-        boolean hasThrown = false;
-        try {
-            actionShutdownComputer.getChild(0);
-        } catch (UnsupportedOperationException ex) {
-            hasThrown = true;
-            Assert.assertEquals("Error message is correct", "Not supported.", ex.getMessage());
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+        assertEquals( 0, actionShutdownComputer.getChildCount(), "getChildCount() returns 0");
+
+        UnsupportedOperationException ex = assertThrows( UnsupportedOperationException.class, () ->
+            actionShutdownComputer.getChild(0), "Exception is thrown");
+        assertEquals( "Not supported.", ex.getMessage(), "Error message is correct");
     }
-    
+
     @Test
     public void testCategory() {
-        Assert.assertTrue("Category matches", Category.OTHER == _base.getCategory());
+        assertSame( LogixNG_Category.OTHER, _base.getCategory(), "Category matches");
     }
-    
-    @Test
-    public void testIsExternal() {
-        Assert.assertTrue("is external", _base.isExternal());
-    }
-    
+
     @Test
     @Override
     public void testMaleSocketIsActive() {
         super.testMaleSocketIsActive();
-        JUnitAppender.assertErrorMessage("Shutdown failed");
-        JUnitAppender.assertErrorMessage("Shutdown failed");
     }
-    
+
     @Test
     @Override
     public void testIsActive() {
         super.testIsActive();
-        JUnitAppender.assertErrorMessage("Shutdown failed");
-        JUnitAppender.assertErrorMessage("Shutdown failed");
     }
-    
+
     @Test
-    public void testExecute() throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+    public void testExecute() throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException, JmriException {
         ShutdownComputer action = new ShutdownComputer("IQDA321", null);
-        
-        action.setOperation(ShutdownComputer.Operation.ShutdownComputer);
+
+        action.getSelectEnum().setEnum(ShutdownComputer.Operation.ShutdownComputer);
         action.execute();
-        Assert.assertEquals(MockShutDownManager.Result.SHUTDOWN_OS, mockShutDownManager.result);
-        JUnitAppender.assertErrorMessage("Shutdown failed");
-        
-        action.setOperation(ShutdownComputer.Operation.RebootComputer);
+        assertEquals(MockShutDownManager.Result.SHUTDOWN_OS, mockShutDownManager.result);
+
+        action.getSelectEnum().setEnum(ShutdownComputer.Operation.RebootComputer);
         action.execute();
-        Assert.assertEquals(MockShutDownManager.Result.RESTART_OS, mockShutDownManager.result);
-        JUnitAppender.assertErrorMessage("Shutdown failed");
-        
-        action.setOperation(ShutdownComputer.Operation.ShutdownJMRI);
+        assertEquals(MockShutDownManager.Result.RESTART_OS, mockShutDownManager.result);
+
+        action.getSelectEnum().setEnum(ShutdownComputer.Operation.ShutdownJMRI);
         action.execute();
-        Assert.assertEquals(MockShutDownManager.Result.SHUTDOWN_JMRI, mockShutDownManager.result);
-        JUnitAppender.assertErrorMessage("Shutdown failed");
-        
-        action.setOperation(ShutdownComputer.Operation.RebootJMRI);
+        assertEquals(MockShutDownManager.Result.SHUTDOWN_JMRI, mockShutDownManager.result);
+
+        action.getSelectEnum().setEnum(ShutdownComputer.Operation.RebootJMRI);
         action.execute();
-        Assert.assertEquals(MockShutDownManager.Result.RESTART_JMRI, mockShutDownManager.result);
-        JUnitAppender.assertErrorMessage("Shutdown failed");
+        assertEquals(MockShutDownManager.Result.RESTART_JMRI, mockShutDownManager.result);
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() throws SocketAlreadyConnectedException {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -146,13 +130,13 @@ public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
         JUnitUtil.initInternalSensorManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initLogixNGManager(true);
-        
+
         mockShutDownManager = new MockShutDownManager();
         InstanceManager.setDefault(ShutDownManager.class, mockShutDownManager);
-        
-        _category = Category.OTHER;
+
+        _category = LogixNG_Category.OTHER;
         _isExternal = true;
-        
+
         logixNG = InstanceManager.getDefault(LogixNG_Manager.class).createLogixNG("A new logix for test");  // NOI18N
         conditionalNG = new DefaultConditionalNGScaffold("IQC1", "A conditionalNG");  // NOI18N;
         InstanceManager.getDefault(ConditionalNG_Manager.class).register(conditionalNG);
@@ -165,57 +149,53 @@ public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
         conditionalNG.getChild(0).connect(maleSocket);
         _base = actionShutdownComputer;
         _baseMaleSocket = maleSocket;
-        
-        if (! logixNG.setParentForAllChildren(new ArrayList<>())) throw new RuntimeException();
+
+        assertTrue( logixNG.setParentForAllChildren(new ArrayList<>()));
+        logixNG.activate();
         logixNG.setEnabled(true);
     }
-    
-    @After
+
+    @AfterEach
     public void tearDown() {
-        JUnitAppender.assertErrorMessage("Shutdown failed");
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
         JUnitUtil.tearDown();
     }
-    
-    
-    
+
+
+
     private static class MockShutDownManager extends DefaultShutDownManager {
-        
+
         public enum Result {
             SHUTDOWN_JMRI,
             SHUTDOWN_OS,
             RESTART_JMRI,
             RESTART_OS,
         }
-        
+
         public Result result = null;
-        
+
         @Override
-        public boolean shutdown() {
+        public void shutdown() {
             result = Result.SHUTDOWN_JMRI;
-            return true;
         }
 
         @Override
-        public boolean restart() {
+        public void restart() {
             result = Result.RESTART_JMRI;
-            return true;
         }
 
         @Override
-        public boolean restartOS() {
+        public void restartOS() {
             result = Result.RESTART_OS;
-            return true;
         }
 
         @Override
-        public boolean shutdownOS() {
+        public void shutdownOS() {
             result = Result.SHUTDOWN_OS;
-            return true;
         }
     }
-    
-    
+
+
     /**
      * Exception thrown by restartOS() when simulating shutdown.
      */
@@ -239,5 +219,5 @@ public class ShutdownComputerTest extends AbstractDigitalActionTestBase {
      */
     public static class ShutdownException extends RuntimeException {
     }
-    
+
 }

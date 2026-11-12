@@ -2,21 +2,24 @@ package jmri.jmrit.display.controlPanelEditor.shape;
 
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionListener;
 import java.awt.geom.Ellipse2D;
+
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+
 import jmri.jmrit.display.Editor;
+import jmri.util.swing.JmriMouseEvent;
+import jmri.util.swing.JmriMouseMotionListener;
 
 /**
+ * Frame to create/edit a Control Panel shape Circle object.
  * @author Pete Cressman Copyright (c) 2012
  */
 public class DrawCircle extends DrawFrame {
 
-    JTextField _diameterText;
+    private JTextField _diameterText;
 
     public DrawCircle(String which, String title, PositionableShape ps, Editor ed, boolean create) {
         super(which, title, ps, ed, create);
@@ -34,18 +37,19 @@ public class DrawCircle extends DrawFrame {
         _diameterText.setText(Integer.toString(_shape.getWidth()));
         _diameterText.setHorizontalAlignment(JTextField.RIGHT);
         pp.add(_diameterText);
-        _diameterText.addMouseMotionListener(new MouseMotionListener() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                updateShape();
-            }
+        _diameterText.addMouseMotionListener(JmriMouseMotionListener.adapt(
+                new JmriMouseMotionListener() {
+                    @Override
+                    public void mouseDragged(JmriMouseEvent e) {
+                        updateShape();
+                    }
 
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                _shape.setWidth(getInteger(_diameterText, _shape.getWidth()));
-                updateShape();
-            }
-        });
+                    @Override
+                    public void mouseMoved(JmriMouseEvent e) {
+                        _shape.setWidth(getInteger(_diameterText, _shape.getWidth()));
+                        updateShape();
+                    }
+                }));
         _diameterText.addActionListener((ActionEvent e) -> {
             _shape.setWidth(getInteger(_diameterText, _shape.getWidth()));
             updateShape();

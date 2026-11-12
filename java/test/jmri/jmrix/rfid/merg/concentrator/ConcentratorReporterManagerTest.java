@@ -40,15 +40,15 @@ public class ConcentratorReporterManagerTest extends jmri.managers.AbstractRepor
     @NotApplicable("Not supported by this manager at this time")
     public void testReporterProvideByNumber() {
     }
-    
-    // No test for manager-specific system name validation at present
+
     @Test
     @Override
+    @NotApplicable("No test for manager-specific system name validation at present")
     public void testMakeSystemNameWithNoPrefixNotASystemName() {}
-    
-    // No test for manager-specific system name validation at present
+
     @Test
     @Override
+    @NotApplicable("No test for manager-specific system name validation at present")
     public void testMakeSystemNameWithPrefixNotASystemName() {}
 
     ConcentratorTrafficController tc = null;
@@ -71,7 +71,7 @@ public class ConcentratorReporterManagerTest extends jmri.managers.AbstractRepor
             }
 
             @Override
-            public void reply(jmri.jmrix.rfid.RfidReply m) {
+            public synchronized void reply(jmri.jmrix.rfid.RfidReply m) {
             }
 
         };

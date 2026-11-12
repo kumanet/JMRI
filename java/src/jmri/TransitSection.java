@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
  * A TransitSection is referenced via a list in its parent Transit, and is
  * stored on disk when its parent Transit is stored.
  * <p>
- * Provides for delayed initializatio of Section when loading panel files, so
+ * Provides for delayed initialization of Section when loading panel files, so
  * that this is not dependent on order of items in the panel file.
  *
  * @author Dave Duchamp Copyright (C) 2008
@@ -64,14 +64,19 @@ public class TransitSection {
      *                  a train is dispatched safe section to safe section with all intervening sections available.
      * @param stopAllocatingSensorName If this sensor is present, valid, and Active allocation will stop until
      *                  it is no longer Active.
+     * @param fwdStopPerCent The distance into the section when traveling fwd thru the transit.
+     * @param revStopPerCent The distance into the section when traveling rev thru the transit.
      */
-    public TransitSection(jmri.Section s, int seq, int direction, boolean alt, boolean safe, String stopAllocatingSensorName) {
+    public TransitSection(jmri.Section s, int seq, int direction, boolean alt, boolean safe,
+            String stopAllocatingSensorName, float fwdStopPerCent, float revStopPerCent) {
         mSection = s;
         mSequence = seq;
         mDirection = direction;
         mAlternate = alt;
         mSafe = safe;
         mStopAllocatingSensorName = stopAllocatingSensorName;
+        mFwdStopPerCent = fwdStopPerCent;
+        mRevStopPerCent = revStopPerCent;
     }
 
     /**
@@ -105,14 +110,20 @@ public class TransitSection {
      *                  a train is dispatched safe section to safe section with all intervening sections available.
      * @param stopAllocatingSensorName If this sensor is present, valid, and Active allocation will stop until
      *                  it is no longer Active.
+     * @param fwdStopPerCent The distance into the section when traveling fwd thru the transit.
+     * @param revStopPerCent The distance into the section when traveling rev thru the transit.
      */
-    public TransitSection(String secName, int seq, int direction, boolean alt, boolean safe, String stopAllocatingSensorName) {
+    public TransitSection(String secName, int seq, int direction, boolean alt,
+            boolean safe, String stopAllocatingSensorName, float fwdStopPerCent,
+            float revStopPerCent) {
         tSectionName = secName;
         mSequence = seq;
         mDirection = direction;
         mAlternate = alt;
         mSafe = safe;
         mStopAllocatingSensorName = stopAllocatingSensorName;
+        mFwdStopPerCent = fwdStopPerCent;
+        mRevStopPerCent = revStopPerCent;
         needsInitialization = true;
     }
 
@@ -124,6 +135,8 @@ public class TransitSection {
     private boolean mAlternate = false;
     private boolean mSafe = false;
     private String mStopAllocatingSensorName = "";
+    private float mFwdStopPerCent = 1.0f;
+    private float mRevStopPerCent = 1.0f;
 
     // temporary variables and method for delayed initialization of Section
     private String tSectionName = "";
@@ -141,7 +154,7 @@ public class TransitSection {
         needsInitialization = false;
     }
 
-    boolean temporary = false;
+    private boolean temporary = false;
 
     public void setTemporary(boolean boo) {
         temporary = boo;
@@ -170,7 +183,7 @@ public class TransitSection {
         }
         String s = mSection.getSystemName();
         String u = mSection.getUserName();
-        if ((u != null) && (!u.equals(""))) {
+        if ((u != null) && (!u.isEmpty())) {
             return (s + "( " + u + " )");
         }
         return s;
@@ -213,6 +226,35 @@ public class TransitSection {
         mStopAllocatingSensorName = stopAllocatingSensor;
     }
 
+    /**
+     * Sets the stopping distance percentage of section when transit allocated fwd.
+     * @param val length as a percentage of section;
+     */
+    public void setFwdStopPerCent(float val) {
+        mFwdStopPerCent = val;
+    }
+
+    /**
+     * Returns the stopping distance percentage of section when transit allocated fwd.
+     */
+    public float getFwdStopPerCent() {
+        return mFwdStopPerCent;
+    }
+
+    /**
+     * Sets actual distance percentage of section when transit allocated fwd.
+     * @param val length as a percentage of section;
+     */
+    public void setRevStopPerCent(float val) {
+        mRevStopPerCent = val;
+    }
+
+    /**
+     * Returns the stopping distance percentage of section when transit allocated rev.
+     */
+    public float getRevStopPerCent() {
+        return mRevStopPerCent;
+    }
 
     /**
      * Get a list of the actions for this TransitSection
@@ -223,5 +265,5 @@ public class TransitSection {
         return new ArrayList<>(mTransitSectionActionList);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TransitSection.class);
+    private static final Logger log = LoggerFactory.getLogger(TransitSection.class);
 }

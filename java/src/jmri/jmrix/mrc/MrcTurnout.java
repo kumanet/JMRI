@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 /**
  * New MRC implementation of the Turnout interface From Xpa+Modem implementation
  * of the Turnout interface.
- * <p>
  *
  * @author Paul Bender Copyright (C) 2004
  * @author Martin Wade Copyright (C) 2014
@@ -121,6 +120,6 @@ public class MrcTurnout extends AbstractTurnout implements MrcTrafficListener {
     protected void turnoutPushbuttonLockout(boolean pushButtonLockout) {
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MrcTurnout.class);
+    private static final Logger log = LoggerFactory.getLogger(MrcTurnout.class);
 
 }

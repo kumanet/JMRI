@@ -5,14 +5,15 @@ import java.awt.FlowLayout;
 
 import javax.swing.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsFrame;
+import jmri.jmrit.operations.locations.schedules.tools.*;
 import jmri.jmrit.operations.locations.tools.PrintLocationsAction;
 import jmri.jmrit.operations.setup.Control;
 import jmri.swing.JTablePersistenceManager;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Frame for adding and editing the Schedule roster for operations.
@@ -78,12 +79,15 @@ public class SchedulesTableFrame extends OperationsFrame {
         JMenuBar menuBar = new JMenuBar();
         JMenu toolMenu = new JMenu(Bundle.getMessage("MenuTools"));
         toolMenu.add(new ScheduleCopyAction());
-        toolMenu.add(new SchedulesByLoadAction());
         toolMenu.add(new SchedulesResetHitsAction());
+        toolMenu.addSeparator();
         toolMenu.add(new ExportSchedulesAction());
         toolMenu.addSeparator();
+        toolMenu.add(new SchedulesByLoadAction());
+        toolMenu.add(new SchedulesAndStagingAction());
+        toolMenu.addSeparator();
         toolMenu.add(new PrintLocationsAction(false));
-        toolMenu.add(new PrintLocationsAction(true));
+        toolMenu.add(new PrintLocationsAction(true));       
         menuBar.add(toolMenu);
         setJMenuBar(menuBar);
         addHelpMenu("package.jmri.jmrit.operations.Operations_LocationSchedules", true); // NOI18N
@@ -112,15 +116,6 @@ public class SchedulesTableFrame extends OperationsFrame {
         }
     }
 
-    // add button
-    // public void buttonActionPerformed(java.awt.event.ActionEvent ae) {
-    // log.debug("add schedule button activated");
-    // if (ae.getSource() == addButton){
-    // ScheduleEditFrame f = new ScheduleEditFrame();
-    // f.setTitle(MessageFormat.format(Bundle.getMessage("TitleScheduleAdd"), new Object[]{"Track Name"}));
-    // f.initComponents(null, null, null);
-    // }
-    // }
     @Override
     public void dispose() {
         schedulesModel.dispose();
@@ -130,5 +125,5 @@ public class SchedulesTableFrame extends OperationsFrame {
         super.dispose();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SchedulesTableFrame.class);
+    private static final Logger log = LoggerFactory.getLogger(SchedulesTableFrame.class);
 }

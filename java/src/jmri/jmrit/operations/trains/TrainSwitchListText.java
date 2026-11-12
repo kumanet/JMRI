@@ -15,12 +15,14 @@ public class TrainSwitchListText {
     private static String switchListFor = Bundle.getMessage("SwitchListFor");
     private static String scheduledWork = Bundle.getMessage("ScheduledWork");
 
+    private static String trainVisits = Bundle.getMessage("TrainVisits");
     private static String departsAt = Bundle.getMessage("DepartsAt");
     private static String departsAtExpectedArrival = Bundle.getMessage("DepartsAtExpectedArrival");
     private static String departedExpected = Bundle.getMessage("DepartedExpected");
 
     private static String visitNumber = Bundle.getMessage("VisitNumber");
-    private static String visitNumberDeparted = Bundle.getMessage("VisitNumberDeparted"); // this get's appended to "no scheduled work at"
+    private static String visitNumberDeparted = Bundle.getMessage("VisitNumberDeparted"); // this get's appended to "no
+                                                                                          // scheduled work at"
     private static String visitNumberTerminates = Bundle.getMessage("VisitNumberTerminates");
     private static String visitNumberTerminatesDeparted = Bundle.getMessage("VisitNumberTerminatesDeparted");
     private static String visitNumberDone = Bundle.getMessage("VisitNumberDone");
@@ -32,9 +34,9 @@ public class TrainSwitchListText {
 
     private static String trainDepartsCars = Bundle.getMessage("TrainDepartsCars");
     private static String trainDepartsLoads = Bundle.getMessage("TrainDepartsLoads");
-    
+
     private static String switchListByTrack = Bundle.getMessage("SwitchListByTrack");
-    private static String holdCar = Bundle.getMessage("HoldCar"); 
+    private static String holdCar = Bundle.getMessage("HoldCar");
 
     public static String getStringSwitchListFor() {
         return switchListFor;
@@ -50,6 +52,14 @@ public class TrainSwitchListText {
 
     public static void setStringScheduledWork(String s) {
         scheduledWork = s;
+    }
+    
+    public static String getStringTrainVisits() {
+        return trainVisits;
+    }
+
+    public static void setStringTrainVisits(String s) {
+        trainVisits = s;
     }
 
     public static String getStringDepartsAt() {
@@ -163,7 +173,7 @@ public class TrainSwitchListText {
     public static void setStringTrainDepartsLoads(String s) {
         trainDepartsLoads = s;
     }
-    
+
     public static String getStringSwitchListByTrack() {
         return switchListByTrack;
     }
@@ -171,7 +181,7 @@ public class TrainSwitchListText {
     public static void setStringSwitchListByTrack(String s) {
         switchListByTrack = s;
     }
-    
+
     public static String getStringHoldCar() {
         return holdCar;
     }
@@ -194,6 +204,11 @@ public class TrainSwitchListText {
             values.setAttribute(Xml.TEXT, getStringScheduledWork());
         }
 
+        if (!getStringTrainVisits().equals(Bundle.getMessage("TrainVisits"))) {
+            e.addContent(values = new Element(Xml.TRAIN_VISITS));
+            values.setAttribute(Xml.TEXT, getStringTrainVisits());
+        }
+        
         if (!getStringDepartsAt().equals(Bundle.getMessage("DepartsAt"))) {
             e.addContent(values = new Element(Xml.DEPARTS_AT));
             values.setAttribute(Xml.TEXT, getStringDepartsAt());
@@ -264,6 +279,7 @@ public class TrainSwitchListText {
         return e;
     }
 
+    // must synchronize changes with operation-config.dtd
     public static void load(Element e) {
         Element emts = e.getChild(Xml.SWITCH_LIST_TEXT_STRINGS);
         if (emts == null) {
@@ -280,7 +296,12 @@ public class TrainSwitchListText {
                 setStringScheduledWork(a.getValue());
             }
         }
-
+        if (emts.getChild(Xml.TRAIN_VISITS) != null) {
+            if ((a = emts.getChild(Xml.TRAIN_VISITS).getAttribute(Xml.TEXT)) != null) {
+                setStringTrainVisits(a.getValue());
+            }
+        }
+        
         if (emts.getChild(Xml.DEPARTS_AT) != null) {
             if ((a = emts.getChild(Xml.DEPARTS_AT).getAttribute(Xml.TEXT)) != null) {
                 setStringDepartsAt(a.getValue());

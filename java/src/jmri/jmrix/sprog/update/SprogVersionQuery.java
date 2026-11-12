@@ -36,7 +36,7 @@ public class SprogVersionQuery implements SprogListener {
     }       // Version has been found
     QueryState state = QueryState.IDLE;
 
-    final protected int LONG_TIMEOUT = 2000;
+    protected final int LONG_TIMEOUT = 2000;
     javax.swing.Timer timer = null;
 
     private SprogSystemConnectionMemo _memo = null;
@@ -62,9 +62,17 @@ public class SprogVersionQuery implements SprogListener {
         }
     }
 
+    /**
+     * Remove a SprogVersionListener.
+     * Stops Timer ( if running ), when no further Listeners are present.
+     * @param l the Listener to remove.
+     */
     public synchronized void removeSprogVersionListener(SprogVersionListener l) {
         if (versionListeners.contains(l)) {
             versionListeners.removeElement(l);
+        }
+        if (versionListeners.size() == 0 ) {
+            stopTimer();
         }
     }
 
@@ -239,13 +247,13 @@ public class SprogVersionQuery implements SprogListener {
                     log.debug("Found: {}", v.toString());
                     notifyVersion(v);
                     state = QueryState.DONE;
-                    break;
+//                    break;
                 }
+                tc.resetTimeout();
                 break;
             }
 
             case DONE:
-                tc.resetTimeout();
                 break;
 
             default: {
@@ -320,6 +328,6 @@ public class SprogVersionQuery implements SprogListener {
         timer.start();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SprogVersionQuery.class);
+    private static final Logger log = LoggerFactory.getLogger(SprogVersionQuery.class);
 
 }

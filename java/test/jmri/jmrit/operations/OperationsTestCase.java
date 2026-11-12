@@ -1,18 +1,20 @@
 package jmri.jmrit.operations;
 
-import java.util.List;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.File;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Assert;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.netbeans.jemmy.QueueTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jmri.InstanceManager;
 import jmri.ShutDownManager;
-import jmri.ShutDownTask;
 import jmri.util.JUnitOperationsUtil;
 import jmri.util.JUnitUtil;
 
@@ -25,6 +27,9 @@ import jmri.util.JUnitUtil;
  */
 public class OperationsTestCase {
 
+    @TempDir
+    File tempDir;
+
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
@@ -35,7 +40,7 @@ public class OperationsTestCase {
     // Set things up outside of operations
     public void reset() {
         JUnitUtil.resetInstanceManager();
-        JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager(tempDir);
         JUnitUtil.initRosterConfigManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initInternalLightManager();
@@ -45,13 +50,13 @@ public class OperationsTestCase {
         JUnitUtil.clearShutDownManager();
     }
 
-    private final boolean waitOnEventQueueNotEmpty = false;
-    private final boolean checkEventQueueEmpty = false;
-    private final boolean checkShutDownTask = false;
+    private static final boolean WAIT_EVENT_QUEUE_NOT_EMPTY = false;
+    private static final boolean CHECK_EVENT_QUEUE_EMPTY = false;
+    private static final boolean CHECK_SHUTDOWN_TASK = false;
 
     @AfterEach
     public void tearDown() {
-        if (waitOnEventQueueNotEmpty) {
+        if (WAIT_EVENT_QUEUE_NOT_EMPTY) {
             Thread AWT_EventQueue = JUnitUtil.getThreadStartsWithName("AWT-EventQueue");
             if (AWT_EventQueue != null) {
                 if (AWT_EventQueue.isAlive()) {
@@ -66,19 +71,14 @@ public class OperationsTestCase {
             }
         }
 
-        if (checkEventQueueEmpty) {
+        if (CHECK_EVENT_QUEUE_EMPTY) {
             final Semaphore sem = new Semaphore(0);
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    new QueueTool().waitEmpty(250);
-                    sem.release();
-                }
-            }).start();
+            new Thread( () -> checkJemmyQueueTool(sem),
+                "Operations Check Jemmy Thread " + this.getClass().getName()).start();
             try {
                 if (!sem.tryAcquire(2000, TimeUnit.MILLISECONDS)) {
                     System.err.println("Check event queue empty failed for test " + this.getClass().getName());
-                    Assert.fail("Event queue is not empty after this test");
+                    fail("Event queue is not empty after this test");
                 }
             } catch (InterruptedException e) {
                 // ignore.
@@ -86,15 +86,15 @@ public class OperationsTestCase {
         }
 
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         if (InstanceManager.containsDefault(ShutDownManager.class)) {
             ShutDownManager sm = InstanceManager.getDefault(jmri.ShutDownManager.class);
-            List<ShutDownTask> list = sm.tasks();
-            while (list.size() > 0) {
-                ShutDownTask task = list.get(0);
+            var list = sm.getCallables();
+            while (!list.isEmpty()) {
+                var task = list.get(0);
                 sm.deregister(task);
-                if (checkShutDownTask) {
-                    Assert.fail("Shutdown task found: " + task.getName());
+                list = sm.getCallables();
+                if (CHECK_SHUTDOWN_TASK) {
+                    fail("Shutdown task found: " + task);
                 }
             }
         }
@@ -103,5 +103,10 @@ public class OperationsTestCase {
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OperationsTestCase.class);
+    private void checkJemmyQueueTool(Semaphore sem) {
+        new QueueTool().waitEmpty(250);
+        sem.release();
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(OperationsTestCase.class);
 }

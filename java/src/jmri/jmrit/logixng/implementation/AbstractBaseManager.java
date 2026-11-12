@@ -1,5 +1,7 @@
 package jmri.jmrit.logixng.implementation;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.beans.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -7,22 +9,23 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 
+import jmri.JmriUncheckedException;
 import jmri.NamedBean;
 import jmri.jmrit.logixng.*;
 import jmri.managers.AbstractManager;
 
 /**
  * Abstract partial implementation for the LogixNG action and expression managers.
- * 
+ *
  * @param <E> the type of NamedBean supported by this manager
- * 
+ *
  * @author Daniel Bergqvist 2020
  */
 public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractManager<E> implements BaseManager<E> {
-    
+
     protected List<MaleSocketFactory<E>> _maleSocketFactories = new ArrayList<>();
-    
-    
+
+
     /**
      * Inform all registered listeners of a vetoable change.If the propertyName
      * is "CanDelete" ALL listeners with an interest in the bean will throw an
@@ -46,7 +49,7 @@ public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractM
             vc.vetoableChange(evt);
         }
     }
-    
+
     /**
      * Cast the maleSocket to E
      * This method is needed since SpotBugs @SuppressWarnings("unchecked")
@@ -55,12 +58,27 @@ public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractM
      * @return the maleSocket as E
      */
     protected abstract E castBean(MaleSocket maleSocket);
-    
+
+    /** {@inheritDoc} */
+    @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "LogixNG is a tree that must be deleted recursively")
+    public final void deleteBean(@Nonnull E n, @Nonnull String property) throws PropertyVetoException {
+        this.deleteBean((MaleSocket)n, property);
+    }
+
     /** {@inheritDoc} */
     @Override
     @OverridingMethodsMustInvokeSuper
-    @SuppressWarnings("unchecked")  // cast in "deregister((E)socket)" is nessesary and cannot be avoided
     public void deleteBean(@Nonnull MaleSocket socket, @Nonnull String property) throws PropertyVetoException {
+        for (int i=0; i < socket.getChildCount(); i++) {
+            FemaleSocket child = socket.getChild(i);
+            if (child.isConnected()) {
+                MaleSocket maleSocket = child.getConnectedSocket();
+                maleSocket.getManager().deleteBean(maleSocket, property);
+            }
+        }
+
         // throws PropertyVetoException if vetoed
         fireVetoableChange(property, socket);
         if (property.equals("DoDelete")) { // NOI18N
@@ -68,7 +86,41 @@ public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractM
             socket.dispose();
         }
     }
-    
+
+    /** {@inheritDoc} */
+    @Override
+    @OverridingMethodsMustInvokeSuper
+    public void deleteChildren(@Nonnull MaleSocket socket, @Nonnull String property) throws PropertyVetoException {
+        for (int i=socket.getChildCount()-1; i >= 0; i--) {
+            FemaleSocket child = socket.getChild(i);
+            if (child.isConnected()) {
+                MaleSocket maleSocket = child.getConnectedSocket();
+                maleSocket.getManager().deleteBean(maleSocket, property);
+                if (property.equals("DoDelete")) { // NOI18N
+                    child.disconnect();
+                }
+            }
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @OverridingMethodsMustInvokeSuper
+    public void deregister(@Nonnull E s) {
+        // A LogixNG action or expression is contained in one or more male
+        // sockets. A male socket might be contained in another male socket.
+        // In some cases, it seems that the male socket used in this call is
+        // not the male socket that's registered in the manager. To resolve
+        // this, we search for the registered bean with the system name and
+        // then deregister the bean we have found.
+        E bean = getBySystemName(s.getSystemName());
+        if (bean == null) {
+            // This should never happen.
+            throw new IllegalArgumentException(s.getSystemName() + " is not registered in manager");
+        }
+        super.deregister(bean);
+    }
+
     /**
      * Test if parameter is a properly formatted system name.
      *
@@ -80,12 +132,14 @@ public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractM
         return LogixNG_Manager.validSystemNameFormat(
                 getSubSystemNamePrefix(), systemName);
     }
-    
+
     @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "This method must never be called")
     public void register(@Nonnull E s) {
-        throw new RuntimeException("Use BaseManager.registerBean() instead");
+        throw new JmriUncheckedException("Use BaseManager.registerBean() instead");
     }
-    
+
     @Override
     public E registerBean(@Nonnull E s) {
         E bean = s;
@@ -95,12 +149,29 @@ public abstract class AbstractBaseManager<E extends NamedBean> extends AbstractM
         super.register(bean);
         return bean;
     }
-    
+
     @Override
     public void registerMaleSocketFactory(MaleSocketFactory<E> factory) {
         _maleSocketFactories.add(factory);
     }
-    
+
+    /** {@inheritDoc} */
+    @Override
+    @SuppressWarnings("unchecked")   // Can't check generic types
+    protected E getOuterBean(E bean) {
+        if (bean == null) {
+            return null;
+        }
+        if (bean instanceof Base) {
+            Base b = (Base) bean;
+            while (b.getParent() instanceof MaleSocket) {
+                b = b.getParent();
+            }
+            return (E) b;
+        }
+        return bean;
+    }
+
 //    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractBaseManager.class);
-    
+
 }

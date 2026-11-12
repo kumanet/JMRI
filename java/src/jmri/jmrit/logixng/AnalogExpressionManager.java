@@ -2,11 +2,14 @@ package jmri.jmrit.logixng;
 
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
+
+import jmri.Category;
 
 /**
  * Manager for Expression
- * 
+ *
  * @author Dave Duchamp       Copyright (C) 2007
  * @author Daniel Bergqvist   Copyright (C) 2018
  */
@@ -20,14 +23,14 @@ public interface AnalogExpressionManager extends BaseManager<MaleAnalogExpressio
      * @return the male socket for this expression
      * @throws IllegalArgumentException if the expression has an invalid system name
      */
-    public MaleAnalogExpressionSocket registerExpression(@Nonnull AnalogExpressionBean expression)
+    MaleAnalogExpressionSocket registerExpression(@Nonnull AnalogExpressionBean expression)
             throws IllegalArgumentException;
-    
+
     /**
      * Create a new system name for an Expression.
      * @return a new system name
      */
-    public String getAutoSystemName();
+    String getAutoSystemName();
 
     /**
      * Create a female socket for analog expressions
@@ -36,15 +39,15 @@ public interface AnalogExpressionManager extends BaseManager<MaleAnalogExpressio
      * @param socketName the name of the new socket
      * @return the new female socket
      */
-    public FemaleAnalogExpressionSocket createFemaleSocket(
+    FemaleAnalogExpressionSocket createFemaleSocket(
             Base parent, FemaleSocketListener listener, String socketName);
-    
+
     /**
      * Get a set of classes that implements the DigitalAction interface.
-     * 
+     *
      * @return a set of entries with category and class
      */
-    public Map<Category, List<Class<? extends Base>>> getExpressionClasses();
+    Map<Category, List<Class<? extends Base>>> getExpressionClasses();
 
     /*.*
      * Add an Expression.
@@ -70,12 +73,12 @@ public interface AnalogExpressionManager extends BaseManager<MaleAnalogExpressio
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * The sub system prefix for the AnalogExpressionManager is
      * {@link #getSystemNamePrefix() } and "AE";
      */
     @Override
-    public default String getSubSystemNamePrefix() {
+    default String getSubSystemNamePrefix() {
         return getSystemNamePrefix() + "AE";
     }
 
@@ -85,6 +88,6 @@ public interface AnalogExpressionManager extends BaseManager<MaleAnalogExpressio
      *
      * @param x the Expression to delete
      */
-    public void deleteAnalogExpression(MaleAnalogExpressionSocket x);
+    void deleteAnalogExpression(MaleAnalogExpressionSocket x);
 
 }

@@ -1,6 +1,8 @@
 package jmri.jmrix.xpa;
 
+import jmri.InstanceManager;
 import jmri.SpeedStepMode;
+import jmri.ThrottleManager;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender
  */
+@SuppressWarnings("deprecation")
 public class XpaThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     private XpaTrafficController tc = null;
@@ -188,6 +191,7 @@ public class XpaThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup1() {
     }
 
@@ -196,6 +200,7 @@ public class XpaThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup2() {
     }
 
@@ -204,6 +209,7 @@ public class XpaThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup3() {
     }
 
@@ -212,9 +218,11 @@ public class XpaThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     public void setUp() {
         JUnitUtil.setUp();
         tc = new XpaTrafficController();
-        instance = new XpaThrottle(new jmri.DccLocoAddress(3, false), tc);
         XpaSystemConnectionMemo memo = new XpaSystemConnectionMemo();
-        jmri.InstanceManager.setDefault(jmri.ThrottleManager.class, new XpaThrottleManager(memo));
+        var tm = new XpaThrottleManager(memo);
+        InstanceManager.setDefault(ThrottleManager.class, tm);
+        memo.store(tm, ThrottleManager.class);
+        instance = new XpaThrottle(new jmri.DccLocoAddress(3, false), tc, memo);
     }
 
     @Override

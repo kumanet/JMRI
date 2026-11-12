@@ -13,12 +13,16 @@ import org.slf4j.LoggerFactory;
  */
 public class EcosPowerManager extends AbstractPowerManager<EcosSystemConnectionMemo> implements EcosListener {
 
-    EcosTrafficController tc;
+    private EcosTrafficController tc;
 
     public EcosPowerManager(EcosTrafficController etc) {
         super(etc.adaptermemo);
         // connect to the TrafficManager
         tc = etc;
+        init();
+    }
+
+    private void init() {
         tc.addEcosListener(this);
 
         // ask to be notified
@@ -84,6 +88,6 @@ public class EcosPowerManager extends AbstractPowerManager<EcosSystemConnectionM
         // messages are ignored
     }
 
-    private final static Logger log = LoggerFactory.getLogger(EcosPowerManager.class);
+    private static final Logger log = LoggerFactory.getLogger(EcosPowerManager.class);
 
 }

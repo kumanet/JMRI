@@ -1,25 +1,29 @@
 package apps.gui3.paned;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.File;
+import java.io.IOException;
+
 import apps.AppsBase;
 
-import java.awt.GraphicsEnvironment;
-
 import jmri.InstanceManager;
+import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
-import org.junit.Assume;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class PanedTest {
 
     @Test
     public void testCTor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         String[] args = {"DecoderProConfig3.xml"};
         AppsBase a = new Paned(args) {
             // force the application to not actually start.
@@ -53,18 +57,26 @@ public class PanedTest {
             }
 
         };
-        Assert.assertNotNull(a);
+        assertNotNull(a);
         // shutdown the application
-        AppsBase.handleQuit();
+        assertFalse(AppsBase.handleQuit());
         JUnitUtil.disposeFrame("DecoderPro Wizard", true, true);
+        
+        JUnitUtil.waitFor(() -> {
+            return JUnitAppender.checkForMessageStartingWith("No pre-existing config file found, searched for ") != null;
+        }, "no existing config Info line seen");
+
+        JUnitUtil.waitFor( () ->
+            ((jmri.managers.DefaultShutDownManager)InstanceManager.getDefault(
+            jmri.ShutDownManager.class)).isShutDownComplete(),"Shutdown complete");
     }
 
     @BeforeEach
-    public void setUp() {
-        jmri.util.JUnitUtil.setUp();
+    public void setUp(@TempDir File tempDir) throws IOException  {
+        JUnitUtil.setUp();
 
         JUnitUtil.resetApplication();
-        JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager( new jmri.profile.NullProfile( tempDir));
     }
 
     @AfterEach
@@ -74,6 +86,6 @@ public class PanedTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(PanedTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(PanedTest.class);
 
 }

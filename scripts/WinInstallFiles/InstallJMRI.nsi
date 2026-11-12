@@ -50,6 +50,15 @@
 ; -------------------------------------------------------------------------
 ; - Version History
 ; -------------------------------------------------------------------------
+; - Version 0.1.28.0
+; - Add LccPro app
+; -------------------------------------------------------------------------
+; - Version 0.1.27.0
+; - Updated "-CleanUp" so that old/error files are removed before installation in jython directory
+; -------------------------------------------------------------------------
+; - Version 0.1.26.2
+; - Update Java-install message URL
+; -------------------------------------------------------------------------
 ; - Version 0.1.26.1
 ; - Remove Tools start menu items
 ; - Add support for Open JDK 8 Registry Keys
@@ -316,7 +325,7 @@
   ; -- usually, this will be determined by the build.xml ant script
   !define JRE_VER   "1.8"                       ; Required JRE version
 !endif
-!define INST_VER  "0.1.26.1"                    ; Installer version
+!define INST_VER  "0.1.27.0"                    ; Installer version
 !define PNAME     "${APP}.${JMRI_VER}"          ; Name of installer.exe
 !define SRCDIR    "."                           ; Path to head of sources
 InstallDir        "$PROGRAMFILES\JMRI"          ; Default install directory
@@ -350,7 +359,7 @@ SetCompressor /SOLID /FINAL lzma
 ; -------------------------------------------------------------------------
 ; - Defines for downloading
 ; -------------------------------------------------------------------------
-!define JRE_URL     "https://java.com/winoffline_installer/"
+!define JRE_URL     "https://jmri.org/java"
 !define INTERNET_CONNECTION_CONFIGURED 64  ; 0x40
 !define INTERNET_CONNECTION_LAN 2          ; 0x02
 !define INTERNET_CONNECTION_MODEM 1        ; 0x01
@@ -374,6 +383,41 @@ SetCompressor /SOLID /FINAL lzma
 !include "MultiUser.nsh" ; MultiUser installation
 !include "WordFunc.nsh" ; add header for word manipulation
 !insertmacro VersionCompare ; add function to compare versions
+
+;-- from https://nsis.sourceforge.io/GetInQuotes:_Get_string_from_between_quotes
+Function GetInQuotes
+Exch $R0
+Push $R1
+Push $R2
+Push $R3
+
+ StrCpy $R2 -1
+ IntOp $R2 $R2 + 1
+  StrCpy $R3 $R0 1 $R2
+  StrCmp $R3 "" 0 +3
+   StrCpy $R0 ""
+   Goto Done
+  StrCmp $R3 '"' 0 -5
+
+ IntOp $R2 $R2 + 1
+ StrCpy $R0 $R0 "" $R2
+
+ StrCpy $R2 0
+ IntOp $R2 $R2 + 1
+  StrCpy $R3 $R0 1 $R2
+  StrCmp $R3 "" 0 +3
+   StrCpy $R0 ""
+   Goto Done
+  StrCmp $R3 '"' 0 -5
+
+ StrCpy $R0 $R0 $R2
+ Done:
+
+Pop $R3
+Pop $R2
+Pop $R1
+Exch $R0
+FunctionEnd
 
 ; -------------------------------------------------------------------------
 ; - Defines for log saving
@@ -490,7 +534,7 @@ SectionGroup "JMRI Core Files" SEC_CORE
     ; -- Clean up of JMRI folder
     SetOutPath "$INSTDIR"
 
-    ; -- Recursively delete classes folder, which historically contained 
+    ; -- Recursively delete classes folder, which historically contained
     ; -- individual .properties and .classes patch files
     ; -- that might not be consistent with this new version
     RMDir /R "$OUTDIR\classes"
@@ -507,7 +551,15 @@ SectionGroup "JMRI Core Files" SEC_CORE
     Delete "$OUTDIR\jh.1.1.2.jar"
     Delete "$OUTDIR\jh.jar"
     Delete "$OUTDIR\jdom-jdk11.jar"
- 
+
+    ; -- Delete certain jython files that have been moved, or were entered erroneously, as of JMRI 4.21.3
+    Delete "$OUTDIR\jython\SetMqttOptions.py"
+    Delete "$OUTDIR\jython\SetMqttParser.py"
+    Delete "$OUTDIR\jython\SetMqttPrefix.py"
+    Delete "$OUTDIR\jython\ReceiveMqttMessage.py"
+    Delete "$OUTDIR\jython\SendMqttMessage.py"
+    Delete "$OUTDIR\jython\CmriBitsToBytes.jy"
+
     ; -- Delete XmlIO-related files, as of JMRI 3.11.3
     Delete "$OUTDIR\help\en\package\jmri\jmrit\inControl\images\2Throttles.png"
     Delete "$OUTDIR\help\en\package\jmri\jmrit\inControl\images\AnalogClock.png"
@@ -610,6 +662,7 @@ SectionGroup "JMRI Core Files" SEC_CORE
     Delete "$OUTDIR\resources\RedPowerLED.gif"
     Delete "$OUTDIR\resources\YellowPowerLED.gif"
 
+
     ; -- If the current install Start Menu folder exists, remove any
     ; --        predictably-named JMRI-related contents.
 
@@ -623,6 +676,7 @@ SectionGroup "JMRI Core Files" SEC_CORE
     Delete "$SMPROGRAMS\$0\DecoderPro3.lnk"
     Delete "$SMPROGRAMS\$0\PanelPro.lnk"
     Delete "$SMPROGRAMS\$0\SoundPro.lnk"
+    Delete "$SMPROGRAMS\$0\LccPro.lnk"
     Delete "$SMPROGRAMS\$0\Tools and Demos\JmriDemo.lnk"
     Delete "$SMPROGRAMS\$0\Tools and Demos\LocoTools.lnk"
     Delete "$SMPROGRAMS\$0\Tools and Demos\CornwallRR.lnk"
@@ -643,6 +697,7 @@ SectionGroup "JMRI Core Files" SEC_CORE
     Delete "$DESKTOP\DecoderPro3.lnk"
     Delete "$DESKTOP\PanelPro.lnk"
     Delete "$DESKTOP\SoundPro.lnk"
+    Delete "$DESKTOP\LccPro.lnk"
 
   SectionEnd ; SEC_CLEANUP
 
@@ -660,7 +715,7 @@ SectionGroup "JMRI Core Files" SEC_CORE
     File /a "${SRCDIR}\jmri.conf"
     File /a "${SRCDIR}\LaunchJMRI.exe"
     File /a "${SRCDIR}\*.bat"
-    File /a "${SRCDIR}\default.lcf"
+    File /a "${SRCDIR}\default_lcf.xml"
     File /a "${SRCDIR}\*.ico"
     File /a "${SRCDIR}\lib\security.policy"
     File /a "${SRCDIR}\python.properties"
@@ -786,6 +841,11 @@ SectionGroup "Start menu shortcuts" SEC_SMSC
                    "apps.SoundPro.SoundPro" \
                    "$INSTDIR\SoundPro80x80.ico" 0 "" "" \
                    "Start SoundPro"
+    CreateShortcut "$SMPROGRAMS\$SMFOLDER\LccPro.lnk" \
+                   "$INSTDIR\LaunchJMRI.exe" \
+                   "apps.gui3.lccpro.LccPro" \
+                   "$INSTDIR\LccPro80x80.ico" 0 "" "" \
+                   "Start LccPro"
     CreateDirectory "$SMPROGRAMS\$SMFOLDER\Tools"
     CreateShortcut "$SMPROGRAMS\$SMFOLDER\Tools\InstallTest.lnk" \
                    "$INSTDIR\InstallTest.bat" \
@@ -838,6 +898,15 @@ SectionGroup "Desktop Shortcuts" SEC_DTSC
                    "$INSTDIR\SoundPro80x80.ico" 0 "" "" \
                    "Start SoundPro"
   SectionEnd ; SEC_SPDTSC
+
+  Section /o "LccPro" SEC_LPDTSC
+    SectionIn 2
+    CreateShortcut "$DESKTOP\LccPro.lnk" \
+                   "$INSTDIR\LaunchJMRI.exe" \
+                   "apps.gui3.lccpro.LccPro" \
+                   "$INSTDIR\LccPro80x80.ico" 0 "" "" \
+                   "Start LccPro"
+  SectionEnd ; SEC_LPDTSC
 
 SectionGroupEnd ; SEC_DTSC
 
@@ -915,6 +984,7 @@ Section "Uninstall" ; SEC_CRUNINST
   Delete "$SMPROGRAMS\$0\DecoderPro3.lnk"
   Delete "$SMPROGRAMS\$0\PanelPro.lnk"
   Delete "$SMPROGRAMS\$0\SoundPro.lnk"
+  Delete "$SMPROGRAMS\$0\LccPro.lnk"
   Delete "$SMPROGRAMS\$0\Tools and Demos\JmriDemo.lnk"
   Delete "$SMPROGRAMS\$0\Tools and Demos\LocoTools.lnk"
   Delete "$SMPROGRAMS\$0\Tools and Demos\CornwallRR.lnk"
@@ -931,6 +1001,7 @@ Section "Uninstall" ; SEC_CRUNINST
   Delete "$DESKTOP\DecoderPro.lnk"
   Delete "$DESKTOP\PanelPro.lnk"
   Delete "$DESKTOP\SoundPro.lnk"
+  Delete "$DESKTOP\LccPro.lnk"
   Delete "$DESKTOP\DecoderPro3.lnk"
 
   ; -- Remove registry entries
@@ -967,6 +1038,7 @@ LangString DESC_SEC_DTSC ${LANG_ENGLISH} "Select Desktop Shortcuts to create."
 LangString DESC_SEC_DPDTSC ${LANG_ENGLISH} "Creates a Desktop shortcut for DecoderPro"
 LangString DESC_SEC_PPDTSC ${LANG_ENGLISH} "Creates a Desktop shortcut for PanelPro"
 LangString DESC_SEC_SPDTSC ${LANG_ENGLISH} "Creates a Desktop shortcut for SoundPro"
+LangString DESC_SEC_LPDTSC ${LANG_ENGLISH} "Creates a Desktop shortcut for LccPro"
 LangString DESC_SEC_CRUNINST ${LANG_ENGLISH} "Creates an Uninstaller for ${APP}"
 LangString MESSAGE_INVALID_DIRECTORY ${LANG_ENGLISH} "This not a valid installation directory. Please reselect"
 LangString MESSAGE_WIN2K_OR_LATER ${LANG_ENGLISH} "${APP} version ${JMRI_VER} is not supported on this version of Windows. Installation cannot continue."
@@ -1006,7 +1078,7 @@ Function .onInit
   ; -- If so, show a message and then abort
   StrCmp $PROFILE "" 0 Check64 ; -- prior to Win2k this is blank
   ;MessageBox MB_OK|MB_ICONSTOP "${MESSAGE_WIN2K_OR_LATER}"
-  Abort "${MESSAGE_WIN2K_OR_LATER}"
+  Abort "WIN2K_OR_LATER"   ;-- surprise surprise
 
   Check64:
   ; -- Determine OS architecture
@@ -1089,30 +1161,63 @@ Function CheckJRE
 
   ; -- Read from host machine registry
   JRESearch:
-    IntOp $JREINSTALLCOUNT $JREINSTALLCOUNT + 1
-    ClearErrors
-    ReadRegStr $1 HKLM "SOFTWARE\JavaSoft\JRE" "CurrentVersion"
-    ReadRegStr $0 HKLM "SOFTWARE\JavaSoft\JRE\$1" "JavaHome"
-    IfErrors 0 JRECheck
-    ReadRegStr $1 HKLM "SOFTWARE\JavaSoft\Java Runtime Environment" "CurrentVersion"
-    ReadRegStr $0 HKLM "SOFTWARE\JavaSoft\Java Runtime Environment\$1" "JavaHome"
-    IfErrors 0 JRECheck
-    ReadRegStr $1 HKLM "SOFTWARE\JavaSoft\JDK" "CurrentVersion"
-    ReadRegStr $0 HKLM "SOFTWARE\JavaSoft\JDK\$1" "JavaHome"
-    IfErrors 0 JRECheck
-    ReadRegStr $1 HKLM "SOFTWARE\JavaSoft\Java Development Kit" "CurrentVersion"
-    ReadRegStr $0 HKLM "SOFTWARE\JavaSoft\Java Development Kit\$1" "JavaHome"
-
-    ; -- Not found
-    IfErrors 0 JRECheck
-      ; -- If we've got an error here on x64, switch to the 32-bit registry,
-      ; -- decrease the counter and then re-try
-      StrCmp 0 $x64JRE JREInitInstall
-        SetRegView 32
-        DetailPrint "Setting x86 registry view..."
-        StrCpy $x64JRE 0
-        IntOp $JREINSTALLCOUNT $JREINSTALLCOUNT - 1
-        Goto JRESearch
+        IntOp $JREINSTALLCOUNT $JREINSTALLCOUNT + 1
+        ClearErrors
+        DetailPrint "Checking default java first"
+        ; -- Check default java
+        ClearErrors
+        nsExec::ExecToStack "java -fullversion"
+        IfErrors JRESearchC  ; continue to use registry
+        Pop $0
+        Pop $0    ;-- response code
+        DetailPrint "java.exe returns [$0]"
+        push $0
+        call GetInQuotes
+        Pop $R1
+        IfErrors JRESearchC  ; continue to use registry
+        ${VersionCompare} "$R1" "${JRE_VER}" $0
+        IntCmp $0 2 JRESearchC 0 JRESearchC
+        DetailPrint "Using default java"
+        goto JRECheck
+  JRESearchC:
+        ; -- loop over javasoft keys looking for our version or greater
+        StrCpy $0 0
+  loopKeys:
+        EnumRegKey $1 HKLM "SOFTWARE\JavaSoft" $0
+        StrCmp $1 "" doneLoopKeys  ;-- end of keys
+        StrCpy $2 0
+     loopSubKeys:
+            EnumRegKey $3 HKLM "SOFTWARE\JavaSoft\$1" $2
+            DetailPrint "Checked [SOFTWARE\JavaSoft\$1] item [$2] got [$3]"
+            StrCmp $3 "" doneSubKey  ;--end of subkeys
+            ReadRegStr $6 HKLM "SOFTWARE\JavaSoft\$1\$3" "JavaHome"
+            DetailPrint "JavaHome [$6]"
+            IfErrors nextSubKey
+            ${VersionCompare} "$3" "${JRE_VER}" $5
+            DetailPrint "comp [$3] [${JRE_VER}] [$5]"
+            IntCmp $5 2 nextSubKey 0 nextSubKey
+            ;--have good one
+            StrCpy $R0 $6   ;-- stuff home
+            StrCpy $R1 $3   ;-- stuff version
+            goto JRECheck
+     nextSubKey:
+           IntOp $2 $2 + 1
+           DetailPrint "$1 $3 Checked"
+           goto loopSubKeys
+    doneSubKey:
+           IntOp $0 $0 + 1 ;-- move to next top level key
+           DetailPrint "$1 checked - movin on"
+           goto loopKeys
+ doneLoopKeys:
+     ;-- still no good java
+     ; -- If we've got an error here on x64, switch to the 32-bit registry,
+     ; -- decrease the counter and then re-try
+     StrCmp 0 $x64JRE JREInitInstall
+     SetRegView 32
+     DetailPrint "Setting x86 registry view..."
+     StrCpy $x64JRE 0
+     IntOp $JREINSTALLCOUNT $JREINSTALLCOUNT - 1
+     Goto JRESearch
 
   JREInitInstall:
       StrCpy $3 "No JAVA installation found"
@@ -1121,15 +1226,17 @@ Function CheckJRE
       StrCmp $JREINSTALLCOUNT 1 JREInstall NoJRE
 
   JRECheck:
-    StrCpy "$JAVADIR" "$0"
+    StrCpy "$JAVADIR" "$R0"
     ; -- Check we have the required JRE version
     ; -- If so, jump to the end of this section
-    ${VersionCompare} "$1" "${JRE_VER}" $0
+    ${VersionCompare} "$R1" "${JRE_VER}" $0
     StrCmp $0 "2" JREVerCheck JREFound
 
   JREVerCheck:
-    StrCpy $3 "Found JAVA version $1 - ${APP} requires version ${JRE_VER} or later"
-
+     MessageBox MB_YESNO|MB_ICONQUESTION "Found JAVA version $1 - ${APP} requires version ${JRE_VER} (preferred) \
+         or later (may not work) \
+         \nYou will have install and/or set jre directory before using JMRI.$\nInstall now and fix later?" IDYES JREFound IDNO 0
+     quit
   JREInstall:
     ; -- First, check to see if a suitable installer exists in the JRE sub-directory
     ; -- below that of the installer. It needs to be of the format jre*.exe
@@ -1138,7 +1245,7 @@ Function CheckJRE
 
     FindFirst $2 $JREINSTALLER "$EXEDIR\JRE\jre*.exe"
 
-    OfflineJREInstall:
+    ; OfflineJREInstall:
     StrCmp $JREINSTALLER "" DownloadJREQuery
       StrCpy $JREINSTALLER "$EXEDIR\JRE\$JREINSTALLER"
       StrCpy $OFFLINEINSTALL "1"
@@ -1153,15 +1260,17 @@ Function CheckJRE
 ;    MessageBox MB_YESNO|MB_ICONQUESTION "$3$\nWould you like to download JAVA from the internet?" IDYES DownloadJRE IDNO NoJRE
 
   NoJRE:
-    MessageBox MB_ICONSTOP "$3$\nYou need to install JAVA ${JRE_VER} or later$\nThis can be downloaded from ${JRE_URL}$\nInstallation of ${APP} ${JMRI_VER} cannot continue"
-    Quit
-
+    MessageBox MB_YESNO|MB_ICONQUESTION "$3$\nYou will need to install JAVA ${JRE_VER} (prefered) \
+      or later (may not work) before you can use JMRI$\nDo you wish to continue installing?" \
+      IDYES JREFound IDNO 0
+    quit
 ;  DownloadJRE:
 ;    StrCpy $JREINSTALLER "$TEMP\JRE.exe"
 ;    nsisDL::Download /TIMEOUT=30000 ${JRE_URL} $JREINSTALLER
 ;    Pop $0 ; Get the return value
 ;    StrCmp $0 "success" DownloadOK
-;      MessageBox MB_ICONSTOP "Failure downloading JAVA$\nPlease try manually from ${JRE_URL}$\nInstallation of ${APP} ${JMRI_VER} cannot continue"
+;      MessageBox MB_ICONSTOP "Failure downloading JAVA$\nPlease try manually from ${JRE_URL}$ \
+;         \nInstallation of ${APP} ${JMRI_VER} cannot continue"
 ;      Quit
 ;
 ;  DownloadOK:
@@ -1180,7 +1289,7 @@ Function CheckJRE
     ; -- If this was found within the x64 registry view, reset to x86
     ; -- registry view so that our entries are placed in the expected place.
     StrCmp 0 $x64JRE JREDone
-      DetailPrint "Reverting to x86 registry view..."
+      DetailPrint "Reverting to x86 registry view so that our entries are placed in the expected place."
       SetRegView 32
 
   JREDone:

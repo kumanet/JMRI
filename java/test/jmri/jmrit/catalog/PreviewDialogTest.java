@@ -42,6 +42,7 @@ public class PreviewDialogTest {
         jf.dispose();
     }
 
+
     @Test
     public void testPreviewDialog()  throws FileNotFoundException, IOException {
         Assume.assumeFalse(GraphicsEnvironment.isHeadless());
@@ -113,6 +114,6 @@ public class PreviewDialogTest {
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PreviewDialogTest.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(PreviewDialogTest.class.getName());
 
 }

@@ -31,7 +31,7 @@ public class JsonMemoryHttpService extends JsonNamedBeanHttpService<Memory> {
 
     private JsonIdTagHttpService idTagService = new JsonIdTagHttpService(mapper);
     private JsonReporterHttpService reporterService = new JsonReporterHttpService(mapper);
-    private JsonRosterHttpService rosterService = new JsonRosterHttpService(mapper);   
+    private JsonRosterHttpService rosterService = new JsonRosterHttpService(mapper);
 
     public JsonMemoryHttpService(ObjectMapper mapper) {
         super(mapper);
@@ -40,7 +40,7 @@ public class JsonMemoryHttpService extends JsonNamedBeanHttpService<Memory> {
     @Override
     public ObjectNode doGet(Memory memory, String name, String type, JsonRequest request) throws JsonException {
         ObjectNode root = this.getNamedBean(memory, name, getType(), request);
-        ObjectNode data = root.with(DATA);
+        ObjectNode data = root.withObject(DATA);
         if (memory != null) {
             Object val = memory.getValue();
             if (val == null) {
@@ -100,7 +100,7 @@ public class JsonMemoryHttpService extends JsonNamedBeanHttpService<Memory> {
     }
 
     @Override
-    protected ProvidingManager<Memory> getManager() {
+    protected ProvidingManager<Memory> getProvidingManager() {
         return InstanceManager.getDefault(MemoryManager.class);
     }
 }

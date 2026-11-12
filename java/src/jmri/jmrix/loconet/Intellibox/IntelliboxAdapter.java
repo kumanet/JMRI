@@ -38,13 +38,14 @@ public class IntelliboxAdapter extends LocoBufferAdapter {
         setTurnoutHandling(getOptionState(option3Name));
         // connect to a packetizing traffic controller
         IBLnPacketizer packets = new IBLnPacketizer();
+        packets.setLoconetUpdateSlotOnMessageCreation(Bundle.getMessage("ButtonYes").equals(getOptionState("LoconetUpdateSlotOnMessageCreation")));
         packets.connectPort(this);
 
         // create memo
         this.getSystemConnectionMemo().setLnTrafficController(packets);
         // do the common manager config
         this.getSystemConnectionMemo().configureCommandStation(commandStationType,
-                mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable);
+                mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable, mInterrogateAtStart ,false);
         this.getSystemConnectionMemo().configureManagers();
 
         // start operation

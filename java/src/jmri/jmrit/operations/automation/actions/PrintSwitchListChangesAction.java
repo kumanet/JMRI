@@ -3,10 +3,8 @@ package jmri.jmrit.operations.automation.actions;
 import jmri.InstanceManager;
 import jmri.jmrit.operations.locations.Location;
 import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.trains.Train;
-import jmri.jmrit.operations.trains.TrainCsvSwitchLists;
-import jmri.jmrit.operations.trains.TrainManager;
-import jmri.jmrit.operations.trains.TrainSwitchLists;
+import jmri.jmrit.operations.trains.*;
+import jmri.jmrit.operations.trains.csv.TrainCsvSwitchLists;
 
 public class PrintSwitchListChangesAction extends Action {
 
@@ -37,7 +35,7 @@ public class PrintSwitchListChangesAction extends Action {
             setRunning(true);
             TrainSwitchLists trainSwitchLists = new TrainSwitchLists();
             TrainCsvSwitchLists trainCsvSwitchLists = new TrainCsvSwitchLists();
-            for (Location location : InstanceManager.getDefault(LocationManager.class).getLocationsByNameList()) {
+            for (Location location : InstanceManager.getDefault(LocationManager.class).getUniqueLocationsByNameList()) {
                 if (location.isSwitchListEnabled() &&
                         (!isChanged || location.getStatus().equals(Location.MODIFIED))) {
                     // also build the CSV switch lists

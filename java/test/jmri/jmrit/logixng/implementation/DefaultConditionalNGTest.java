@@ -1,22 +1,24 @@
 package jmri.jmrit.logixng.implementation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.*;
 
 import jmri.*;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.actions.AbstractDigitalAction;
-import jmri.jmrit.logixng.actions.IfThenElse;
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.*;
 
 /**
  * Test DefaultConditionalNG
- * 
+ *
  * @author Daniel Bergqvist 2020
  */
 public class DefaultConditionalNGTest {
@@ -24,61 +26,58 @@ public class DefaultConditionalNGTest {
     @Test
     public void testCtor() {
         DefaultConditionalNG conditionalNG = new DefaultConditionalNG("IQC123", null);
-        Assert.assertNotNull("exists", conditionalNG);
-        
-        boolean hasThrown = false;
-        try {
-            // Bad system name
-            new DefaultConditionalNG("IQCAbc", null);
-        } catch (IllegalArgumentException e) {
-            hasThrown = true;
-            Assert.assertEquals("Error message is correct", "system name is not valid", e.getMessage());
-        }
-        Assert.assertTrue("Exception thrown", hasThrown);
+        assertNotNull( conditionalNG, "exists");
+
+        IllegalArgumentException e = assertThrows( IllegalArgumentException.class, () -> {
+            var dc = new DefaultConditionalNG("IQCAbc", null);
+            fail("Should not have got here " + dc);
+        });
+        assertEquals( "system name is not valid", e.getMessage(), "Error message is correct");
     }
-    
+
     @Test
     public void testState() throws JmriException {
         DefaultConditionalNG conditionalNG = new DefaultConditionalNG("IQC123", null);
         conditionalNG.setState(NamedBean.INCONSISTENT);
         JUnitAppender.assertWarnMessage("Unexpected call to setState in DefaultConditionalNG.");
-        
-        Assert.assertEquals("State is correct", NamedBean.UNKNOWN, conditionalNG.getState());
+
+        assertEquals( NamedBean.UNKNOWN, conditionalNG.getState(), "State is correct");
         JUnitAppender.assertWarnMessage("Unexpected call to getState in DefaultConditionalNG.");
     }
-    
+
     @Test
     public void testExecute() throws SocketAlreadyConnectedException, JmriException {
+        DefaultLogixNG logixNG = new DefaultLogixNG("IQ1", null);
         DefaultConditionalNG conditionalNG = new DefaultConditionalNG("IQC123", null);
+        conditionalNG.setParent(logixNG);
         conditionalNG.setRunDelayed(false);
         MyDigitalAction action = new MyDigitalAction("IQDA1", null);
         MaleSocket socket = InstanceManager.getDefault(DigitalActionManager.class)
                 .registerAction(action);
         conditionalNG.getChild(0).connect(socket);
-        if (! conditionalNG.setParentForAllChildren(new ArrayList<>())) throw new RuntimeException();
-        
+        assertTrue( conditionalNG.setParentForAllChildren(new ArrayList<>()));
+
         socket.setErrorHandlingType(MaleSocket.ErrorHandlingType.ThrowException);
-        
+
         action.throwOnExecute = false;
         action.hasExecuted = false;
         conditionalNG.execute();
-        Assert.assertTrue("Action is executed", action.hasExecuted);
-        
+        assertTrue( action.hasExecuted, "Action is executed");
+
         action.throwOnExecute = true;
         action.hasExecuted = false;
         conditionalNG.execute();
         JUnitAppender.assertWarnMessage("ConditionalNG IQC123 got an exception during execute: jmri.JmriException: An error has occured");
     }
-    
+
     @Test
     public void testDescription() {
         DefaultConditionalNG conditionalNG = new DefaultConditionalNG("IQC123", null);
-        Assert.assertEquals("Short description is correct", "ConditionalNG: IQC123", conditionalNG.getShortDescription());
-        Assert.assertEquals("Long description is correct", "ConditionalNG: IQC123", conditionalNG.getLongDescription());
+        assertEquals( "ConditionalNG: IQC123", conditionalNG.getShortDescription(), "Short description is correct");
+        assertEquals( "ConditionalNG: IQC123", conditionalNG.getLongDescription(), "Long description is correct");
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -90,20 +89,21 @@ public class DefaultConditionalNGTest {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
-    
-    
+
+
+
     private static class MyDigitalAction extends AbstractDigitalAction {
 
-        private boolean hasExecuted;
-        private boolean throwOnExecute;
-        
-        public MyDigitalAction(String sys, String user) throws BadUserNameException, BadSystemNameException {
+        boolean hasExecuted;
+        boolean throwOnExecute;
+
+        MyDigitalAction(String sys, String user) throws BadUserNameException, BadSystemNameException {
             super(sys, user);
         }
 
@@ -143,13 +143,8 @@ public class DefaultConditionalNGTest {
         }
 
         @Override
-        public Category getCategory() {
+        public LogixNG_Category getCategory() {
             throw new UnsupportedOperationException("Not supported7");
-        }
-
-        @Override
-        public boolean isExternal() {
-            throw new UnsupportedOperationException("Not supported8");
         }
 
         @Override
@@ -175,7 +170,7 @@ public class DefaultConditionalNGTest {
         public Base deepCopyChildren(Base base, Map<String, String> map, Map<String, String> map1) throws JmriException {
             throw new UnsupportedOperationException("Not supported");
         }
-        
+
     }
-    
+
 }

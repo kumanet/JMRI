@@ -7,13 +7,11 @@ import java.util.List;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
 
-import jmri.progdebugger.ProgDebugger;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.NotApplicable;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test LongAddrVariableValue class.
@@ -23,7 +21,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
 
-    ProgDebugger p = new ProgDebugger();
+    // ProgDebugger p = new ProgDebugger();
 
     // abstract members invoked by tests in parent AbstractVariableValueTestBase class
     @Override
@@ -63,58 +61,69 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
     // some of the premade tests don't quite make sense; override them here.
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreate() {
-    }// mask is ignored by LongAddr
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeValue() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue256() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue2up16() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueTwinMask() {
-    } // mask is ignored
+    }
 
     @Override
     @Test
+    @NotApplicable("low CV is upper part of address")
     public void testVariableFromCV() {
-    }     // low CV is upper part of address
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of LongAddr")
     public void testVariableValueRead() {
-    } // due to multi-cv nature of LongAddr
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of LongAddr")
     public void testVariableValueWrite() {
-    } // due to multi-cv nature of LongAddr
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature of LongAddr")
     public void testVariableCvWrite() {
-    }    // due to multi-cv nature of LongAddr
+    }
 
     @Override
     @Test
+    @NotApplicable("programmer synch is different")
     public void testWriteSynch2() {
-    }        // programmer synch is different
+    }
     // can we create long address , then manipulate the variable to change the CV?
 
     @Test
@@ -127,7 +136,7 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         v.put("17", cv17);
         v.put("18", cv18);
         // create a variable pointed at CV 17&18, check name
-        LongAddrVariableValue var = new LongAddrVariableValue("label", "comment", "", false, false, false, false, "17", "VVVVVVVV", 0, 255, v, null, null, cv18);
+        LongAddrVariableValue var = new LongAddrVariableValue("label", "comment", "", false, false, false, false, "17", "VVVVVVVV", 0, 255, v, jlabel, "stdname", cv18);
         Assert.assertSame("label", var.label());
         // pretend you've edited the value, check its in same object
         ((JTextField) var.getCommonRep()).setText("4797");
@@ -150,7 +159,7 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         v.put("17", cv17);
         v.put("18", cv18);
         // create a variable pointed at CV 17 & 18
-        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "VVVVVVVV", 0, 255, v, null, null, cv18);
+        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "VVVVVVVV", 0, 255, v, jlabel, "stdname", cv18);
         ((JTextField) var.getCommonRep()).setText("1029");
         var.actionPerformed(new java.awt.event.ActionEvent(var, 0, ""));
 
@@ -162,7 +171,7 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals(189, cv18.getValue());
     }
 
-    List<java.beans.PropertyChangeEvent> evtList = null;  // holds a list of ParameterChange events
+    private List<java.beans.PropertyChangeEvent> evtList = null;  // holds a list of ParameterChange events
 
     // check a long address read operation
     @Test
@@ -176,18 +185,15 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         v.put("17", cv17);
         v.put("18", cv18);
 
-        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "XXVVVVXX", 0, 255, v, null, null, cv18);
+        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "XXVVVVXX", 0, 255, v, jlabel, "stdname", cv18);
         // register a listener for parameter changes
-        java.beans.PropertyChangeListener listen = new java.beans.PropertyChangeListener() {
-            @Override
-            public void propertyChange(java.beans.PropertyChangeEvent e) {
-                evtList.add(e);
-                if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
-                    log.debug("Busy false seen in test");
-                }
+        java.beans.PropertyChangeListener listen = (java.beans.PropertyChangeEvent e) -> {
+            evtList.add(e);
+            if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
+                log.debug("Busy false seen in test");
             }
         };
-        evtList = new ArrayList<java.beans.PropertyChangeEvent>();
+        evtList = new ArrayList<>();
         var.addPropertyChangeListener(listen);
 
         // set to specific value
@@ -208,7 +214,7 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("only one Busy -> false transition ", 1, nBusyFalse);
 
         Assert.assertEquals("text value ", "15227", ((JTextField) var.getCommonRep()).getText());  // 15227 = (1230x3f)*256+123
-        Assert.assertEquals("Var state", AbstractValue.READ, var.getState());
+        Assert.assertEquals("Var state", AbstractValue.ValueState.READ, var.getState());
         Assert.assertEquals("CV 17 value ", 251, cv17.getValue());  // 123 with 128 bit set
         Assert.assertEquals("CV 18 value ", 123, cv18.getValue());
     }
@@ -224,7 +230,7 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         v.put("17", cv17);
         v.put("18", cv18);
 
-        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "XXVVVVXX", 0, 255, v, null, null, cv18);
+        LongAddrVariableValue var = new LongAddrVariableValue("name", "comment", "", false, false, false, false, "17", "XXVVVVXX", 0, 255, v, jlabel, "stdname", cv18);
         ((JTextField) var.getCommonRep()).setText("4797");
         var.actionPerformed(new java.awt.event.ActionEvent(var, 0, ""));
 
@@ -235,23 +241,27 @@ public class LongAddrVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("CV 17 value ", 210, cv17.getValue());
         Assert.assertEquals("CV 18 value ", 189, cv18.getValue());
         Assert.assertEquals("4797", ((JTextField) var.getCommonRep()).getText());
-        Assert.assertEquals("Var state", AbstractValue.STORED, var.getState());
+        Assert.assertEquals("Var state", AbstractValue.ValueState.STORED, var.getState());
         Assert.assertEquals(189, p.lastWrite());
         // how do you check separation of the two writes?  State model?
     }
+
+    private JLabel jlabel;
 
     @BeforeEach
     @Override
     public void setUp() {
         super.setUp();
+        jlabel = new JLabel();
     }
-    
+
     @AfterEach
     @Override
     public void tearDown() {
         super.tearDown();
+        jlabel = null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LongAddrVariableValueTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LongAddrVariableValueTest.class);
 
 }

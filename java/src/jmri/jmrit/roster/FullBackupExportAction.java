@@ -7,19 +7,21 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.swing.Icon;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
+
+import jmri.util.ThreadingUtil;
+import jmri.util.swing.CountingBusyDialog;
 import jmri.util.swing.JmriAbstractAction;
 import jmri.util.swing.WindowInterface;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Offer an easy mechanism to save the entire roster contents from one instance
- * of DecoderPro. The result is a zip format file, containing all of the roster
+ * of DecoderPro to another. The result is a zip format file, containing all of the roster
  * entries plus the overall roster.xml index file.
  *
  * @author david d zuhn
@@ -31,12 +33,16 @@ public class FullBackupExportAction
     // parent component for GUI
     public FullBackupExportAction(String s, WindowInterface wi) {
         super(s, wi);
+        _parent = wi.getFrame();
     }
 
     public FullBackupExportAction(String s, Icon i, WindowInterface wi) {
         super(s, i, wi);
+        _parent = wi.getFrame();
     }
-    private Component _parent;
+    protected Component _parent;
+    protected String filename;
+    protected CountingBusyDialog dialog;
 
     /**
      * @param s      Name of this action, e.g. in menus
@@ -50,11 +56,10 @@ public class FullBackupExportAction
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        Roster roster = Roster.getDefault();
 
         String roster_filename_extension = "roster";
 
-        JFileChooser chooser = new JFileChooser();
+        JFileChooser chooser = new jmri.util.swing.JmriJFileChooser();
         FileNameExtensionFilter filter = new FileNameExtensionFilter(
                 "JMRI full roster files", roster_filename_extension);
         chooser.setFileFilter(filter);
@@ -64,47 +69,70 @@ public class FullBackupExportAction
             return;
         }
 
-        String filename = chooser.getSelectedFile().getAbsolutePath();
+        filename = chooser.getSelectedFile().getAbsolutePath();
 
-        if (!filename.endsWith(roster_filename_extension)) {
-            filename = filename.concat(roster_filename_extension);
+        if (!filename.endsWith("."+roster_filename_extension)) {
+            filename = filename.concat("."+roster_filename_extension);
         }
 
-        try (ZipOutputStream zipper = new ZipOutputStream(new FileOutputStream(filename))) {
+        Roster roster = Roster.getDefault();
+        var list = roster.getAllEntries();
+        new Thread(() -> {run(list);}).start();
+    }
 
-            // create a zip file roster entry for each entry in the main roster
-            for (RosterEntry entry : roster.getAllEntries()) {
-                try {
-                    copyFileToStream(entry.getPathName(), "roster", zipper, "roster: "+entry.getId());
-                    
-                    // process image files if present
-                    if (entry.getImagePath() != null && ! entry.getImagePath().isEmpty())
-                        copyFileToStream(entry.getImagePath(), "roster", zipper, "image: "+entry.getId());
-                    if (entry.getIconPath() != null && ! entry.getIconPath().isEmpty())
-                        copyFileToStream(entry.getIconPath(), "roster", zipper, "icon: "+entry.getId());
-                        
-                } catch (FileNotFoundException ex) {
-                    log.error("Unable to find file in entry {}", entry.getId(), ex);
-                } catch (IOException ex) {
-                    log.error("Unable to write during entry {}", entry.getId(), ex);
-                } catch (Exception ex) {
-                    log.error("Unexpected exception during entry {}", entry.getId(), ex);
+    /**
+     * Actually do the copying
+     */
+    public void run(List<RosterEntry> entries) {
+        try {
+
+            dialog = new CountingBusyDialog(null, "Exporting Roster", false, entries.size());
+            ThreadingUtil.runOnGUIEventually(() -> {dialog.start();});
+
+            try (ZipOutputStream zipper = new ZipOutputStream(new FileOutputStream(filename))) {
+
+                // create a zip file roster entry for each entry in the main roster
+                int count = 0;
+                for (RosterEntry entry : entries) {
+                    count++;
+                    final int thisCount = count;
+                    ThreadingUtil.runOnGUIEventually(() -> {dialog.count(thisCount);});
+                    try {
+
+                        // process image files if present
+                        if (entry.getImagePath() != null && ! entry.getImagePath().isEmpty())
+                            copyFileToStream(entry.getImagePath(), "roster", zipper, "image: "+entry.getId());
+                        if (entry.getIconPath() != null && ! entry.getIconPath().isEmpty())
+                            copyFileToStream(entry.getIconPath(), "roster", zipper, "icon: "+entry.getId());
+
+                        // store the roster entry itself
+                        copyFileToStream(entry.getPathName(), "roster", zipper, "roster: "+entry.getId());
+
+                    } catch (FileNotFoundException ex) {
+                        log.error("Unable to find file in entry {}", entry.getId(), ex);
+                    } catch (IOException ex) {
+                        log.error("Unable to write during entry {}", entry.getId(), ex);
+                    } catch (Exception ex) {
+                        log.error("Unexpected exception during entry {}", entry.getId(), ex);
+                    }
                 }
+
+                // Now the full roster entry
+                copyFileToStream(Roster.getDefault().getRosterIndexPath(), null, zipper, null);
+
+                zipper.setComment("Roster file saved from DecoderPro " + jmri.Version.name());
+
+                zipper.close();
+
+            } catch (FileNotFoundException ex) {
+                log.error("Unable to find file {}", filename, ex);
+            } catch (IOException ex) {
+                log.error("Unable to write to {}", filename, ex);
             }
-
-            // Now the full roster entry
-            copyFileToStream(Roster.getDefault().getRosterIndexPath(), null, zipper, null);
-
-            zipper.setComment("Roster file saved from DecoderPro " + jmri.Version.name());
-
-            zipper.close();
-
-        } catch (FileNotFoundException ex) {
-            log.error("Unable to find file {}", filename, ex);
-        } catch (IOException ex) {
-            log.error("Unable to write to {}", filename, ex);
+        } finally {
+            ThreadingUtil.runOnGUIEventually(() -> {dialog.finish();});
+            log.info("Writing backup done");
         }
-
     }
 
     /**
@@ -120,9 +148,9 @@ public class FullBackupExportAction
      */
     private void copyFileToStream(String filename, String dirname, ZipOutputStream zipper, String comment)
             throws IOException {
-            
+
         log.debug("write: {}", filename);
-        
+
         File file = new File(filename);
         String entryName;
 
@@ -161,5 +189,5 @@ public class FullBackupExportAction
         throw new IllegalArgumentException("Should not be invoked");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(FullBackupExportAction.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FullBackupExportAction.class);
 }

@@ -12,6 +12,7 @@ import javax.swing.table.TableColumnModel;
 
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.util.LogixNG_Thread;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
 
@@ -109,10 +110,10 @@ public class EditThreadsDialog {
         addThread.addActionListener((ActionEvent e) -> {
             String newName = "";
             if (! LogixNG_Thread.validateNewThreadName(newName)) {
-                JOptionPane.showMessageDialog(null,
+                JmriJOptionPane.showMessageDialog(null,
                         Bundle.getMessage("EditThreadsDialog_ErrorThreadNameAlreadyExists", newName),
                         Bundle.getMessage("EditThreadsDialog_ErrorTitle"),
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             }
             LogixNG_Thread thread = LogixNG_Thread.createNewThread(newName);
@@ -120,7 +121,7 @@ public class EditThreadsDialog {
             _threadTableModel._threads.add(thread);
             _threadTableModel.fireTableRowsInserted(row, row);
         });
-//        addThread.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
+//        addThread.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
         
         // Cancel
         JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));    // NOI18N
@@ -128,7 +129,7 @@ public class EditThreadsDialog {
         cancel.addActionListener((ActionEvent e) -> {
             abortPressed();
         });
-//        cancel.setToolTipText(Bundle.getMessage("CancelLogixButtonHint"));      // NOI18N
+        cancel.setToolTipText(Bundle.getMessage("LogixNG_CancelButtonHint"));      // NOI18N
         
         // OK
         JButton ok = new JButton(Bundle.getMessage("ButtonOK"));    // NOI18N
@@ -298,10 +299,10 @@ public class EditThreadsDialog {
             LogixNG_Thread thread = _threads.get(row);
             if (!thread.getThreadName().equals(name)) {
                 if (! LogixNG_Thread.validateNewThreadName(name)) {
-                    JOptionPane.showMessageDialog(null,
+                    JmriJOptionPane.showMessageDialog(null,
                             Bundle.getMessage("EditThreadsDialog_ErrorThreadNameAlreadyExists", name),
                             Bundle.getMessage("EditThreadsDialog_ErrorTitle"),
-                            JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 thread.setThreadName(name);

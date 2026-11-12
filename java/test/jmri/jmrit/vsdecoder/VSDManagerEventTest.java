@@ -29,11 +29,13 @@ public class VSDManagerEventTest {
 
     @AfterEach
     public void tearDown() {
+
+        // Potentially no Audio Device installed
+        jmri.util.JUnitAppender.suppressWarnMessageStartsWith("Error initialising JOAL");
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(VSDManagerEventTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(VSDManagerEventTest.class);
 
 }

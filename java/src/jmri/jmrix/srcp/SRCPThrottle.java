@@ -1,6 +1,5 @@
 package jmri.jmrix.srcp;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.DccLocoAddress;
 import jmri.LocoAddress;
 import jmri.SpeedStepMode;
@@ -108,7 +107,6 @@ public class SRCPThrottle extends AbstractThrottle {
      *
      * @param speed Number from 0 to 1; less than zero is emergency stop
      */
-    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY") // OK to compare floating point, notify on any change
     @Override
     public synchronized void setSpeedSetting(float speed) {
         float oldSpeed = this.speedSetting;
@@ -136,14 +134,28 @@ public class SRCPThrottle extends AbstractThrottle {
     void sendUpdate() {
         String msg = "SET " + bus + " GL ";
 
+        int outSpeed;
+        
+        synchronized(this) {
+            outSpeed = Math.round(speedSetting * maxsteps);
+            if (speedSetting > 0 && outSpeed == 0) {
+                outSpeed = 1;       //  ensure non-zero input results in non-zero output
+            }
+        }
+        
         // address
         msg += (address.getNumber());
 
         // direction and speed
-        msg += (isForward ? " 1" : " 0");
         synchronized(this) {
-            msg += " " + ((int) (speedSetting * maxsteps));
+            if (speedSetting >= 0) {
+                msg += (isForward ? " 1" : " 0");
+            }
+            else {
+                msg += " 2";        // handle emergency stop
+            }
         }
+        msg += " " + outSpeed;
         msg += " ";
         msg += maxsteps;
 

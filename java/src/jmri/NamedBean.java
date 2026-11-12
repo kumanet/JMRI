@@ -71,31 +71,51 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * initial state of a newly created object before communication with the
      * layout.
      */
-    public static final int UNKNOWN = 0x01;
+    static final int UNKNOWN = 0x01;
 
     /**
      * Constant representing an "inconsistent" state, indicating that some
      * inconsistency has been detected in the hardware readback.
      */
-    public static final int INCONSISTENT = 0x08;
+    static final int INCONSISTENT = 0x08;
 
     /**
      * Format used for {@link #getDisplayName(DisplayOptions)} when displaying
-     * the user name and system name without quoation marks around the user
+     * the user name and system name without quotation marks around the user
      * name.
      */
-    public static final String DISPLAY_NAME_FORMAT = "%s (%s)";
+    static final String DISPLAY_NAME_FORMAT = "%s (%s)";
 
     /**
      * Format used for {@link #getDisplayName(DisplayOptions)} when displaying
-     * the user name and system name with quoation marks around the user name.
+     * the user name and system name with quotation marks around the user name.
      */
-    public static final String QUOTED_NAME_FORMAT = "\"%s\" (%s)";
+    static final String QUOTED_NAME_FORMAT = "\"%s\" (%s)";
 
     /**
      * Property of changed state.
      */
-    public static final String PROPERTY_STATE = "state";
+    static final String PROPERTY_STATE = "state";
+
+    /**
+     * Property of known state.
+     */
+    String PROPERTY_KNOWN_STATE = "KnownState";
+
+    /**
+     * Property of Enabled state ( Light / Logix / LogixNG / Route / SML ).
+     */
+    String PROPERTY_ENABLED = "Enabled";
+
+    /**
+     * Property of Comment updated.
+     */
+    String PROPERTY_COMMENT = "Comment";
+
+    /**
+     * Property of User Name.
+     */
+    String PROPERTY_USERNAME = "UserName";
 
     /**
      * User's identification for the item. Bound parameter so manager(s) can
@@ -106,7 +126,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @CheckForNull
-    public String getUserName();
+    String getUserName();
 
     /**
      * Set the user name, normalizing it if needed.
@@ -115,7 +135,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @throws jmri.NamedBean.BadUserNameException if the user name can not be
      *                                                 normalized
      */
-    public void setUserName(@CheckForNull String s) throws BadUserNameException;
+    void setUserName(@CheckForNull String s) throws BadUserNameException;
 
     /**
      * Get a system-specific name. This encodes the hardware addressing
@@ -125,21 +145,21 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @Nonnull
-    public String getSystemName();
+    String getSystemName();
 
     /**
      * Display the system-specific name.
      * <p>Note that this is a firm contract:  toString() in
      * all implementing classes must return the system name
      * followed by optional additional information.
-     * Using code can assume that the result of toString() will always be 
+     * Using code can assume that the result of toString() will always be
      * or start with the system name followed by some kind of separator character.
      *
      * @return the system-specific name
      */
     @Nonnull
     @Override
-    public String toString();
+    String toString();
 
     /**
      * Get user name if it exists, otherwise return System name.
@@ -148,7 +168,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @Nonnull
-    public default String getDisplayName() {
+    default String getDisplayName() {
         return getDisplayName(DisplayOptions.DISPLAYNAME);
     }
 
@@ -160,7 +180,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @Nonnull
-    public default String getDisplayName(DisplayOptions options) {
+    default String getDisplayName(DisplayOptions options) {
         String userName = getUserName();
         String systemName = getSystemName();
         // since there are two undisplayable states for the user name,
@@ -189,39 +209,21 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
     }
 
     /**
-     * Get a fully formatted display that includes the SystemName and, if set,
-     * the UserName.
-     * <p>
-     * This is the same as calling {@link #getDisplayName(DisplayOptions)} with
-     * the parameter {@link DisplayOptions#USERNAME_SYSTEMNAME}.
-     *
-     * @return {@code UserName (SystemName)} or {@code SystemName} if the
-     *         UserName is null, empty, or matches the SystemName
-     * @deprecated since 4.17.2; use {@link #getDisplayName(DisplayOptions)}
-     *             with {@link DisplayOptions#USERNAME_SYSTEMNAME} instead
+     * Get a recommended text for a tooltip when displaying 
+     * the NamedBean, e.g. in a list or table.
+     * By default, this is the comment from the NamedBean, on the theory
+     * that the system name and/or user name are being displayed directly.
+     * Specific system implementations may override that.
+     * @return empty String if no recommendation.
      */
     @CheckReturnValue
     @Nonnull
-    @Deprecated
-    public default String getFullyFormattedDisplayName() {
-        return getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME);
-    }
-
-    /**
-     * Returns a fully formatted display that includes the SystemName and
-     * UserName if set. This uses the format {@value #DISPLAY_NAME_FORMAT}
-     *
-     * @param userNameFirst ignored; retained for compatibility until removed
-     * @return {@code UserName (SystemName)} or {@code SystemName} if the
-     *         UserName is null, empty, or matches the SystemName
-     * @deprecated since 4.17.2; use {@link #getDisplayName(DisplayOptions)}
-     *             with {@link DisplayOptions#USERNAME_SYSTEMNAME} instead
-     */
-    @CheckReturnValue
-    @Nonnull
-    @Deprecated
-    public default String getFullyFormattedDisplayName(boolean userNameFirst) {
-        return getDisplayName(DisplayOptions.USERNAME_SYSTEMNAME);
+    default String getRecommendedToolTip() {
+        String retval = getComment();
+        if (retval == null) {
+            return "";
+        }
+        return retval;
     }
 
     /**
@@ -239,7 +241,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @param listenerRef A textual reference for the listener, that can be
      *                        presented to the user when a delete is called
      */
-    public void addPropertyChangeListener(@Nonnull PropertyChangeListener listener, String name, String listenerRef);
+    void addPropertyChangeListener(@Nonnull PropertyChangeListener listener, String name, String listenerRef);
 
     /**
      * Request a call-back when a bound property changes. Bound properties are
@@ -258,12 +260,12 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @param listenerRef  A textual reference for the listener, that can be
      *                         presented to the user when a delete is called
      */
-    public void addPropertyChangeListener(@Nonnull String propertyName, @Nonnull PropertyChangeListener listener,
+    void addPropertyChangeListener(@Nonnull String propertyName, @Nonnull PropertyChangeListener listener,
             String name, String listenerRef);
 
-    public void updateListenerRef(@Nonnull PropertyChangeListener l, String newName);
+    void updateListenerRef(@Nonnull PropertyChangeListener l, String newName);
 
-    public void vetoableChange(@Nonnull PropertyChangeEvent evt) throws PropertyVetoException;
+    void vetoableChange(@Nonnull PropertyChangeEvent evt) throws PropertyVetoException;
 
     /**
      * Get the textual reference for the specific listener
@@ -272,7 +274,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @return the textual reference
      */
     @CheckReturnValue
-    public String getListenerRef(@Nonnull PropertyChangeListener l);
+    String getListenerRef(@Nonnull PropertyChangeListener l);
 
     /**
      * Returns a list of all the listeners references
@@ -280,7 +282,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @return a list of textual references
      */
     @CheckReturnValue
-    public ArrayList<String> getListenerRefs();
+    ArrayList<String> getListenerRefs();
 
     /**
      * Number of current listeners. May return -1 if the information is not
@@ -289,7 +291,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * @return the number of listeners.
      */
     @CheckReturnValue
-    public int getNumPropertyChangeListeners();
+    int getNumPropertyChangeListeners();
 
     /**
      * Get a list of all the property change listeners that are registered using
@@ -301,7 +303,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @Nonnull
-    public PropertyChangeListener[] getPropertyChangeListenersByReference(@Nonnull String name);
+    PropertyChangeListener[] getPropertyChangeListenersByReference(@Nonnull String name);
 
     /**
      * Deactivate this object, so that it releases as many resources as possible
@@ -320,7 +322,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * be keeping any other objects alive. Therefore, this method should null
      * out any references to other objects that this NamedBean contained.
      */
-    public void dispose(); // remove _all_ connections!
+    void dispose(); // remove _all_ connections!
 
     /**
      * Provide generic access to internal state.
@@ -389,8 +391,8 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      * These are not bound properties as yet, and don't throw events on
      * modification. Key must not be null.
      * <p>
-     * Prior to JMRI 4.3, the key was of Object type. It was constrained to
-     * String to make these more like normal Java Beans.
+     * The key is constrained to
+     * String to make these behave like normal Java Beans.
      *
      * @param key   the property to set
      * @param value the value of the property
@@ -449,7 +451,7 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
      */
     @CheckReturnValue
     @CheckForNull
-    static public String normalizeUserName(@CheckForNull String inputName) throws BadUserNameException {
+    public static String normalizeUserName(@CheckForNull String inputName) throws BadUserNameException {
         String result = inputName;
         if (result != null) {
             result = result.trim();
@@ -483,8 +485,9 @@ public interface NamedBean extends Comparable<NamedBean>, PropertyChangeProvider
         int p2len = Manager.getSystemPrefixLength(o2);
 
         int comp = ac.compare(o1.substring(0, p1len), o2.substring(0, p2len));
-        if (comp != 0)
+        if (comp != 0) {
             return comp;
+        }
 
         char c1 = o1.charAt(p1len);
         char c2 = o2.charAt(p2len);

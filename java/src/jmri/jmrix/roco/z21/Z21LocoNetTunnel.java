@@ -5,12 +5,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+
 import jmri.jmrix.loconet.LocoNetListener;
 import jmri.jmrix.loconet.LocoNetMessage;
 import jmri.jmrix.loconet.LocoNetMessageException;
 import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.jmrix.loconet.streamport.LnStreamPortController;
 import jmri.util.ImmediatePipedOutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,17 +32,21 @@ public class Z21LocoNetTunnel implements Z21Listener, LocoNetListener , Runnable
     // internal ends of the pipes
     private DataOutputStream outpipe = null;  // feed pin
     private DataInputStream inpipe = null; // feed pout
-    private Z21SystemConnectionMemo _memo;
+    private final Z21SystemConnectionMemo _memo;
     private Thread sourceThread;
+    private volatile boolean stopThread = false;
 
     /**
      * Build a new LocoNet tunnel.
      * @param memo system connection.
      */
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value="SC_START_IN_CTOR", justification="done at end, waits for data")
     public Z21LocoNetTunnel(Z21SystemConnectionMemo memo) {
         // save the SystemConnectionMemo.
         _memo = memo;
+        init();
+    }
+
+    private void init() {
 
         // configure input and output pipes to use for
         // the communication with the LocoNet implementation.
@@ -80,7 +86,7 @@ public class Z21LocoNetTunnel implements Z21Listener, LocoNetListener , Runnable
         // and writes modified data to the output pipe.  This is the heart
         // of the command station simulation.
         log.debug("LocoNet Tunnel Thread Started");
-        for (;;) {
+        while (!stopThread) {
             LocoNetMessage m = readMessage();
             if(m != null) {
                // don't forward a null message.
@@ -287,22 +293,33 @@ public class Z21LocoNetTunnel implements Z21Listener, LocoNetListener , Runnable
 
     }
 
-    @SuppressWarnings("deprecation") // Thread.stop not likely to be removed
+    @SuppressWarnings("deprecation") // Thread.stop
     public void dispose(){
-       if(lsc != null){
-          lsc.dispose();
-       }
-       if(_memo != null){
-          _memo.dispose();
-       }
-       sourceThread.stop();
-       try {
-          sourceThread.join();
-       } catch (InterruptedException ie){
-          // interrupted durrng cleanup.
-       }
+        if (sourceThread != null) {
+            stopThread = true;
+            sourceThread.interrupt();
+            try {
+                sourceThread.join();
+            } catch (InterruptedException e) {
+                // Do nothing
+            }
+        }
+        if(lsc != null){
+            lsc.dispose();
+        }
+        if( _memo != null ) {
+            Z21TrafficController tc = _memo.getTrafficController();
+            if ( tc != null ) {
+                tc.removez21Listener(this);
+            }
+        }
+        try {
+            inpipe.close();
+        } catch (IOException ex) {
+            // Ignore IO error
+        }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(Z21LocoNetTunnel.class);
+    private static final Logger log = LoggerFactory.getLogger(Z21LocoNetTunnel.class);
 
 }

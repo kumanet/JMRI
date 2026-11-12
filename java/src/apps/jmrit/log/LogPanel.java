@@ -30,9 +30,15 @@ public class LogPanel extends JPanel {
         add(sendButton);
 
         sendButton.setToolTipText(Bundle.getMessage("LogSendToolTip"));
-        sendButton.addActionListener(e -> log.error(textField.getText()));
+        sendButton.addActionListener(this::sendTextToLog );
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LogPanel.class);
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification="Error String always needs to be evaluated unchanged.")
+    private void sendTextToLog(java.awt.event.ActionEvent e){
+        log.error(textField.getText());
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(LogPanel.class);
 
 }

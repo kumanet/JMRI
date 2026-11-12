@@ -1,13 +1,9 @@
 package jmri.jmrix.can.cbus.swing;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.util.JUnitUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.junit.jupiter.api.Test;
+
+import org.junit.jupiter.api.*;
 
 /**
  * Test simple functioning of CbusMenu
@@ -16,21 +12,19 @@ import org.junit.jupiter.api.Test;
  */
 public class CbusMenuTest {
 
-
-    // private TrafficController tc = null;
-    private CanSystemConnectionMemo m;
+    private CanSystemConnectionMemo m = null;
  
     @Test
-    @DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
+    @jmri.util.junit.annotations.DisabledIfHeadless
     public void testCtor() {
         CbusMenu action = new CbusMenu(m);
-        assertThat(action).isNotNull();
+        Assertions.assertNotNull(action);
     }
 
     @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
-        // tc = new TestTrafficController();
+
         m = new CanSystemConnectionMemo();
         m.setSystemPrefix("ABC");
 
@@ -38,9 +32,10 @@ public class CbusMenuTest {
 
     @AfterEach
     public void tearDown() { 
+        Assertions.assertNotNull(m);
         m.dispose();
         m = null;
         JUnitUtil.tearDown();
-        // tc = null;
+
     }
 }

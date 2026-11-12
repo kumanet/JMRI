@@ -33,7 +33,7 @@ public class ClientRxHandlerTest {
         // ensure memo exists in order to later use InstanceManager.getDefault()
         lnis = new LocoNetInterfaceScaffold(memo);
         memo.setLnTrafficController(lnis);
-        memo.configureCommandStation(jmri.jmrix.loconet.LnCommandStationType.COMMAND_STATION_DCS100, true, false, true);
+        memo.configureCommandStation(jmri.jmrix.loconet.LnCommandStationType.COMMAND_STATION_DCS100, true, false, true, false, false);
     }
 
     @AfterEach
@@ -43,6 +43,6 @@ public class ClientRxHandlerTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ClientRxHandlerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ClientRxHandlerTest.class);
 
 }

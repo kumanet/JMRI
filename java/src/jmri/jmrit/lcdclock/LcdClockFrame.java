@@ -6,10 +6,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.Date;
+
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+
 import jmri.InstanceManager;
 import jmri.Timebase;
 import jmri.jmrit.catalog.NamedIcon;
@@ -27,7 +31,7 @@ import jmri.util.JmriJFrame;
  * Bob Jacobson.
  *
  */
-public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChangeListener {
+public class LcdClockFrame extends JmriJFrame implements PropertyChangeListener {
 
     // GUI member declarations
     JLabel h1;  // msb of hours
@@ -38,8 +42,12 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
 
     double aspect;
     double iconAspect;
+    int runPauseButtonWidth;
+
+    JButton runPauseButton;
 
     Timebase clock;
+    private final PropertyChangeListener minuteListener = (PropertyChangeEvent evt) -> update();
 
     NamedIcon tubes[] = new NamedIcon[10];
     NamedIcon baseTubes[] = new NamedIcon[10];
@@ -67,16 +75,19 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
         Image scaledImage = baseColon.getImage().getScaledInstance(12, 32, Image.SCALE_SMOOTH);
         colonIcon.setImage(scaledImage);
 
+        // create the run/pause button and get it's size
+        runPauseButton = new JButton(Bundle.getMessage("ButtonPauseClock"));
+        runPauseButton.setText( Bundle.getMessage( "ButtonPauseClock") );
+        runPauseButtonWidth = runPauseButton.getPreferredSize().width;
+        
         // determine aspect ratio of a single digit graphic
         iconAspect = 24. / 32.;
 
         // determine the aspect ratio of the 4 digit base graphic plus a half digit for the colon
-        // This DOES NOT allow space for the Run/Stop button, if it is enabled.
-        // When the Run/Stop button is enabled, the layout will change accordingly.
         if (!clock.getShowStopButton()) {
             aspect = (4.5 * 24.) / 32.; // pick up clock prefs choice: no button
         } else {
-            aspect = (4.5 * 24. + 20.) / 32.; // pick up clock prefs choice: add 20. for a stop/start button
+            aspect = (4.5 * 24. + runPauseButtonWidth) / 32.; // pick up clock prefs choice: add size of a stop/start button
         }
 
         // listen for changes to the Timebase parameters
@@ -96,18 +107,16 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
         getContentPane().add(m1);
         getContentPane().add(m2);
         this.getContentPane().setBackground(new Color(0xFFFFFF)); // set background to white to match lcd
-        getContentPane().add(b = new JButton(Bundle.getMessage("ButtonPauseClock")));
-        b.addActionListener(new ButtonListener());
+        getContentPane().add(runPauseButton);
+        runPauseButton.addActionListener(new ButtonListener());
         // since Run/Stop button looks crummy, user may turn it on in clock prefs
-        b.setVisible(clock.getShowStopButton()); // pick up clock prefs choice
+        runPauseButton.setVisible(clock.getShowStopButton()); // pick up clock prefs choice
         updateButtonText();
         update();
         pack();
 
         // request callback to update time
-        clock.addMinuteChangeListener((java.beans.PropertyChangeEvent e) -> {
-            update();
-        });
+        clock.addMinuteChangeListener(minuteListener);
 
         // Add component listener to handle frame resizing event
         this.addComponentListener(
@@ -131,22 +140,23 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
             iconHeight = frameHeight;
             iconWidth = (int) (iconAspect * iconHeight);
         } else {
-            //this DOES NOT allow space for the Run/Stop button, if it is
-            //enabled.  When the Run/Stop button is enabled, the layout will have to be changed
-            iconWidth = (int) (frameWidth / 4.5);
+            // allow space in width for run stop button
+            int workingWidth = frameWidth;
+            if (clock.getShowStopButton()) workingWidth = frameWidth - runPauseButtonWidth;
+            iconWidth = (int) (workingWidth / 4.5);
             iconHeight = (int) (iconWidth / iconAspect);
         }
         for (int i = 0; i < 10; i++) {
-            Image scaledImage = baseTubes[i].getImage().getScaledInstance(iconWidth, iconHeight, Image.SCALE_SMOOTH);
+            Image scaledImage = baseTubes[i].getImage().getScaledInstance(Math.max(1,iconWidth), Math.max(1,iconHeight), Image.SCALE_SMOOTH);
             tubes[i].setImage(scaledImage);
         }
-        Image scaledImage = baseColon.getImage().getScaledInstance(iconWidth / 2, iconHeight, Image.SCALE_SMOOTH);
+        Image scaledImage = baseColon.getImage().getScaledInstance(Math.max(1,iconWidth / 2), Math.max(1,iconHeight), Image.SCALE_SMOOTH);
         colonIcon.setImage(scaledImage);
         // update the images on screen
         this.getContentPane().revalidate();
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // Date.getHours, getMinutes, getSeconds
     void update() {
         Date now = clock.getTime();
         int hours = now.getHours();
@@ -163,18 +173,16 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
      * @param e unused.
      */
     @Override
-    public void propertyChange(java.beans.PropertyChangeEvent e) {
+    public void propertyChange( PropertyChangeEvent e) {
         updateButtonText();
     }
-    
+
     /**
      * Update clock button text.
      */
     private void updateButtonText(){
-        b.setText( Bundle.getMessage( clock.getRun() ? "ButtonPauseClock" : "ButtonRunClock") );
+        runPauseButton.setText( Bundle.getMessage( clock.getRun() ? "ButtonPauseClock" : "ButtonRunClock") );
     }
-
-    JButton b;
 
     private class ButtonListener implements ActionListener {
         @Override
@@ -183,4 +191,12 @@ public class LcdClockFrame extends JmriJFrame implements java.beans.PropertyChan
             updateButtonText();
         }
     }
+
+    @Override
+    public void dispose() {
+        clock.removeMinuteChangeListener(minuteListener);
+        clock.removePropertyChangeListener(this);
+        super.dispose();
+    }
+
 }

@@ -61,25 +61,17 @@ public class ProxySensorManager extends AbstractProvidingProxyManager<Sensor>
         return newNamedBean(systemName, userName);
     }
 
-    // null implementation to satisfy the SensorManager interface
+    /**
+     * Triggers #updateAll on all SensorManagers.
+     */
     @Override
     public void updateAll() {
+        getManagerList().forEach(m -> ((SensorManager) m).updateAll());
     }
 
     @Override
     public boolean allowMultipleAdditions(@Nonnull String systemName) {
         return ((SensorManager) getManagerOrDefault(systemName)).allowMultipleAdditions(systemName);
-    }
-
-    @SuppressWarnings("deprecation") // user warned by actual manager class
-    @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix) throws jmri.JmriException {
-        return getNextValidAddress(curAddress, prefix, typeLetter());
-    }
-    
-    @Override
-    public String getNextValidAddress(@Nonnull String curAddress, @Nonnull String prefix, boolean ignoreInitialExisting) throws jmri.JmriException {
-        return getNextValidAddress(curAddress, prefix, ignoreInitialExisting, typeLetter());
     }
 
     @Override
@@ -133,5 +125,15 @@ public class ProxySensorManager extends AbstractProvidingProxyManager<Sensor>
        return false;
     }
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProxySensorManager.class);
+    /**
+     * Do the sensor objects provided by the manager for this system name
+     * support configuring an internal pull up or pull down resistor?
+     * @param systemName to select correct manager
+     * @return true if pull up/pull down configuration is supported
+     */
+    public boolean isPullResistanceConfigurable(String systemName){
+        return ((SensorManager) getManagerOrDefault(systemName)).isPullResistanceConfigurable();
+    }
+
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProxySensorManager.class);
 }

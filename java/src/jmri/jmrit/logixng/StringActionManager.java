@@ -2,11 +2,14 @@ package jmri.jmrit.logixng;
 
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
+
+import jmri.Category;
 
 /**
  * Manager for StringActionBean
- * 
+ *
  * @author Dave Duchamp       Copyright (C) 2007
  * @author Daniel Bergqvist   Copyright (C) 2018
  */
@@ -20,24 +23,24 @@ public interface StringActionManager extends BaseManager<MaleStringActionSocket>
      * @return the male socket for this action
      * @throws IllegalArgumentException if the action has an invalid system name
      */
-    public MaleStringActionSocket registerAction(@Nonnull StringActionBean action)
+    MaleStringActionSocket registerAction(@Nonnull StringActionBean action)
             throws IllegalArgumentException;
-    
+
     /**
      * Create a new system name for an StringActionBean.
      * @return a new system name
      */
-    public String getAutoSystemName();
+    String getAutoSystemName();
 
-    public FemaleStringActionSocket createFemaleSocket(
+    FemaleStringActionSocket createFemaleSocket(
             Base parent, FemaleSocketListener listener, String socketName);
 
     /**
      * Get a set of classes that implements the DigitalAction interface.
-     * 
+     *
      * @return a set of entries with category and class
      */
-    public Map<Category, List<Class<? extends Base>>> getActionClasses();
+    Map<Category, List<Class<? extends Base>>> getActionClasses();
 
     /*.*
      * Add an Action.
@@ -45,7 +48,7 @@ public interface StringActionManager extends BaseManager<MaleStringActionSocket>
      * @param action the action to add
      * @throws IllegalArgumentException if the action has an invalid system name
      */
-//    public void addAction(Action action)
+//    void addAction(Action action)
 //            throws IllegalArgumentException;
 
     /*.*
@@ -55,20 +58,20 @@ public interface StringActionManager extends BaseManager<MaleStringActionSocket>
      * @param name User name or system name to match
      * @return null if no match found
      */
-//    public Action getAction(String name);
+//    Action getAction(String name);
 
-//    public Action getByUserName(String s);
+//    Action getByUserName(String s);
 
-//    public Action getBySystemName(String s);
+//    Action getBySystemName(String s);
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * The sub system prefix for the StringActionManager is
      * {@link #getSystemNamePrefix() } and "SA";
      */
     @Override
-    public default String getSubSystemNamePrefix() {
+    default String getSubSystemNamePrefix() {
         return getSystemNamePrefix() + "SA";
     }
 
@@ -78,6 +81,6 @@ public interface StringActionManager extends BaseManager<MaleStringActionSocket>
      *
      * @param x the StringAction to delete
      */
-    public void deleteStringAction(MaleStringActionSocket x);
-    
+    void deleteStringAction(MaleStringActionSocket x);
+
 }

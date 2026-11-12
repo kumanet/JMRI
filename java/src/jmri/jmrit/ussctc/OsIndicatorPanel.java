@@ -14,6 +14,9 @@ import org.slf4j.LoggerFactory;
  * User interface frame for creating and editing "OS Indicator" logic on USS CTC
  * machines.
  *
+ * @see jmri.jmrit.ussctc.OsIndicator
+ * @see jmri.jmrit.ussctc.OsIndicatorFrame
+ * @see jmri.jmrit.ussctc.OsIndicatorAction
  * @author Bob Jacobsen Copyright (C) 2007
  */
 public class OsIndicatorPanel extends BasePanel {
@@ -111,10 +114,10 @@ public class OsIndicatorPanel extends BasePanel {
             sensorName.setText(o.getOsSensorName());
             lockName.setText(o.getLockName());
         } catch (jmri.JmriException e) {
-            log.error("Exception trying to find existing OS Indicator: {}", e);  // NOI18N
+            log.error("Exception trying to find existing OS Indicator", e);  // NOI18N
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OsIndicatorPanel.class);
+    private static final Logger log = LoggerFactory.getLogger(OsIndicatorPanel.class);
 
 }

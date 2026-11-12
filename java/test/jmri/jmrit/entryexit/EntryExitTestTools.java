@@ -1,18 +1,20 @@
 package jmri.jmrit.entryexit;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.HashMap;
-import jmri.InstanceManager;
-import jmri.Sensor;
-import jmri.SensorManager;
+
+import jmri.*;
+import jmri.configurexml.JmriConfigureXmlException;
 import jmri.jmrit.display.EditorManager;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
 
 class EntryExitTestTools {
-    static HashMap<String, LayoutEditor> getPanels() throws Exception {
+    static HashMap<String, LayoutEditor> getPanels() throws JmriConfigureXmlException, JmriException, IllegalArgumentException {
         HashMap<String, LayoutEditor> panels = new HashMap<>();
         jmri.configurexml.ConfigXmlManager cm = new jmri.configurexml.ConfigXmlManager();
         java.io.File f = new java.io.File("java/test/jmri/jmrit/entryexit/load/EntryExitTest.xml");
-        cm.load(f);
+        assertTrue(cm.load(f));
 
         for (LayoutEditor panel : InstanceManager.getDefault(EditorManager.class).getAll(LayoutEditor.class)) {
             switch (panel.getLayoutName()) {
@@ -27,7 +29,7 @@ class EntryExitTestTools {
             }
         }
 
-        InstanceManager.getDefault(SensorManager.class).getSensor("Reset").setKnownState(Sensor.ACTIVE);
+        InstanceManager.getDefault(SensorManager.class).provideSensor("Reset").setKnownState(Sensor.ACTIVE);
         InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class).initializeLayoutBlockPaths();
         return panels;
     }
@@ -47,5 +49,5 @@ class EntryExitTestTools {
         return (src == null || pd == null) ? null : src.getDestForPoint(pd);
     }
 
-//     private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntryExitTestTools.class);
+//     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntryExitTestTools.class);
 }

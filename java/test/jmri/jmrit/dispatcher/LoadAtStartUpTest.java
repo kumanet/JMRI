@@ -1,18 +1,19 @@
 package jmri.jmrit.dispatcher;
 
-import org.junit.Assume;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
+import jmri.*;
+
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.netbeans.jemmy.operators.JButtonOperator;
+import org.junit.jupiter.api.io.TempDir;
+
 import org.netbeans.jemmy.operators.JFrameOperator;
 
-import jmri.DccLocoAddress;
-import jmri.InstanceManager;
-import jmri.Sensor;
-import jmri.SensorManager;
-import jmri.SignalMastManager;
-import jmri.Throttle;
-import jmri.ThrottleManager;
+import jmri.configurexml.JmriConfigureXmlException;
 import jmri.implementation.SignalSpeedMap;
 import jmri.jmrit.logix.WarrantPreferences;
 import jmri.util.FileUtil;
@@ -21,12 +22,6 @@ import jmri.util.JUnitUtil;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-
 /**
  *
  * @author Steve Gigiel 2018
@@ -34,48 +29,65 @@ import java.nio.file.StandardCopyOption;
  * Tests the LoadAtStartUp function for Dispatcher In addition it tests auto
  * running of a train.
  */
-@DisabledIfSystemProperty(named ="java.awt.headless", matches ="true")
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class LoadAtStartUpTest {
 
     // Only one aat at a time
     private AutoActiveTrain aat = null;
+    private static final double TOLERANCE = 0.0001;
 
-    @SuppressWarnings("null")  // spec says cannot happen, everything defined in test data.
+    private static void increaseWaitForStep() {
+        JUnitUtil.WAITFOR_DELAY_STEP = 20;
+    }
+
+    /**
+     * Wait for a mast to show an aspect. Each mast's Signal Mast Logic sets
+     * its aspect in a delayed job of its own on the layout thread, so a mast
+     * can still be changing after the one just waited for has changed.
+     */
+    private static void waitForAspect(SignalMastManager smm, String mast, String aspect, String message) {
+        JUnitUtil.waitFor(() -> aspect.equals(smm.provideSignalMast(mast).getAspect()),
+                message + ": " + mast + " shows " + aspect);
+    }
+
     @Test
-    public void testShowAndClose() throws Exception {
+    public void testShowAndClose() throws JmriConfigureXmlException, JmriException {
         // Assume.assumeFalse("Ignoring intermittent test", Boolean.getBoolean("jmri.skipTestsRequiringSeparateRunning"));
         jmri.configurexml.ConfigXmlManager cm = new jmri.configurexml.ConfigXmlManager() {
         };
+        // more time for us less for the waitfor code...
+        LoadAtStartUpTest.increaseWaitForStep();
         WarrantPreferences.getDefault().setShutdown(WarrantPreferences.Shutdown.NO_MERGE);
 
         // load layout file
         java.io.File f = new java.io.File("java/test/jmri/jmrit/dispatcher/DispatcherSMLLayout.xml");
-        cm.load(f);
+        Assertions.assertTrue(cm.load(f));
+
+        InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class).initializeLayoutBlockPaths();
+
         // load dispatcher, with all the correct options
         OptionsFile.setDefaultFileName("java/test/jmri/jmrit/dispatcher/TestTrainDispatcherOptions.xml");
         DispatcherFrame d = InstanceManager.getDefault(DispatcherFrame.class);
         JFrameOperator dw = new JFrameOperator(Bundle.getMessage("TitleDispatcher"));
-        
-        // signal mast manager
+
+        // signal mast managerls -l
         SignalMastManager smm = InstanceManager.getDefault(SignalMastManager.class);
 
         checkAndSetSpeeds();
 
-        //set sensors inactive
-        SensorManager sm = InstanceManager.getDefault(SensorManager.class);
-        for (Sensor s : sm.getNamedBeanSet()) {
-            s.setState(Sensor.INACTIVE);
+        BlockManager bm = InstanceManager.getDefault(BlockManager.class);
+        for (Block b : bm.getNamedBeanSet()) {
+            b.setState(Block.UNOCCUPIED);
         }
         // place train on layout
-        sm.getSensor("Occ South Platform").setState(Sensor.ACTIVE);
-        JUnitUtil.waitFor(100);
-        sm.getSensor("Occ West Platform Switch").setState(Sensor.ACTIVE); // set blocker
-        
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Platform"),Block.OCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Platform Switch"),Block.OCCUPIED); // set blocker
+
         // and load. only one of 2 trains will load
         d.loadAtStartup();
         assertThat(d.getActiveTrainsList().size()).withFailMessage("Train Loaded").isEqualTo(1);
-        
-        sm.getSensor("Occ West Platform Switch").setState(Sensor.INACTIVE); // release blocker
+
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Platform Switch"),Block.UNOCCUPIED); // release blocker
 
         // trains loads and runs, 4 allocated sections, the one we are in and 3 ahead.
         JUnitUtil.waitFor(() -> {
@@ -86,112 +98,136 @@ public class LoadAtStartUpTest {
         ActiveTrain at = d.getActiveTrainsList().get(0);
         aat = at.getAutoActiveTrain();
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("West End Div").getAspect().equals("Clear");
+            return "Clear".equals(smm.provideSignalMast("West End Div").getAspect());
         }, "Signal West End Div now green");
         // check signals and speed
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("1 West End Div Signal Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("1 West To South  Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("1 South To East Signal Green").isEqualTo("Approach");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("1 East End Throat Signal Green").isEqualTo("Stop");
-        float speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Clear", "1 West End Div Signal Green");
+        waitForAspect(smm, "West To South", "Clear", "1 West To South  Green");
+        waitForAspect(smm, "South To East", "Approach", "1 South To East Signal Green");
+        waitForAspect(smm, "East End Throat", "Stop", "1 East End Throat Signal Green");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "Exit South Platform Speed is correct");
 
-        sm.getSensor("Occ West Platform Switch").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Platform Switch"),Block.OCCUPIED);
 
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("West End Div").getAspect().equals("Stop");
+            return "Stop".equals(smm.provideSignalMast("West End Div").getAspect());
         }, "Signal Just passed stop");
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("2 West End Div Signal Stop").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("2 West To South  Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("2 South To East Signal Green").isEqualTo("Approach");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("2 East End Throat Signal Green").isEqualTo("Stop");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Stop", "2 West End Div Signal Stop");
+        waitForAspect(smm, "West To South", "Clear", "2 West To South  Green");
+        waitForAspect(smm, "South To East", "Approach", "2 South To East Signal Green");
+        waitForAspect(smm, "East End Throat", "Stop", "2 East End Throat Signal Green");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "West Platform Switch Speed is correct");
 
-        sm.getSensor("Occ West Block").setState(Sensor.ACTIVE);
-        sm.getSensor("Occ South Platform").setState(Sensor.INACTIVE);
-        sm.getSensor("Occ West Platform Switch").setState(Sensor.INACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Block"),Block.OCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Platform"),Block.UNOCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Platform Switch"),Block.UNOCCUPIED);
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("South To East").getAspect().equals("Clear");
+            return "Clear".equals(smm.provideSignalMast("South To East").getAspect());
         }, "Signal South To East now Clear");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("3 West To South  Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("3 South To East Signal Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("3 East End Throat Signal Approach").isEqualTo("Approach");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West To South", "Clear", "3 West To South  Green");
+        waitForAspect(smm, "South To East", "Clear", "3 South To East Signal Green");
+        waitForAspect(smm, "East End Throat", "Approach", "3 East End Throat Signal Approach");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "South To East Speed is correct");
 
-        sm.getSensor("Occ South Block").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Block"),Block.OCCUPIED);
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("West To South").getAspect().equals("Stop");
+            return "Stop".equals(smm.provideSignalMast("West To South").getAspect());
         }, "Signal Just passed West To South now stop");
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("4 West End Div Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("4 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("4 South To East Signal Green").isEqualTo("Clear");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("4 East End Throat Signal Green").isEqualTo("Approach");
-        String strSigSpeed  = (String) smm.getSignalMast("South To East").getSignalSystem().getProperty(smm.getSignalMast("South To East").getAspect(), "speed");
-        assertThat(jmri.InstanceManager.getDefault(SignalSpeedMap.class).getSpeed(strSigSpeed)/100).isEqualTo(speedNormal);
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(0.6f); //The signal head indicates 1.0f but train is limited to a max of 0.6f
+        waitForAspect(smm, "West End Div", "Stop", "4 West End Div Signal Red");
+        waitForAspect(smm, "West To South", "Stop", "4 West To South  Red");
+        waitForAspect(smm, "South To East", "Clear", "4 South To East Signal Green");
+        waitForAspect(smm, "East End Throat", "Approach", "4 East End Throat Signal Green");
+        String strSigSpeed  = (String) smm.provideSignalMast("South To East").getSignalSystem().getProperty(smm.provideSignalMast("South To East").getAspect(), "speed");
+        assertThat(InstanceManager.getDefault(SignalSpeedMap.class).getSpeed(strSigSpeed)/100).isEqualTo(speedNormal);
+        //The signal head indicates 1.0f but train is limited to a max of 0.6f
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - 0.6f ) < TOLERANCE ); }, "West To South Speed is correct");
 
-        sm.getSensor("Occ West Block").setState(Sensor.INACTIVE);
-        sm.getSensor("Occ East Block").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("West Block"),Block.UNOCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Block"),Block.OCCUPIED);
 
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("South To East").getAspect().equals("Stop");
+            return "Stop".equals(smm.provideSignalMast("South To East").getAspect());
         }, "Signal Just passed south to east now stop");
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("5 West End Div Signal Green").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("5 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("5 South To East Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("5 East End Throat Signal yellow").isEqualTo("Approach");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Stop", "5 West End Div Signal Green");
+        waitForAspect(smm, "West To South", "Stop", "5 West To South  Red");
+        waitForAspect(smm, "South To East", "Stop", "5 South To East Signal Red");
+        waitForAspect(smm, "East End Throat", "Approach", "5 East End Throat Signal yellow");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "South To East Speed is correct");
 
-        sm.getSensor("Occ South Block").setState(Sensor.INACTIVE);
-        sm.getSensor("Occ East Platform Switch").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Block"),Block.UNOCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Platform Switch"),Block.OCCUPIED);
         JUnitUtil.waitFor(() -> {
-            return smm.getSignalMast("East End Throat").getAspect().equals("Stop");
+            return "Stop".equals(smm.provideSignalMast("East End Throat").getAspect());
         }, "Signal Just passed east end throat now stop");
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("6 West End Div Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("6 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("6 South To East Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("6 East End Throat Signal Red").isEqualTo("Stop");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Stop", "6 West End Div Signal Red");
+        waitForAspect(smm, "West To South", "Stop", "6 West To South  Red");
+        waitForAspect(smm, "South To East", "Stop", "6 South To East Signal Red");
+        waitForAspect(smm, "East End Throat", "Stop", "6 East End Throat Signal Red");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "East Platform Switch Speed is correct");
 
-        sm.getSensor("Occ East Platform Switch").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Platform Switch"),Block.OCCUPIED);
         // No change
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("7 West End Div Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("7 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("7 South To East Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("7 East End Throat Signal Red").isEqualTo("Stop");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Stop", "7 West End Div Signal Red");
+        waitForAspect(smm, "West To South", "Stop", "7 West To South  Red");
+        waitForAspect(smm, "South To East", "Stop", "7 South To East Signal Red");
+        waitForAspect(smm, "East End Throat", "Stop", "7 East End Throat Signal Red");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE ); }, "East Platform Switch Speed is correct");
 
-        sm.getSensor("Occ South Platform").setState(Sensor.ACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Platform"),Block.OCCUPIED);
         // signals no change, speed changes
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("8 West End Div Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("8 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("8 South To East Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("8 East End Throat Signal Red").isEqualTo("Stop");
-        speed = aat.getThrottle().getSpeedSetting();
-        assertThat(speed).isEqualTo(speedRestricted);
+        waitForAspect(smm, "West End Div", "Stop", "8 West End Div Signal Red");
+        waitForAspect(smm, "West To South", "Stop", "8 West To South  Red");
+        waitForAspect(smm, "South To East", "Stop", "8 South To East Signal Red");
+        waitForAspect(smm, "East End Throat", "Stop", "8 East End Throat Signal Red");
+        JUnitUtil.waitFor(() -> { return (Math.abs(aat.getTargetSpeed() - speedRestrictedSlow ) < TOLERANCE ); }, "Speed is correct");
 
-        sm.getSensor("Occ East Block").setState(Sensor.INACTIVE);
-        sm.getSensor("Occ East Platform Switch").setState(Sensor.INACTIVE);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Block"),Block.UNOCCUPIED);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Platform Switch"),Block.UNOCCUPIED);
         // signals no change, speed changes to stop
-        assertThat(smm.getSignalMast("West End Div").getAspect()).withFailMessage("9 West End Div Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("West To South").getAspect()).withFailMessage("9 West To South  Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("South To East").getAspect()).withFailMessage("9 South To East Signal Red").isEqualTo("Stop");
-        assertThat(smm.getSignalMast("East End Throat").getAspect()).withFailMessage("9 East End Throat Signal Red").isEqualTo("Stop");
+        waitForAspect(smm, "West End Div", "Stop", "9 West End Div Signal Red");
+        waitForAspect(smm, "West To South", "Stop", "9 West To South  Red");
+        waitForAspect(smm, "South To East", "Stop", "9 South To East Signal Red");
+        waitForAspect(smm, "East End Throat", "Stop", "9 East End Throat Signal Red");
 
         // train slows to stop
         JUnitUtil.waitFor(() -> {
-            return aat.getThrottle().getSpeedSetting() == 0.0;
+            return (Math.abs(aat.getTargetSpeed() ) < TOLERANCE );
         }, "Signal Just passed east end throat now stop");
 
-        // cancel (terminate) the train.
-        JButtonOperator bo = new JButtonOperator(dw, Bundle.getMessage("TerminateTrain"));
-        bo.push();
+        JUnitUtil.waitFor(2200);
+        // check for next train note dcc name is original transit name has changed
+        assertEquals( "1000 / SouthPlatFormReturnToSouthCC",
+            d.getActiveTrainsList().get(0).getActiveTrainName(), "Next Train Load");
+        JUnitUtil.waitFor(2000);
+        // its a new train.
+        at = d.getActiveTrainsList().get(0);
+        aat = at.getAutoActiveTrain();
+        JUnitUtil.waitFor(() -> {
+            return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE );
+        }, "Started to move");
+
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Platform Switch"),Block.OCCUPIED);
+        JUnitUtil.waitFor(50);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Block"),Block.OCCUPIED);
+        JUnitUtil.waitFor(50);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Platform"),Block.UNOCCUPIED);
+
+       JUnitUtil.waitFor(() -> {
+            return (Math.abs(aat.getTargetSpeed() - speedRestricted ) < TOLERANCE );
+        }, "Continuing speed was "+ aat.getTargetSpeed() + " not " + speedRestricted);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("South Block"),Block.OCCUPIED);
+
+        JUnitUtil.waitFor(() -> {
+            return (Math.abs(aat.getTargetSpeed() - speedRestrictedSlow ) < TOLERANCE );
+        }, "Prepare to stop");
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Platform Switch"),Block.UNOCCUPIED);
+        JUnitUtil.waitFor(50);
+        JUnitUtil.setBeanStateAndWait(bm.provideBlock("East Block"),Block.UNOCCUPIED);
+        // train slows to stop
+        JUnitUtil.waitFor(() -> {
+            return (Math.abs(aat.getTargetSpeed() ) < TOLERANCE );
+        }, "Did not Stop " + at.getActiveTrainName() + " with throttle SpeedSetting " + aat.getTargetSpeed());
+        //terminates at end
         // wait for cleanup to finish
         JUnitUtil.waitFor(200);
 
@@ -200,12 +236,20 @@ public class LoadAtStartUpTest {
         JFrameOperator aw = new JFrameOperator("AutoTrains");
 
         aw.requestClose();
+        aw.waitClosed();
         dw.requestClose();
+        dw.waitClosed();
+
+        JFrameOperator le = new JFrameOperator("Test Layout");
+        JUnitUtil.dispose(le.getWindow());
+        le.waitClosed();
 
         // cleanup window
         JUnitUtil.dispose(d);
+        InstanceManager.getDefault(jmri.SignalMastManager.class).dispose();
+        InstanceManager.getDefault(jmri.SignalMastLogicManager.class).dispose();
     }
-    
+
     private float speedStopping = 0.0f;
     private float speedSlow = 0.0f;
     private float speedRestrictedSlow = 0.0f;
@@ -215,106 +259,85 @@ public class LoadAtStartUpTest {
 
     private void checkAndSetSpeeds() {
         // Check we have got the right signal map
-        speedStopping = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        speedStopping = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed(InstanceManager.getDefault(DispatcherFrame.class).getStoppingSpeedName())/100.0f;
-        assertEquals(0.1f, speedStopping);
-        speedNormal = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        assertEquals(0.1f, speedStopping, TOLERANCE );
+        speedNormal = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed("Normal")/100.0f;
-        assertEquals(1.0f, speedNormal );
-        speedMedium = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        assertEquals(1.0f, speedNormal, TOLERANCE );
+        speedMedium = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed("Medium")/100.0f;
-        assertEquals(0.5f, speedMedium);
-        speedSlow = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        assertEquals(0.5f, speedMedium, TOLERANCE );
+        speedSlow = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed("Slow")/100.0f;
-        assertEquals(0.31f, speedSlow);
-        speedRestricted = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        assertEquals(0.31f, speedSlow, TOLERANCE );
+        speedRestricted = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed("Restricted")/100.0f;
-        assertEquals(0.35f, speedRestricted);
-        speedRestrictedSlow = jmri.InstanceManager.getDefault(SignalSpeedMap.class)
+        assertEquals(0.35f, speedRestricted, TOLERANCE );
+        speedRestrictedSlow = InstanceManager.getDefault(SignalSpeedMap.class)
                 .getSpeed("RestrictedSlow")/100.0f;
-        assertEquals(0.1f, speedRestrictedSlow);
-        assertEquals(SignalSpeedMap.PERCENT_THROTTLE, jmri.InstanceManager.getDefault(SignalSpeedMap.class)
-                .getInterpretation());
+        assertEquals(0.1f, speedRestrictedSlow, TOLERANCE);
+        assertEquals(SignalSpeedMap.PERCENT_THROTTLE, InstanceManager.getDefault(SignalSpeedMap.class)
+                .getInterpretation(), TOLERANCE);
     }
 
     // Where in user space the "signals" file tree should live
-    private static File outBaseTrainInfo = null;
-    private static File outBaseSignal = null;
+    private File outBaseTrainInfo = null;
+    private File outBaseSignal = null;
 
     // the file we create that we will delete
-    private static Path outPathTrainInfo1 = null;
-    private static Path outPathTrainInfo2 = null;
-    private static Path outPathWarrentPreferences = null;
+    private Path outPathTrainInfo1 = null;
+    private Path outPathTrainInfo2 = null;
+    private Path outPathTrainInfo3 = null;
+    private Path outPathWarrentPreferences = null;
 
-    @BeforeAll
-    public static void doOnce() throws Exception {
+
+    @BeforeEach
+    public void setUp(@TempDir File tempDir) throws IOException {
         JUnitUtil.setUp();
-        JUnitUtil.resetFileUtilSupport();
+        JUnitUtil.resetProfileManager( new jmri.profile.NullProfile( tempDir));
+
+        JUnitUtil.initRosterConfigManager();
+        JUnitUtil.initDebugThrottleManager();
 
         // set up users files in temp tst area
         outBaseTrainInfo = new File(FileUtil.getUserFilesPath(), "dispatcher/traininfo");
         outBaseSignal = new File(FileUtil.getUserFilesPath(), "signal");
-        try {
-            FileUtil.createDirectory(outBaseTrainInfo);
-            {
-                Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/traininfo"),
-                        "TestTrainCW.xml").toPath();
-                outPathTrainInfo1 = new File(outBaseTrainInfo, "TestTrainCW.xml").toPath();
-                Files.copy(inPath, outPathTrainInfo1, StandardCopyOption.REPLACE_EXISTING);
-            }
-            {
-                Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/traininfo"),
-                        "TestTrain.xml").toPath();
-                outPathTrainInfo2 = new File(outBaseTrainInfo, "TestTrain.xml").toPath();
-                Files.copy(inPath, outPathTrainInfo2, StandardCopyOption.REPLACE_EXISTING);
-            }
-            FileUtil.createDirectory(outBaseSignal);
-            {
-                Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/signal"),
-                        "WarrantPreferences.xml").toPath();
-                outPathWarrentPreferences = new File(outBaseSignal, "WarrantPreferences.xml").toPath();
-                Files.copy(inPath, outPathWarrentPreferences, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (IOException e) {
-            throw e;
+
+        FileUtil.createDirectory(outBaseTrainInfo);
+        {
+            Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/traininfo"),
+                    "TestTrainCW.xml").toPath();
+            outPathTrainInfo1 = new File(outBaseTrainInfo, "TestTrainCW.xml").toPath();
+            Files.copy(inPath, outPathTrainInfo1, StandardCopyOption.REPLACE_EXISTING);
         }
-    }
-    
-    @AfterAll
-    public static void unDoOnce() {
-        try {
-            Files.delete(outPathTrainInfo1);
-        } catch  (IOException e) {
-            // doesnt matter its gonezo
+        {
+            Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/traininfo"),
+                    "TestTrainCW_Return.xml").toPath();
+            outPathTrainInfo3 = new File(outBaseTrainInfo, "TestTrainCW_Return.xml").toPath();
+            Files.copy(inPath, outPathTrainInfo3, StandardCopyOption.REPLACE_EXISTING);
         }
-        try {
-            Files.delete(outPathTrainInfo2);
-        } catch  (IOException e) {
-            // doesnt matter its gonezo
+        {
+            Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/traininfo"),
+                    "TestTrain.xml").toPath();
+            outPathTrainInfo2 = new File(outBaseTrainInfo, "TestTrain.xml").toPath();
+            Files.copy(inPath, outPathTrainInfo2, StandardCopyOption.REPLACE_EXISTING);
         }
-        try {
-            Files.delete(outPathWarrentPreferences);
-        } catch  (IOException e) {
-            // doesnt matter its gonezo
+        FileUtil.createDirectory(outBaseSignal);
+        {
+            Path inPath = new File(new File(FileUtil.getProgramPath(), "java/test/jmri/jmrit/dispatcher/signal"),
+                    "WarrantPreferences.xml").toPath();
+            outPathWarrentPreferences = new File(outBaseSignal, "WarrantPreferences.xml").toPath();
+            Files.copy(inPath, outPathWarrentPreferences, StandardCopyOption.REPLACE_EXISTING);
         }
 
-    }
-
-    @BeforeEach
-    public void setUp() throws Exception {
-        JUnitUtil.setUp();
-        JUnitUtil.resetProfileManager();
-        JUnitUtil.resetInstanceManager();
-        JUnitUtil.initRosterConfigManager();
-        JUnitUtil.initDebugThrottleManager();
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
-        JUnitUtil.resetFileUtilSupport();
+    public void tearDown() {
+
+        JUnitUtil.resetInstanceManager();
         JUnitUtil.clearShutDownManager();
-        JUnitUtil.resetWindows(false,false);
-        JUnitUtil.resetFileUtilSupport();
         JUnitUtil.tearDown();
     }
 }

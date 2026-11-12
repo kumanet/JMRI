@@ -8,8 +8,6 @@ import jmri.jmrix.acela.AcelaSignalHead;
 import jmri.jmrix.acela.AcelaSystemConnectionMemo;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handle XML configuration for AcelaSignalHead objects. based upon example of
@@ -86,5 +84,5 @@ public class AcelaSignalHeadXml extends jmri.managers.configurexml.AbstractNamed
         return true;
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(AcelaSignalHeadXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(AcelaSignalHeadXml.class);
 }

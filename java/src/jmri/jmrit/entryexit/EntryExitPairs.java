@@ -13,7 +13,6 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 import javax.swing.JDialog;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import jmri.*;
@@ -24,9 +23,8 @@ import jmri.jmrit.display.layoutEditor.LayoutBlockConnectivityTools;
 import jmri.jmrit.display.layoutEditor.LayoutBlockManager;
 import jmri.jmrit.display.layoutEditor.LayoutEditor;
 import jmri.jmrix.internal.InternalSystemConnectionMemo;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.ThreadingUtil;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Implements an Entry Exit based method of setting turnouts, setting up signal
@@ -46,13 +44,10 @@ import org.slf4j.LoggerFactory;
 public class EntryExitPairs extends VetoableChangeSupport implements Manager<DestinationPoints>, jmri.InstanceManagerAutoDefault,
         PropertyChangeListener {
 
-    public LayoutBlockConnectivityTools.Metric routingMethod = LayoutBlockConnectivityTools.Metric.METRIC;
-
-    public final static int NXBUTTONSELECTED = 0x08;
-    public final static int NXBUTTONACTIVE = Sensor.ACTIVE;
-    public final static int NXBUTTONINACTIVE = Sensor.INACTIVE;
+    public static final int NXBUTTONSELECTED = 0x08;
+    public static final int NXBUTTONACTIVE = Sensor.ACTIVE;
+    public static final int NXBUTTONINACTIVE = Sensor.INACTIVE;
     private final SystemConnectionMemo memo;
-    private final Map<String, Boolean> silencedProperties = new HashMap<>();
 
     private int settingTimer = 2000;
 
@@ -82,37 +77,50 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * Constant value to represent that the entryExit will only set up the
      * turnouts between two different points.
      */
-    public final static int SETUPTURNOUTSONLY = 0x00;
+    public static final int SETUPTURNOUTSONLY = 0x00;
 
     /**
      * Constant value to represent that the entryExit will set up the turnouts
      * between two different points and configure the Signal Mast Logic to use
      * the correct blocks.
      */
-    public final static int SETUPSIGNALMASTLOGIC = 0x01;
+    public static final int SETUPSIGNALMASTLOGIC = 0x01;
 
     /**
      * Constant value to represent that the entryExit will do full interlocking.
      * It will set the turnouts and "reserve" the blocks.
      */
-    public final static int FULLINTERLOCK = 0x02;
+    public static final int FULLINTERLOCK = 0x02;
 
     boolean allocateToDispatcher = false;
+    boolean absSignalMode = false;
+    boolean quietFail = false;      // Suppress the dialog when a route allocation fails.
+    boolean enableDoubleClick = false;  // Hold back NX button clicks while a route is set.  This keeps double-click chaining.
 
-    public final static int PROMPTUSER = 0x00;
-    public final static int AUTOCLEAR = 0x01;
-    public final static int AUTOCANCEL = 0x02;
-    public final static int AUTOSTACK = 0x03;
+    public static final int PROMPTUSER = 0x00;
+    public static final int AUTOCLEAR = 0x01;
+    public static final int AUTOCANCEL = 0x02;
+    public static final int AUTOSTACK = 0x03;
 
-    public final static int OVERLAP_CANCEL = 0x01;
-    public final static int OVERLAP_STACK = 0x02;
+    public static final int OVERLAP_CANCEL = 0x01;
+    public static final int OVERLAP_STACK = 0x02;
+
+    /**
+     * String constant for auto generate complete.
+     */
+    public static final String PROPERTY_AUTO_GENERATE_COMPLETE = "autoGenerateComplete";
+
+    /**
+     * String constant for active.
+     */
+    public static final String PROPERTY_ACTIVE = "active";
 
     int routeClearOption = PROMPTUSER;
     int routeOverlapOption = PROMPTUSER;
     String memoryOption = "";     // Optional memory variable to receive allocation messages
     int memoryClearDelay = 0;     // Delay before clearing memory, 0 for clearing disabled
 
-    static JPanel glassPane = new JPanel();
+    private final JPanel glassPane = new JPanel();
 
     /**
      * Delay between issuing Turnout commands
@@ -123,6 +131,9 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * Constructor for creating an EntryExitPairs object and create a transparent JPanel for it.
      */
     public EntryExitPairs() {
+        // EntryExitPairs needs the SignalMastLogicManager initialized so load it here.
+        InstanceManager.getDefault(jmri.SignalMastLogicManager.class);
+
         memo = InstanceManager.getDefault(InternalSystemConnectionMemo.class);
         InstanceManager.getOptionalDefault(ConfigureManager.class).ifPresent(cm -> cm.registerUser(this));
         InstanceManager.getDefault(LayoutBlockManager.class).addPropertyChangeListener(propertyBlockManagerListener);
@@ -143,6 +154,30 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
 
     public boolean getDispatcherIntegration() {
         return allocateToDispatcher;
+    }
+
+    public void setAbsSignalMode(boolean absMode) {
+        absSignalMode = absMode;
+    }
+
+    public boolean isAbsSignalMode() {
+        return absSignalMode;
+    }
+
+    public void setQuietFail(boolean quiet) {
+        quietFail = quiet;
+    }
+
+    public boolean isQuietFail() {
+        return quietFail;
+    }
+
+    public void setEnableDoubleClick(boolean enable) {
+        enableDoubleClick = enable;
+    }
+
+    public boolean isDoubleClickEnabled() {
+        return enableDoubleClick;
     }
 
     /**
@@ -182,7 +217,8 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         PointDetails point;
         point = providePoint(source, panel);
         if (point == null) {
-            log.error("Unable to find a location on the panel {} for item {}", panel.getLayoutName(), source.getDisplayName());  // NOI18N
+            log.error("Unable to find a location on the panel {} for item {}",
+                panel.getLayoutName(), source.getDisplayName());
         }
     }
 
@@ -277,35 +313,6 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         return getNamedBeanSet().size();
     }
 
-    /** {@inheritDoc} */
-    @Override
-    @Nonnull
-    @Deprecated  // will be removed when superclass method is removed due to @Override
-    public List<String> getSystemNameList() {
-        jmri.util.LoggingUtil.deprecationWarning(log, "getSystemNameList");
-        return getEntryExitList();
-    }
-
-    /**
-     * Implemented to support the Conditional combo box name list
-     * @since 4.9.3
-     * @return a list of Destination Point beans
-     */
-    @Override
-    @Nonnull
-    @Deprecated  // will be removed when superclass method is removed due to @Override
-    public List<DestinationPoints> getNamedBeanList() {
-        jmri.util.LoggingUtil.deprecationWarning(log, "getNamedBeanList");
-        List<DestinationPoints> beanList = new ArrayList<>();
-        for (Source e : nxpair.values()) {
-            List<String> uidList = e.getDestinationUniqueId();
-            for (String uid : uidList) {
-                beanList.add(e.getByUniqueId(uid));
-            }
-        }
-        return beanList;
-    }
-
     /**
      * Implemented to support the Conditional combo box name list
      * @since 4.9.3
@@ -371,6 +378,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
     /** {@inheritDoc} */
     @Override
     public void dispose() {
+        InstanceManager.getDefault(LayoutBlockManager.class).removePropertyChangeListener(propertyBlockManagerListener);
     }
 
     /**
@@ -387,7 +395,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             LayoutBlock facing = InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class).getFacingBlockByNamedBean(source, null);
             List<LayoutBlock> protecting = InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class).getProtectingBlocksByNamedBean(source, null);
 //             log.info("facing = {}, protecting = {}", facing, protecting);
-            if (facing == null && protecting.size() == 0) {
+            if (facing == null && protecting.isEmpty()) {
                 log.error("Unable to find facing and protecting blocks");  // NOI18N
                 return null;
             }
@@ -410,11 +418,9 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         for (Entry<PointDetails, Source> e : nxpair.entrySet()) {
             Object obj = (e.getKey()).getRefObject();
             LayoutEditor pan = (e.getKey()).getPanel();
-            if (pan == panel) {
-                if (!list.contains(obj)) {
-                    list.add(obj);
-                }
-            } // end while
+            if (pan == panel && !list.contains(obj)) {
+                list.add(obj);
+            }
         }
         return list;
     }
@@ -429,11 +435,35 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             PointDetails key = e.getKey();
             LayoutEditor pan = key.getPanel();
             if (pan == panel) {
-                total = total + e.getValue().getNumberOfDestinations();
+                total += e.getValue().getNumberOfDestinations();
             } // end while
         }
 
         return total;
+    }
+
+    /**
+     * Set a reversed route between two points.  Special case to support a LogixNG action.
+     * @since 5.5.7
+     * @param nxPair The system or user name of the destination point.
+     */
+    public void setReversedRoute(String nxPair) {
+        DestinationPoints dp = getNamedBean(nxPair);
+        if (dp != null) {
+            String destUUID = dp.getUniqueId();
+            nxpair.forEach((pd, src) -> {
+                for (String srcUUID : src.getDestinationUniqueId()) {
+                    if (destUUID.equals(srcUUID)) {
+                        log.debug("Found the correct reverse route source: src = {}, dest = {}",
+                                pd.getSensor().getDisplayName(), dp.getDestPoint().getSensor().getDisplayName());
+                        int ref = nextRef();
+                        addRoutesToSet(Collections.singletonList(new SourceToDest(src, dp, true, ref)));
+                        processRoutesToSet(ref);
+                        return;
+                    }
+                }
+            });
+        }
     }
 
     /**
@@ -461,43 +491,50 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
 
     public void setMultiPointRoute(PointDetails requestpd, LayoutEditor panel) {
         for (PointDetails pd : pointDetails) {
-            if (pd != requestpd) {
-                if (pd.getNXState() == NXBUTTONSELECTED) {
-                    setMultiPointRoute(pd, requestpd);
-                    return;
-                }
+            if ( pd != requestpd && pd.getNXState() == NXBUTTONSELECTED ) {
+                setMultiPointRoute(pd, requestpd);
+                return;
             }
         }
     }
 
     private void setMultiPointRoute(PointDetails fromPd, PointDetails toPd) {
+        log.debug("[setMultiPointRoute] Start, from = {}, to = {}", fromPd.getSensor().getDisplayName(), toPd.getSensor().getDisplayName());
         boolean cleardown = false;
         if (fromPd.isRouteFromPointSet() && toPd.isRouteToPointSet()) {
             cleardown = true;
         }
         for (LayoutBlock pro : fromPd.getProtecting()) {
             try {
-                jmri.jmrit.display.layoutEditor.LayoutBlockManager lbm = InstanceManager.getDefault(jmri.jmrit.display.layoutEditor.LayoutBlockManager.class);
+                jmri.jmrit.display.layoutEditor.LayoutBlockManager lbm = InstanceManager.getDefault(
+                    jmri.jmrit.display.layoutEditor.LayoutBlockManager.class);
                 LayoutBlock toProt = null;
                 if (!toPd.getProtecting().isEmpty()) {
                     toProt = toPd.getProtecting().get(0);
                 }
-                boolean result = lbm.getLayoutBlockConnectivityTools().checkValidDest(fromPd.getFacing(), pro, toPd.getFacing(), toProt, LayoutBlockConnectivityTools.Routing.SENSORTOSENSOR);
+                log.trace("Calling checkValidDest");
+                boolean result = lbm.getLayoutBlockConnectivityTools().checkValidDest(
+                    fromPd.getFacing(), pro, toPd.getFacing(), toProt,
+                        LayoutBlockConnectivityTools.Routing.NONE); // Was SENSORTOSENSOR, needs to be consistent with three lines below
+                                                                    // See also around line 353 in LayoutBlockConnectivityTools
+                log.trace("         checkValidDest returned {}", result);
                 if (result) {
                     List<LayoutBlock> blkList = lbm.getLayoutBlockConnectivityTools().getLayoutBlocks(fromPd.getFacing(), toPd.getFacing(), pro, cleardown, LayoutBlockConnectivityTools.Routing.NONE);
                     if (!blkList.isEmpty()) {
                         if (log.isDebugEnabled()) {
+                            log.debug("[setMultiPointRoute] blocks and sensors");
                             for (LayoutBlock blk : blkList) {
-                                log.debug("blk = {}", blk.getDisplayName());
+                                log.debug("  blk = {}", blk.getDisplayName());
                             }
                         }
                         List<jmri.NamedBean> beanList = lbm.getLayoutBlockConnectivityTools().getBeansInPath(blkList, null, jmri.Sensor.class);
                         PointDetails fromPoint = fromPd;
-                        refCounter++;
+                        int ref = nextRef();
+                        List<SourceToDest> toSet = new ArrayList<>();
                         if (!beanList.isEmpty()) {
                             if (log.isDebugEnabled()) {
                                 for (NamedBean xnb : beanList) {
-                                    log.debug("xnb = {}", xnb.getDisplayName());
+                                    log.debug("  sensor = {}", xnb.getDisplayName());
                                 }
                             }
                             for (int i = 1; i < beanList.size(); i++) {
@@ -505,7 +542,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
                                 PointDetails cur = getPointDetails(nb, fromPd.getPanel());
                                 Source s = nxpair.get(fromPoint);
                                 if (s != null) {
-                                    routesToSet.add(new SourceToDest(s, s.getDestForPoint(cur), false, refCounter));
+                                    toSet.add(new SourceToDest(s, s.getDestForPoint(cur), false, ref));
                                 }
                                 fromPoint = cur;
                             }
@@ -513,22 +550,51 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
                         Source s = nxpair.get(fromPoint);
                         if (s != null) {
                             if (s.getDestForPoint(toPd) != null) {
-                                routesToSet.add(new SourceToDest(s, s.getDestForPoint(toPd), false, refCounter));
+                                toSet.add(new SourceToDest(s, s.getDestForPoint(toPd), false, ref));
                             }
                         }
-                        processRoutesToSet();
+                        log.debug("[setMultiPointRoute] Invoke processRoutesToSet");
+                        addRoutesToSet(toSet);
+                        processRoutesToSet(ref);
+                        log.debug("[setMultiPointRoute] processRoutesToSet is done");
                         return;
                     }
                 }
             } catch (jmri.JmriException e) {
-                //Can be considered normal if route is blocked
+                log.debug("setMultiPointRoute catches exception", e);
+                // Can be considered normal if route is blocked
+                if (!isQuietFail()) {
+                    JmriJOptionPane.showMessageDialog(null,
+                            Bundle.getMessage("MultiPointBlocked"),  // NOI18N
+                            Bundle.getMessage("WarningTitle"),  // NOI18N
+                            JmriJOptionPane.WARNING_MESSAGE);
+                }
             }
         }
         fromPd.setNXButtonState(NXBUTTONINACTIVE);
         toPd.setNXButtonState(NXBUTTONINACTIVE);
+        log.debug("[setMultiPointRoute] Done, from = {}, to = {}", fromPd.getSensor().getDisplayName(), toPd.getSensor().getDisplayName());
     }
 
     int refCounter = 0;
+
+    /**
+     * Get the reference for a new request to set a route.
+     *
+     * @return the reference
+     */
+    private synchronized int nextRef() {
+        return ++refCounter;
+    }
+
+    /**
+     * Add the SourceToDest sets of a request to routesToSet.
+     *
+     * @param routes the SourceToDest sets, in the order they are to be set
+     */
+    private synchronized void addRoutesToSet(List<SourceToDest> routes) {
+        routesToSet.addAll(routes);
+    }
 
     /**
      * List holding SourceToDest sets of routes between two points.
@@ -539,7 +605,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * Class to store NX sets consisting of a source point, a destination point,
      * a direction and a reference.
      */
-    static class SourceToDest {
+    private static class SourceToDest {
 
         Source s = null;
         DestinationPoints dp = null;
@@ -562,61 +628,167 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         }
     }
 
-    int currentDealing = 0;
+    /**
+     * The request each destination point is currently setting a route for.
+     */
+    private final Map<DestinationPoints, Integer> routesInProgress = new HashMap<>();
 
     /**
-     * Activate each SourceToDest set in routesToSet
+     * Activate the next SourceToDest set of a request in routesToSet.
+     * <p>
+     * The set is taken from the list under the lock, but it is activated
+     * outside it, as activating it can show a dialog and locks the destination
+     * point.
+     *
+     * @param ref the reference of the request
      */
-    synchronized void processRoutesToSet() {
-        if (log.isDebugEnabled()) {
+    void processRoutesToSet(int ref) {
+        SourceToDest next = null;
+        synchronized (this) {
+            if (log.isDebugEnabled()) {
+                log.debug("[processRoutesToSet] Current routesToSet list");
+                for (SourceToDest sd : routesToSet) {
+                    String dpName = (sd.dp == null) ? "- null -" : sd.dp.getDestPoint().getSensor().getDisplayName();
+                    log.debug("  from = {}, to = {}, ref = {}", sd.s.getPoint().getSensor().getDisplayName(), dpName, sd.ref);
+                }
+            }
+
             for (SourceToDest sd : routesToSet) {
-                String dpName = (sd.dp == null) ? "- null -" : sd.dp.getDestPoint().getSensor().getDisplayName();
-                log.debug("processRoutesToSet: {} -- {} -- {}", sd.s.getPoint().getSensor().getDisplayName(), dpName, sd.ref);
+                if (sd.ref == ref) {
+                    next = sd;
+                    break;
+                }
+            }
+            if (next == null) {
+                return;
+            }
+            routesToSet.remove(next);
+            if (next.dp != null) {
+                routesInProgress.put(next.dp, ref);
             }
         }
-
-        if (routesToSet.isEmpty()) {
+        if (next.dp == null) {
+            removeRemainingRoute(ref);
             return;
         }
-        Source s = routesToSet.get(0).s;
-        DestinationPoints dp = routesToSet.get(0).dp;
-        boolean dir = routesToSet.get(0).direction;
-        currentDealing = routesToSet.get(0).ref;
-        routesToSet.remove(0);
-
-        dp.addPropertyChangeListener(propertyDestinationListener);
-        s.activeBean(dp, dir);
+        next.s.activeBean(next.dp, next.direction);
     }
 
     /**
-     * Remove remaining SourceToDest sets in routesToSet
+     * Remove remaining SourceToDest sets of a request in routesToSet
+     *
+     * @param ref the reference of the request
      */
-    synchronized void removeRemainingRoute() {
+    void removeRemainingRoute(int ref) {
         List<SourceToDest> toRemove = new ArrayList<>();
-        for (SourceToDest rts : routesToSet) {
-            if (rts.ref == currentDealing) {
-                toRemove.add(rts);
+        synchronized (this) {
+            for (SourceToDest rts : routesToSet) {
+                if (rts.ref == ref) {
+                    toRemove.add(rts);
+                }
+            }
+            routesToSet.removeAll(toRemove);
+        }
+        for (SourceToDest rts : toRemove) {
+            if (rts.dp != null) {
                 rts.dp.getDestPoint().setNXButtonState(NXBUTTONINACTIVE);
             }
         }
-        for (SourceToDest rts : toRemove) {
-            routesToSet.remove(rts);
+    }
+
+    /**
+     * Called by a destination point when it has finished handling a request
+     * to set or clear down its route. When the route is part of a route over
+     * several NX pairs, the next pair is handled on the layout thread if this
+     * route has been set or cleared down, otherwise the rest of the request is
+     * dropped.
+     *
+     * @param dp      the destination point
+     * @param success true if the route has been set or cleared down
+     */
+    void routeSettingDone(DestinationPoints dp, boolean success) {
+        Integer ref;
+        synchronized (this) {
+            ref = routesInProgress.remove(dp);
+        }
+        if (ref == null) {
+            return;
+        }
+        int request = ref;
+        if (success) {
+            ThreadingUtil.runOnLayoutEventually(() -> processRoutesToSet(request));
+        } else {
+            removeRemainingRoute(request);
         }
     }
 
-    protected PropertyChangeListener propertyDestinationListener = new PropertyChangeListener() {
-        @Override
-        public void propertyChange(PropertyChangeEvent e) {
-            ((DestinationPoints) e.getSource()).removePropertyChangeListener(this);
-            if (e.getPropertyName().equals("active")) {
-                processRoutesToSet();
-            } else if (e.getPropertyName().equals("stacked") || e.getPropertyName().equals("failed") || e.getPropertyName().equals("noChange")) {  // NOI18N
-                removeRemainingRoute();
-            }
-        }
-    };
+    /**
+     * Number of routes whose turnouts are being set.
+     */
+    private int routesBeingSet = 0;
 
-    List<Object> destinationList = new ArrayList<>();
+    /**
+     * NX button clicks held back until no route is being set.
+     */
+    private final List<Runnable> heldButtonClicks = new ArrayList<>();
+
+    /**
+     * Called by a destination point when it starts to set its route.
+     */
+    synchronized void routeSettingStarted() {
+        routesBeingSet++;
+    }
+
+    /**
+     * Called by a destination point when it has finished setting its route,
+     * after the result has been reported with routeSettingDone. When no other
+     * route is being set, the NX button clicks held back are handled on the
+     * layout thread, in the order they happened.
+     */
+    void routeSettingFinished() {
+        List<Runnable> held;
+        synchronized (this) {
+            routesBeingSet--;
+            if (routesBeingSet > 0 || heldButtonClicks.isEmpty()) {
+                return;
+            }
+            held = new ArrayList<>(heldButtonClicks);
+            heldButtonClicks.clear();
+        }
+        ThreadingUtil.runOnLayoutEventually(() -> held.forEach(Runnable::run));
+    }
+
+    /**
+     * With the old GUI behavior (now called enableDoubleClick), hold back a click on an NX button while a
+     * route is being set. The panel used to wait until the turnouts of a route
+     * were set, so a second click on the destination button was handled after
+     * the route had been set and started the next route instead of cancelling
+     * this one. The turnouts are now set without making the panel wait, so the
+     * click is held back until the route has been set. Held clicks are handled
+     * in the order they happened.
+     *
+     * @param click the handling of the click, run later if it is held back
+     * @return true if the click has been held back
+     */
+    synchronized boolean holdButtonClick(Runnable click) {
+        if (!enableDoubleClick || routesBeingSet == 0) {
+            return false;
+        }
+        heldButtonClicks.add(click);
+        return true;
+    }
+
+    /**
+     * Check if a request to set a route is still being handled.
+     *
+     * @return true if a route is being set or a route over several NX pairs
+     *         has pairs left to set
+     */
+    synchronized boolean isSettingRoutes() {
+        return routesBeingSet > 0 || !routesInProgress.isEmpty() || !routesToSet.isEmpty();
+    }
+
+    private List<Object> destinationList = new ArrayList<>();
 
     // Need to sort out the presentation of the name here rather than using the point ID.
     // This is used for the creation and display of information in the table.
@@ -673,7 +845,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      */
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        firePropertyChange("active", evt.getOldValue(), evt.getNewValue());
+        firePropertyChange(PROPERTY_ACTIVE, evt.getOldValue(), evt.getNewValue());
     }
 
 
@@ -720,7 +892,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             nxpair.get(sourcePoint).addDestination(destPoint, id);
         }
 
-        firePropertyChange("length", null, null);  // NOI18N
+        firePropertyChange(PROPERTY_LENGTH, null, null);
     }
 
     public List<Object> getDestinationList(Object obj, LayoutEditor panel) {
@@ -747,11 +919,10 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * 1) Build a list of affected NX pairs.
      * 2) Check for Conditional references.
      * 3) If no references, do the delete process with user approval.
-     * <p>
      * @since 4.11.2
      * @param sensor The sensor whose pairs should be deleted.
      * @return true if the delete was successful. False if prevented by
-     * Conditional references or user choice.
+     * Conditional/LogixNG references or user choice.
      */
     public boolean deleteNxPair(NamedBean sensor) {
         if (sensor == null) {
@@ -759,8 +930,8 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             return false;
         }
         createDeletePairList(sensor);
-        if (checkNxPairs()) {
-            // No Conditional references.
+        if (checkNxPairs() && checkLogixNG()) {
+            // No Conditional or LogixNG references.
             if (confirmDeletePairs()) {
                 deleteNxPairs();
                 return true;
@@ -776,25 +947,27 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * @param entrySensor The sensor that acts as the entry point.
      * @param exitSensor The sensor that acts as the exit point.
      * @param panel The layout editor panel that contains the entry sensor.
-     * @return true if the delete was successful. False if there are Conditional references.
+     * @return true if the delete was successful. False if there are Conditional/LogixNG references.
      */
     public boolean deleteNxPair(NamedBean entrySensor, NamedBean exitSensor, LayoutEditor panel) {
         if (entrySensor == null || exitSensor == null || panel == null) {
             log.error("deleteNxPair: One or more null inputs");  // NOI18N
             return false;
         }
+
         deletePairList.clear();
         deletePairList.add(new DeletePair(entrySensor, exitSensor, panel));
-        if (checkNxPairs()) {
-            // No Conditional references.
+        if (checkNxPairs() && checkLogixNG()) {
+            // No Conditional or LogixNG references.
             deleteNxPairs();  // Delete with no prompt
             return true;
         }
+
         return false;
     }
 
     /**
-     * Find Logix Conditionals that have Variables or Actions for the affected NX Pairs
+     * Find Logix Conditionals that have Variables or Actions for the affected NX Pairs.
      * If any are found, display a dialog box listing the Conditionals and return false.
      * <p>
      * @since 4.11.2
@@ -843,10 +1016,45 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         for (String ref : conditionalReferences) {
             msg.append("\n    " + ref);  // NOI18N
         }
-        JOptionPane.showMessageDialog(null,
+        JmriJOptionPane.showMessageDialog(null,
                 msg.toString(),
                 Bundle.getMessage("WarningTitle"),  // NOI18N
-                JOptionPane.WARNING_MESSAGE);
+                JmriJOptionPane.WARNING_MESSAGE);
+
+        return false;
+    }
+
+    /**
+     * Find LogixNG ConditionalNGs that have Expressions or Actions for the affected NX Pairs.
+     * If any are found, display a dialog box listing the details and return false.
+     * <p>
+     * @since 5.5.7
+     * @return true if there are no references.
+     */
+    private boolean checkLogixNG() {
+        List<String> conditionalReferences = new ArrayList<>();
+        for (DeletePair dPair : deletePairList) {
+            if (dPair.dp == null) {
+                continue;
+            }
+            var usage = jmri.jmrit.logixng.util.WhereUsed.whereUsed(dPair.dp);
+            if (!usage.isEmpty()) {
+                conditionalReferences.add(usage);
+            }
+        }
+        if (conditionalReferences.isEmpty()) {
+            return true;
+        }
+
+        conditionalReferences.sort(null);
+        StringBuilder msg = new StringBuilder(Bundle.getMessage("DeleteReferences"));
+        for (String ref : conditionalReferences) {
+            msg.append("\n" + ref);  // NOI18N
+        }
+        JmriJOptionPane.showMessageDialog(null,
+                msg.toString(),
+                Bundle.getMessage("WarningTitle"),  // NOI18N
+                JmriJOptionPane.WARNING_MESSAGE);
 
         return false;
     }
@@ -857,20 +1065,20 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * @return true if deletion confirmation is Yes.
      */
     private boolean confirmDeletePairs() {
-        if (deletePairList.size() > 0) {
+        if (!deletePairList.isEmpty()) {
             StringBuilder msg = new StringBuilder(Bundle.getMessage("DeletePairs"));  // NOI18N
             for (DeletePair dPair : deletePairList) {
                 if (dPair.dp != null) {
-                    msg.append("\n    " + dPair.dp.getDisplayName());  // NOI18N
+                    msg.append("\n    ").append(dPair.dp.getDisplayName());  // NOI18N
                 }
             }
-            msg.append("\n" + Bundle.getMessage("DeleteContinue"));  // NOI18N
-            int resp = JOptionPane.showConfirmDialog(null,
+            msg.append("\n").append(Bundle.getMessage("DeleteContinue"));  // NOI18N
+            int resp = JmriJOptionPane.showConfirmDialog(null,
                     msg.toString(),
                     Bundle.getMessage("WarningTitle"),  // NOI18N
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE);
-            if (resp != 0) {
+                    JmriJOptionPane.YES_NO_OPTION,
+                    JmriJOptionPane.QUESTION_MESSAGE);
+            if (resp != JmriJOptionPane.YES_OPTION ) {
                 return false;
             }
         }
@@ -888,7 +1096,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             PointDetails sourcePoint = getPointDetails(dp.src, dp.pnl);
             PointDetails destPoint = getPointDetails(dp.dest, dp.pnl);
             nxpair.get(sourcePoint).removeDestination(destPoint);
-            firePropertyChange("length", null, null);  // NOI18N
+            firePropertyChange(PROPERTY_LENGTH, null, null);
             if (nxpair.get(sourcePoint).getDestinationPoints().isEmpty()) {
                 nxpair.get(sourcePoint).removePropertyChangeListener(this);
                 nxpair.remove(sourcePoint);
@@ -906,7 +1114,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * Class to store NX pair components.
      * @since 4.11.2
      */
-    class DeletePair {
+    private class DeletePair {
         NamedBean src = null;
         NamedBean dest = null;
         LayoutEditor pnl = null;
@@ -939,7 +1147,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
      * Rebuild the delete pair list based on the supplied sensor.
      * Find all of the NX pairs that use this sensor as either a source or
      * destination.  They will be candidates for deletion.
-     * <p>
+     *
      * @since 4.11.2
      * @param sensor The sensor being deleted,
      */
@@ -1083,12 +1291,10 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
 
     }
 
-    jmri.SignalMastLogicManager smlm = InstanceManager.getDefault(jmri.SignalMastLogicManager.class);
-
-    public final static int CANCELROUTE = 0;
-    public final static int CLEARROUTE = 1;
-    public final static int EXITROUTE = 2;
-    public final static int STACKROUTE = 4;
+    public static final int CANCELROUTE = 0;
+    public static final int CLEARROUTE = 1;
+    public static final int EXITROUTE = 2;
+    public static final int STACKROUTE = 4;
 
    /**
      * Return a point from a given LE Panel.
@@ -1327,7 +1533,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
         for (Entry<NamedBean, List<NamedBean>> entry : validPaths.entrySet()) {
             NamedBean key = entry.getKey();
             List<NamedBean> validDestMast = validPaths.get(key);
-            if (validDestMast.size() > 0) {
+            if (!validDestMast.isEmpty()) {
                 eep.addNXSourcePoint(key, editor);
                 for (int i = 0; i < validDestMast.size(); i++) {
                     if (!eep.isDestinationValid(key, validDestMast.get(i), editor)) {
@@ -1338,14 +1544,13 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
             }
         }
 
-        firePropertyChange("autoGenerateComplete", null, null);  // NOI18N
+        firePropertyChange(PROPERTY_AUTO_GENERATE_COMPLETE, null, null);
     }
 
     protected PropertyChangeListener propertyBlockManagerListener = new PropertyChangeListener() {
         @Override
         public void propertyChange(PropertyChangeEvent e) {
-            if (e.getPropertyName().equals("topology")) {  // NOI18N
-                //boolean newValue = new Boolean.parseBoolean(String.valueOf(e.getNewValue()));
+            if ( LayoutBlockManager.PROPERTY_TOPOLOGY.equals(e.getPropertyName())) {
                 boolean newValue = (Boolean) e.getNewValue();
                 if (newValue) {
                     if (runWhenStabilised) {
@@ -1372,7 +1577,7 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
     @Override
     @Nonnull
     public String getBeanTypeHandled(boolean plural) {
-        return Bundle.getMessage(plural ? "BeanNameTransits" : "BeanNameTransit");  // NOI18N
+        return Bundle.getMessage(plural ? "BeanNameEntryExits" : "BeanNameEntryExit");  // NOI18N
     }
 
     /**
@@ -1389,35 +1594,28 @@ public class EntryExitPairs extends VetoableChangeSupport implements Manager<Des
     @Override
     @OverridingMethodsMustInvokeSuper
     public void setPropertyChangesSilenced(@Nonnull String propertyName, boolean silenced) {
-        if (!"beans".equals(propertyName)) {
+        if (!Manager.PROPERTY_BEANS.equals(propertyName)) {
             throw new IllegalArgumentException("Property " + propertyName + " cannot be silenced.");
         }
-        silencedProperties.put(propertyName, silenced);
-        if (propertyName.equals("beans") && !silenced) {
-            fireIndexedPropertyChange("beans", getNamedBeanSet().size(), null, null);
+        if (propertyName.equals(Manager.PROPERTY_BEANS) && !silenced) {
+            fireIndexedPropertyChange(Manager.PROPERTY_BEANS, getNamedBeanSet().size(), null, null);
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    @Deprecated
-    @SuppressWarnings("deprecation")
     public void addDataListener(ManagerDataListener<DestinationPoints> e) {
         if (e != null) listeners.add(e);
     }
 
     /** {@inheritDoc} */
     @Override
-    @Deprecated
-    @SuppressWarnings("deprecation")
     public void removeDataListener(ManagerDataListener<DestinationPoints> e) {
         if (e != null) listeners.remove(e);
     }
 
-    @SuppressWarnings("deprecation")
     final List<ManagerDataListener<DestinationPoints>> listeners = new ArrayList<>();
 
-    // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(EntryExitPairs.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EntryExitPairs.class);
 
 }

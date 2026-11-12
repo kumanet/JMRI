@@ -8,17 +8,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * VSD listener.
+ *
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2012
@@ -27,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public class VSDListener {
 
     // Only one Audio Listener can exist, and it is already present in the Audio Table
-    public final static String ListenerSysName = "IAL$";
+    public static final String ListenerSysName = "IAL$";
 
     private AudioFactory af;
     private AudioListener listener;
@@ -77,6 +79,6 @@ public class VSDListener {
         // Set position here
     }
 
-    private final static Logger log = LoggerFactory.getLogger(VSDListener.class);
+    private static final Logger log = LoggerFactory.getLogger(VSDListener.class);
 
 }

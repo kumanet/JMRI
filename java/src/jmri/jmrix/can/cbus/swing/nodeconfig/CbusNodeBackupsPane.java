@@ -6,14 +6,15 @@ import java.awt.Component;
 import java.awt.event.ActionListener;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Objects;
+
 import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.table.TableCellRenderer;
+
 import jmri.jmrix.can.cbus.node.*;
-import jmri.jmrix.can.cbus.node.CbusNodeConstants.BackupType;
 
 import jmri.jmrix.can.cbus.swing.CbusCommonSwing;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -394,10 +395,11 @@ public class CbusNodeBackupsPane extends CbusNodeConfigTab implements TableModel
     @Override
     public void dispose() {
         // bupFile.getBackupModel().removeTableModelListener(this);
-        disposeOfNode(nodeOfInterest);
-        nodeOfInterest.removePropertyChangeListener(cbusNodeBackupTableModel);
+        // nodeOfInterest is null if the pane was never shown for a node,
+        // CbusNodeConfigTab.dispose() calls disposeOfNode() when not null.
+        super.dispose();
     }
     
-    private final static Logger log = LoggerFactory.getLogger(CbusNodeBackupsPane.class);
+    private static final Logger log = LoggerFactory.getLogger(CbusNodeBackupsPane.class);
     
 }

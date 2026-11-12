@@ -1,14 +1,7 @@
 package jmri.jmrit.display.layoutEditor;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.event.MouseEvent;
 import java.awt.geom.*;
-import java.util.*;
 import javax.annotation.*;
-import javax.swing.JPopupMenu;
-import jmri.*;
-import jmri.util.*;
 
 /**
  * MVC View component for the LayoutSingleSlip class.
@@ -32,7 +25,7 @@ public class LayoutSingleSlipView extends LayoutSlipView {
         editor = new jmri.jmrit.display.layoutEditor.LayoutEditorDialogs.LayoutSingleSlipEditor(layoutEditor);
     }
         
-    // final private LayoutSingleSlip slip;
+    // private final LayoutSingleSlip slip;
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutSingleSlipView.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutSingleSlipView.class);
 }

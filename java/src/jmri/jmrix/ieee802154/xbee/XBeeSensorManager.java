@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manage the XBee specific Sensor implementation.
- *
+ * <p>
  * System names are formatted as one of:
  * <ul>
  *   <li>"ZSnnn", where nnn is the sensor number without padding</li>
@@ -306,6 +306,6 @@ public class XBeeSensorManager extends jmri.managers.AbstractSensorManager imple
         return Bundle.getMessage("AddEntryToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(XBeeSensorManager.class);
+    private static final Logger log = LoggerFactory.getLogger(XBeeSensorManager.class);
 
 }

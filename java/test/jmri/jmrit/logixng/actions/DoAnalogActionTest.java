@@ -1,5 +1,11 @@
 package jmri.jmrit.logixng.actions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
 
 import jmri.InstanceManager;
@@ -8,35 +14,33 @@ import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.expressions.AnalogExpressionConstant;
 import jmri.jmrit.logixng.expressions.AnalogExpressionMemory;
 import jmri.jmrit.logixng.implementation.DefaultConditionalNGScaffold;
-import jmri.jmrit.logixng.implementation.DefaultSymbolTable;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test DoAnalogAction
- * 
+ *
  * @author Daniel Bergqvist 2018
  */
 public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
 
-    LogixNG logixNG;
-    ConditionalNG conditionalNG;
-    DoAnalogAction actionDoAnalogAction;
-    
+    private LogixNG logixNG;
+    private ConditionalNG conditionalNG;
+    private DoAnalogAction actionDoAnalogAction;
+
     @Override
     public ConditionalNG getConditionalNG() {
         return conditionalNG;
     }
-    
+
     @Override
     public LogixNG getLogixNG() {
         return logixNG;
     }
-    
+
     @Override
     public MaleSocket getConnectableChild() {
         AnalogExpressionBean childExpression = new AnalogExpressionConstant("IQAE999", null);
@@ -44,7 +48,7 @@ public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
                 InstanceManager.getDefault(AnalogExpressionManager.class).registerExpression(childExpression);
         return maleSocketChild;
     }
-    
+
     @Override
     public String getExpectedPrintedTree() {
         return String.format(
@@ -54,7 +58,7 @@ public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
                 "   !~ A%n" +
                 "      Socket not connected%n");
     }
-    
+
     @Override
     public String getExpectedPrintedTreeFromRoot() {
         return String.format(
@@ -67,212 +71,206 @@ public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
                 "            !~ A%n" +
                 "               Socket not connected%n");
     }
-    
+
     @Override
     public NamedBean createNewBean(String systemName) {
         return new DoAnalogAction(systemName, null);
     }
-    
+
     @Override
     public boolean addNewSocket() {
         return false;
     }
-    
+
     @Test
     public void testCtor() {
-        Assert.assertNotNull("exists", new DoAnalogAction("IQDA321", null));
+        assertNotNull( new DoAnalogAction("IQDA321", null), "exists");
     }
-    
+
     @Test
     public void testCtorAndSetup1() {
         DoAnalogAction expression = new DoAnalogAction("IQDA321", null);
-        Assert.assertNotNull("exists", expression);
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+        assertNotNull( expression, "exists");
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
         expression.getChild(0).setName("XYZ123");
         expression.setAnalogExpressionSocketSystemName("IQAE52");
         expression.getChild(1).setName("ZH12");
         expression.setAnalogActionSocketSystemName("IQAA554");
-        
-        Assert.assertEquals("expression female socket name is XYZ123",
-                "XYZ123", expression.getChild(0).getName());
-        Assert.assertEquals("expression female socket is of correct class",
+
+        assertEquals( "XYZ123", expression.getChild(0).getName(),
+                "expression female socket name is XYZ123");
+        assertEquals(
 //                "jmri.jmrit.logixng.implementation.DefaultFemaleGenericExpressionSocket$AnalogSocket",
                 "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogExpressionSocket",
-                expression.getChild(0).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(0).isConnected());
-        
-        Assert.assertEquals("expression female socket name is ZH12",
-                "ZH12", expression.getChild(1).getName());
-        Assert.assertEquals("expression female socket is of correct class",
-                "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
-                expression.getChild(1).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(1).isConnected());
-        
+                expression.getChild(0).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(0).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( "ZH12", expression.getChild(1).getName(),
+                "expression female socket name is ZH12");
+        assertEquals( "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
+                expression.getChild(1).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(1).isConnected(),
+                "expression female socket is not connected");
+
         // Setup action. This connects the child actions to this action
         expression.setup();
-        
+
         jmri.util.JUnitAppender.assertMessage("cannot load analog expression IQAE52");
         jmri.util.JUnitAppender.assertMessage("cannot load analog action IQAA554");
-        
-        Assert.assertEquals("expression female socket name is XYZ123",
-                "XYZ123", expression.getChild(0).getName());
-        Assert.assertEquals("expression female socket is of correct class",
+
+        assertEquals( "XYZ123", expression.getChild(0).getName(),
+                "expression female socket name is XYZ123");
+        assertEquals(
 //                "jmri.jmrit.logixng.implementation.DefaultFemaleGenericExpressionSocket$AnalogSocket",
                 "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogExpressionSocket",
-                expression.getChild(0).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(0).isConnected());
-        
-        Assert.assertEquals("expression female socket name is ZH12",
-                "ZH12", expression.getChild(1).getName());
-        Assert.assertEquals("expression female socket is of correct class",
-                "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
-                expression.getChild(1).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(1).isConnected());
-        
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+                expression.getChild(0).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(0).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( "ZH12", expression.getChild(1).getName(),
+                "expression female socket name is ZH12");
+        assertEquals( "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
+                expression.getChild(1).getClass().getName(), "expression female socket is of correct class");
+        assertFalse( expression.getChild(1).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
     }
-    
+
     @Test
     public void testCtorAndSetup2() {
         DoAnalogAction expression = new DoAnalogAction("IQDA321", null);
-        Assert.assertNotNull("exists", expression);
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+        assertNotNull( expression, "exists");
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
         expression.getChild(0).setName("XYZ123");
         expression.setAnalogExpressionSocketSystemName(null);
         expression.getChild(1).setName("ZH12");
         expression.setAnalogActionSocketSystemName(null);
-        
-        Assert.assertEquals("expression female socket name is XYZ123",
-                "XYZ123", expression.getChild(0).getName());
-        Assert.assertEquals("expression female socket is of correct class",
+
+        assertEquals( "XYZ123", expression.getChild(0).getName(),
+                "expression female socket name is XYZ123");
+        assertEquals(
 //                "jmri.jmrit.logixng.implementation.DefaultFemaleGenericExpressionSocket$AnalogSocket",
                 "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogExpressionSocket",
-                expression.getChild(0).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(0).isConnected());
-        
-        Assert.assertEquals("expression female socket name is ZH12",
-                "ZH12", expression.getChild(1).getName());
-        Assert.assertEquals("expression female socket is of correct class",
-                "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
-                expression.getChild(1).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(1).isConnected());
-        
+                expression.getChild(0).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(0).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( "ZH12", expression.getChild(1).getName(),
+                "expression female socket name is ZH12");
+        assertEquals( "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
+                expression.getChild(1).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(1).isConnected(),
+                "expression female socket is not connected");
+
         // Setup action. This connects the child actions to this action
         expression.setup();
-        
-        Assert.assertEquals("expression female socket name is XYZ123",
-                "XYZ123", expression.getChild(0).getName());
-        Assert.assertEquals("expression female socket is of correct class",
+
+        assertEquals( "XYZ123", expression.getChild(0).getName(),
+                "expression female socket name is XYZ123");
+        assertEquals(
 //                "jmri.jmrit.logixng.implementation.DefaultFemaleGenericExpressionSocket$AnalogSocket",
                 "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogExpressionSocket",
-                expression.getChild(0).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(0).isConnected());
-        
-        Assert.assertEquals("expression female socket name is ZH12",
-                "ZH12", expression.getChild(1).getName());
-        Assert.assertEquals("expression female socket is of correct class",
-                "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
-                expression.getChild(1).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(1).isConnected());
-        
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+                expression.getChild(0).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(0).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( "ZH12", expression.getChild(1).getName(),
+                "expression female socket name is ZH12");
+        assertEquals( "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
+                expression.getChild(1).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(1).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
     }
-    
+
     @Test
     public void testCtorAndSetup3() {
         AnalogExpressionManager m0 = InstanceManager.getDefault(AnalogExpressionManager.class);
         AnalogActionManager m1 = InstanceManager.getDefault(AnalogActionManager.class);
-        
+
         m0.registerExpression(new AnalogExpressionMemory("IQAE52", null));
         m1.registerAction(new AnalogActionMemory("IQAA554", null));
-        
+
         DoAnalogAction expression = new DoAnalogAction("IQDA321", null);
-        Assert.assertNotNull("exists", expression);
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+        assertNotNull( expression, "exists");
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
         expression.getChild(0).setName("XYZ123");
         expression.setAnalogExpressionSocketSystemName("IQAE52");
         expression.getChild(1).setName("ZH12");
         expression.setAnalogActionSocketSystemName("IQAA554");
-        
-        Assert.assertEquals("expression female socket name is XYZ123",
-                "XYZ123", expression.getChild(0).getName());
-        Assert.assertEquals("expression female socket is of correct class",
+
+        assertEquals( "XYZ123", expression.getChild(0).getName(),
+                "expression female socket name is XYZ123");
+        assertEquals(
 //                "jmri.jmrit.logixng.implementation.DefaultFemaleGenericExpressionSocket$AnalogSocket",
                 "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogExpressionSocket",
-                expression.getChild(0).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(0).isConnected());
-        
-        Assert.assertEquals("expression female socket name is ZH12",
-                "ZH12", expression.getChild(1).getName());
-        Assert.assertEquals("expression female socket is of correct class",
-                "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
-                expression.getChild(1).getClass().getName());
-        Assert.assertFalse("expression female socket is not connected",
-                expression.getChild(1).isConnected());
-        
+                expression.getChild(0).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(0).isConnected(),
+                "expression female socket is not connected");
+
+        assertEquals( "ZH12", expression.getChild(1).getName(),
+                "expression female socket name is ZH12");
+        assertEquals( "jmri.jmrit.logixng.implementation.DefaultFemaleAnalogActionSocket",
+                expression.getChild(1).getClass().getName(),
+                "expression female socket is of correct class");
+        assertFalse( expression.getChild(1).isConnected(),
+                "expression female socket is not connected");
+
         // Setup action. This connects the child actions to this action
         expression.setup();
-        
-        Assert.assertTrue("expression female socket is connected",
-                expression.getChild(0).isConnected());
+
+        assertTrue( expression.getChild(0).isConnected(),
+                "expression female socket is connected");
 //        Assert.assertEquals("child is correct bean",
 //                childSocket0,
 //                expression.getChild(0).getConnectedSocket());
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
-        
-        Assert.assertTrue("expression female socket is connected",
-                expression.getChild(1).isConnected());
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
+
+        assertTrue( expression.getChild(1).isConnected(),
+                "expression female socket is connected");
 //        Assert.assertEquals("child is correct bean",
 //                childSocket1,
 //                expression.getChild(1).getConnectedSocket());
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
-        
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
+
         // Try run setup() again. That should not cause any problems.
         expression.setup();
-        
-        Assert.assertEquals("expression has 2 female sockets", 2, expression.getChildCount());
+
+        assertEquals( 2, expression.getChildCount(), "expression has 2 female sockets");
     }
-    
+
     @Test
     public void testGetChild() {
-        Assert.assertTrue("getChildCount() returns 2", 2 == actionDoAnalogAction.getChildCount());
-        
-        Assert.assertNotNull("getChild(0) returns a non null value",
-                actionDoAnalogAction.getChild(0));
-        Assert.assertNotNull("getChild(1) returns a non null value",
-                actionDoAnalogAction.getChild(1));
-        
-        boolean hasThrown = false;
-        try {
-            actionDoAnalogAction.getChild(2);
-        } catch (IllegalArgumentException ex) {
-            hasThrown = true;
-            Assert.assertEquals("Error message is correct", "index has invalid value: 2", ex.getMessage());
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+        assertEquals( 2, actionDoAnalogAction.getChildCount(), "getChildCount() returns 2");
+
+        assertNotNull( actionDoAnalogAction.getChild(0),
+                "getChild(0) returns a non null value");
+        assertNotNull( actionDoAnalogAction.getChild(1),
+                "getChild(1) returns a non null value");
+
+        IllegalArgumentException ex = assertThrows( IllegalArgumentException.class, () ->
+            actionDoAnalogAction.getChild(2), "Exception is thrown");
+        assertEquals( "index has invalid value: 2", ex.getMessage(),
+                "Error message is correct");
     }
-    
+
     @Test
     public void testCategory() {
-        Assert.assertEquals("Category matches", Category.COMMON, _base.getCategory());
+        assertEquals( LogixNG_Category.COMMON, _base.getCategory(), "Category matches");
     }
-    
-    @Test
-    public void testIsExternal() {
-        Assert.assertFalse("is external", _base.isExternal());
-    }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() throws SocketAlreadyConnectedException {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -281,10 +279,10 @@ public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
         JUnitUtil.initInternalSensorManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initLogixNGManager();
-        
-        _category = Category.OTHER;
+
+        _category = LogixNG_Category.OTHER;
         _isExternal = false;
-        
+
         logixNG = InstanceManager.getDefault(LogixNG_Manager.class).createLogixNG("A new logix for test");  // NOI18N
         conditionalNG = new DefaultConditionalNGScaffold("IQC1", "A conditionalNG");  // NOI18N;
         InstanceManager.getDefault(ConditionalNG_Manager.class).register(conditionalNG);
@@ -297,15 +295,17 @@ public class DoAnalogActionTest extends AbstractDigitalActionTestBase {
         conditionalNG.getChild(0).connect(maleSocket);
         _base = actionDoAnalogAction;
         _baseMaleSocket = maleSocket;
-        
-        if (! logixNG.setParentForAllChildren(new ArrayList<>())) throw new RuntimeException();
+
+        assertTrue( logixNG.setParentForAllChildren(new ArrayList<>()));
+        logixNG.activate();
         logixNG.setEnabled(true);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
+
 }

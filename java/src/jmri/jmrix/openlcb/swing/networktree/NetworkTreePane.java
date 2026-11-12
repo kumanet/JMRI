@@ -4,6 +4,8 @@ import java.awt.Dimension;
 import javax.swing.JTree;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
+
+import jmri.*;
 import jmri.jmrix.can.CanListener;
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanReply;
@@ -11,6 +13,8 @@ import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.swing.CanPanelInterface;
 import jmri.jmrix.openlcb.swing.ClientActions;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriPanel;
+
 import org.openlcb.Connection;
 import org.openlcb.MimicNodeStore;
 import org.openlcb.NodeID;
@@ -21,15 +25,21 @@ import org.openlcb.swing.memconfig.MemConfigDescriptionPane;
 import org.openlcb.swing.memconfig.MemConfigReadWritePane;
 import org.openlcb.swing.networktree.NodeTreeRep;
 import org.openlcb.swing.networktree.TreePane;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Frame displaying tree of OpenLCB nodes.
+ * <p>
+ * This uses a {@link CanSystemConnectionMemo} for access to various 
+ * org.openlcb.*
+ * OpenLCB context objects from the 
+ * <a href="https://github.com/openlcb/OpenLCB_Java">OpenLCB_Java project</a>.
+ * The {@link org.openlcb.MimicNodeStore} fills out the tree of known nodes.
+ * When requested to configure a node, that node's CDI is loaded
+ * and presented using a {@link org.openlcb.swing.networktree.TreePane}.
  *
- * @author Bob Jacobsen Copyright (C) 2009, 2010, 2012
+ * @author Bob Jacobsen Copyright (C) 2009, 2010, 2012, 2024
  */
-public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanListener, CanPanelInterface {
+public class NetworkTreePane extends JmriPanel implements CanListener, CanPanelInterface {
 
     public NetworkTreePane() {
         super();
@@ -53,10 +63,42 @@ public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanLis
         // add GUI components
         setLayout(new javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS));
 
-        treePane = new TreePane();
+        treePane = new TreePane(){
+            UserPreferencesManager pref = jmri.InstanceManager.getDefault(UserPreferencesManager.class);
+            String sortPreferenceName = NetworkTreePane.class.getName() + ".selectedSortOrder";
+
+            @Override
+            public void initComponents(MimicNodeStore store, final Connection connection,
+                            final NodeID node, final NodeTreeRep.SelectionKeyLoader loader) {
+                super.initComponents(store, connection, node, loader);
+                // finally handle sort-by JComboBox preferences WITHOUT setting preferences
+                var name = pref.getProperty(this.getClass().getName(), sortPreferenceName);
+                if (name == null) name = "BY_NAME";
+                SortOrder order;
+                try {
+                    order = SortOrder.valueOf((String)name);
+                } catch (IllegalArgumentException e) {
+                    order = SortOrder.BY_NAME;
+                }
+                super.setSortOrder(order);
+                // and do it a little later to make sure the table has been shown
+                final var localOrder = order;
+                jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> {
+                    super.setSortOrder(localOrder);
+                }, 750
+                );
+            }
+            
+            // This overrides setOrder to preserve the order
+            @Override
+            public void setSortOrder(SortOrder order) {
+                pref.setProperty(this.getClass().getName(), sortPreferenceName, order.name());
+                super.setSortOrder(order);
+            }
+        };
         treePane.setPreferredSize(new Dimension(300, 300));
 
-        treePane.initComponents(memo.get(MimicNodeStore.class), memo.get(Connection.class), memo.get(NodeID.class), new ActionLoader(memo.get(OlcbInterface.class))
+        treePane.initComponents(memo.get(MimicNodeStore.class), memo.get(Connection.class), memo.get(NodeID.class), new ActionLoader(memo)
         );
         add(treePane);
 
@@ -78,7 +120,10 @@ public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanLis
 
     @Override
     public String getTitle() {
-        return "OpenLCB Network Tree";
+        if (memo != null) {
+            return (memo.getUserName() + " " + Bundle.getMessage("PaneTitle"));
+        }
+        return "LCC / OpenLCB Network Tree";
     }
 
     @Override
@@ -94,8 +139,7 @@ public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanLis
     public synchronized void reply(CanReply l) {  // receive a reply and log it
     }
 
-    @SuppressWarnings("unused")
-    private final static Logger log = LoggerFactory.getLogger(NetworkTreePane.class);
+    //private static final Logger log = LoggerFactory.getLogger(NetworkTreePane.class);
 
     /**
      * Nested class to open specific windows when proper tree element is picked.
@@ -104,8 +148,9 @@ public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanLis
 
         private final ClientActions actions;
 
-        ActionLoader(OlcbInterface iface) {
-            actions = new ClientActions(iface);
+        ActionLoader(CanSystemConnectionMemo memo) {
+            OlcbInterface iface = memo.get(OlcbInterface.class);
+            actions = new ClientActions(iface, memo);
             this.store = iface.getNodeStore();
             this.mcs = iface.getMemoryConfigurationService();
         }
@@ -189,4 +234,39 @@ public class NetworkTreePane extends jmri.util.swing.JmriPanel implements CanLis
         }
     }
 
+    // Create the panel-name of this node depending on what's available
+    public static String augmentedNodeName(MimicNodeStore.NodeMemo nodememo) {
+        var node = nodememo.getNodeID();
+        var ident = nodememo.getSimpleNodeIdent();
+
+        var description = new StringBuilder();
+        if (ident.getUserName() != null) {
+            description.append(ident.getUserName());
+        }
+        if (ident.getUserDesc() != null && ident.getUserDesc().length() > 0) {
+            if (description.length() > 0) {
+                description.append(" - ");
+            }
+            description.append(ident.getUserDesc());
+        }
+        if (description.length() == 0) {
+            if (ident.getMfgName() != null && ident.getMfgName().length() > 0) {
+                description.append(ident.getMfgName());
+            }
+            if (ident.getModelName() != null && ident.getModelName().length() > 0) {
+                if (description.length() > 0) {
+                    description.append(" - ");
+                }
+                description.append(ident.getModelName());
+            }
+        }
+        if (description.length() == 0) {
+            description.append(node.toString());
+        } else {
+            description.append(" (");
+            description.append(node.toString());
+            description.append(")");
+        }
+        return description.toString();
+    }
 }

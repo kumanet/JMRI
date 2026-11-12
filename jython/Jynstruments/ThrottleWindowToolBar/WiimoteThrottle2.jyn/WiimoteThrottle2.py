@@ -50,7 +50,7 @@ import javax.swing.JButton as JButton
 import javax.swing.ImageIcon as ImageIcon
 import javax.swing.SwingUtilities as SwingUtilities
 import thread
-import jmri.jmrit.throttle.AddressListener as AddressListener
+import jmri.jmrit.throttle.interfaces.AddressListener as AddressListener
 import jmri.jmrit.jython.Jynstrument as Jynstrument
 import javax.swing.JOptionPane as JOptionPane
 import javax.swing.JTextArea as JTextArea
@@ -71,9 +71,13 @@ class WiimoteThrottle2(Jynstrument, PropertyChangeListener, AddressListener, Wii
     
     def init(self):
         self.getContext().addPropertyChangeListener(self) #ThrottleFrame change
-        self.addressPanel=self.getContext().getCurrentThrottleFrame().getAddressPanel();
-        self.addressPanel.addAddressListener(self) # change of throttle in Current frame
-        self.throttle = self.getContext().getCurrentThrottleFrame().getAddressPanel().getThrottle() # the throttle
+        if ( self.getContext().getCurentThrottleController() != None ):
+            self.addressPanel= self.getContext().getCurentThrottleController().getAddressPanel();
+            self.addressPanel.addAddressListener(self) # change of throttle in Current frame
+            self.throttle = self.getContext().getCurentThrottleController().getAddressPanel().getThrottle() # the throttle
+        else:
+            self.addressPanel = None
+            self.throttle = None
         self.speedAction =  SpeedAction()  #Speed increase thread
         self.speedAction.setThrottle( self.throttle )
         self.speedTimer = Timer(valueSpeedTimerRepeat, self.speedAction ) # Very important to use swing Timer object (see Swing and multithreading doc)
@@ -102,9 +106,11 @@ class WiimoteThrottle2(Jynstrument, PropertyChangeListener, AddressListener, Wii
         self.speedTimer = None
         self.throttle = None
         self.advFunctions = None
-        self.getContext().removePropertyChangeListener(self)
-        self.addressPanel.removeAddressListener(self)
-        self.addressPanel = None    
+        if (self.getContext() != None):
+            self.getContext().removePropertyChangeListener(self)
+        if (self.addressPanel != None):
+            self.addressPanel.removeAddressListener(self)
+            self.addressPanel = None    
     #Wiimote discoverer events
         
     def findFinished(self, nb):
@@ -180,20 +186,20 @@ class WiimoteThrottle2(Jynstrument, PropertyChangeListener, AddressListener, Wii
             # Home : F0            
             if ( evt.wasReleased(WRButtonEvent.HOME) ):  # LIGHTS
                 if not ((self.addressPanel.getRosterEntry() != None) and (self.advFunctions.call(self.addressPanel.getRosterEntry(), "0", False, self.throttle) != None)):
-                   self.throttle.setF0( not self.throttle.getF0() )
+                   self.throttle.setFunction(0, not self.throttle.getFunction(0) )
             # Wiimote 1 & 2 buttons
             if (evt.isPressed(WRButtonEvent.ONE)):
                 if not ((self.addressPanel.getRosterEntry() != None) and (self.advFunctions.call(self.addressPanel.getRosterEntry(), "1", True, self.throttle) != None)):
                     pass # default F1 not momentary (switch only on Release, do nothing here)
             if (evt.wasReleased(WRButtonEvent.ONE)):
                 if not ((self.addressPanel.getRosterEntry() != None) and (self.advFunctions.call(self.addressPanel.getRosterEntry(), "1", False, self.throttle) != None)):
-                    self.throttle.setF1( not self.throttle.getF1() )  # default F1 not momentary              
+                    self.throttle.setFunction(1, not self.throttle.getFunction(1) )  # default F1 not momentary              
             if (evt.isPressed(WRButtonEvent.TWO)):
                 if not ((self.addressPanel.getRosterEntry() != None) and (self.advFunctions.call(self.addressPanel.getRosterEntry(), "2", True, self.throttle) != None)):
-                    self.throttle.setF2( True )  # default F2 momentary
+                    self.throttle.setFunction(2, True )  # default F2 momentary
             if (evt.wasReleased(WRButtonEvent.TWO)):
                 if not ((self.addressPanel.getRosterEntry() != None) and (self.advFunctions.call(self.addressPanel.getRosterEntry(), "2", False, self.throttle) != None)):
-                    self.throttle.setF2( False )
+                    self.throttle.setFunction(2, False )
 
     def disconnected(self):
         self.wiiDevice = None
@@ -221,12 +227,14 @@ class WiimoteThrottle2(Jynstrument, PropertyChangeListener, AddressListener, Wii
 #Property listener part
     def propertyChange(self, event):
         self.speedTimer.stop()                     
-        if (event.propertyName == "ThrottleFrame") :  # Current throttle frame changed
-            event.oldValue.getAddressPanel().removeAddressListener(self)
-            self.addressPanel = event.newValue.getAddressPanel()
-            self.throttle = self.addressPanel.getThrottle()
-            self.speedAction.setThrottle( self.throttle )
-            self.addressPanel.addAddressListener(self)
+        if (event.propertyName.startswith("ThrottleFrame")) :  # Current throttle frame changed
+            if event.oldValue != None :
+                event.oldValue.getAddressPanel().removeAddressListener(self)
+            if event.newValue != None :
+                self.addressPanel = event.newValue.getAddressPanel()
+                self.throttle = self.addressPanel.getThrottle()
+                self.speedAction.setThrottle( self.throttle )
+                self.addressPanel.addAddressListener(self)
 
 #AddressListener part: to listen for address changes in address panel (release, acquired)
     def notifyAddressChosen(self, address):
@@ -242,13 +250,13 @@ class WiimoteThrottle2(Jynstrument, PropertyChangeListener, AddressListener, Wii
         self.throttle = None
         self.speedAction.setThrottle( self.throttle )
 
-    def notifyConsistAddressChosen(self, address, isLong):
+    def notifyConsistAddressChosen(self, address):
         self.notifyAddressChosen(address)
 
     def notifyConsistAddressThrottleFound(self, throttle):
         self.notifyAddressThrottleFound(throttle)
 
-    def notifyConsistAddressReleased(self, address, isLong):
+    def notifyConsistAddressReleased(self, address):
         self.notifyAddressReleased(address)
                 
 # Speed timer class, to increase speed regularly once button pushed, thread stopped on button release

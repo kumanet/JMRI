@@ -1,12 +1,14 @@
 package jmri.jmrit.logixng.swing;
 
+import jmri.JmriUncheckedException;
+
 /**
  * LogixNG Swing tools.
- * 
+ *
  * @author Daniel Bergqvist 2019
  */
 public final class SwingTools {
-    
+
     // Private constructor to ensure this class never get instanciated.
     private SwingTools() {
     }
@@ -27,7 +29,7 @@ public final class SwingTools {
      * @param c class of a configurable type
      * @return class name of adapter
      */
-    public static String adapterNameForClass(Class c) {
+    public static String adapterNameForClass(Class<?> c) {
         String className = c.getName();
         log.trace("handle object of class {}", className);
         int lastDot = className.lastIndexOf(".");
@@ -42,7 +44,7 @@ public final class SwingTools {
         } else {
             // No last dot found! This should not be possible in Java.
             log.error("No package name found, which is not yet handled!");
-            throw new RuntimeException("No package name found, which is not yet handled!");
+            throw new JmriUncheckedException("No package name found, which is not yet handled!");
         }
     }
 
@@ -51,11 +53,11 @@ public final class SwingTools {
      * @param object The object to get a SwingConfiguratorInterface of
      * @return a SwingConfiguratorInterface object
      */
-    static public SwingConfiguratorInterface getSwingConfiguratorForObject(Object object) {
+    public static SwingConfiguratorInterface getSwingConfiguratorForObject(Object object) {
         SwingConfiguratorInterface adapter = null;
         try {
             adapter = (SwingConfiguratorInterface) Class.forName(adapterNameForObject(object)).getDeclaredConstructor().newInstance();
-        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException 
+        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException
                     | NoSuchMethodException | java.lang.reflect.InvocationTargetException ex) {
             log.error("Cannot load SwingConfiguratorInterface adapter for {}", object.getClass().getName(), ex);
         }
@@ -72,11 +74,11 @@ public final class SwingTools {
      * @param clazz The class to get a SwingConfiguratorInterface of
      * @return a SwingConfiguratorInterface object
      */
-    static public SwingConfiguratorInterface getSwingConfiguratorForClass(Class clazz) {
+    public static SwingConfiguratorInterface getSwingConfiguratorForClass(Class<?> clazz) {
         SwingConfiguratorInterface adapter = null;
         try {
             adapter = (SwingConfiguratorInterface) Class.forName(adapterNameForClass(clazz)).getDeclaredConstructor().newInstance();
-        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException 
+        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException
                     | NoSuchMethodException | java.lang.reflect.InvocationTargetException ex) {
             log.error("Cannot load SwingConfiguratorInterface adapter for {}", clazz.getName(), ex);
         }
@@ -89,6 +91,6 @@ public final class SwingTools {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SwingTools.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SwingTools.class);
 
 }

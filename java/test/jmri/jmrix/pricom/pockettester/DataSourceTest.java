@@ -1,9 +1,13 @@
 package jmri.jmrix.pricom.pockettester;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import jmri.util.JUnitUtil;
-import org.junit.Assert;
-import org.junit.Assume;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
 import org.junit.jupiter.api.*;
 
 /**
@@ -11,33 +15,32 @@ import org.junit.jupiter.api.*;
  *
  * @author Bob Jacobsen Copyright 2005
  */
+@DisabledIfHeadless
 public class DataSourceTest {
 
     @Test
     public void testCreate() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("no instance before ctor", DataSource.instance() == null);
+        assertNull( DataSource.instance() , "no instance before ctor");
         DataSource d = new DataSource();
-        Assert.assertTrue("no instance after ctor", DataSource.instance() == null);
+        assertNull( DataSource.instance() , "no instance after ctor");
         d.initComponents();
-        Assert.assertTrue("valid instance after init", DataSource.instance() != null);
+        assertNotNull( DataSource.instance(), "valid instance after init");
         d.dispose();
     }
 
     // test version handling
     @Test
     public void testVersion() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         DataSource f = new DataSource();
         String message;
 
         message = "nothing interesing";
         f.nextLine(message);
-        Assert.assertTrue("pass misc ", !message.equals(f.version.getText()));
+        assertNotEquals( message, f.version.getText(), "pass misc ");
 
         message = TestConstants.version;
         f.nextLine(message);
-        Assert.assertTrue("show version ", message.equals(f.version.getText()));
+        assertEquals( message, f.version.getText(), "show version ");
 
         f.dispose();
     }
@@ -46,13 +49,12 @@ public class DataSourceTest {
     @BeforeEach
     public void setup() {
         JUnitUtil.setUp();
-        jmri.util.JUnitUtil.resetProfileManager();
-
-        DataSource.existingInstance = null;
+        JUnitUtil.resetProfileManager();
+        DataSource.setInstance(null);
     }
 
     @AfterEach
-    public void tearDown() throws Exception {
+    public void tearDown() {
         JUnitUtil.tearDown();
     }
 

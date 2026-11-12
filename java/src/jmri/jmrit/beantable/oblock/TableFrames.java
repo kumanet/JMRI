@@ -13,6 +13,7 @@ import javax.swing.*;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 
 import jmri.*;
@@ -28,12 +29,11 @@ import jmri.util.SystemType;
 import jmri.util.com.sun.TransferActionListener;
 import jmri.util.gui.GuiLafPreferencesManager;
 import jmri.util.swing.XTableColumnModel;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.table.ButtonEditor;
 import jmri.util.table.ButtonRenderer;
 import jmri.util.table.ToggleButtonEditor;
 import jmri.util.table.ToggleButtonRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * GUI to define OBlocks.
@@ -56,16 +56,17 @@ import org.slf4j.LoggerFactory;
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
  *
  * @author Pete Cressman (C) 2010
+ * @author Egbert Broerse (C) 2019
  * @author Egbert Broerse (C) 2020
  */
-public class TableFrames implements InternalFrameListener {
+public class TableFrames implements InternalFrameListener, Disposable {
 
     public static final int ROW_HEIGHT = (new JButton("X").getPreferredSize().height)*9/10;
     public static final int STRUT_SIZE = 10;
     protected static final String SET_CLOSED = jmri.InstanceManager.turnoutManagerInstance().getClosedText();
     protected static final String SET_THROWN = jmri.InstanceManager.turnoutManagerInstance().getThrownText();
     private static String oblockPrefix;
-    private final static String portalPrefix = "IP";
+    private static final String PORTAL_PREFIX = "IP";
     private String _title;
 
     private JTable _oBlockTable;
@@ -81,9 +82,7 @@ public class TableFrames implements InternalFrameListener {
     private boolean pathEdit = false;
 
     private JmriJFrame desktopframe;
-    private JDesktopPane _desktop;
-    private final int maxHeight = 600;
-    private final int maxWidth = 1100;
+    private static final int MAX_HEIGHT = 600;
     private JInternalFrame _blockTableFrame;
     private JInternalFrame _portalTableFrame;
     private JInternalFrame _blockPortalXRefFrame;
@@ -93,9 +92,7 @@ public class TableFrames implements InternalFrameListener {
     private JMenuItem _showWarnItem;
     private JMenu tablesMenu;
     private JMenuItem openBlock;
-    private JMenuItem openPortal;
-    private JMenuItem openXRef;
-    private JMenuItem openSignal;
+    private JMenuItem _setUnits;
 
     private final HashMap<String, BlockPathFrame> _blockPathMap = new HashMap<>();
     private final HashMap<String, PathTurnoutFrame> _pathTurnoutMap = new HashMap<>();
@@ -114,6 +111,7 @@ public class TableFrames implements InternalFrameListener {
         // create the tables
         _oBlockModel = new OBlockTableModel(this);
         _portalModel = new PortalTableModel(this);
+        _portalModel.initListeners();
         _blockPortalXRefModel = new BlockPortalTableModel(_oBlockModel);
         _signalModel = new SignalTableModel(this);
         _signalModel.init();
@@ -277,20 +275,25 @@ public class TableFrames implements InternalFrameListener {
 
     // for desktop style interface, ignored for _tabbed
     private void createDesktop() {
-        _desktop = new JDesktopPane();
-        _desktop.putClientProperty("JDesktopPane.dragMode", "outline"); // slower or faster?
-        _desktop.setPreferredSize(new Dimension(1100, 600));
-        _desktop.setBackground(new Color(180,180,180));
-        desktopframe.setContentPane(_desktop);
+        JDesktopPane desktop = new JDesktopPane();
+        desktop.putClientProperty("JDesktopPane.dragMode", "outline"); // slower or faster?
+        int deskWidth = _blockTableFrame.getWidth();
+        int deskHeight = _blockTableFrame.getHeight();
+//        _desktop.setPreferredSize(new Dimension(deskWidth,
+//                deskHeight + _portalTableFrame.getHeight() + 100));
+        desktop.setBackground(new Color(180,180,180));
+        desktopframe.setContentPane(desktop);
+        desktopframe.setPreferredSize(new Dimension(deskWidth + 16,
+                deskHeight + _portalTableFrame.getHeight() + 64));
 
         // placed at 0,0
-        _desktop.add(_blockTableFrame);
-        _portalTableFrame.setLocation(0, 320);
-        _desktop.add(_portalTableFrame);
-        _signalTableFrame.setLocation(350, 400);
-        _desktop.add(_signalTableFrame);
-        _blockPortalXRefFrame.setLocation(700, 20);
-        _desktop.add(_blockPortalXRefFrame);
+        desktop.add(_blockTableFrame);
+        _portalTableFrame.setLocation(0, deskHeight);
+        desktop.add(_portalTableFrame);
+        _signalTableFrame.setLocation(200, deskHeight+100);
+        desktop.add(_signalTableFrame);
+        _blockPortalXRefFrame.setLocation(deskWidth - _blockPortalXRefFrame.getWidth(), deskHeight);
+        desktop.add(_blockPortalXRefFrame);
     }
 
     public JMenu getOptionMenu() {
@@ -311,6 +314,10 @@ public class TableFrames implements InternalFrameListener {
         if (jmri.InstanceManager.getNullableDefault(jmri.BlockManager.class) == null) { // means Block list is empty
             importBlocksItem.setEnabled(false);
         }
+        _setUnits = new JMenuItem(Bundle.getMessage("changeUnits",
+                (_oBlockModel.isMetric() ? Bundle.getMessage("LengthInches") : Bundle.getMessage("LengthCentimeters"))));
+        _setUnits.addActionListener(event -> setUnits());
+        optionMenu.add(_setUnits);
         return optionMenu;
     }
 
@@ -340,8 +347,7 @@ public class TableFrames implements InternalFrameListener {
     /**
      * Convert a copy of your current JMRI Blocks to OBlocks and connect them with Portals and Paths.
      * Accessed from the Options menu.
-     *
-     * @author Egbert Broerse 2019
+     * @throws IllegalArgumentException exception
      */
     protected void importBlocks() throws IllegalArgumentException {
         Manager<Block> bm = InstanceManager.getDefault(jmri.BlockManager.class);
@@ -351,15 +357,15 @@ public class TableFrames implements InternalFrameListener {
         // don't return an element if there are no Blocks to include
         if (blkList.isEmpty()) {
             log.warn("no Blocks to convert"); // NOI18N
-            JOptionPane.showMessageDialog(desktopframe, Bundle.getMessage("ImportNoBlocks"),
-                    Bundle.getMessage("InfoTitle"), JOptionPane.INFORMATION_MESSAGE);
+            JmriJOptionPane.showMessageDialog(desktopframe, Bundle.getMessage("ImportNoBlocks"),
+                    Bundle.getMessage("InfoTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
             return;
         } else {
             if (_showWarnings) {
-                int reply = JOptionPane.showOptionDialog(null,
+                int reply = JmriJOptionPane.showOptionDialog(null,
                         Bundle.getMessage("ImportBlockConfirm", oblockPrefix(), blkList.size()),
                         Bundle.getMessage("QuestionTitle"),
-                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, null,
+                        JmriJOptionPane.YES_NO_OPTION, JmriJOptionPane.QUESTION_MESSAGE, null,
                         new Object[]{Bundle.getMessage("ButtonYes"),
                                 Bundle.getMessage("ButtonCancel")},
                         Bundle.getMessage("ButtonYes")); // standard JOptionPane can't be found in Jemmy log4J
@@ -406,10 +412,10 @@ public class TableFrames implements InternalFrameListener {
                     log.debug("Start loop: Path {} on Block {}", n, oBlockName);
                     String toBlockNumber = pa.getBlock().getSystemName().substring(sName.startsWith("IB:AUTO:") ? 8 : 3);
                     toBlockName = oblockPrefix() + toBlockNumber;
-                    String portalName = portalPrefix + toBlockNumber + "-" + blockNumber; // reversed name for new Portal
+                    String portalName = PORTAL_PREFIX + toBlockNumber + "-" + blockNumber; // reversed name for new Portal
                     port = pom.getPortal(portalName);
                     if (port == null) {
-                        portalName = portalPrefix + blockNumber + "-" + toBlockNumber; // normal name for new Portal
+                        portalName = PORTAL_PREFIX + blockNumber + "-" + toBlockNumber; // normal name for new Portal
                         log.debug("new Portal {} on block {}, path #{}", portalName, toBlockName, n);
                         port = pom.providePortal(portalName); // normally, will create a new Portal
                         port.setFromBlock(oBlock, false);
@@ -447,7 +453,8 @@ public class TableFrames implements InternalFrameListener {
                     p0.setToPortal(port);
                 }
             } catch (IllegalArgumentException iae) {
-                log.error(iae.toString());
+                log.error("Could not convert Block {} to OBlock. {}",
+                    b.getDisplayName(NamedBean.DisplayOptions.USERNAME_SYSTEMNAME), iae.getMessage());
             }
             // finished setting up 1 OBlock
         }
@@ -468,10 +475,10 @@ public class TableFrames implements InternalFrameListener {
         // storing and reloading will add in these items
         WarrantTableAction.getDefault().errorCheck();
         if (_showWarnings) {
-            JOptionPane.showMessageDialog(null,
+            JmriJOptionPane.showMessageDialog(null,
                     Bundle.getMessage("ImportBlockComplete", blkList.size(), oblkList.size()),
                     Bundle.getMessage("MessageTitle"),
-                    JOptionPane.INFORMATION_MESSAGE); // standard JOptionPane can't be found in Jemmy log4J
+                    JmriJOptionPane.INFORMATION_MESSAGE); // standard JOptionPane can't be found in Jemmy log4J
         }
     }
     // End of importBlocks() menu method
@@ -487,6 +494,12 @@ public class TableFrames implements InternalFrameListener {
             _showWarnItem.setText(Bundle.getMessage("ShowWarning"));
         }
         log.debug("setShowWarnings: _showWarnings= {}", _showWarnings);
+    }
+
+    private void setUnits() {
+        _oBlockModel.changeUnits();
+        _setUnits.setText(Bundle.getMessage("changeUnits",
+                (_oBlockModel.isMetric() ? Bundle.getMessage("LengthInches") : Bundle.getMessage("LengthCentimeters"))));
     }
 
     // listen for _desktopframe closing
@@ -525,15 +538,15 @@ public class TableFrames implements InternalFrameListener {
             tablesMenu.add(openBlock);
             openBlock.addActionListener(event -> showHideFrame(_blockTableFrame, openBlock, "OpenBlockMenu"));
 
-            openPortal = new JMenuItem(Bundle.getMessage("OpenPortalMenu", Bundle.getMessage("HideTable")));
+            JMenuItem openPortal = new JMenuItem(Bundle.getMessage("OpenPortalMenu", Bundle.getMessage("HideTable")));
             tablesMenu.add(openPortal);
             openPortal.addActionListener(event -> showHideFrame(_portalTableFrame, openPortal, "OpenPortalMenu"));
 
-            openXRef = new JMenuItem(Bundle.getMessage("OpenXRefMenu", Bundle.getMessage("ShowTable")));
+            JMenuItem openXRef = new JMenuItem(Bundle.getMessage("OpenXRefMenu", Bundle.getMessage("ShowTable")));
             tablesMenu.add(openXRef);
             openXRef.addActionListener(event -> showHideFrame(_blockPortalXRefFrame, openXRef, "OpenXRefMenu"));
 
-            openSignal = new JMenuItem(Bundle.getMessage("OpenSignalMenu", Bundle.getMessage("ShowTable")));
+            JMenuItem openSignal = new JMenuItem(Bundle.getMessage("OpenSignalMenu", Bundle.getMessage("ShowTable")));
             tablesMenu.add(openSignal);
             openSignal.addActionListener(event -> showHideFrame(_signalTableFrame, openSignal, "OpenSignalMenu"));
         }
@@ -547,7 +560,7 @@ public class TableFrames implements InternalFrameListener {
             openBlockPathPane(blockSystemName, Bundle.getMessage("TitlePaths")); // handles both interfaces
         };
 
-        if (manager.getNamedBeanSet().size() == 0) {
+        if (manager.getNamedBeanSet().isEmpty()) {
             JMenuItem mi = new JMenuItem(Bundle.getMessage("NoBlockPathYet"));
             mi.setEnabled(false);
             openBlockPath.add(mi);
@@ -563,7 +576,7 @@ public class TableFrames implements InternalFrameListener {
 
         // Path-Turnout submenus
         JMenu openTurnoutPath = new JMenu(Bundle.getMessage("OpenBlockPathTurnoutMenu"));
-        if (manager.getNamedBeanSet().size() == 0) {
+        if (manager.getNamedBeanSet().isEmpty()) {
             JMenuItem mi = new JMenuItem(Bundle.getMessage("NoPathTurnoutYet"));
             mi.setEnabled(false);
             openTurnoutPath.add(mi);
@@ -719,16 +732,20 @@ public class TableFrames implements InternalFrameListener {
         }
         _oBlockTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         _oBlockTable.setRowHeight(ROW_HEIGHT);
-        _oBlockTable.setPreferredScrollableViewportSize(new java.awt.Dimension(maxWidth,
-                Math.min(TableFrames.ROW_HEIGHT * 10, maxHeight)));
 
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.REPORTERCOL), false);
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.REPORT_CURRENTCOL), false);
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.PERMISSIONCOL), false);
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.WARRANTCOL), false);
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.ERR_SENSORCOL), false);
-        tcm.setColumnVisible(tcm.getColumnByModelIndex(OBlockTableModel.CURVECOL), false);
+        TableColumn column = tcm.getColumnByModelIndex(OBlockTableModel.REPORTERCOL);
+        tcm.setColumnVisible(column, false);
+        column = tcm.getColumnByModelIndex(OBlockTableModel.REPORT_CURRENTCOL);
+        tcm.setColumnVisible(column, false);
+        column = tcm.getColumnByModelIndex(OBlockTableModel.PERMISSIONCOL);
+        tcm.setColumnVisible(column, false);
+        column = tcm.getColumnByModelIndex(OBlockTableModel.ERR_SENSORCOL);
+        tcm.setColumnVisible(column, false);
+        column = tcm.getColumnByModelIndex(OBlockTableModel.CURVECOL);
+        tcm.setColumnVisible(column, false);
 
+        _oBlockTable.setPreferredScrollableViewportSize(new java.awt.Dimension(_oBlockTable.getPreferredSize().width,
+                ROW_HEIGHT * Math.min(20, InstanceManager.getDefault(OBlockManager.class).getObjectCount())));
         return _oBlockTable;
     }
 
@@ -860,7 +877,8 @@ public class TableFrames implements InternalFrameListener {
         _portalTable.doLayout();
         int tableWidth = _portalTable.getPreferredSize().width;
         _portalTable.setRowHeight(ROW_HEIGHT);
-        _portalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth, TableFrames.ROW_HEIGHT * 10));
+        _portalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth,
+                ROW_HEIGHT * Math.min(20, InstanceManager.getDefault(PortalManager.class).getPortalCount())));
         return _portalTable;
     }
 
@@ -880,8 +898,9 @@ public class TableFrames implements InternalFrameListener {
         }
         _blockPortalTable.doLayout();
         _blockPortalTable.setRowHeight(ROW_HEIGHT);
-        _blockPortalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(maxWidth/3,
-                Math.min(TableFrames.ROW_HEIGHT * 20, maxHeight)));
+        int tableWidth = _blockPortalTable.getPreferredSize().width;
+        _blockPortalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth,
+                ROW_HEIGHT * Math.min(20, InstanceManager.getDefault(PortalManager.class).getPortalCount())));
 
         return _blockPortalTable;
     }
@@ -910,8 +929,8 @@ public class TableFrames implements InternalFrameListener {
         _signalTable.doLayout();
         int tableWidth = _signalTable.getPreferredSize().width;
         _signalTable.setRowHeight(ROW_HEIGHT);
-        _signalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth*2/3,
-                Math.min(TableFrames.ROW_HEIGHT * 8, maxHeight)));
+        _signalTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth,
+                ROW_HEIGHT * Math.min(10, _signalTable.getRowCount())));
         return _signalTable;
     }
 
@@ -963,7 +982,7 @@ public class TableFrames implements InternalFrameListener {
             try {
                 frame.setIcon(false);
             } catch (PropertyVetoException pve) {
-                log.warn("BlockPath Table Frame for \"{}\" vetoed setIcon {}", blockSystemName, pve);
+                log.warn("BlockPath Table Frame for \"{}\" vetoed setIcon", blockSystemName, pve);
             }
         }
         frame.moveToFront();
@@ -986,7 +1005,7 @@ public class TableFrames implements InternalFrameListener {
 
     // *************** Block-Path InternalFrame for _desktop ***********************
 
-    protected BlockPathFrame makeBlockPathFrame(OBlock block) {
+    protected BlockPathFrame makeBlockPathFrame(@Nonnull OBlock block) {
         String title = Bundle.getMessage("TitleBlockPathTable", block.getDisplayName());
         // create table
         BlockPathTableModel model = new BlockPathTableModel(block, this);
@@ -1004,7 +1023,7 @@ public class TableFrames implements InternalFrameListener {
 
     // *************** Block-Path Edit Panel for _tabbed ***********************
 
-    protected BlockPathJPanel makeBlockPathEditPanel(OBlock block) {
+    protected BlockPathJPanel makeBlockPathEditPanel(@Nonnull OBlock block) {
         // Path Table placed on jmri.jmrit.beanedit OBlockEditAction - Paths tab
         String title = Bundle.getMessage("TitleBlockPathEditor", block.getDisplayName());
         // create table
@@ -1050,6 +1069,10 @@ public class TableFrames implements InternalFrameListener {
         return pathEdit;
     }
 
+    @Override
+    public void dispose() {
+        _portalModel.dispose();
+    }
 
     // ***************** Block-Path Frame class for _desktop **************************
     protected static class BlockPathFrame extends JInternalFrame {
@@ -1134,7 +1157,7 @@ public class TableFrames implements InternalFrameListener {
         blockPathTable.doLayout();
         int tableWidth = blockPathTable.getPreferredSize().width;
         blockPathTable.setRowHeight(ROW_HEIGHT);
-        blockPathTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth, Math.min(TableFrames.ROW_HEIGHT * 10, maxHeight)));
+        blockPathTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth, Math.min(TableFrames.ROW_HEIGHT * 10, MAX_HEIGHT)));
 
         return blockPathTable;
     }
@@ -1297,7 +1320,7 @@ public class TableFrames implements InternalFrameListener {
         int tableWidth = pathTurnoutTable.getPreferredSize().width;
         pathTurnoutTable.setRowHeight(ROW_HEIGHT);
         pathTurnoutTable.setPreferredScrollableViewportSize(new java.awt.Dimension(tableWidth,
-            Math.min(TableFrames.ROW_HEIGHT * 5, maxHeight)));
+            Math.min(TableFrames.ROW_HEIGHT * 5, MAX_HEIGHT)));
 
         return pathTurnoutTable;
     }
@@ -1341,7 +1364,7 @@ public class TableFrames implements InternalFrameListener {
             try {
                 frame.setIcon(false);
             } catch (PropertyVetoException pve) {
-                log.warn("PathTurnout Table Frame for \"{}\" vetoed setIcon {}", pathTurnoutName, pve);
+                log.warn("PathTurnout Table Frame for \"{}\" vetoed setIcon", pathTurnoutName, pve);
             }
         }
         frame.moveToFront();
@@ -1375,9 +1398,9 @@ public class TableFrames implements InternalFrameListener {
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.PAGE_AXIS));
         p.add(turnouttable);
-        JButton ok;
-        p.add(ok = new JButton(Bundle.getMessage("ButtonOK"))); // no need to save things, handled by TurnoutTable
-        ok.addActionListener((ActionEvent e) -> frame.dispose());
+        JButton ok = new JButton(Bundle.getMessage("ButtonOK"));
+        p.add(ok); // no need to save things, handled by TurnoutTable
+        ok.addActionListener( e -> frame.dispose());
         frame.getContentPane().add(p);
         frame.pack();
         frame.setVisible(true);
@@ -1429,13 +1452,13 @@ public class TableFrames implements InternalFrameListener {
 
         JPanel btns = new JPanel();
         btns.setLayout(new BoxLayout(btns, BoxLayout.LINE_AXIS));
-        JButton cancel;
-        btns.add(cancel = new JButton(Bundle.getMessage("ButtonCancel")));
-        cancel.addActionListener((ActionEvent e) -> frame.dispose());
-        JButton ok;
-        btns.add(ok = new JButton(Bundle.getMessage("ButtonOK")));
-        ok.addActionListener((ActionEvent e) -> {
-            if (turnoutBox.getSelectedItem() == null || turnoutBox.getSelectedIndex() == 0) {
+        JButton cancel = new JButton(Bundle.getMessage("ButtonCancel"));
+        btns.add(cancel);
+        cancel.addActionListener( e -> frame.dispose());
+        JButton ok = new JButton(Bundle.getMessage("ButtonOK"));
+        btns.add(ok);
+        ok.addActionListener( e -> {
+            if (turnoutBox.getSelectedItem() == null || turnoutBox.getSelectedIndex() < 0) {
                 statusBar.setText(Bundle.getMessage("WarningSelectionEmpty"));
                 statusBar.setForeground(Color.red);
             } else {
@@ -1475,9 +1498,9 @@ public class TableFrames implements InternalFrameListener {
         int val = 0;
         if (_showWarnings) {
             // verify deletion
-            val = JOptionPane.showOptionDialog(null,
+            val = JmriJOptionPane.showOptionDialog(null,
                     message, Bundle.getMessage("WarningTitle"),
-                    JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null,
+                    JmriJOptionPane.YES_NO_CANCEL_OPTION, JmriJOptionPane.QUESTION_MESSAGE, null,
                     new Object[]{Bundle.getMessage("ButtonYes"),
                         Bundle.getMessage("ButtonYesPlus"),
                         Bundle.getMessage("ButtonNo")},
@@ -1517,8 +1540,8 @@ public class TableFrames implements InternalFrameListener {
             if (frame instanceof BlockPathFrame) {
                 String msg = WarrantTableAction.getDefault().checkPathPortals(((BlockPathFrame) frame).getModel().getBlock());
                 if (!msg.isEmpty()) {
-                    JOptionPane.showMessageDialog(desktopframe, msg,
-                            Bundle.getMessage("InfoTitle"), JOptionPane.INFORMATION_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(desktopframe, msg,
+                            Bundle.getMessage("InfoTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
                 }
                 ((BlockPathFrame) frame).getModel().removeListener();
             }
@@ -1552,8 +1575,8 @@ public class TableFrames implements InternalFrameListener {
         if (name != null && name.startsWith(oblockPrefix())) {
             if (frame instanceof BlockPathFrame) {
                 String msg = WarrantTableAction.getDefault().checkPathPortals(((BlockPathFrame) frame).getModel().getBlock());
-                JOptionPane.showMessageDialog(desktopframe, msg,
-                    Bundle.getMessage("InfoTitle"), JOptionPane.INFORMATION_MESSAGE);
+                JmriJOptionPane.showMessageDialog(desktopframe, msg,
+                    Bundle.getMessage("InfoTitle"), JmriJOptionPane.INFORMATION_MESSAGE);
             }
         }
     }
@@ -1576,6 +1599,6 @@ public class TableFrames implements InternalFrameListener {
         //log.debug("Internal frame deactivated: {}", frame.getTitle());
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TableFrames.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TableFrames.class);
 
 }

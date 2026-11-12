@@ -1,9 +1,11 @@
 package jmri.jmrix.nce.simulator;
 
-import jmri.util.JUnitUtil;
-
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import jmri.util.JUnitUtil;
 
 /**
  *
@@ -33,7 +35,7 @@ public class SimulatorAdapterTest {
 
     @Test
     public void testBaudRates(){
-       Assert.assertEquals("empty baud rates array for simulator", new String[]{}, adapter.validBaudRates());
+       Assert.assertArrayEquals("empty baud rates array for simulator", new String[]{}, adapter.validBaudRates());
        Assert.assertEquals("no currentbaudrate set for simulator","", adapter.getCurrentBaudRate());
     }
 
@@ -50,6 +52,6 @@ public class SimulatorAdapterTest {
         adapter = null;
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SimulatorAdapterTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SimulatorAdapterTest.class);
 
 }

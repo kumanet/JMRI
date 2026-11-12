@@ -1,13 +1,14 @@
 package jmri.jmrit.display;
 
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 import javax.swing.AbstractAction;
@@ -18,22 +19,32 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+
+import jmri.InstanceManager;
+import jmri.JmriUncheckedException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jmri.jmrit.display.palette.ItemPanel;
 import jmri.jmrit.display.palette.TextItemPanel;
+import jmri.jmrit.logixng.LogixNG;
+import jmri.jmrit.logixng.LogixNG_Manager;
+import jmri.util.swing.JmriMouseEvent;
+import jmri.util.swing.JmriMouseListener;
+import jmri.util.swing.JmriMouseMotionListener;
 
 /**
  * <a href="doc-files/Heirarchy.png"><img src="doc-files/Heirarchy.png" alt="UML class diagram for package" height="33%" width="33%"></a>
  * @author Bob Jacobsen copyright (C) 2009
  */
-public class PositionableJPanel extends JPanel implements Positionable, MouseListener, MouseMotionListener {
+public class PositionableJPanel extends JPanel implements Positionable, JmriMouseListener, JmriMouseMotionListener {
 
     protected Editor _editor = null;
 
     private String _id;            // user's Id or null if no Id
+    private final Set<String> _classes = new HashSet<>(); // user's classes
 
     private ToolTip _tooltip;
     protected boolean _showTooltip = true;
@@ -42,14 +53,43 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
     protected boolean _viewCoordinates = false;
     protected boolean _controlling = true;
     protected boolean _hidden = false;
+    protected boolean _emptyHidden = false;
     protected int _displayLevel;
     private double _scale = 1.0;    // scaling factor
 
     JMenuItem lock = null;
     JCheckBoxMenuItem showTooltipItem = null;
 
+    private LogixNG _logixNG;
+    private String _logixNG_SystemName;
+
     public PositionableJPanel(Editor editor) {
         _editor = editor;
+    }
+
+    /**
+     * Hit testing must use the same scaled bounds as painting in an editor
+     * with a paint scale other than 1.0.
+     *
+     * @param x the x coordinate relative to this panel
+     * @param y the y coordinate relative to this panel
+     * @return true if the point is inside the displayed panel
+     */
+    @Override
+    public boolean contains(int x, int y) {
+        if (_editor == null || _editor.getTargetPanel() == null || getParent() == null) {
+            return super.contains(x, y);
+        }
+        double scale = _editor.getPaintScale();
+        if (scale == 1.0) {
+            return super.contains(x, y);
+        }
+
+        Point origin = SwingUtilities.convertPoint(this, 0, 0, _editor.getTargetPanel());
+        double unscaledX = (x + origin.x) / scale - origin.x;
+        double unscaledY = (y + origin.y) / scale - origin.y;
+        return unscaledX >= 0 && unscaledX < getWidth()
+                && unscaledY >= 0 && unscaledY < getHeight();
     }
 
     @Override
@@ -88,6 +128,35 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
     @Override
     public String getId() {
         return _id;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void addClass(String className) {
+        _editor.positionalAddClass(this, className);
+        _classes.add(className);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void removeClass(String className) {
+        _editor.positionalRemoveClass(this, className);
+        _classes.remove(className);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void removeAllClasses() {
+        for (String className : _classes) {
+            _editor.positionalRemoveClass(this, className);
+        }
+        _classes.clear();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Set<String> getClasses() {
+        return java.util.Collections.unmodifiableSet(_classes);
     }
 
     @Override
@@ -132,7 +201,10 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
 
     @Override
     public void setHidden(boolean hide) {
-        _hidden = hide;
+        if (_hidden != hide) {
+            _hidden = hide;
+            showHidden();
+        }
     }
 
     @Override
@@ -147,6 +219,25 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
         } else {
             setVisible(false);
         }
+    }
+
+    @Override
+    public void setEmptyHidden(boolean hide) {
+        _emptyHidden = hide;
+    }
+
+    @Override
+    public boolean isEmptyHidden() {
+        return _emptyHidden;
+    }
+
+    @Override
+    public void setValueEditDisabled(boolean isDisabled) {
+    }
+
+    @Override
+    public boolean isValueEditDisabled() {
+        return false;
     }
 
     public void setLevel(int l) {
@@ -211,6 +302,12 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
     @Override
     public JComponent getTextComponent() {
         return this;
+    }
+
+    @Override
+    @Nonnull
+    public String getTypeString() {
+        return Bundle.getMessage("PositionableType_PositionableJPanel");
     }
 
     @Override
@@ -293,31 +390,31 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
 
     // overide where used - e.g. momentary
     @Override
-    public void doMousePressed(MouseEvent event) {
+    public void doMousePressed(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseReleased(MouseEvent event) {
+    public void doMouseReleased(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseClicked(MouseEvent event) {
+    public void doMouseClicked(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseDragged(MouseEvent event) {
+    public void doMouseDragged(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseMoved(MouseEvent event) {
+    public void doMouseMoved(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseEntered(MouseEvent event) {
+    public void doMouseEntered(JmriMouseEvent event) {
     }
 
     @Override
-    public void doMouseExited(MouseEvent event) {
+    public void doMouseExited(JmriMouseEvent event) {
     }
 
     @Override
@@ -428,54 +525,49 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
         return active;
     }
 
-    @Override
-    public void mousePressed(MouseEvent e) {
-        _editor.mousePressed(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    private JmriMouseEvent toEditorMouseEvent(JmriMouseEvent event) {
+        Component source = event.getComponent();
+        Point point = SwingUtilities.convertPoint(source, event.getPoint(), _editor.getTargetPanel());
+        double scale = _editor.getPaintScale();
+        return new JmriMouseEvent(this, event.getID(), event.getWhen(), event.getModifiersEx(),
+                (int) Math.round(point.x * scale), (int) Math.round(point.y * scale),
+                event.getClickCount(), event.isPopupTrigger(), event.getButton());
     }
 
     @Override
-    public void mouseReleased(MouseEvent e) {
-        _editor.mouseReleased(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    public void mousePressed(JmriMouseEvent e) {
+        _editor.mousePressed(toEditorMouseEvent(e));
     }
 
     @Override
-    public void mouseClicked(MouseEvent e) {
-        _editor.mouseClicked(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    public void mouseReleased(JmriMouseEvent e) {
+        _editor.mouseReleased(toEditorMouseEvent(e));
     }
 
     @Override
-    public void mouseExited(MouseEvent e) {
+    public void mouseClicked(JmriMouseEvent e) {
+        _editor.mouseClicked(toEditorMouseEvent(e));
+    }
+
+    @Override
+    public void mouseExited(JmriMouseEvent e) {
 //     transferFocus();
-        _editor.mouseExited(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+        _editor.mouseExited(toEditorMouseEvent(e));
     }
 
     @Override
-    public void mouseEntered(MouseEvent e) {
-        _editor.mouseEntered(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    public void mouseEntered(JmriMouseEvent e) {
+        _editor.mouseEntered(toEditorMouseEvent(e));
     }
 
     @Override
-    public void mouseMoved(MouseEvent e) {
-        _editor.mouseMoved(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    public void mouseMoved(JmriMouseEvent e) {
+        _editor.mouseMoved(toEditorMouseEvent(e));
     }
 
     @Override
-    public void mouseDragged(MouseEvent e) {
-        _editor.mouseDragged(new MouseEvent(this, e.getID(), e.getWhen(), e.getModifiersEx(),
-                e.getX() + this.getX(), e.getY() + this.getY(),
-                e.getClickCount(), e.isPopupTrigger()));
+    public void mouseDragged(JmriMouseEvent e) {
+        _editor.mouseDragged(toEditorMouseEvent(e));
     }
 
     /**
@@ -575,5 +667,36 @@ public class PositionableJPanel extends JPanel implements Positionable, MouseLis
         return null;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PositionableJPanel.class);
+    /** {@inheritDoc} */
+    @Override
+    public LogixNG getLogixNG() {
+        return _logixNG;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setLogixNG(LogixNG logixNG) {
+        this._logixNG = logixNG;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setLogixNG_SystemName(String systemName) {
+        this._logixNG_SystemName = systemName;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setupLogixNG() {
+        _logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
+                .getBySystemName(_logixNG_SystemName);
+        if (_logixNG == null) {
+            throw new JmriUncheckedException(String.format(
+                    "LogixNG %s is not found for positional %s in panel %s",
+                    _logixNG_SystemName, getNameString(), getEditor().getName()));
+        }
+        _logixNG.setInlineLogixNG(this);
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(PositionableJPanel.class);
 }

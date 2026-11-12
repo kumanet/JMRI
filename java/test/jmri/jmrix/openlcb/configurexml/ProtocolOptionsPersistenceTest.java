@@ -1,8 +1,7 @@
 package jmri.jmrix.openlcb.configurexml;
 
-import org.hamcrest.core.IsCollectionContaining;
-
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import org.junit.jupiter.api.*;
 
@@ -18,25 +17,31 @@ import jmri.jmrix.ConnectionConfigManager;
 import jmri.jmrix.PortAdapter;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.profile.Profile;
+import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 import jmri.util.prefs.HasConnectionButUnableToConnectException;
 
 /**
  * @author Balazs Racz, (C) 2018.
  */
-
 public class ProtocolOptionsPersistenceTest {
 
-    private Path workspace;
+    private Path workspace = null;
     private Profile profile;
     private ConnectionConfigManager connectionConfigManager;
     private CanSystemConnectionMemo canSystemConnectionMemo;
     private String profileId;
     private PortAdapter adapter;
 
+    @BeforeAll
+    public static void checkSeparate() {
+       // this test is run separately because it leaves a lot of threads behind
+        assumeFalse( Boolean.getBoolean("jmri.skipTestsRequiringSeparateRunning"), "Ignoring intermittent test");
+    }
+
     @BeforeEach
     public void setUp() {
-        jmri.util.JUnitUtil.setUp();
+        JUnitUtil.setUp();
         this.workspace = FileSystems.getDefault().getPath("/tmp/testprofile");
         //this.workspace = Files.createTempDirectory(this.getClass().getSimpleName());
         JUnitUtil.resetInstanceManager();
@@ -45,12 +50,13 @@ public class ProtocolOptionsPersistenceTest {
 
     @AfterEach
     public void tearDown() {
-        jmri.util.JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
+        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
 
         JUnitUtil.resetProfileManager();
         JUnitUtil.resetFileUtilSupport();
         //FileUtil.delete(this.workspace.toFile());
-        jmri.util.JUnitUtil.tearDown();
+        JUnitAppender.suppressWarnMessage("Can't get IP address to make NodeID. You should set a NodeID in the Connection preferences.");
+        JUnitUtil.tearDown();
     }
 
     private void resetSystem() {
@@ -68,6 +74,7 @@ public class ProtocolOptionsPersistenceTest {
 
     private void createEmptyProfile() throws IOException, HasConnectionButUnableToConnectException {
         profileId = Long.toString((new Date()).getTime());
+        Assertions.assertNotNull(this.workspace);
         profile = new Profile(this.getClass().getSimpleName(), profileId, new File(this.workspace.toFile(), profileId));
         JUnitUtil.initConnectionConfigManager();
         connectionConfigManager = InstanceManager.getDefault(ConnectionConfigManager.class);
@@ -93,6 +100,7 @@ public class ProtocolOptionsPersistenceTest {
 
         JUnitUtil.initConnectionConfigManager();
         connectionConfigManager = InstanceManager.getDefault(ConnectionConfigManager.class);
+        assertNotNull(this.workspace);
         profile = new Profile(new File(this.workspace.toFile(), profileId));
         connectionConfigManager.initialize(profile);
 
@@ -153,17 +161,32 @@ public class ProtocolOptionsPersistenceTest {
 
         saveAndRestart();
         assertEquals("Hello, World", canSystemConnectionMemo.getProtocolOption("Ident", "UserName"));
-        assertThat(canSystemConnectionMemo.getProtocolsWithOptions(), IsCollectionContaining.hasItems("Ident", "Throttles", "Single"));
+
+        assertTrue( canSystemConnectionMemo.getProtocolsWithOptions().contains("Ident"),
+            "getProtocolsWithOptions has Ident");
+        assertTrue( canSystemConnectionMemo.getProtocolsWithOptions().contains("Throttles"),
+            "getProtocolsWithOptions has Throttles");
+        assertTrue( canSystemConnectionMemo.getProtocolsWithOptions().contains("Single"),
+            "getProtocolsWithOptions has Single");
         assertEquals(3, canSystemConnectionMemo.getProtocolsWithOptions().size());
 
-        assertThat(canSystemConnectionMemo.getProtocolAllOptions("Ident").keySet(), IsCollectionContaining.hasItems("UserName", "Description"));
-        assertEquals(2, canSystemConnectionMemo.getProtocolAllOptions("Ident").keySet().size());
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Ident").keySet().contains("UserName"),
+            "Ident has UserName");
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Ident").keySet().contains("Description"),
+            "Ident has Description");
+        assertEquals(2, canSystemConnectionMemo.getProtocolAllOptions("Ident").size());
 
-        assertThat(canSystemConnectionMemo.getProtocolAllOptions("Throttles").keySet(), IsCollectionContaining.hasItems("Used", "Steal", "MaxFn"));
-        assertEquals(3, canSystemConnectionMemo.getProtocolAllOptions("Throttles").keySet().size());
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Throttles").keySet().contains("Used"),
+            "Throttles has Used");
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Throttles").keySet().contains("Steal"),
+            "Throttles has Steal");
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Throttles").keySet().contains("MaxFn"),
+            "Throttles has MaxFn");
+        assertEquals(3, canSystemConnectionMemo.getProtocolAllOptions("Throttles").size());
 
-        assertThat(canSystemConnectionMemo.getProtocolAllOptions("Single").keySet(), IsCollectionContaining.hasItems("Foo"));
-        assertEquals(1, canSystemConnectionMemo.getProtocolAllOptions("Single").keySet().size());
+        assertTrue( canSystemConnectionMemo.getProtocolAllOptions("Single").keySet().contains("Foo"),
+            "Single has Foo");
+        assertEquals(1, canSystemConnectionMemo.getProtocolAllOptions("Single").size());
 
         expectOptionValue("Ident", "UserName", "Hello, World");
         expectOptionValue("Ident", "Description", "something");
@@ -173,5 +196,5 @@ public class ProtocolOptionsPersistenceTest {
         expectOptionValue("Single", "Foo", "");
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(ProtocolOptionsPersistenceTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(ProtocolOptionsPersistenceTest.class);
 }

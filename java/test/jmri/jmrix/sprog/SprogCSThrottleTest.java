@@ -11,6 +11,7 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@SuppressWarnings("deprecation")
 public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     private SprogTrafficControlScaffold stcs = null;
@@ -323,10 +324,22 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     }
 
     /**
+     * Test of setFxx method for Fns above F28
+     */
+    @Test
+    public void testSetHigherFns() {
+        for(int i=29; i<maxFns; i++) {
+            instance.setFunction(i, true);
+            Assert.assertEquals(true, instance.getFunction(i));
+        }
+    }
+
+    /**
      * Test of sendFunctionGroup1 method, of class AbstractThrottle.
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup1() {
     }
 
@@ -335,6 +348,7 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup2() {
     }
 
@@ -343,6 +357,7 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup3() {
     }
 
@@ -351,6 +366,7 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup4() {
     }
 
@@ -359,6 +375,7 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup5() {
     }
 
@@ -383,7 +400,7 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         float result = instance.getSpeedIncrement();
         Assert.assertEquals(expResult, result, 0.0);
     }
-    
+
     @BeforeEach
     @Override
     public void setUp() {
@@ -393,9 +410,12 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         stcs = new SprogTrafficControlScaffold(m);
         m.setSprogTrafficController(stcs);
         m.configureCommandStation();
-        jmri.InstanceManager.setDefault(jmri.ThrottleManager.class,new SprogCSThrottleManager(m));
-
+        var tm = new SprogCSThrottleManager(m);
+        jmri.InstanceManager.setDefault(jmri.ThrottleManager.class,tm);
+        m.store(tm, jmri.ThrottleManager.class);
         instance = new SprogCSThrottle(m,new jmri.DccLocoAddress(2,false));
+
+        setMaxFns(SprogConstants.MAX_FUNCTIONS);
     }
 
     @AfterEach
@@ -403,6 +423,8 @@ public class SprogCSThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     public void tearDown() {
         try {
             m.getSlotThread().interrupt();
+            m.dispose();
+            JUnitUtil.waitThreadTerminated(m.getSlotThread().getName());
             stcs.dispose();
         } finally {
             JUnitUtil.tearDown();

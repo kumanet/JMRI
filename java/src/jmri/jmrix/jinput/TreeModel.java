@@ -1,17 +1,23 @@
 package jmri.jmrix.jinput;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.util.Arrays;
+
 import javax.swing.SwingUtilities;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+
 import jmri.util.SystemType;
+
 import net.java.games.input.Component;
 import net.java.games.input.Controller;
 import net.java.games.input.ControllerEnvironment;
 import net.java.games.input.Event;
 import net.java.games.input.EventQueue;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +41,8 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bob Jacobsen Copyright 2008, 2010
  */
+@SuppressFBWarnings(value = "SING_SINGLETON_IMPLEMENTS_SERIALIZABLE",
+        justification = "DefaultTreeModel implements Serializable")
 public final class TreeModel extends DefaultTreeModel {
 
     private TreeModel() {
@@ -45,7 +53,7 @@ public final class TreeModel extends DefaultTreeModel {
         // load initial USB objects
         boolean pass = loadSystem();
         if (!pass) {
-            log.error("loadSystem failed");
+            log.warn("loading of HID System failed");
         }
 
         // If you don't call loadSystem, the following line was
@@ -80,7 +88,7 @@ public final class TreeModel extends DefaultTreeModel {
         try {
             insertNodeInto(pChild, pParent, index);
         } catch (IllegalArgumentException e) {
-            log.error("insertNode({}, {}) Exception {}", pChild, pParent, e);
+            log.error("insertNode({}, {})", pChild, pParent, e);
         }
         return pChild;
     }
@@ -93,7 +101,7 @@ public final class TreeModel extends DefaultTreeModel {
      *
      * @return the default instance of the TreeModel; creating it if necessary
      */
-    static public TreeModel instance() {
+    public static TreeModel instance() {
         if (instanceValue == null) {
             instanceValue = new TreeModel();
         }
@@ -109,7 +117,7 @@ public final class TreeModel extends DefaultTreeModel {
         runner.join();
     }
 
-    static private TreeModel instanceValue = null;
+    private static TreeModel instanceValue = null;
 
     class Runner extends Thread {
 
@@ -152,7 +160,7 @@ public final class TreeModel extends DefaultTreeModel {
                         float value = event.getValue();
 
                         if (log.isDebugEnabled()) {
-                            StringBuffer buffer = new StringBuffer("Name [");
+                            StringBuffer buffer = new StringBuffer();
                             buffer.append(controllers[i].getName());
                             buffer.append("] Component [");
                             // buffer.append(event.getNanos()).append(", ");
@@ -166,7 +174,7 @@ public final class TreeModel extends DefaultTreeModel {
                                     buffer.append("Off");
                                 }
                             }
-                            log.debug(new String(buffer));
+                            log.debug("Name [ {}", buffer);
                         }
 
                         // ensure item exits
@@ -221,7 +229,7 @@ public final class TreeModel extends DefaultTreeModel {
             try {
                 cNode = (UsbNode) insertNode(cNode, dRoot);
             } catch (IllegalArgumentException e) {
-                log.error("insertNode({}, {}) Exception {}", cNode, dRoot, e);
+                log.error("insertNode({}, {})", cNode, dRoot, e);
             }
             // Device (component) node
             String dname = component.getName() + " [" + component.getIdentifier().toString() + "]";
@@ -229,7 +237,7 @@ public final class TreeModel extends DefaultTreeModel {
             try {
                 dNode = (UsbNode) insertNode(dNode, cNode);
             } catch (IllegalArgumentException e) {
-                log.error("insertNode({}, {}) Exception {}", dNode, cNode, e);
+                log.error("insertNode({}, {})", dNode, cNode, e);
             }
 
             dNode.setValue(value);
@@ -265,9 +273,15 @@ public final class TreeModel extends DefaultTreeModel {
             } else {
                 log.error("Encountered Throwable while getting controllers", ex);
             }
-            
+
             // could not load some component(s)
             ca = null;
+            return false;
+        }
+
+        if (controllers().length == 0) {
+            log.warn("No controllers found; tool is probably not working");
+            jmri.util.HelpUtil.displayHelpRef("package.jmri.jmrix.jinput.treemodel.TreeFrame");
             return false;
         }
 
@@ -300,10 +314,10 @@ public final class TreeModel extends DefaultTreeModel {
                     break;  // skip this controller
                 } catch (IllegalArgumentException e) {
                     // ignore components that throw IllegalArgumentExceptions
-                    log.error("insertNode({}, {}) Exception {}", deviceNode, controllerNode, e);
+                    log.error("insertNode({}, {}) Exception", deviceNode, controllerNode, e);
                 } catch (Exception e) {
                     // log all others
-                    log.error("Exception {}", e);
+                    log.error("Exception", e);
                 }
             }
         }
@@ -320,5 +334,5 @@ public final class TreeModel extends DefaultTreeModel {
         pcs.removePropertyChangeListener(l);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(TreeModel.class);
+    private static final Logger log = LoggerFactory.getLogger(TreeModel.class);
 }

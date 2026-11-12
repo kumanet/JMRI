@@ -17,7 +17,6 @@ import javax.swing.ButtonGroup;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JSpinner;
@@ -27,6 +26,7 @@ import jmri.InstanceManager;
 import jmri.swing.JTitledSeparator;
 import jmri.swing.PreferencesPanel;
 import jmri.util.FileUtil;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.zeroconf.ZeroConfPreferences;
 import jmri.util.zeroconf.ZeroConfServiceManager;
 
@@ -43,6 +43,8 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
 
     JCheckBox momF2CB;
 
+    JCheckBox exclusiveCB;
+
     JSpinner port;
 
     JCheckBox powerCB;
@@ -58,6 +60,12 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
     int startupActionPosition = -1;
     JRadioButton wifiRB;
     JRadioButton dccRB;
+
+    //early defaults while creating panel
+    int eStopInitialValue = 10;
+    int eStopMinValue = 4;
+    int eStopMaxValue = 180;
+    int eStopStepSize = 2;
 
     WiThrottlePreferences localPrefs;
 
@@ -76,6 +84,8 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
         add(eStopDelayPanel());
         add(new JTitledSeparator(Bundle.getMessage("TitleFunctionsPanel")));
         add(functionsPanel());
+        add(new JTitledSeparator(Bundle.getMessage("TitleExclusivePanel")));
+        add(exclusivePanel());
         add(new JTitledSeparator(Bundle.getMessage("TitleNetworkPanel")));
         add(networkPanel());
         add(new JTitledSeparator(Bundle.getMessage("TitleControllersPanel")));
@@ -87,6 +97,8 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
         delaySpinner.setValue(localPrefs.getEStopDelay());
 
         momF2CB.setSelected(localPrefs.isUseMomF2());
+
+        exclusiveCB.setSelected(localPrefs.isExclusiveUseOfAddress());
 
         port.setValue(localPrefs.getPort());
         powerCB.setSelected(localPrefs.isAllowTrackPower());
@@ -117,6 +129,8 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
 
         localPrefs.setUseMomF2(momF2CB.isSelected());
 
+        localPrefs.setExclusiveUseOfAddress(exclusiveCB.isSelected());
+
         int portNum;
         try {
             portNum = (int) port.getValue();
@@ -124,10 +138,10 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
             portNum = 0;
         }
         if ((portNum < 1) || (portNum > 65535)) { //  Invalid port value
-            javax.swing.JOptionPane.showMessageDialog(this,
+            JmriJOptionPane.showMessageDialog(this,
                     Bundle.getMessage("WarningInvalidPort"),
                     Bundle.getMessage("TitlePortWarningDialog"),
-                    JOptionPane.WARNING_MESSAGE);
+                    JmriJOptionPane.WARNING_MESSAGE);
             didSet = false;
         } else {
             localPrefs.setPort((int) port.getValue());
@@ -152,7 +166,7 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
 
         eStopCB = new JCheckBox(Bundle.getMessage("LabelUseEStop"));
         eStopCB.setToolTipText(Bundle.getMessage("ToolTipUseEStop"));
-        SpinnerNumberModel spinMod = new SpinnerNumberModel(10, 4, 60, 2);
+        SpinnerNumberModel spinMod = new SpinnerNumberModel(eStopInitialValue, eStopMinValue, eStopMaxValue, eStopStepSize);
         delaySpinner = new JSpinner(spinMod);
         ((JSpinner.DefaultEditor) delaySpinner.getEditor()).getTextField().setEditable(false);
         panel.add(eStopCB);
@@ -167,6 +181,26 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
         momF2CB = new JCheckBox(Bundle.getMessage("LabelMomF2"));
         momF2CB.setToolTipText(Bundle.getMessage("ToolTipMomF2"));
         panel.add(momF2CB);
+        return panel;
+    }
+
+    private JPanel exclusivePanel() {
+        JPanel panel = new JPanel();
+
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        JPanel eCbPanel = new JPanel();
+        exclusiveCB = new JCheckBox(Bundle.getMessage("LabelExclusive"));
+        exclusiveCB.setToolTipText(Bundle.getMessage("ToolTipExclusive"));
+        eCbPanel.add(exclusiveCB);
+        panel.add(eCbPanel);
+
+        // only display hint if silent share option is enabled in main throttle prefs
+        var tm = InstanceManager.getNullableDefault(jmri.ThrottleManager.class);
+        if ( tm != null && tm.enablePrefSilentShareOption() ) {
+            JPanel sscHint = new JPanel();
+            sscHint.add(new JLabel(Bundle.getMessage("LabelStealShare")));
+            panel.add(sscHint);
+        }
         return panel;
     }
 
@@ -190,6 +224,14 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
             this.startupCB.removeItemListener(this.startupItemListener);
             StartupActionsManager manager = InstanceManager.getDefault(StartupActionsManager.class);
             if (this.startupCB.isSelected()) {
+                // Delete any existing WiThrottle start up actions.
+                // Manually adding a start up action sets the start up check box active which triggers
+                // the creation of a second start up action.
+                manager.getActions(PerformActionModel.class).stream().filter((model) -> (WiThrottleCreationAction.class.getName().equals(model.getClassName()))).forEach((model) -> {
+                    this.startupActionPosition = Arrays.asList(manager.getActions()).indexOf(model);
+                    manager.removeAction(model);
+                });
+
                 PerformActionModel model = new PerformActionModel();
                 model.setClassName(WiThrottleCreationAction.class.getName());
                 if (this.startupActionPosition == -1 || this.startupActionPosition >= manager.getActions().length) {
@@ -273,7 +315,7 @@ public class WiThrottlePrefsPanel extends JPanel implements PreferencesPanel {
         return panel;
     }
 
-    //private final static Logger log = LoggerFactory.getLogger(WiThrottlePrefsPanel.class);
+    //private static final Logger log = LoggerFactory.getLogger(WiThrottlePrefsPanel.class);
     @Override
     public String getPreferencesItem() {
         return "WITHROTTLE"; // NOI18N

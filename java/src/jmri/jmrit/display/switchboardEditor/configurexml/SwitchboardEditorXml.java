@@ -11,6 +11,7 @@ import jmri.configurexml.AbstractXmlAdapter;
 import jmri.configurexml.XmlAdapter;
 import jmri.jmrit.display.EditorManager;
 import jmri.jmrit.display.switchboardEditor.SwitchboardEditor;
+import jmri.jmrit.display.switchboardEditor.SwitchBoardLabelDisplays;
 import jmri.util.ColorUtil;
 
 import org.jdom2.Attribute;
@@ -92,6 +93,10 @@ public class SwitchboardEditorXml extends AbstractXmlAdapter {
      */
     @Override
     public boolean load(Element shared, Element perNode) {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return true;
+        }
+
         boolean result = true;
         Attribute a;
         // find coordinates
@@ -227,8 +232,15 @@ public class SwitchboardEditorXml extends AbstractXmlAdapter {
             }
         }
         panel.setRows(rows); // if 0, autoRows is selected (handled in Editor)
-        value = (a = shared.getAttribute("showusername")) == null || !a.getValue().equals("no");
-        panel.setShowUserName(value);
+
+        a = shared.getAttribute("showusername");
+        if (a == null || a.getValue().equals("yes")) {
+            panel.setShowUserName(SwitchBoardLabelDisplays.BOTH_NAMES); // default and migration
+        } else if (a.getValue().equals("no")) {
+            panel.setShowUserName(SwitchBoardLabelDisplays.SYSTEM_NAME); // only how system name
+        } else {
+            panel.setShowUserName(SwitchBoardLabelDisplays.USER_NAME); // display name (one, prefer user name)
+        }
 
         if (shared.getAttribute("iconscale") != null) {
             try {
@@ -335,6 +347,6 @@ public class SwitchboardEditorXml extends AbstractXmlAdapter {
         return jmri.Manager.PANELFILES;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SwitchboardEditorXml.class);
+    private static final Logger log = LoggerFactory.getLogger(SwitchboardEditorXml.class);
 
 }

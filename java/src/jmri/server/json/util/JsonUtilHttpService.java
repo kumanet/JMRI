@@ -14,8 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.awt.Container;
-import java.awt.Frame;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -27,9 +26,12 @@ import java.util.Objects;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.servlet.http.HttpServletResponse;
+import javax.swing.JFrame;
+
 import jmri.DccLocoAddress;
 import jmri.InstanceManager;
 import jmri.Metadata;
+import jmri.PermissionManager;
 import jmri.server.json.JsonServerPreferences;
 import jmri.jmrit.display.Editor;
 import jmri.jmrit.display.EditorManager;
@@ -46,11 +48,12 @@ import jmri.server.json.JSON;
 import jmri.server.json.JsonException;
 import jmri.server.json.JsonHttpService;
 import jmri.server.json.JsonRequest;
-import jmri.util.JmriJFrame;
 import jmri.util.node.NodeIdentity;
 import jmri.util.zeroconf.ZeroConfService;
 import jmri.util.zeroconf.ZeroConfServiceManager;
 import jmri.web.server.WebServerPreferences;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Randall Wood Copyright 2016, 2017, 2018
@@ -58,6 +61,7 @@ import jmri.web.server.WebServerPreferences;
 public class JsonUtilHttpService extends JsonHttpService {
 
     private static final String RESOURCE_PATH = "jmri/server/json/util/";
+    private static final Logger log = LoggerFactory.getLogger(JsonUtilHttpService.class);
 
     public JsonUtilHttpService(ObjectMapper mapper) {
         super(mapper);
@@ -145,6 +149,21 @@ public class JsonUtilHttpService extends JsonHttpService {
     // Use @CheckForNull to override non-null requirement of superclass
     public JsonNode doPost(String type, @CheckForNull String name,
             JsonNode data, JsonRequest request) throws JsonException {
+        log.debug("doPost(type='{}', name='{}', data='{}')", type, name, data);
+        // This will be expanded with more cases and warrants a CASE rather than an IF
+        switch (type) {
+            case JSON.RAILROAD:
+                InstanceManager.getDefault(WebServerPreferences.class).setRailroadName(name);
+                break;
+            case JSON.SESSION_LOGIN:
+                return this.postSessionLogin(name, data, request);
+            case JSON.SESSION_LOGOUT:
+                return this.postSessionLogout(name, data, request);
+            default:
+                log.debug("Received unexpected POST command: '{}'", type);
+                break;
+        }
+        // Implicitly answer all doPost the way an equivalent doGet would be answered.
         return this.doGet(type, name, data, request);
     }
 
@@ -189,21 +208,6 @@ public class JsonUtilHttpService extends JsonHttpService {
         Profile activeProfile = ProfileManager.getDefault().getActiveProfile();
         data.put(JSON.ACTIVE_PROFILE, activeProfile != null ? activeProfile.getName() : null);
         return message(JSON.HELLO, data, request.id);
-    }
-
-    /**
-     * Send a JSON {@link jmri.server.json.JSON#HELLO} message.
-     *
-     * @param locale    the client's Locale
-     * @param id        message id set by client
-     * @param heartbeat seconds in which a client must send a message before its
-     *                  connection is broken
-     * @return the JSON hello message
-     * @deprecated since 4.19.2; use {@link #getHello(int, JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getHello(Locale locale, int heartbeat, int id) {
-        return getHello(heartbeat, new JsonRequest(locale, JSON.V5, JSON.GET, id));
     }
 
     /**
@@ -259,22 +263,6 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * Get a JSON array of metadata elements as listed by
-     * {@link jmri.Metadata#getSystemNameList()}.
-     *
-     * @param locale The client's Locale
-     * @param id     message id set by client
-     * @return Array of JSON metadata elements
-     * @throws JsonException if thrown by
-     *                       {@link #getMetadata(java.util.Locale, java.lang.String, int)}
-     * @deprecated since 4.19.2; use {@link #getMetadata(JsonRequest)} instead
-     */
-    @Deprecated
-    public ArrayNode getMetadata(Locale locale, int id) throws JsonException {
-        return getMetadata(new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * Get a running {@link jmri.util.zeroconf.ZeroConfService} using the
      * protocol as the name of the service.
      *
@@ -293,24 +281,6 @@ public class JsonUtilHttpService extends JsonHttpService {
         throw new JsonException(404,
                 Bundle.getMessage(request.locale, JsonException.ERROR_OBJECT, JSON.NETWORK_SERVICE, name),
                 request.id);
-    }
-
-    /**
-     * Get a running {@link jmri.util.zeroconf.ZeroConfService} using the
-     * protocol as the name of the service.
-     *
-     * @param locale the client's Locale
-     * @param name   the service protocol
-     * @param id     message id set by client
-     * @return the JSON networkService message
-     * @throws JsonException if type is not a running zeroconf networking
-     *                       protocol
-     * @deprecated since 4.19.2; use
-     *             {@link #getNetworkService(String, JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getNetworkService(Locale locale, String name, int id) throws JsonException {
-        return getNetworkService(name, new JsonRequest(locale, JSON.V5, JSON.GET, id));
     }
 
     private JsonNode getNetworkService(ZeroConfService service, int id) {
@@ -365,24 +335,9 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * Send a JSON {@link jmri.server.json.JSON#NODE} message containing the
-     * JMRI node identity and former identities.
-     *
-     * @param locale the client's Locale
-     * @param id     message id set by client
-     * @return the JSON node message
-     * @see jmri.util.node.NodeIdentity
-     * @deprecated since 4.19.2; use {@link #getNode(JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getNode(Locale locale, int id) {
-        return getNode(new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * return a JSON {@link jmri.server.json.JSON#NODE} message containing the
      * requested panel details
-     * 
+     *
      * @param locale the client's Locale
      * @param name   panel name to return
      * @param id     message id set by client
@@ -401,9 +356,9 @@ public class JsonUtilHttpService extends JsonHttpService {
 
     public ObjectNode getPanel(Editor editor, String format, int id) {
         if (editor.getAllowInFrameServlet()) {
-            Container container = editor.getTargetPanel().getTopLevelAncestor();
-            if (container instanceof JmriJFrame) {
-                String title = ((Frame) container).getTitle();
+            JFrame frame = editor.getTargetFrame();
+            if (frame != null) {
+                String title = frame.getTitle();
                 if (!title.isEmpty() &&
                         !Arrays.asList(InstanceManager.getDefault(WebServerPreferences.class).getDisallowedFrames())
                                 .contains(title)) {
@@ -460,22 +415,8 @@ public class JsonUtilHttpService extends JsonHttpService {
 
     /**
      * return a JSON {@link jmri.server.json.JSON#NODE} message containing the
-     * Railroad from the Railroad Name preferences.
-     *
-     * @param locale the client's Locale
-     * @param id     message id set by client
-     * @return the JSON railroad name message
-     * @deprecated since 4.19.2; use {@link #getRailroad(JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getRailroad(Locale locale, int id) {
-        return getRailroad(new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
-     * return a JSON {@link jmri.server.json.JSON#NODE} message containing the
      * requested systemConnection details
-     * 
+     *
      * @param name    system connection name to return
      * @param request the JSON request
      * @return the JSON systemConnections message
@@ -494,25 +435,8 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * return a JSON {@link jmri.server.json.JSON#NODE} message containing the
-     * requested systemConnection details
-     * 
-     * @param locale the client's Locale.
-     * @param name   system connection name to return
-     * @param id     message id set by client
-     * @return the JSON systemConnections message.
-     * @throws JsonException if systemConnection not found
-     * @deprecated since 4.19.2; use
-     *             {@link #getSystemConnection(String, JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getSystemConnection(Locale locale, String name, int id) throws JsonException {
-        return getSystemConnection(name, new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * return a JSON array containing the defined system connections
-     * 
+     *
      * @param request the JSON request
      * @return the JSON systemConnections message.
      */
@@ -560,22 +484,8 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * return a JSON array containing the defined system connections
-     * 
-     * @param locale the client's Locale.
-     * @param id     message id set by client
-     * @return the JSON systemConnections message.
-     * @deprecated since 4.19.2; use {@link #getSystemConnections(JsonRequest)}
-     *             instead
-     */
-    @Deprecated
-    public ArrayNode getSystemConnections(Locale locale, int id) {
-        return getSystemConnections(new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * Get a JSON message containing the requested configuration profile.
-     * 
+     *
      * @param profile the requested profile
      * @param manager the in use profile manager
      * @param request the JSON request
@@ -601,7 +511,7 @@ public class JsonUtilHttpService extends JsonHttpService {
 
     /**
      * Get the named configuration profile.
-     * 
+     *
      * @param name    the Profile name
      * @param request the JSON request
      * @return the JSON configProfiles message
@@ -620,23 +530,8 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * find and return the data for a single config profile
-     * 
-     * @param locale the client's Locale.
-     * @param name   requested configProfile name
-     * @param id     message id set by client
-     * @return the JSON configProfiles message.
-     * @throws JsonException if the requested configProfile is not found
-     * @deprecated since 4.19.2; use {@link #getConfigProfile(String, JsonRequest)} instead
-     */
-    @Deprecated
-    public JsonNode getConfigProfile(Locale locale, String name, int id) throws JsonException {
-        return getConfigProfile(name, new JsonRequest(locale, JSON.V5, JSON.GET, id));
-    }
-
-    /**
      * Get a JSON array of all configuration profiles.
-     * 
+     *
      * @param request the JSON request
      * @return the JSON configProfiles message
      */
@@ -652,17 +547,75 @@ public class JsonUtilHttpService extends JsonHttpService {
     }
 
     /**
-     * Get a JSON array of all configuration profiles.
-     * 
-     * @param locale the client's Locale.
-     * @param id     message id set by client
-     * @return the JSON configProfiles message.
-     * @deprecated since 4.19.2; use
-     *             {@link #getConfigProfiles(JsonRequest)} instead
+     * Handle session login request.
+     *
+     * @param username the username (may be null if not provided in path)
+     * @param data JSON data containing username and password
+     * @param request the JSON request
+     * @return JSON response with session token or error
+     * @throws JsonException if login fails or parameters are missing
      */
-    @Deprecated
-    public ArrayNode getConfigProfiles(Locale locale, int id) {
-        return getConfigProfiles(new JsonRequest(locale, JSON.V5, JSON.GET, id));
+    private JsonNode postSessionLogin(@CheckForNull String username, JsonNode data, JsonRequest request) throws JsonException {
+        // Extract username and password from JSON data
+        String user = username != null ? username : data.path("username").asText("");
+        String password = data.path("password").asText("");
+
+        if (user.isEmpty()) {
+            throw new JsonException(HttpServletResponse.SC_BAD_REQUEST,
+                    Bundle.getMessage(request.locale, "ErrorMissingParameter", "username"), request.id);
+        }
+
+        PermissionManager mngr = InstanceManager.getDefault(PermissionManager.class);
+
+        // Check if guest user
+        if (mngr.isAGuestUser(user)) {
+            throw new JsonException(HttpServletResponse.SC_FORBIDDEN,
+                    Bundle.getMessage(request.locale, "ErrorGuestLogin"), request.id);
+        }
+
+        // Attempt login
+        StringBuilder sessionId = new StringBuilder("");
+        boolean result = mngr.remoteLogin(sessionId, request.locale, user, password);
+
+        if (!result) {
+            throw new JsonException(HttpServletResponse.SC_UNAUTHORIZED,
+                    Bundle.getMessage(request.locale, "ErrorInvalidCredentials"), request.id);
+        }
+
+        // Build success response
+        ObjectNode root = mapper.createObjectNode();
+        root.put(TYPE, JSON.SESSION_LOGIN);
+        ObjectNode dataNode = root.putObject(JSON.DATA);
+        dataNode.put("authenticationToken", sessionId.toString());
+
+        log.debug("Successful login for user: {}", user);
+        return root;
+    }
+
+    /**
+     * Handle session logout request.
+     *
+     * @param username the username (may be null)
+     * @param data JSON data containing session token or username
+     * @param request the JSON request
+     * @return JSON response confirming logout
+     * @throws JsonException if logout fails
+     */
+    private JsonNode postSessionLogout(@CheckForNull String username, JsonNode data, JsonRequest request) throws JsonException {
+        // Extract token
+        String token = data.path("token").asText("");
+
+        PermissionManager mngr = InstanceManager.getDefault(PermissionManager.class);
+        mngr.remoteLogout(token);
+
+        // Build success response
+        ObjectNode root = mapper.createObjectNode();
+        root.put(TYPE, JSON.SESSION_LOGOUT);
+        ObjectNode dataNode = root.putObject(JSON.DATA);
+        dataNode.put("authenticationToken", token);
+
+        log.debug("Successful logout for token: {}", token);
+        return root;
     }
 
     /**
@@ -724,7 +677,7 @@ public class JsonUtilHttpService extends JsonHttpService {
                     if (server) {
                         return doSchema(type, server,
                                 this.mapper.readTree(this.getClass().getClassLoader()
-                                        .getResource(RESOURCE_PATH + type + "-server.json")),
+                                        .getResourceAsStream(RESOURCE_PATH + type + "-server.json")),
                                 id);
                     } else {
                         throw new JsonException(HttpServletResponse.SC_BAD_REQUEST,
@@ -735,7 +688,7 @@ public class JsonUtilHttpService extends JsonHttpService {
                     if (!server) {
                         return doSchema(type, server,
                                 this.mapper.readTree(this.getClass().getClassLoader()
-                                        .getResource(RESOURCE_PATH + type + "-client.json")),
+                                        .getResourceAsStream(RESOURCE_PATH + type + "-client.json")),
                                 id);
                     } else {
                         throw new JsonException(HttpServletResponse.SC_BAD_REQUEST,
@@ -747,6 +700,8 @@ public class JsonUtilHttpService extends JsonHttpService {
                 case JSON.NODE:
                 case JSON.RAILROAD:
                 case JSON.VERSION:
+                case JSON.SESSION_LOGIN:
+                case JSON.SESSION_LOGOUT:
                     return doSchema(type,
                             server,
                             RESOURCE_PATH + type + "-server.json",

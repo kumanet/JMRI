@@ -49,9 +49,10 @@ public class SpeedoConsoleActionTest {
 
     @AfterEach
     public void tearDown() {
+        JUnitUtil.clearShutDownManager();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SpeedoConsoleActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SpeedoConsoleActionTest.class);
 
 }

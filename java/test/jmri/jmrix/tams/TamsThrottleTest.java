@@ -10,6 +10,7 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@SuppressWarnings("deprecation")
 public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     private TamsTrafficController tc;
@@ -42,7 +43,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         SpeedStepMode result = instance.getSpeedStepMode();
         Assert.assertEquals(expResult, result);
     }
-    
+
     /**
      * Test of getSpeedIncrement method, of class AbstractThrottle.
      */
@@ -349,6 +350,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup1() {
     }
 
@@ -357,6 +359,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup2() {
     }
 
@@ -365,6 +368,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup3() {
     }
 
@@ -373,6 +377,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup4() {
     }
 
@@ -381,6 +386,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup5() {
     }
 
@@ -393,6 +399,7 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         memo = new TamsSystemConnectionMemo(tc);
         tm = new TamsThrottleManager(memo);
         jmri.InstanceManager.setDefault(jmri.ThrottleManager.class, tm);
+        memo.store(tm, jmri.ThrottleManager.class);
         instance = new TamsThrottle(memo, new jmri.DccLocoAddress(1234,true));
     }
 
@@ -410,6 +417,6 @@ public class TamsThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TamsThrottleTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(TamsThrottleTest.class);
 
 }

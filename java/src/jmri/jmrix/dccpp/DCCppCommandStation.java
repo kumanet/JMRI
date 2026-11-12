@@ -1,5 +1,8 @@
 package jmri.jmrix.dccpp;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.annotation.Nonnull;
 
 import org.slf4j.Logger;
@@ -7,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Defines the standard/common routines used in multiple classes related to the
- * DCC++ Command Station, on a DCC++ network.
+ * DCC-EX Command Station, on a DCC-EX network.
  *
  * @author Bob Jacobsen Copyright (C) 2001
  * @author Portions by Paul Bender Copyright (C) 2003
@@ -30,6 +33,7 @@ public class DCCppCommandStation implements jmri.CommandStation {
     @Nonnull private String version     = "0.0.0";
     private DCCppRegisterManager rmgr = null;
     private int maxNumSlots = DCCppConstants.MAX_MAIN_REGISTERS; //default to register size
+    private List<String> trackModes = new ArrayList<String>();   //Modes for tracks A-H (as returned from EX-CS) 
 
     public DCCppCommandStation() {
         super();
@@ -96,7 +100,7 @@ public class DCCppCommandStation implements jmri.CommandStation {
     }
 
     /**
-     * Parse the DCC++ CS status response to pull out the base station version
+     * Parse the DCC-EX CS status response to pull out the base station version
      * and software version.
      * @param l status response to query.
      */
@@ -108,8 +112,8 @@ public class DCCppCommandStation implements jmri.CommandStation {
  // V1.0/V1.1 Simplified
  //String syntax = "iDCC\\+\\+(.*): BUILD (.*)";
         // V1.2.1 Syntax
-        // String syntax = "iDCC++ BASE STATION FOR ARDUINO \\b(\\w+)\\b \\/ (ARDUINO|POLOLU\\sMC33926) MOTOR SHIELD: ((\\d+\\s\\w+\\s\\d+)\\s+(\\d+:\\d+:\\d+))";
-        // Changes from v1.1: space between "DCC++" and "BASE", and "BUILD" is removed.
+        // String syntax = "iDCC-EX BASE STATION FOR ARDUINO \\b(\\w+)\\b \\/ (ARDUINO|POLOLU\\sMC33926) MOTOR SHIELD: ((\\d+\\s\\w+\\s\\d+)\\s+(\\d+:\\d+:\\d+))";
+        // Changes from v1.1: space between "DCC-EX" and "BASE", and "BUILD" is removed.
         // V1.0/V1.1/V1.2 Simplified
         // String syntax = "iDCC\\+\\+\\s?(.*):\\s?(?:BUILD)? (.*)";
 
@@ -150,7 +154,7 @@ public class DCCppCommandStation implements jmri.CommandStation {
     boolean mInServiceMode = false;
 
     /**
-     * DCC++ command station does provide Ops Mode.
+     * DCC-EX command station does provide Ops Mode.
      * @return always true.
      */
     public boolean isOpsModePossible() {
@@ -172,6 +176,19 @@ public class DCCppCommandStation implements jmri.CommandStation {
     }
 
     /**
+     * Does this command station support the latest Current commands &lt;JG&gt;, &lt;JI&gt;, etc.?
+     * @return true if supported, false if not
+     */
+    public boolean isCurrentListSupported() {
+        boolean ret = false;
+        try {
+            ret = (jmri.Version.compareCanonicalVersions(version, "4.2.20") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
      * Can this command station handle the Read with a starting value ('V'erify)
      * @return true if yes or false if no
      */
@@ -179,6 +196,85 @@ public class DCCppCommandStation implements jmri.CommandStation {
         boolean ret = false;
         try {
             //command stations starting with 3 can handle reads with startVals
+            ret = (jmri.Version.compareCanonicalVersions(version, "3.0.0") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+ 
+    /**
+     * Can this command station handle the Servo and Vpin Turnout creation message formats?
+     * @return true if yes or false if no
+     */
+    public boolean isServoTurnoutCreationSupported() {
+        boolean ret = false;
+        try {
+            // SERVO and VPIN turnout commands added at 3.2.0
+            ret = (jmri.Version.compareCanonicalVersions(version, "3.2.0") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
+     * Does this command station require the new "J" commands for turnout definitions?
+     * @return true if yes or false if no
+     */
+    public boolean isTurnoutIDsMessageRequired() {
+        boolean ret = false;
+        try {
+            ret = (jmri.Version.compareCanonicalVersions(version, "5.0.0") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
+     * Does this command station need the throttle register to be sent?
+     * @return true if yes or false if no
+     */
+    public boolean isThrottleRegisterRequired() {
+        boolean ret = true;
+        try {
+            ret = (jmri.Version.compareCanonicalVersions(version, "4.0.0") < 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
+     * Can this command station handle the newer (V4) function message format?
+     * @return true if yes or false if no
+     */
+    public boolean isFunctionV4Supported() {
+        boolean ret = false;
+        try {
+            ret = (jmri.Version.compareCanonicalVersions(version, "4.0.0") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
+     * Can this command station handle the newer (V4) program message formats?
+     * @return true if yes or false if no
+     */
+    public boolean isProgramV4Supported() {
+        boolean ret = false;
+        try {
+            ret = (jmri.Version.compareCanonicalVersions(version, "4.0.1") >= 0);
+        } catch (IllegalArgumentException ignore) {
+        }
+        return ret;  
+    }
+
+    /**
+     * Can this command station handle the &lt;#&gt; request to get supported number of cabs(locos)?
+     * @return true if yes or false if no
+     */
+    public boolean isMaxNumSlotsMsgSupported() {
+        boolean ret = false;
+        try {
             ret = (jmri.Version.compareCanonicalVersions(version, "3.0.0") >= 0);
         } catch (IllegalArgumentException ignore) {
         }
@@ -244,7 +340,7 @@ public class DCCppCommandStation implements jmri.CommandStation {
         }
 
         int reg = 0;  // register 0, so this doesn't repeat
-        //  DCC++ BaseStation code appends its own error-correction byte.
+        //  DCC-EX BaseStation code appends its own error-correction byte.
         // So we have to omit the JMRI-generated one.
         DCCppMessage msg = DCCppMessage.makeWriteDCCPacketMainMsg(reg, packet.length - 1, packet);
         assert msg != null;
@@ -285,7 +381,7 @@ public class DCCppCommandStation implements jmri.CommandStation {
     @Override
     public String getUserName() {
         if (adaptermemo == null) {
-            return "DCC++";
+            return "DCC-EX";
         }
         return adaptermemo.getUserName();
     }
@@ -321,9 +417,28 @@ public class DCCppCommandStation implements jmri.CommandStation {
         return (rmgr.getRegisterAddress(num));
     }
 
+    // entries will be received in order, but the whole list may be sent again
+    public void setTrackMode(int i, String mode) {        
+        if (this.trackModes.size() > i) {
+            this.trackModes.set(i, mode); //update it
+        } else {
+            this.trackModes.add(mode);  // add it
+        }
+    }
+    public List<String> getTrackModes() {
+        return trackModes;
+    }
+    public String getTrackMode(int i) {
+        if (this.trackModes.size() > i) {
+            return trackModes.get(i);
+        } else {
+            return "";  //don't crash downstream
+        }
+    }
+
     /*
      * We need to register for logging
      */
-    private final static Logger log = LoggerFactory.getLogger(DCCppCommandStation.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppCommandStation.class);
 
 }

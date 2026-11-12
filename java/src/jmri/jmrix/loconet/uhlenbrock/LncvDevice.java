@@ -2,9 +2,6 @@ package jmri.jmrix.loconet.uhlenbrock;
 
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.decoderdefn.DecoderFile;
-import jmri.jmrix.loconet.LncvDevicesManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A class to hold LocoNet LNCV device identity information.
@@ -62,7 +59,11 @@ public class LncvDevice {
     }
     public void setRosterEntry(RosterEntry e) {
         rosterEntry = e;
-        setRosterName(e.getId()); // is a name (String)
+        if (e == null) {
+            setRosterName("");
+        } else {
+            setRosterName(e.getId()); // is a name (String)
+        }
     }
 
     // optional: remember last used CV
@@ -79,6 +80,6 @@ public class LncvDevice {
         cvValue = val;
     }
 
-    //private final static Logger log = LoggerFactory.getLogger(LncvDevice.class);
+    //private static final Logger log = LoggerFactory.getLogger(LncvDevice.class);
 
 }

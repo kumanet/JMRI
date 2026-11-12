@@ -1,5 +1,7 @@
 package jmri.jmrit.logixng.tools;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.util.ArrayList;
 
 import jmri.*;
@@ -9,11 +11,9 @@ import jmri.jmrit.logixng.LogixNG_Manager;
 import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test import of Logix to LogixNG.
@@ -22,24 +22,24 @@ import org.junit.Test;
  * deletes the original Logix and then test that the new LogixNG works.
  * <P>
  * This class is base class for the expression tests
- * 
+ *
  * @author Daniel Bergqvist (C) 2020
  */
 public abstract class ImportExpressionTestBase {
-    
+
     public enum State {
         ON,     // Sensor.ACTIVE, Turnout.CLOSED, and so on
         OFF,    // Sensor.INACTIVE, Turnout.THROWN, and so on
         OTHER,  // Sensor.UNKNOWN, Turnout.UNKNOWN, and so on
     }
-    
+
     private LogixManager logixManager;
     private Logix logix;
     private Conditional conditional;
     private ArrayList<ConditionalVariable> variables;
     private ArrayList<ConditionalAction> actions;
     private Turnout t1;
-    
+
     /**
      * Some NamedBeans, for example Light, does not support other states than ON and OFF
      * @return true if other states than ON and OFF is allowed
@@ -47,35 +47,31 @@ public abstract class ImportExpressionTestBase {
     public boolean isStateOtherAllowed() {
         return true;
     }
-    
+
     /**
      * Set the sensor, turnout, or other bean to the desired state
      * @param state the state
      * @throws jmri.JmriException in case of an exception
      */
     abstract public void setNamedBeanState(State state) throws JmriException;
-    
+
     /**
      * Set the conditional variable to check for the desired state
      * @param state the state
      */
     abstract public void setConditionalVariableState(State state);
-    
+
     /**
      * Create a new conditional variable of the desired type
      * @return the new conditional variable
      */
     abstract public ConditionalVariable newConditionalVariable();
-    
-    
+
+
     public void assertBoolean(String message, boolean expectSuccess, boolean result) {
-        if (expectSuccess) {
-            Assert.assertTrue(message, result);
-        } else {
-            Assert.assertFalse(message, result);
-        }
+        assertEquals( expectSuccess, result, message);
     }
-    
+
     // Test that state ON is imported correctly
     @Test
     public void testOn() throws JmriException {
@@ -86,7 +82,7 @@ public abstract class ImportExpressionTestBase {
             // This should not throw the turnout
             if (isStateOtherAllowed()) setNamedBeanState(State.OTHER);
             assertBoolean(message, true, t1.getState() == Turnout.CLOSED);
-            
+
             setNamedBeanState(State.OFF);
             setConditionalVariableState(State.ON);
             t1.setState(Turnout.CLOSED);
@@ -94,39 +90,39 @@ public abstract class ImportExpressionTestBase {
             setNamedBeanState(State.ON);
             assertBoolean(message, expectSuccess, t1.getState() == Turnout.THROWN);
         };
-        
+
         check.runTest("Logix is not activated", false);
-        
+
         logixManager.activateAllLogixs();
-        
+
         check.runTest("Logix is activated", true);
-        
+
         logix.deActivateLogix();
-        
+
         // Import the logix to LogixNG
         ImportLogix importLogix = new ImportLogix(logix);
         importLogix.doImport();
-        
+
         logix.setEnabled(false);
         logixManager.deleteLogix(logix);
-        
+
         check.runTest("Logix is removed and LogixNG is not activated", false);
-        
+
         // We want the conditionalNGs run immediately during this test
         InstanceManager.getDefault(ConditionalNG_Manager.class).setRunOnGUIDelayed(false);
-        
+
         importLogix.getLogixNG().setEnabled(true);
         InstanceManager.getDefault(LogixNG_Manager.class)
                 .activateAllLogixNGs(false, false);
-        
+
         check.runTest("LogixNG is activated", true);
-        
+
         importLogix.getLogixNG().setEnabled(false);
         InstanceManager.getDefault(LogixNG_Manager.class).deleteLogixNG(importLogix.getLogixNG());
-        
+
         check.runTest("LogixNG is removed", false);
     }
-    
+
     // Test that state OFF is imported correctly
     @Test
     public void testOff() throws JmriException {
@@ -137,7 +133,7 @@ public abstract class ImportExpressionTestBase {
             // This should not throw the turnout
             if (isStateOtherAllowed()) setNamedBeanState(State.OTHER);
             assertBoolean(message, true, t1.getState() == Turnout.CLOSED);
-            
+
             setNamedBeanState(State.ON);
             setConditionalVariableState(State.OFF);
             t1.setState(Turnout.CLOSED);
@@ -145,41 +141,40 @@ public abstract class ImportExpressionTestBase {
             setNamedBeanState(State.OFF);
             assertBoolean(message, expectSuccess, t1.getState() == Turnout.THROWN);
         };
-        
+
         check.runTest("Logix is not activated", false);
-        
+
         logixManager.activateAllLogixs();
-        
+
         check.runTest("Logix is activated", true);
-        
+
         logix.deActivateLogix();
-        
+
         // Import the logix to LogixNG
         ImportLogix importLogix = new ImportLogix(logix);
         importLogix.doImport();
-        
+
         logix.setEnabled(false);
         logixManager.deleteLogix(logix);
-        
+
         check.runTest("Logix is removed and LogixNG is not activated", false);
-        
+
         // We want the conditionalNGs run immediately during this test
         InstanceManager.getDefault(ConditionalNG_Manager.class).setRunOnGUIDelayed(false);
-        
+
         importLogix.getLogixNG().setEnabled(true);
         InstanceManager.getDefault(LogixNG_Manager.class)
                 .activateAllLogixNGs(false, false);
-        
+
         check.runTest("LogixNG is activated", true);
-        
+
         importLogix.getLogixNG().setEnabled(false);
         InstanceManager.getDefault(LogixNG_Manager.class).deleteLogixNG(importLogix.getLogixNG());
-        
+
         check.runTest("LogixNG is removed", false);
     }
-    
-    // The minimal setup for log4J
-    @Before
+
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -189,20 +184,20 @@ public abstract class ImportExpressionTestBase {
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initLogixManager();
         JUnitUtil.initLogixNGManager();
-        
+
         t1 = InstanceManager.getDefault(TurnoutManager.class).provide("IT1");
-        
+
         logixManager = InstanceManager.getDefault(LogixManager.class);
         ConditionalManager conditionalManager = InstanceManager.getDefault(ConditionalManager.class);
-        
+
         logix = logixManager.createNewLogix("IX1", null);
-        
+
         conditional = conditionalManager.createNewConditional("IX1C1", "First conditional");
         logix.addConditional(conditional.getSystemName(), 0);
-        
+
         conditional.setTriggerOnChange(true);
         conditional.setLogicType(Conditional.AntecedentOperator.ALL_AND, "");
-        
+
         variables = new ArrayList<>();
         ConditionalVariable cv = newConditionalVariable();
         cv.setTriggerActions(true);
@@ -213,7 +208,7 @@ public abstract class ImportExpressionTestBase {
         cv.setType(Conditional.Type.SENSOR_ACTIVE);
         variables.add(cv);
         conditional.setStateVariables(variables);
-        
+
         actions = new ArrayList<>();
         ConditionalAction ca = new DefaultConditionalAction();
         ca.setType(Conditional.Action.SET_TURNOUT);
@@ -223,13 +218,15 @@ public abstract class ImportExpressionTestBase {
         conditional.setAction(actions);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         // JUnitAppender.clearBacklog();    REMOVE THIS!!!
-        
+
+        JUnitAppender.suppressWarnMessage("Import Conditional 'IX1C1' to LogixNG 'IQ:AUTO:0001'");
+
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
         JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
+
 }

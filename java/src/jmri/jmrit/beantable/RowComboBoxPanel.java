@@ -8,15 +8,18 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.EventObject;
+
 import javax.annotation.Nonnull;
 import javax.swing.DefaultCellEditor;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.ListCellRenderer;
-import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.TableCellRenderer;
+
+import jmri.util.swing.JComboBoxUtil;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,11 +54,6 @@ public abstract class RowComboBoxPanel
      * The table.
      */
     protected JTable table;
-
-    /**
-     *  To request the focus for the combobox (with SwingUtilities.invokeLater())
-     */
-    protected Runnable comboBoxFocusRequester;
 
     /**
      *  The current row.
@@ -179,6 +177,8 @@ public abstract class RowComboBoxPanel
         if (value != null) {
             editorbox.setSelectedItem(value); // display current Value
         }
+        JComboBoxUtil.setupComboBoxMaxRows(editorbox);
+
         editorbox.addActionListener((ActionEvent evt) -> {
             Object choice = editorbox.getSelectedItem();
             log.debug("actionPerformed (event={}, choice={}", evt.toString(), choice.toString());
@@ -331,7 +331,6 @@ public abstract class RowComboBoxPanel
     protected void eventEditorMousePressed() {
         this.editor.add(getEditorBox(table.convertRowIndexToModel(this.currentRow))); // add editorBox to JPanel
         this.editor.revalidate();
-        SwingUtilities.invokeLater(this.comboBoxFocusRequester);
         log.debug("eventEditorMousePressed in row {}; me = {})", this.currentRow, this.toString());
     }
 
@@ -369,6 +368,6 @@ public abstract class RowComboBoxPanel
         return new JComboBox<>(list);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RowComboBoxPanel.class);
+    private static final Logger log = LoggerFactory.getLogger(RowComboBoxPanel.class);
 
 }

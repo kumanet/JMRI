@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class performs initialization for DCC++. It
+ * This class performs initialization for DCC-EX. It
  * adds the appropriate Managers via the Initialization Manager.
  *
  * @author Paul Bender Copyright (C) 2003-2010
@@ -20,14 +20,14 @@ public class DCCppInitializationManager {
     protected DCCppSystemConnectionMemo systemMemo = null;
 
     DCCppPredefinedMeters predefinedMeters;
+    jmri.jmrix.dccpp.swing.messages.MessagesWatcher messagesWatcher;
     
     public DCCppInitializationManager(DCCppSystemConnectionMemo memo) {
 
         systemMemo = memo;
 
-        log.debug("Starting DCC++ Initialization Process");
+        log.debug("Starting DCC-EX/DCC-EX Initialization Process");
 
-        DCCppCommandStation cs = systemMemo.getDCCppTrafficController().getCommandStation();
         jmri.InstanceManager.setThrottleManager(systemMemo.getThrottleManager());
         systemMemo.setProgrammerManager(new DCCppProgrammerManager(new DCCppProgrammer(systemMemo.getDCCppTrafficController()), systemMemo));
         if (systemMemo.getProgrammerManager().isAddressedModePossible()) {
@@ -46,22 +46,15 @@ public class DCCppInitializationManager {
         jmri.InstanceManager.setSensorManager(systemMemo.getSensorManager());
         jmri.InstanceManager.store(systemMemo.getPowerManager(), jmri.PowerManager.class);
         log.debug("PowerManager: {}", jmri.InstanceManager.getDefault(jmri.PowerManager.class));
+        systemMemo.setClockControl(new DCCppClockControl(systemMemo));
         predefinedMeters = new DCCppPredefinedMeters(systemMemo);
+        messagesWatcher = new jmri.jmrix.dccpp.swing.messages.MessagesWatcher(systemMemo);
 
         systemMemo.register();
 
-        String base_station = "Unknown";
-        String code_build   = "Unknown";
-        String version      = "Unknown";
-        if (cs != null) {
-            base_station    = cs.getStationType();
-            code_build      = cs.getBuild();
-            version         = cs.getVersion();
-        }
-        
-        log.info("DCC++ Initialization Complete with station type '{}', version '{}' and build '{}'", base_station, version, code_build);
+        log.info("DCC-EX/DCC-EX Initialization Complete");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppInitializationManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppInitializationManager.class);
 
 }

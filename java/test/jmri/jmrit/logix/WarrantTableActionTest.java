@@ -2,21 +2,19 @@ package jmri.jmrit.logix;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  *
  * @author Paul Bender Copyright (C) 2017
  */
 public class WarrantTableActionTest {
-    WarrantTableAction wta;
+
+    private WarrantTableAction wta;
 
     @Test
     public void testCTor() {
-        assertThat(wta).withFailMessage("exists").isNotNull();
+        Assertions.assertNotNull( wta, "exists");
     }
 
     @BeforeEach
@@ -30,6 +28,6 @@ public class WarrantTableActionTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(WarrantTableActionTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(WarrantTableActionTest.class);
 
 }

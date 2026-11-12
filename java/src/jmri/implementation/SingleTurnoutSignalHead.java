@@ -6,8 +6,6 @@ import java.beans.PropertyChangeListener;
 import jmri.NamedBeanHandle;
 import jmri.SignalHead;
 import jmri.Turnout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Drive a single signal head via one "Turnout" object.
@@ -27,10 +25,10 @@ import org.slf4j.LoggerFactory;
 public class SingleTurnoutSignalHead extends DefaultSignalHead implements PropertyChangeListener {
 
     /**
-     * Ctor using only a system name.
+     * Ctor including user name.
      *
-     * @param sys  system name for haed
-     * @param user userName user name for mast
+     * @param sys  system name for head
+     * @param user userName user name for head
      * @param lit  named bean for turnout switching the Lit property
      * @param on   Appearance constant from {@link jmri.SignalHead} for the
      *             output on (Turnout thrown) appearance
@@ -43,9 +41,9 @@ public class SingleTurnoutSignalHead extends DefaultSignalHead implements Proper
     }
 
     /**
-     * Ctor including user name.
+     * Ctor using only a system name.
      *
-     * @param sys system name for haed
+     * @param sys system name for head
      * @param lit named bean for turnout switching the Lit property
      * @param on  Appearance constant from {@link jmri.SignalHead} for the
      *            output on (Turnout thrown) appearance
@@ -112,7 +110,8 @@ public class SingleTurnoutSignalHead extends DefaultSignalHead implements Proper
             } else if ((mAppearance == mOnAppearance) || (mAppearance == (mOnAppearance * 2))) {
                 setTurnoutState(Turnout.THROWN);
             } else {
-                log.warn("Unexpected new appearance: {}", mAppearance);
+                log.warn("Unexpected: Single Output Red / Green SignalHeads cannot display new appearance: {}",
+                    describeState(mAppearance));
             }
         }
     }
@@ -255,7 +254,7 @@ public class SingleTurnoutSignalHead extends DefaultSignalHead implements Proper
     }
 
     @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         return getOutput() != null && t.equals(getOutput().getBean());
     }
 
@@ -292,6 +291,6 @@ public class SingleTurnoutSignalHead extends DefaultSignalHead implements Proper
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SingleTurnoutSignalHead.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SingleTurnoutSignalHead.class);
 
 }

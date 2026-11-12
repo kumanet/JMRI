@@ -68,19 +68,16 @@ public abstract class SignalMastAddPane extends JPanel implements JmriServicePro
      * @param username   user name value
      * @return false if the operation failed, in which case the user should have already been notified
      */
-    abstract public boolean createMast(@Nonnull
-            String sigsysname, @Nonnull
-                    String mastname, @Nonnull
-                            String username);
+    abstract public boolean createMast(@Nonnull String sigsysname, @Nonnull String mastname, @Nonnull String username);
     
     /**
      * @return human-preferred name for type of signal mast, in local language
      */
     @Nonnull abstract public String getPaneName();
     
-    final protected static int NOTIONAL_ASPECT_COUNT = 12;  // size of maps, not critical
+    protected static final int NOTIONAL_ASPECT_COUNT = 12;  // size of maps, not critical
 
-    static public abstract class SignalMastAddPaneProvider implements JmriServiceProviderInterface {
+    public static abstract class SignalMastAddPaneProvider implements JmriServiceProviderInterface {
         /**
          * Is this pane available, given the current configuration of the program?
          * In other words, are all necessary managers and other objects present?
@@ -104,7 +101,7 @@ public abstract class SignalMastAddPane extends JPanel implements JmriServicePro
          * name order.
          * @return all instance map sorted in name order.
          */
-        final static public Map<String, SignalMastAddPaneProvider> getInstancesMap() {
+        public static final Map<String, SignalMastAddPaneProvider> getInstancesMap() {
             if (instanceMap == null) loadInstances();
             return Collections.unmodifiableMap(instanceMap);
         }
@@ -114,7 +111,7 @@ public abstract class SignalMastAddPane extends JPanel implements JmriServicePro
          * between the (localized) name and the pane. 
          * @return unmodifiable collection.
          */
-        final static public Collection<SignalMastAddPaneProvider> getInstancesCollection() {
+        public static final Collection<SignalMastAddPaneProvider> getInstancesCollection() {
             if (instanceMap == null) loadInstances();
             return Collections.unmodifiableCollection(instanceMap.values());
         }
@@ -123,7 +120,7 @@ public abstract class SignalMastAddPane extends JPanel implements JmriServicePro
          * Load all the available instances. Note this only runs
          * once; there's no reloading once the program is running.
          */
-        final static public void loadInstances() {
+        public static final void loadInstances() {
             if (instanceMap != null) return;
         
             instanceMap = new TreeMap<>();  // sorted map, in string order on key

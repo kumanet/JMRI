@@ -2,8 +2,6 @@ package jmri.jmrix.dcc4pc.configurexml;
 
 import jmri.configurexml.JmriConfigureXmlException;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring Dcc4PcSensorManagers.
@@ -33,5 +31,5 @@ public class Dcc4PcSensorManagerXml extends jmri.managers.configurexml.AbstractS
         return loadSensors(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(Dcc4PcSensorManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(Dcc4PcSensorManagerXml.class);
 }

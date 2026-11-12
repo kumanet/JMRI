@@ -4,7 +4,6 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
-import jmri.JmriException;
 import jmri.Light;
 import jmri.LightControl;
 
@@ -106,7 +105,7 @@ public abstract class AbstractLight extends AbstractNamedBean
         boolean old = mEnabled;
         mEnabled = v;
         if (old != v) {
-            firePropertyChange("Enabled", old, v);
+            firePropertyChange(PROPERTY_ENABLED, old, v);
         }
     }
 
@@ -121,11 +120,10 @@ public abstract class AbstractLight extends AbstractNamedBean
     public void setState(int newState) {
         log.debug("setState {} was {}", newState, mState);
         
-        //int oldState = mState;
         if (newState != ON && newState != OFF) {
             throw new IllegalArgumentException("cannot set state value " + newState);
         }
-        
+
         // do the state change in the hardware
         doNewState(mState, newState); // old state, new state
         // change value and tell listeners
@@ -143,7 +141,7 @@ public abstract class AbstractLight extends AbstractNamedBean
         double oldValue = mCurrentIntensity;
         mCurrentIntensity = intensity;
         if (oldValue != intensity) {
-            firePropertyChange("TargetIntensity", oldValue, intensity);
+            firePropertyChange(PROPERTY_TARGET_INTENSITY, oldValue, intensity);
         }
     }
 
@@ -157,7 +155,7 @@ public abstract class AbstractLight extends AbstractNamedBean
     protected void notifyStateChange(int oldState, int newState) {
         mState = newState;
         if (oldState != newState) {
-            firePropertyChange("KnownState", oldState, newState);
+            firePropertyChange(PROPERTY_KNOWN_STATE, oldState, newState);
         }
     }
 
@@ -180,9 +178,7 @@ public abstract class AbstractLight extends AbstractNamedBean
      */
     @Override
     public void activateLight() {
-        lightControlList.stream().forEach((lc) -> {
-            lc.activateLightControl();
-        });
+        lightControlList.forEach(LightControl::activateLightControl);
         mActive = true; // set flag for control listeners
     }
 
@@ -193,9 +189,7 @@ public abstract class AbstractLight extends AbstractNamedBean
     public void deactivateLight() {
         // skip if Light is not active
         if (mActive) { // check if flag set for control listeners
-            lightControlList.stream().forEach((lc) -> {
-                lc.deactivateLightControl();
-            });
+            lightControlList.forEach(LightControl::deactivateLightControl);
             mActive = false; // unset flag for control listeners
         }
     }
@@ -227,11 +221,7 @@ public abstract class AbstractLight extends AbstractNamedBean
 
     @Override
     public List<LightControl> getLightControlList() {
-        List<LightControl> listCopy = new ArrayList<>();
-        lightControlList.stream().forEach((lightControlList1) -> {
-            listCopy.add(lightControlList1);
-        });
-        return listCopy;
+        return new ArrayList<>(lightControlList);
     }
 
     @Override
@@ -240,7 +230,7 @@ public abstract class AbstractLight extends AbstractNamedBean
         jmri.SensorManager sm = jmri.InstanceManager.getDefault(jmri.SensorManager.class);
         jmri.TurnoutManager tm = jmri.InstanceManager.getDefault(jmri.TurnoutManager.class);
         if (bean != null) {
-            getLightControlList().forEach((control) -> {
+            getLightControlList().forEach( control -> {
                 String descText = control.getDescriptionText("");
                 if (bean.equals(sm.getSensor(control.getControlSensorName()))) {
                     report.add(new jmri.NamedBeanUsageReport("LightControlSensor1", descText));  // NOI18N
@@ -259,6 +249,6 @@ public abstract class AbstractLight extends AbstractNamedBean
         return report;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractLight.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractLight.class);
 
 }

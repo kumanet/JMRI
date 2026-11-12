@@ -14,7 +14,7 @@ public class BasePanel extends JPanel implements Constants {
     }
 
     void complain(String message, String value) {
-        javax.swing.JOptionPane.showMessageDialog(this,
+        jmri.util.swing.JmriJOptionPane.showMessageDialog(this,
                 java.text.MessageFormat.format(
                         Bundle.getMessage(message),
                         new Object[]{value}),
@@ -67,5 +67,5 @@ public class BasePanel extends JPanel implements Constants {
         return true;
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BasePanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BasePanel.class);
 }

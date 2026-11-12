@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import jmri.Sensor;
-import jmri.jmrit.ctc.ctcserialdata.ProjectsCommonSubs;
 import jmri.jmrit.ctc.ctcserialdata.TrafficLockingData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +14,7 @@ import org.slf4j.LoggerFactory;
  */
 
 public class TrafficLocking {
-    private final static Logger log = LoggerFactory.getLogger(TrafficLocking.class);
+    private static final Logger log = LoggerFactory.getLogger(TrafficLocking.class);
 
     private static class TrafficLockingRecord {
         private final SwitchIndicatorsRoute _mSwitchIndicatorsRoute;

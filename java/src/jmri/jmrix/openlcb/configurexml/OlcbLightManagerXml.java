@@ -4,9 +4,6 @@ import jmri.InstanceManager;
 import jmri.jmrix.openlcb.OlcbConfigurationManager;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nonnull;
 
 /**
@@ -51,5 +48,5 @@ public class OlcbLightManagerXml extends jmri.managers.configurexml.AbstractLigh
         return result;
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(OlcbLightManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(OlcbLightManagerXml.class);
 }

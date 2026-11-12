@@ -1,15 +1,13 @@
 package apps.swing;
 
-import java.awt.GraphicsEnvironment;
-
 import javax.swing.JFrame;
 
 import jmri.util.JUnitUtil;
 import jmri.util.ThreadingUtil;
 
-import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.jupiter.api.*;
+
+import org.netbeans.jemmy.operators.JButtonOperator;
 import org.netbeans.jemmy.operators.JDialogOperator;
 
 /**
@@ -17,40 +15,37 @@ import org.netbeans.jemmy.operators.JDialogOperator;
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@jmri.util.junit.annotations.DisabledIfHeadless
 public class AboutDialogTest {
 
     @Test
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         // create a frame to be the dialog parent so that nothing attempts to
         // remove the SwingUtilities$SharedOwnerFrame instance
         JFrame frame = new JFrame();
         AboutDialog dialog = new AboutDialog(frame, true);
-        Assert.assertNotNull(dialog);
-        JUnitUtil.dispose(dialog);
+        Assertions.assertNotNull(dialog);
         JUnitUtil.dispose(frame);
     }
 
     @Test
     public void testShowAndClose() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         JFrame frame = new JFrame();
         AboutDialog dialog = new AboutDialog(frame, true);
 
         Thread t = new Thread(() -> {
             // constructor for jdo will wait until the dialog is visible
             JDialogOperator jdo = new JDialogOperator(Bundle.getMessage("TitleAbout", jmri.Application.getApplicationName()));
-            jdo.close();
+            JButtonOperator jbo = new JButtonOperator(jdo, "OK");
+            jbo.doClick();
+            jdo.waitClosed();
         });
         t.setName("About Dialog Close Thread");
         t.start();
-        ThreadingUtil.runOnGUI(() -> {
-            dialog.setVisible(true);
-        });
+        ThreadingUtil.runOnGUI(() -> dialog.setVisible(true));
         JUnitUtil.waitFor(() -> {
-            return !dialog.isVisible();
+            return !t.isAlive();
         }, "About dialog did not close");
-        JUnitUtil.dispose(dialog);
         JUnitUtil.dispose(frame);
     }
 
@@ -62,9 +57,6 @@ public class AboutDialogTest {
 
     @AfterEach
     public void tearDown() {
-        JUnitUtil.resetWindows(false, false); // don't display the list of windows,
-        // it will display only show the ones
-        // from the current test.
         JUnitUtil.tearDown();
     }
 }

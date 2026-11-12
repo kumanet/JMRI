@@ -54,6 +54,7 @@
                 <li><a href="/JavaDoc/doc/index.html">Packages</a></li>
                 <li><a href="/JavaDoc/doc/allclasses-index.html">Classes</a></li>
                 </ul>
+            <li><a href="NetBeansGUIEditor.shtml">NetBeans Swing GUI Builder</a>
             </ul>
         </dd>
 
@@ -65,6 +66,7 @@
             <li><a href="I8N.shtml">Internationalization</a></li>
             <li><a href="Logging.shtml">Logging &amp; Error Handling</a></li>
             <li><a href="JUnit.shtml">Unit testing with JUnit</a></li>
+            <li><a href="simulatedtrains.shtml">Writing tests with simulated trains</a></li>
             <li><a href="Javadoc.shtml">Documentation using Javadoc and UML</a></li>
             <li><a href="SpotBugs.shtml">Run the SpotBugs static analysis tool</a></li>
             <li><a href="Help.shtml">Providing help using JavaHelp</a></li>
@@ -76,10 +78,10 @@
         <dt class="dtheader">Help and Web Site</dt>
         <dd>
             <ul class="navigation">
-            <li><a href="Help.shtml">Providing Help using JavaHelp</a></li>
+            <li><a href="Help.shtml">Providing Help using JmriHelp</a></li>
             <li><a href="WebSite.shtml">The JMRI Web Site</a></li>
-                        <li><a href="UpdatingDocs.shtml">Updating JMRI Web and Help</a></li>
-                        <li><a href="Help.shtml#hwhelp">Creating Help for New Hardware</a></li>
+            <li><a href="UpdatingDocs.shtml">Updating JMRI Web and Help</a></li>
+            <li><a href="Help.shtml#hwhelp">Creating Help for New Hardware</a></li>
             <li><a href="Javadoc.shtml">Program Documentation Using Javadoc</a></li>
             </ul>
         </dd>

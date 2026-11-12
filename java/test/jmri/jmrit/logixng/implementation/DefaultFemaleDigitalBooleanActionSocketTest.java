@@ -1,5 +1,10 @@
 package jmri.jmrit.logixng.implementation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,15 +14,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import jmri.*;
 import jmri.jmrit.logixng.*;
-import jmri.jmrit.logixng.actions.DigitalBooleanOnChange;
+import jmri.jmrit.logixng.actions.DigitalBooleanLogixAction;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.*;
 
 /**
  * Test ExpressionTimer
@@ -28,9 +28,6 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
 
     private MyOnChangeAction _action;
 
-    @Rule
-    public final ExpectedException thrown = ExpectedException.none();
-
     @Override
     protected Manager<? extends NamedBean> getManager() {
         return InstanceManager.getDefault(DigitalBooleanActionManager.class);
@@ -38,20 +35,20 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
 
     @Test
     public void testBundleClass() {
-        Assert.assertEquals("bundle is correct", "Test Bundle bb aa cc", Bundle.getMessage("TestBundle", "aa", "bb", "cc"));
-        Assert.assertEquals("bundle is correct", "Generic", Bundle.getMessage(Locale.US, "SocketTypeGeneric"));
-        Assert.assertEquals("bundle is correct", "Test Bundle bb aa cc", Bundle.getMessage(Locale.US, "TestBundle", "aa", "bb", "cc"));
+        assertEquals( "Test Bundle bb aa cc", Bundle.getMessage("TestBundle", "aa", "bb", "cc"), "bundle is correct");
+        assertEquals( "Generic", Bundle.getMessage(Locale.US, "SocketTypeGeneric"), "bundle is correct");
+        assertEquals( "Test Bundle bb aa cc", Bundle.getMessage(Locale.US, "TestBundle", "aa", "bb", "cc"), "bundle is correct");
     }
 
     @Test
     public void testGetName() {
-        Assert.assertTrue("String matches", "A1".equals(_femaleSocket.getName()));
+        assertTrue( "A1".equals(_femaleSocket.getName()), "String matches");
     }
 
     @Test
     public void testGetDescription() {
-        Assert.assertTrue("String matches", "!b".equals(_femaleSocket.getShortDescription()));
-        Assert.assertTrue("String matches", "!b A1".equals(_femaleSocket.getLongDescription()));
+        assertTrue( "!b".equals(_femaleSocket.getShortDescription()), "String matches");
+        assertTrue( "!b A1".equals(_femaleSocket.getLongDescription()), "String matches");
     }
 
     @Override
@@ -73,12 +70,12 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
     }
 
     @Test
-    public void testSetValue() throws Exception {
+    public void testSetValue() throws JmriException {
         // Every test method should have an assertion
-        Assert.assertNotNull("femaleSocket is not null", _femaleSocket);
-        Assert.assertFalse("femaleSocket is not connected", _femaleSocket.isConnected());
+        assertNotNull( _femaleSocket, "femaleSocket is not null");
+        assertFalse( _femaleSocket.isConnected(), "femaleSocket is not connected");
         // Test execute() when not connected
-        ((DefaultFemaleDigitalBooleanActionSocket)_femaleSocket).execute(false, false);
+        ((DefaultFemaleDigitalBooleanActionSocket)_femaleSocket).execute(false);
     }
 
     @Test
@@ -87,23 +84,22 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
 
         List<Class<? extends Base>> classes = new ArrayList<>();
 //        classes.add(jmri.jmrit.logixng.actions.ActionLight.class);
-        map.put(Category.ITEM, classes);
+        map.put(LogixNG_Category.ITEM, classes);
 
         classes = new ArrayList<>();
         classes.add(jmri.jmrit.logixng.actions.DigitalBooleanMany.class);
-        classes.add(jmri.jmrit.logixng.actions.DigitalBooleanOnChange.class);
-        map.put(Category.COMMON, classes);
+        classes.add(jmri.jmrit.logixng.actions.DigitalBooleanLogixAction.class);
+        map.put(LogixNG_Category.COMMON, classes);
 
         classes = new ArrayList<>();
 //        classes.add(jmri.jmrit.logixng.actions.ShutdownComputer.class);
-        map.put(Category.OTHER, classes);
+        map.put(LogixNG_Category.OTHER, classes);
 
-        Assert.assertTrue("maps are equal",
-                isConnectionClassesEquals(map, _femaleSocket.getConnectableClasses()));
+        assertTrue( isConnectionClassesEquals(map, _femaleSocket.getConnectableClasses()),
+            "maps are equal");
     }
 
-    // The minimal setup for log4J
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -121,7 +117,7 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
         flag = new AtomicBoolean();
         errorFlag = new AtomicBoolean();
         _action = new MyOnChangeAction("IQDB321");
-        DigitalBooleanOnChange otherAction = new MyOnChangeAction("IQDB322");
+        DigitalBooleanLogixAction otherAction = new MyOnChangeAction("IQDB322");
         manager = InstanceManager.getDefault(DigitalBooleanActionManager.class);
         maleSocket = ((DigitalBooleanActionManager)manager).registerAction(_action);
         otherMaleSocket = ((DigitalBooleanActionManager)manager).registerAction(otherAction);
@@ -138,20 +134,21 @@ public class DefaultFemaleDigitalBooleanActionSocketTest extends FemaleSocketTes
         }, "A1");
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
 
 
-    private class MyOnChangeAction extends DigitalBooleanOnChange {
+    private static class MyOnChangeAction extends DigitalBooleanLogixAction {
 
-        private boolean _hasBeenSetup = false;
+        boolean _hasBeenSetup = false;
 
-        public MyOnChangeAction(String systemName) {
-            super(systemName, null, DigitalBooleanOnChange.Trigger.CHANGE);
+        MyOnChangeAction(String systemName) {
+            super(systemName, null, DigitalBooleanLogixAction.When.Either);
         }
 
         /** {@inheritDoc} */

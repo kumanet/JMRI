@@ -3,12 +3,6 @@ package jmri.server.json.signalhead;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import jmri.JmriException;
 import jmri.SignalHead;
 import jmri.server.json.JSON;
@@ -18,6 +12,12 @@ import jmri.server.json.JsonRequest;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
@@ -74,8 +74,8 @@ public class JsonSignalHeadHttpServiceTest extends JsonHttpServiceTestBase<JsonS
         jmri.InstanceManager.getDefault(jmri.SignalHeadManager.class).register(s);
         assertNotNull(s);
 
-        JsonNode result = null;
-        JsonNode message = null;
+        JsonNode result;
+        JsonNode message;
 
         //set signalhead to Green and verify change
         message = mapper.createObjectNode().put(JSON.NAME, userName).put(JSON.STATE, SignalHead.GREEN);
@@ -86,27 +86,25 @@ public class JsonSignalHeadHttpServiceTest extends JsonHttpServiceTestBase<JsonS
 
         // try to set to FLASHLUNAR, which should not be allowed for this signalHead,
         //  so check for error, and verify state does not change
-        result = null;
-        message = null;
-        try {
-            message = mapper.createObjectNode().put(JSON.NAME, userName).put(JSON.STATE, SignalHead.FLASHLUNAR);
-            result = service.doPost(JsonSignalHead.SIGNAL_HEAD, userName, message, new JsonRequest(locale, JSON.V5, JSON.GET, 42));
-            fail("Expected exception not thrown");
-        } catch (JsonException ex) {
-            assertEquals(400, ex.getCode());
-        }
+        JsonException ex = assertThrows( JsonException.class, () -> {
+            JsonNode messageEx = mapper.createObjectNode().put(JSON.NAME, userName).put(JSON.STATE, SignalHead.FLASHLUNAR);
+            service.doPost(JsonSignalHead.SIGNAL_HEAD, userName, messageEx, new JsonRequest(locale, JSON.V5, JSON.GET, 42));
+        });
+        assertEquals(400, ex.getCode());
         assertEquals(SignalHead.GREEN, s.getState());
 
         assertEquals(false, s.getHeld());
         // set signalmast to Held, then verify
         message = mapper.createObjectNode().put(JSON.NAME, userName).put(JSON.STATE, SignalHead.HELD);
         result = service.doPost(JsonSignalHead.SIGNAL_HEAD, userName, message, new JsonRequest(locale, JSON.V5, JSON.GET, 42));
+        assertNotNull(result);
         assertEquals(true, s.getHeld());
 
         assertEquals(true, s.getHeld());
         // set signalmast to something other than Held, then verify Held is released
         message = mapper.createObjectNode().put(JSON.NAME, userName).put(JSON.STATE, SignalHead.RED);
         result = service.doPost(JsonSignalHead.SIGNAL_HEAD, userName, message, new JsonRequest(locale, JSON.V5, JSON.GET, 42));
+        assertNotNull(result);
         assertEquals(false, s.getHeld());
     }
 

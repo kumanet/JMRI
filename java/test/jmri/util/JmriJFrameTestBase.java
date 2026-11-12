@@ -1,10 +1,10 @@
 package jmri.util;
 
-import java.awt.GraphicsEnvironment;
 
-import org.junit.Assert;
+import jmri.util.junit.annotations.DisabledIfHeadless;
+
 import org.junit.jupiter.api.*;
-import org.junit.Assume;
+
 import org.netbeans.jemmy.operators.JFrameOperator;
 
 /**
@@ -16,26 +16,33 @@ abstract public class JmriJFrameTestBase {
 
     protected JmriJFrame frame = null;
 
+    @DisabledIfHeadless
     @Test
     public void testCTor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertNotNull("exists",frame);
+        Assertions.assertNotNull( frame, "exists");
     }
 
+    @DisabledIfHeadless
     @Test
     public void testShowAndClose() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         frame.initComponents();
-        jmri.util.ThreadingUtil.runOnLayout(() -> {
+        jmri.util.ThreadingUtil.runOnGUI(() -> {
             frame.setVisible(true);
         });
         JFrameOperator fo = new JFrameOperator(frame);
         // It's up at this point, and can be manipulated
         // Ask to close window
         fo.requestClose();
+        fo.waitClosed();
     }
 
-    @BeforeEach
+    @DisabledIfHeadless
+    @Test
+    public void testAccessibleContent() {
+        frame.initComponents();
+        jmri.util.AccessibilityChecks.check(frame);
+    }
+
     abstract public void setUp();  // set the value of frame.  
                                    // do not call initComponents.
 

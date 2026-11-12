@@ -2,11 +2,14 @@ package jmri.jmrit.logixng;
 
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
+
+import jmri.Category;
 
 /**
  * Manager for AnalogActionBean
- * 
+ *
  * @author Dave Duchamp       Copyright (C) 2007
  * @author Daniel Bergqvist   Copyright (C) 2018
  */
@@ -20,24 +23,24 @@ public interface AnalogActionManager extends BaseManager<MaleAnalogActionSocket>
      * @return the male socket for this action
      * @throws IllegalArgumentException if the action has an invalid system name
      */
-    public MaleAnalogActionSocket registerAction(@Nonnull AnalogActionBean action)
+    MaleAnalogActionSocket registerAction(@Nonnull AnalogActionBean action)
             throws IllegalArgumentException;
-    
+
     /**
      * Create a new system name for an AnalogActionBean.
      * @return a new system name
      */
-    public String getAutoSystemName();
+    String getAutoSystemName();
 
-    public FemaleAnalogActionSocket createFemaleSocket(
+    FemaleAnalogActionSocket createFemaleSocket(
             Base parent, FemaleSocketListener listener, String socketName);
 
     /**
      * Get a set of classes that implements the DigitalAction interface.
-     * 
+     *
      * @return a set of entries with category and class
      */
-    public Map<Category, List<Class<? extends Base>>> getActionClasses();
+    Map<Category, List<Class<? extends Base>>> getActionClasses();
 
     /*.*
      * Add an Action.
@@ -63,12 +66,12 @@ public interface AnalogActionManager extends BaseManager<MaleAnalogActionSocket>
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * The sub system prefix for the AnalogActionManager is
      * {@link #getSystemNamePrefix() } and "AA";
      */
     @Override
-    public default String getSubSystemNamePrefix() {
+    default String getSubSystemNamePrefix() {
         return getSystemNamePrefix() + "AA";
     }
 
@@ -78,6 +81,6 @@ public interface AnalogActionManager extends BaseManager<MaleAnalogActionSocket>
      *
      * @param x the Action to delete
      */
-    public void deleteAnalogAction(MaleAnalogActionSocket x);
-    
+    void deleteAnalogAction(MaleAnalogActionSocket x);
+
 }

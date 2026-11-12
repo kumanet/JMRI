@@ -1,16 +1,12 @@
 package jmri.jmrit;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Writer;
+import java.io.*;
 import java.util.ArrayList;
-import jmri.util.StringUtil;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jmri.util.StringUtil;
 
 /**
  * Models (and provides utility functions for) board memory as expressed in .hex
@@ -447,7 +443,7 @@ public class MemoryContents {
                             // could not infer a valid addressing type.
                             String message = "Could not infer addressing type from" // NOI18N
                                     + " line " + lineNum + "."; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordContentException(message);
                         }
                     }
@@ -459,7 +455,7 @@ public class MemoryContents {
                         // unknown LOAD OFFSET field type - cannot continue.
                         String message = "Fell thru with unknown loadOffsetFieldType value " // NOI18N
                                 + loadOffsetFieldType + " for line" + lineNum + "."; // NOI18N
-                        log.error(message);
+                        logError(message);
                         throw new MemoryFileAddressingRangeException(message);
                     }
 
@@ -482,7 +478,7 @@ public class MemoryContents {
                                 = "Data record line length is incorrect for " // NOI18N
                                 + "inferred addressing type and for data " // NOI18N
                                 + "count field in line " + lineNum;// NOI18N
-                        log.error(message);
+                        logError(message);
                         throw new MemoryFileRecordLengthException(message);
                     }
 
@@ -509,7 +505,7 @@ public class MemoryContents {
                                 + ", expected checksum = 0x" // NOI18N
                                 + Integer.toHexString(expectedChecksum)
                                 + "."; // NOI18N
-                        log.error(message);
+                        logError(message);
                         throw new MemoryFileChecksumException(message);
                     }
 
@@ -519,7 +515,7 @@ public class MemoryContents {
                             // problem - data record happened after an EOF record was parsed
                             String message = "Found a Data record in line " // NOI18N
                                     + lineNum + " after the EOF record"; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordFoundAfterEOFRecord(message);
                         }
 
@@ -539,7 +535,7 @@ public class MemoryContents {
                             String message = "Data crosses boundary which could lead to " // NOI18N
                                     + " mis-interpretation.  Aborting read at line " // NOI18N
                                     + line;
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileAddressingRangeException(message);
                         }
 
@@ -573,7 +569,7 @@ public class MemoryContents {
                                     = "Found a Extended Segment Address record in line " // NOI18N
                                     + lineNum
                                     + " after the EOF record"; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordFoundAfterEOFRecord(message);
                         }
 
@@ -582,7 +578,7 @@ public class MemoryContents {
                             String message = "Extended Segment Address record " // NOI18N
                                     + "did not have 16 bits of data content." // NOI18N
                                     + lineNum;
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordContentException(message);
                         }
                         int startpoint = indexOfLastAddressCharacter + 3;
@@ -596,7 +592,7 @@ public class MemoryContents {
                                     + "Record data value 0x" // NOI18N
                                     + Integer.toHexString(newPage)
                                     + " in line " + lineNum; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileAddressingRangeException(message);
                         }
                         curExtLinAddr = 0;
@@ -613,7 +609,7 @@ public class MemoryContents {
                                     = "Found a Extended Linear Address record in line " // NOI18N
                                     + lineNum
                                     + " after the EOF record"; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordFoundAfterEOFRecord(message);
                         }
 
@@ -622,7 +618,7 @@ public class MemoryContents {
                             String message = "Extended Linear Address record has " // NOI18N
                                     + "non-zero LOAD OFFSET field." // NOI18N
                                     + lineNum;
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordContentException(message);
                         }
 
@@ -633,7 +629,7 @@ public class MemoryContents {
                                     + "found RECLEN value of " + // NOI18N
                                     +extractRecLen(line)
                                     + " in line " + lineNum; // NOI18N
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordContentException(message);
                         }
                         int startpoint = indexOfLastAddressCharacter + 3;
@@ -647,7 +643,7 @@ public class MemoryContents {
                                     + lineNum
                                     + " is not allowed in files using " // NOI18N
                                     + "24-bit LOAD OFFSET field.";  // NOI18N
-                            log.error(message); // NOI18N
+                            logError(message); // NOI18N
                             throw new MemoryFileRecordContentException(message);
                         } else if (tempPage < PAGES) {
                             curExtLinAddr = tempPage * 65536;
@@ -663,7 +659,7 @@ public class MemoryContents {
                                     + " specified in line number " // NOI18N
                                     + lineNum
                                     + " is beyond the supported 24-bit address range."; // NOI18N;
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileAddressingRangeException(message);
                         }
 
@@ -672,7 +668,7 @@ public class MemoryContents {
                                 || (extractLoadOffset(line) != 0)) {
                             String message = "Illegal EOF record form in line " // NOI18N
                                     + lineNum;
-                            log.error(message);
+                            logError(message);
                             throw new MemoryFileRecordContentException(message);
                         }
 
@@ -683,13 +679,13 @@ public class MemoryContents {
                                 + Integer.toHexString(recordType)
                                 + " was found in line " // NOI18N
                                 + lineNum + ".  Aborting file read."; // NOI18N
-                        log.error(message);
+                        logError(message);
                         throw new MemoryFileUnknownRecordType(message);
                     }
                     // end parsing hex file record
                 } else {
                     String message = "Unknown line type in line " + lineNum + "."; // NOI18N
-                    log.error(message);
+                    logError(message);
                     throw new MemoryFileUnknownRecordType(message);
                 }
             }
@@ -705,15 +701,21 @@ public class MemoryContents {
         }
         if (!foundDataRecords) {
             String message = "No Data Records found in file - aborting."; // NOI18N
-            log.error(message);
+            logError(message);
             throw new MemoryFileNoDataRecordsException(message);
         } else if (!foundEOFRecord) {  // found Data Records, but no EOF
             String message = "No EOF Record found in file - aborting."; // NOI18N
-            log.error(message);
+            logError(message);
             throw new MemoryFileNoEOFRecordException(message);
         }
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value="SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification="pass Error String directly.")
+    private void logError(String errorToLog) {
+        log.error(errorToLog);
+    }
+    
     /**
      * Sends a character stream of an image of a programmatic representation of
      * memory in the Intel "I8HEX" file format to a Writer.
@@ -759,6 +761,7 @@ public class MemoryContents {
      * @throws MemoryFileAddressingFormatException if unsupported addressing
      *                                             format
      */
+    @SuppressWarnings("javadoc")
     public void writeHex(Writer writer, boolean writeKeyVals, int blockSize)
             throws IOException, MemoryFileAddressingFormatException {
         if (writeKeyVals) {
@@ -1225,7 +1228,6 @@ public class MemoryContents {
      * Since the key/value metadata is typically presented at the beginning of a
      * firmware file, the method would typically be invoked before invocation of
      * the writeHex method.
-     * <p>
      * @param writer Writer to which the character stream is sent
      * @throws IOException if problems writing data to file
      */
@@ -1461,5 +1463,5 @@ public class MemoryContents {
         
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MemoryContents.class);
+    private static final Logger log = LoggerFactory.getLogger(MemoryContents.class);
 }

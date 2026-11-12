@@ -4,8 +4,6 @@ import java.awt.event.ActionEvent;
 import javax.swing.Icon;
 import jmri.util.swing.JmriAbstractAction;
 import jmri.util.swing.WindowInterface;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Action to start a web server. Doesn't show a panel.
@@ -15,7 +13,7 @@ import org.slf4j.LoggerFactory;
 public class WebServerAction extends JmriAbstractAction {
 
     private static ServerThread serverThread = null;
-    private final static Logger log = LoggerFactory.getLogger(WebServerAction.class);
+    private static final Object lock = new Object();
 
     public WebServerAction(String s, WindowInterface wi) {
         super(s, wi);
@@ -31,7 +29,7 @@ public class WebServerAction extends JmriAbstractAction {
 
     @Override
     public void actionPerformed(ActionEvent ev) {
-        synchronized (this) {
+        synchronized (lock) {
             if (serverThread == null) {
                 serverThread = new ServerThread();
                 serverThread.setName("WebServerAction action");
@@ -56,4 +54,6 @@ public class WebServerAction extends JmriAbstractAction {
             }
         }
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WebServerAction.class);
 }

@@ -42,14 +42,8 @@ public class TimeSinceMidnight extends AbstractAnalogExpression implements Prope
 
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
 
     public void setType(Type type) {
@@ -115,7 +109,7 @@ public class TimeSinceMidnight extends AbstractAnalogExpression implements Prope
                 return Bundle.getMessage(locale, "TimeSinceMidnight_Long_FastClock");
 
             default:
-                throw new RuntimeException("Unknown value of _timerType: "+_type.name());
+                throw new JmriUncheckedException("Unknown value of _timerType: "+_type.name());
         }
     }
 
@@ -212,6 +206,6 @@ public class TimeSinceMidnight extends AbstractAnalogExpression implements Prope
 
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TimeSinceMidnight.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TimeSinceMidnight.class);
 
 }

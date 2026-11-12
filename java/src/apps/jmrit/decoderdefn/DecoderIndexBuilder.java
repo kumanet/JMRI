@@ -15,19 +15,12 @@ import jmri.jmrit.decoderdefn.DecoderIndexCreateAction;
 public class DecoderIndexBuilder {
 
     // main entry point to run standalone
-    static public void main(String[] args) {
+    public static void main(String[] args) {
     
         // logging needed for code invoked from here
-        String logFile = "default.lcf";
-        try {
-            if (new java.io.File(logFile).canRead()) {
-                org.apache.log4j.PropertyConfigurator.configure("default.lcf");
-            } else {
-                org.apache.log4j.BasicConfigurator.configure();
-            }
-        } catch (java.lang.NoSuchMethodError e) {
-            System.out.println("Exception starting logging: " + e);
-        }
+        String configFile = "default_lcf.xml";
+        apps.util.Log4JUtil.initLogging(configFile);
+        Thread.setDefaultUncaughtExceptionHandler(new jmri.util.exceptionhandler.UncaughtExceptionHandler());
 
         // log the location where the result is stored
         System.out.println(jmri.util.FileUtil.getUserFilesPath() + "decoderIndex.xml"); // command line

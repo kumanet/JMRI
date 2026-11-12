@@ -1,5 +1,7 @@
 package jmri.jmrit.logixng.tools;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.Arrays;
 
 import jmri.*;
@@ -17,8 +19,8 @@ import jmri.implementation.VirtualSignalHead;
  */
 public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestBase {
 
-    SignalHead signalHead;
-    ConditionalVariable cv;
+    private SignalHead signalHead;
+    private ConditionalVariable cv;
     
     private enum SignalHeadEnum {
         EqualsDARK(Conditional.Type.SIGNAL_HEAD_DARK, SignalHead.RED, SignalHead.FLASHRED, SignalHead.DARK),
@@ -33,10 +35,10 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
         IsLit(Conditional.Type.SIGNAL_HEAD_LIT, -1, -1, -1),
         IsHeld(Conditional.Type.SIGNAL_HEAD_HELD, -1, -1, -1);
         
-        private Conditional.Type type;
-        private int initAppearance;
-        private int failAppearance;
-        private int successAppearance;
+        final Conditional.Type type;
+        final int initAppearance;
+        final int failAppearance;
+        final int successAppearance;
         
         private SignalHeadEnum(Conditional.Type type, int initAppearance, int failAppearance, int successAppearance) {
             this.type = type;
@@ -47,12 +49,12 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
     }
     
     @Override
-    public Enum[] getEnums() {
+    protected Enum<?>[] getEnums() {
         return SignalHeadEnum.values();
     }
     
     @Override
-    public void setNamedBeanState(Enum e, Setup setup) throws JmriException {
+    public void setNamedBeanState(Enum<?> e, Setup setup) throws JmriException {
         SignalHeadEnum me = SignalHeadEnum.valueOf(e.name());
         
         cv.setType(me.type);
@@ -76,14 +78,14 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
                     case Succeed2:
                     case Succeed3:
                     case Succeed4: signalHead.setAppearance(me.successAppearance); break;
-                    default: throw new RuntimeException("Unknown enum: "+e.name());
+                    default: fail("Unknown enum: "+e.name());
                 }
 //                System.out.format("setNamedBeanState: %s, %s, %s%n", me.name(), setup.name(), signalHead.getAppearanceKey());
                 break;
                 
             case IsLit:
                 switch (setup) {
-                    case Init: signalHead.setLit(false); break;
+                    case Init:
                     case Fail1:
                     case Fail2:
                     case Fail3: signalHead.setLit(false); break;
@@ -91,13 +93,13 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
                     case Succeed2:
                     case Succeed3:
                     case Succeed4: signalHead.setLit(true); break;
-                    default: throw new RuntimeException("Unknown enum: "+e.name());
+                    default: fail("Unknown enum: "+e.name());
                 }
                 break;
                 
             case IsHeld:
                 switch (setup) {
-                    case Init: signalHead.setHeld(false); break;
+                    case Init:
                     case Fail1:
                     case Fail2:
                     case Fail3: signalHead.setHeld(false); break;
@@ -105,12 +107,12 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
                     case Succeed2:
                     case Succeed3:
                     case Succeed4: signalHead.setHeld(true); break;
-                    default: throw new RuntimeException("Unknown enum: "+e.name());
+                    default: fail("Unknown enum: "+e.name());
                 }
                 break;
             
             default:
-                throw new RuntimeException("Unknown enum: "+e.name());
+                fail("Unknown enum: "+e.name());
         }
     }
     
@@ -126,16 +128,12 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
     
     
     private static class MySignalHead extends VirtualSignalHead {
-        
-        public MySignalHead(String sys, String user) {
-            super(sys, user);
-        }
 
-        public MySignalHead(String sys) {
+        MySignalHead(String sys) {
             super(sys);
         }
 
-        final static private int[] VALID_STATES = new int[]{
+        private static final int[] VALID_STATES = new int[]{
             DARK,
             RED,
             YELLOW,
@@ -147,7 +145,7 @@ public class ImportExpressionSignalHeadTest extends ImportExpressionComplexTestB
             FLASHLUNAR,
         }; // No int for Lunar
 
-        final static private String[] VALID_STATE_KEYS = new String[]{
+        private static final String[] VALID_STATE_KEYS = new String[]{
             "SignalHeadStateDark",
             "SignalHeadStateRed",
             "SignalHeadStateYellow",

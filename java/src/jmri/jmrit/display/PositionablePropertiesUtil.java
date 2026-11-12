@@ -301,7 +301,6 @@ public class PositionablePropertiesUtil {
     javax.swing.JSpinner yPositionTextSpin;
     javax.swing.JSpinner widthSizeTextSpin;
     javax.swing.JSpinner heightSizeTextSpin;
-    JCheckBox autoWidth;
 
     /**
      * Create and fill in the Contents tab of the UI (Text Label objects).
@@ -438,6 +437,9 @@ public class PositionablePropertiesUtil {
                 si.setTextInconsistent(txtList.get(3).getForeground());
                 si.setBackgroundInconsistent(txtList.get(3).getBackground());
             }
+        } else if (_parent instanceof PositionableJPanel) {
+             pop.setForeground(txtList.get(0).getForeground());
+             pop.setBackgroundColor(txtList.get(0).getBackground());
         } else {
             PositionableLabel pp = (PositionableLabel) _parent;
             pp.setText(txtList.get(0).getText());
@@ -595,6 +597,9 @@ public class PositionablePropertiesUtil {
                 si.setTextInconsistent(txtList.get(3).getOrigForeground());
                 si.setBackgroundInconsistent(txtList.get(3).getOrigBackground());
             }
+        } else if (_parent instanceof PositionableJPanel) {
+             pop.setForeground(txtList.get(0).getForeground());
+             pop.setBackgroundColor(txtList.get(0).getBackground());
         } else {
             PositionableLabel pp = (PositionableLabel) _parent;
             pp.setText(txtList.get(0).getOrigText());
@@ -656,8 +661,8 @@ public class PositionablePropertiesUtil {
         }
         defaultForeground = pop.getForeground();
         defaultBorderColor = pop.getBorderColor();
-        if (_parent instanceof MemoryIcon) {
-            MemoryIcon pm = (MemoryIcon) _parent;
+        if (_parent instanceof MemoryOrGVIcon) {
+            MemoryOrGVIcon pm = (MemoryOrGVIcon) _parent;
             xPos = pm.getOriginalX();
             yPos = pm.getOriginalY();
         } else {
@@ -689,7 +694,7 @@ public class PositionablePropertiesUtil {
         "20", "24", "28", "32", "36"};
 
     javax.swing.JSpinner getSpinner(int value, String tooltip) {
-        SpinnerNumberModel model = new SpinnerNumberModel(0, 0, 1000, 1);
+        SpinnerNumberModel model = new SpinnerNumberModel(0, 0, 9999, 1);
         javax.swing.JSpinner spinX = new javax.swing.JSpinner(model);
         spinX.setValue(value);
         spinX.setToolTipText(tooltip);
@@ -779,5 +784,5 @@ public class PositionablePropertiesUtil {
 
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PositionablePropertiesUtil.class);
+    private static final Logger log = LoggerFactory.getLogger(PositionablePropertiesUtil.class);
 }

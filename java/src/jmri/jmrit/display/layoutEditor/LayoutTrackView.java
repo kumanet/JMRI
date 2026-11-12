@@ -1,18 +1,22 @@
 package jmri.jmrit.display.layoutEditor;
 
 import java.awt.*;
-import java.awt.event.MouseEvent;
+import java.awt.event.ActionEvent;
 import java.awt.geom.*;
-import java.util.List;
+import java.beans.PropertyVetoException;
 import java.util.*;
+import java.util.List;
 
-import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
+import javax.annotation.*;
 import javax.swing.*;
 
-import jmri.JmriException;
-import jmri.Turnout;
+import jmri.*;
+import jmri.jmrit.logixng.*;
+import jmri.jmrit.logixng.tools.swing.DeleteBean;
+import jmri.jmrit.logixng.tools.swing.LogixNGEditor;
 import jmri.util.*;
+import jmri.util.swing.JmriJOptionPane;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * MVC View component abstract base for the LayoutTrack hierarchy.
@@ -32,7 +36,7 @@ import jmri.util.*;
  * @author Bob Jacobsen Copyright (c) 2020
  *
  */
-abstract public class LayoutTrackView {
+abstract public class LayoutTrackView implements InlineLogixNG {
 
     /**
      * Constructor method.
@@ -58,23 +62,35 @@ abstract public class LayoutTrackView {
         this.center = c;
     }
 
-    final private LayoutTrack layoutTrack;
+    private final LayoutTrack layoutTrack;
 
-    final protected LayoutEditor layoutEditor;
+    protected final LayoutEditor layoutEditor;
+
+    private LogixNG _logixNG;
+    private String _logixNG_SystemName;
+
+    private boolean _inEditInlineLogixNGMode = false;
+    private LogixNGEditor _inlineLogixNGEdit;
 
     // Accessor Methods
 
     @Nonnull
-    final public String getId() {  // temporary Id vs name; is one for the View?
+    public final String getId() {  // temporary Id vs name; is one for the View?
         return layoutTrack.getId();
     }
 
     @Nonnull
-    final public String getName() {
+    public final String getName() {
         return layoutTrack.getName();
     }
 
-    final protected void setIdent(@Nonnull String ident) {
+    @Nonnull
+    @CheckReturnValue
+    public LayoutEditor getLayoutEditor() {
+        return layoutEditor;
+    }
+
+    protected final void setIdent(@Nonnull String ident) {
         layoutTrack.setIdent(ident);
     }
 
@@ -133,7 +149,7 @@ abstract public class LayoutTrackView {
      *                    perhaps including multiple values separated by
      *                    semicolons.
      */
-    public void setDecorations(Map<String, String> decorations) {
+    public void setDecorations(@Nonnull Map<String, String> decorations) {
         this.decorations = decorations;
     }
     protected Map<String, String> decorations = null;
@@ -144,32 +160,32 @@ abstract public class LayoutTrackView {
      * @return the layout editor's toolbar panel
      */
     @Nonnull
-    final public LayoutEditorToolBarPanel getLayoutEditorToolBarPanel() {
+    public final LayoutEditorToolBarPanel getLayoutEditorToolBarPanel() {
         return layoutEditor.getLayoutEditorToolBarPanel();
     }
 
     // these are convenience methods to return circles & rectangle used to draw onscreen
     //
     // compute the control point rect at inPoint; use the turnout circle size
-    final public Ellipse2D trackEditControlCircleAt(@Nonnull Point2D inPoint) {
+    public final Ellipse2D trackEditControlCircleAt(@Nonnull Point2D inPoint) {
         return trackControlCircleAt(inPoint);
     }
 
     // compute the turnout circle at inPoint (used for drawing)
-    final public Ellipse2D trackControlCircleAt(@Nonnull Point2D inPoint) {
+    public final Ellipse2D trackControlCircleAt(@Nonnull Point2D inPoint) {
         return new Ellipse2D.Double(inPoint.getX() - layoutEditor.circleRadius,
                 inPoint.getY() - layoutEditor.circleRadius,
                 layoutEditor.circleDiameter, layoutEditor.circleDiameter);
     }
 
     // compute the turnout circle control rect at inPoint
-    final public Rectangle2D trackControlCircleRectAt(@Nonnull Point2D inPoint) {
+    public final Rectangle2D trackControlCircleRectAt(@Nonnull Point2D inPoint) {
         return new Rectangle2D.Double(inPoint.getX() - layoutEditor.circleRadius,
                 inPoint.getY() - layoutEditor.circleRadius,
                 layoutEditor.circleDiameter, layoutEditor.circleDiameter);
     }
 
-    final protected Color getColorForTrackBlock(
+    protected final Color getColorForTrackBlock(
             @CheckForNull LayoutBlock layoutBlock, boolean forceBlockTrackColor) {
         Color result = ColorUtil.CLEAR;  // transparent
         if (layoutBlock != null) {
@@ -183,11 +199,11 @@ abstract public class LayoutTrackView {
     }
 
     // optional parameter forceTrack = false
-    final protected Color getColorForTrackBlock(@CheckForNull LayoutBlock lb) {
+    protected final Color getColorForTrackBlock(@CheckForNull LayoutBlock lb) {
         return getColorForTrackBlock(lb, false);
     }
 
-    final protected Color setColorForTrackBlock(Graphics2D g2,
+    protected final Color setColorForTrackBlock(Graphics2D g2,
             @CheckForNull LayoutBlock layoutBlock, boolean forceBlockTrackColor) {
         Color result = getColorForTrackBlock(layoutBlock, forceBlockTrackColor);
         g2.setColor(result);
@@ -195,7 +211,7 @@ abstract public class LayoutTrackView {
     }
 
     // optional parameter forceTrack = false
-    final protected Color setColorForTrackBlock(Graphics2D g2, @CheckForNull LayoutBlock lb) {
+    protected final Color setColorForTrackBlock(Graphics2D g2, @CheckForNull LayoutBlock lb) {
         return setColorForTrackBlock(g2, lb, false);
     }
 
@@ -225,7 +241,7 @@ abstract public class LayoutTrackView {
     // abstract protected void drawHidden(Graphics2D g2);
     // note: placeholder until I get this implemented in all sub-classes
     // TODO: replace with abstract declaration (above)
-    final protected void drawHidden(Graphics2D g2) {
+    protected final void drawHidden(Graphics2D g2) {
         // nothing to do here... move along...
     }
 
@@ -234,7 +250,7 @@ abstract public class LayoutTrackView {
      * @param g
      * note: currently can't override (final); change this if you need to
      */
-    final protected void drawLayoutTrackText(Graphics2D g) {
+    protected final void drawLayoutTrackText(Graphics2D g) {
         // get the center coordinates
         int x = (int) center.getX(), y = (int) center.getY();
 
@@ -283,7 +299,7 @@ abstract public class LayoutTrackView {
     abstract protected void highlightUnconnected(Graphics2D g2, HitPointType specificType);
 
     // optional parameter specificType = NONE
-    final protected void highlightUnconnected(Graphics2D g2) {
+    protected final void highlightUnconnected(Graphics2D g2) {
         highlightUnconnected(g2, HitPointType.NONE);
     }
 
@@ -313,11 +329,11 @@ abstract public class LayoutTrackView {
      *
      * @return true if hidden; false otherwise
      */
-    final public boolean isHidden() {
+    public final boolean isHidden() {
         return hidden;
     }
 
-    final public void setHidden(boolean hide) {
+    public final void setHidden(boolean hide) {
         if (hidden != hide) {
             hidden = hide;
             if (layoutEditor != null) {
@@ -337,7 +353,7 @@ abstract public class LayoutTrackView {
      * @param turnoutState of the turnout
      * @return the turnout state string
      */
-    final public String getTurnoutStateString(int turnoutState) {
+    public final String getTurnoutStateString(int turnoutState) {
         String result = "";
         if (turnoutState == Turnout.CLOSED) {
             result = Bundle.getMessage("TurnoutStateClosed");
@@ -366,17 +382,17 @@ abstract public class LayoutTrackView {
      * @param itemList A list of the attached heads, masts and/or sensors.
      * @param typeKey  The object type such as Turnout, Level Crossing, etc.
      */
-    final public void displayRemoveWarningDialog(List<String> itemList, String typeKey) {
+    public final void displayRemoveWarningDialog(List<String> itemList, String typeKey) {
         itemList.sort(null);
         StringBuilder msg = new StringBuilder(Bundle.getMessage("MakeLabel", // NOI18N
                 Bundle.getMessage("DeleteTrackItem", Bundle.getMessage(typeKey))));  // NOI18N
         for (String item : itemList) {
             msg.append("\n    " + item);  // NOI18N
         }
-        javax.swing.JOptionPane.showMessageDialog(layoutEditor,
+        JmriJOptionPane.showMessageDialog(layoutEditor,
                 msg.toString(),
                 Bundle.getMessage("WarningTitle"), // NOI18N
-                javax.swing.JOptionPane.WARNING_MESSAGE);
+                JmriJOptionPane.WARNING_MESSAGE);
     }
 
     /**
@@ -402,7 +418,7 @@ abstract public class LayoutTrackView {
      */
     abstract public void rotateCoords(double angleDEG);
 
-    final protected Point2D rotatePoint(@Nonnull Point2D p, double sineRot, double cosineRot) {
+    protected final Point2D rotatePoint(@Nonnull Point2D p, double sineRot, double cosineRot) {
         double cX = center.getX();
         double cY = center.getY();
 
@@ -431,12 +447,12 @@ abstract public class LayoutTrackView {
                                                     boolean requireUnconnected);
 
     // optional useRectangles & requireUnconnected parameters default to false
-    final protected HitPointType findHitPointType(@Nonnull Point2D p) {
+    protected final HitPointType findHitPointType(@Nonnull Point2D p) {
         return findHitPointType(p, false, false);
     }
 
     // optional requireUnconnected parameter defaults to false
-    final protected HitPointType findHitPointType(@Nonnull Point2D p, boolean useRectangles) {
+    protected final HitPointType findHitPointType(@Nonnull Point2D p, boolean useRectangles) {
         return findHitPointType(p, useRectangles, false);
     }
 
@@ -455,13 +471,195 @@ abstract public class LayoutTrackView {
     abstract public Rectangle2D getBounds();
 
     /**
+     * Tell whether this track is drawn, in whole or in part, in a layout
+     * block's colours, so that it has to be redrawn when that block's state or
+     * colours change.
+     *
+     * @param layoutBlock the layout block
+     * @return true if some of this track is drawn in that block's colours
+     */
+    abstract public boolean usesLayoutBlock(@Nonnull LayoutBlock layoutBlock);
+
+    /**
+     * Get an area that holds everything this track draws in a layout block's
+     * colours, before the width of the lines is allowed for. Used to redraw
+     * only that part of the panel when a block changes, so it may be larger
+     * than the track but never smaller.
+     *
+     * @return the area, in panel coordinates (not zoomed)
+     */
+    @Nonnull
+    public Rectangle2D getRepaintBounds() {
+        return getBounds();
+    }
+
+    /**
      * show the popup menu for this layout track
      *
      * @param mouseEvent the mouse down event that triggered this popup
      * @return the popup menu for this layout track
      */
     @Nonnull
-    abstract protected JPopupMenu showPopup(@Nonnull MouseEvent mouseEvent);
+    abstract protected JPopupMenu showPopup(@Nonnull JmriMouseEvent mouseEvent);
+
+    /**
+     * Att items to the popup menu that's common to all implementing classes.
+     * @param mouseEvent  the mouse down event that triggered this popup
+     * @param popup       the popup menu
+     */
+    protected void addCommonPopupItems(@Nonnull JmriMouseEvent mouseEvent, @Nonnull JPopupMenu popup) {
+        popup.addSeparator();
+        setLogixNGPositionableMenu(popup);
+        layoutEditor.addPopupItems(popup, mouseEvent);
+    }
+
+    @Override
+    public String getNameString() {
+        return getName();
+    }
+
+    @Override
+    public String getEditorName() {
+        return getLayoutEditor().getName();
+    }
+
+    @Override
+    public int getX() {
+        return (int) center.getX();
+    }
+
+    @Override
+    public int getY() {
+        return (int) center.getY();
+    }
+
+    @Override
+    public String getTypeName() {
+        return layoutTrack.getTypeName();
+    }
+
+    /**
+     * Check if edit of a conditional is in progress.
+     *
+     * @return true if this is the case, after showing dialog to user
+     */
+    private boolean checkEditConditionalNG() {
+        if (_inEditInlineLogixNGMode) {
+            // Already editing a LogixNG, ask for completion of that edit
+            JmriJOptionPane.showMessageDialog(null,
+                    Bundle.getMessage("Error_InlineLogixNGInEditMode"), // NOI18N
+                    Bundle.getMessage("ErrorTitle"), // NOI18N
+                    JmriJOptionPane.ERROR_MESSAGE);
+            _inlineLogixNGEdit.bringToFront();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Add a menu entry to edit Id of the Positionable item
+     *
+     * @param popup the menu to add the entry to
+     */
+    public void setLogixNGPositionableMenu(JPopupMenu popup) {
+        JMenu logixNG_Menu = new JMenu("LogixNG");
+        popup.add(logixNG_Menu);
+
+        logixNG_Menu.add(new AbstractAction(Bundle.getMessage("LogixNG_Inline")) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (checkEditConditionalNG()) return;
+
+                if (getLogixNG() == null) {
+                    LogixNG logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
+                            .createLogixNG(null, true);
+                    logixNG.setInlineLogixNG(LayoutTrackView.this);
+                    logixNG.activate();
+                    logixNG.setEnabled(true);
+                    logixNG.clearStartup();
+                    setLogixNG(logixNG);
+                }
+                LogixNGEditor logixNGEditor = new LogixNGEditor(null, getLogixNG().getSystemName());
+                logixNGEditor.addEditorEventListener((HashMap<String, String> data) -> {
+                    _inEditInlineLogixNGMode = false;
+                    data.forEach((key, value) -> {
+                        if (key.equals("Finish")) {                  // NOI18N
+                            _inlineLogixNGEdit = null;
+                            _inEditInlineLogixNGMode = false;
+                        } else if (key.equals("Delete")) {           // NOI18N
+                            _inEditInlineLogixNGMode = false;
+                            deleteLogixNG(getLogixNG());
+                        } else if (key.equals("chgUname")) {         // NOI18N
+                            getLogixNG().setUserName(value);
+                        }
+                    });
+                    if (getLogixNG() != null && getLogixNG().getNumConditionalNGs() == 0) {
+                        deleteLogixNG_Internal(getLogixNG());
+                    }
+                });
+                logixNGEditor.bringToFront();
+                _inEditInlineLogixNGMode = true;
+                _inlineLogixNGEdit = logixNGEditor;
+            }
+        });
+    }
+
+    private void deleteLogixNG(LogixNG logixNG) {
+        DeleteBean<LogixNG> deleteBean = new DeleteBean<>(
+                InstanceManager.getDefault(LogixNG_Manager.class));
+
+        boolean hasChildren = logixNG.getNumConditionalNGs() > 0;
+
+        deleteBean.delete(logixNG, hasChildren, (t)->{deleteLogixNG_Internal(t);},
+                (t,list)->{logixNG.getListenerRefsIncludingChildren(list);},
+                jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName());
+    }
+
+    private void deleteLogixNG_Internal(LogixNG logixNG) {
+        logixNG.setEnabled(false);
+        try {
+            InstanceManager.getDefault(LogixNG_Manager.class).deleteBean(logixNG, "DoDelete");
+            logixNG.getInlineLogixNG().setLogixNG(null);
+        } catch (PropertyVetoException e) {
+            //At this stage the DoDelete shouldn't fail, as we have already done a can delete, which would trigger a veto
+            log.error("{} : Could not Delete.", e.getMessage());
+        }
+    }
+
+    /**
+     * Get the LogixNG of this Positionable.
+     * @return the LogixNG or null if it has no LogixNG
+     */
+    @Override
+    public LogixNG getLogixNG() {
+        return _logixNG;
+    }
+
+    /**
+     * Set the LogixNG of this Positionable.
+     * @param logixNG the LogixNG or null if remove the LogixNG from the Positionable
+     */
+    @Override
+    public void setLogixNG(LogixNG logixNG) {
+        this._logixNG = logixNG;
+    }
+
+    @Override
+    public void setLogixNG_SystemName(String systemName) {
+        this._logixNG_SystemName = systemName;
+    }
+
+    @Override
+    public void setupLogixNG() {
+        _logixNG = InstanceManager.getDefault(LogixNG_Manager.class)
+                .getBySystemName(_logixNG_SystemName);
+        if (_logixNG == null) {
+            throw new JmriUncheckedException(String.format(
+                    "LogixNG %s is not found for LayoutTrackView %s in panel %s",
+                    _logixNG_SystemName, getName(), layoutEditor.getName()));
+        }
+        _logixNG.setInlineLogixNG(this);
+    }
 
     /**
      * show the popup menu for this layout track
@@ -470,10 +668,10 @@ abstract public class LayoutTrackView {
      * @return the popup menu for this layout track
      */
     @Nonnull
-    final protected JPopupMenu showPopup(Point2D where) {
-        return this.showPopup(new MouseEvent(
+    protected final JPopupMenu showPopup(Point2D where) {
+        return this.showPopup(new JmriMouseEvent(
                 layoutEditor.getTargetPanel(), // source
-                MouseEvent.MOUSE_CLICKED, // id
+                JmriMouseEvent.MOUSE_CLICKED, // id
                 System.currentTimeMillis(), // when
                 0, // modifiers
                 (int) where.getX(), (int) where.getY(), // where
@@ -488,7 +686,7 @@ abstract public class LayoutTrackView {
      * @return the popup menu for this layout track
      */
     @Nonnull
-    final protected JPopupMenu showPopup() {
+    protected final JPopupMenu showPopup() {
         Point2D where = MathUtil.multiply(getCoordsCenter(),
                 layoutEditor.getZoom());
         return this.showPopup(where);
@@ -596,5 +794,21 @@ abstract public class LayoutTrackView {
      */
     abstract public void setAllLayoutBlocks(LayoutBlock layoutBlock);
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTrackView.class);
+    protected boolean removeInlineLogixNG() {
+        LogixNG logixNG = getLogixNG();
+
+        if (logixNG == null) return true;
+
+        DeleteBean<LogixNG> deleteBean = new DeleteBean<>(
+                InstanceManager.getDefault(LogixNG_Manager.class));
+
+        boolean hasChildren = logixNG.getNumConditionalNGs() > 0;
+
+        return deleteBean.delete(logixNG, hasChildren, (t)->{deleteLogixNG_Internal(t);},
+                (t,list)->{logixNG.getListenerRefsIncludingChildren(list);},
+                jmri.jmrit.logixng.LogixNG_UserPreferences.class.getName(),
+                true);
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTrackView.class);
 }

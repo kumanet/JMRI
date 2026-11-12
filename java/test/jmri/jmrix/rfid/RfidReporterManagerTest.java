@@ -83,14 +83,14 @@ public class RfidReporterManagerTest extends jmri.managers.AbstractReporterMgrTe
     public void testReporterProvideByNumber() {
     }
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithNoPrefixNotASystemName() {}
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithPrefixNotASystemName() {}
 
     @BeforeEach
@@ -100,8 +100,9 @@ public class RfidReporterManagerTest extends jmri.managers.AbstractReporterMgrTe
         memo = new RfidSystemConnectionMemo();
         l = new RfidReporterManager(memo){
             @Override
-            protected Reporter createNewReporter(@Nonnull String systemName, String userName){
-               return null;
+            @Nonnull
+            protected Reporter createNewReporter(@Nonnull String systemName, String userName) throws IllegalArgumentException {
+               return new RfidReporter(systemName, userName);
             }
             @Override
             public void message(RfidMessage m){}

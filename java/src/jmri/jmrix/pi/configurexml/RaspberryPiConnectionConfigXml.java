@@ -32,7 +32,7 @@ public class RaspberryPiConnectionConfigXml extends AbstractConnectionConfigXml 
         log.debug("getInstance without Parameter called");
         if (adapter == null) {
             adapter = new RaspberryPiAdapter();
-            if (adapter.getGPIOController() == null) {
+            if (adapter.getPi4JContext() == null) {
                 handleException("Not running on Raspberry PI.", null, adapter.getSystemPrefix(), adapter.getUserName(), null);
             }
         }
@@ -76,6 +76,11 @@ public class RaspberryPiConnectionConfigXml extends AbstractConnectionConfigXml 
         return true;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(RaspberryPiConnectionConfigXml.class);
+    @Override
+    protected void dispose() {
+        adapter.dispose();
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(RaspberryPiConnectionConfigXml.class);
 
 }

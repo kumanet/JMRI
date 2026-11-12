@@ -24,11 +24,11 @@ public class LokProgImporterTest {
         File f = new java.io.File(FileUtil.getUserFilesPath() + "temp" + File.separator + "CsvImporter.test.xml");
         // recreate it
         if (f.exists()) {
-            f.delete();
+            Assertions.assertTrue(f.delete());
         }
-        PrintStream p = new PrintStream(new FileOutputStream(f));
-        p.print(contents);
-        p.close();
+        try (PrintStream p = new PrintStream(new FileOutputStream(f))) {
+            p.print(contents);
+        }
 
         return f;
     }
@@ -55,6 +55,6 @@ public class LokProgImporterTest {
         jmri.util.JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(LokProgImporterTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(LokProgImporterTest.class);
 
 }

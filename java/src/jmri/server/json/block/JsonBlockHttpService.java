@@ -39,9 +39,9 @@ import jmri.server.json.sensor.JsonSensor;
  */
 public class JsonBlockHttpService extends JsonNamedBeanHttpService<Block> {
 
-    private JsonIdTagHttpService idTagService = new JsonIdTagHttpService(mapper);
-    private JsonReporterHttpService reporterService = new JsonReporterHttpService(mapper);
-    private JsonRosterHttpService rosterService = new JsonRosterHttpService(mapper);
+    private final JsonIdTagHttpService idTagService = new JsonIdTagHttpService(mapper);
+    private final JsonReporterHttpService reporterService = new JsonReporterHttpService(mapper);
+    private final JsonRosterHttpService rosterService = new JsonRosterHttpService(mapper);
 
     public JsonBlockHttpService(ObjectMapper mapper) {
         super(mapper);
@@ -50,7 +50,7 @@ public class JsonBlockHttpService extends JsonNamedBeanHttpService<Block> {
     @Override
     public ObjectNode doGet(Block block, String name, String type, JsonRequest request) throws JsonException {
         ObjectNode root = this.getNamedBean(block, name, getType(), request);
-        ObjectNode data = root.with(JSON.DATA);
+        ObjectNode data = root.withObject(JSON.DATA);
         switch (block.getState()) {
             case Block.UNDETECTED:
             case NamedBean.UNKNOWN:
@@ -59,25 +59,13 @@ public class JsonBlockHttpService extends JsonNamedBeanHttpService<Block> {
             default:
                 data.put(JSON.STATE, block.getState());
         }
-        // set block value based on type stored there
-        Object bv = block.getValue();
-        if (bv == null) {
-            data.putNull(VALUE);
-        } else if (bv instanceof jmri.IdTag) {
-            ObjectNode idTagValue = idTagService.doGet((jmri.IdTag) bv, name, IDTAG, request);
-            data.set(VALUE, idTagValue);
-        } else if (bv instanceof jmri.Reporter) {
-            ObjectNode reporterValue = reporterService.doGet((jmri.Reporter) bv, name, REPORTER, request);
-            data.set(VALUE, reporterValue);
-        } else if (bv instanceof jmri.BasicRosterEntry) {
-            ObjectNode rosterValue = (ObjectNode) rosterService.getRosterEntry(request.locale, ((BasicRosterEntry) bv).getId(), request.id);
-            data.set(VALUE, rosterValue);
-        } else {
-            // send string for types not explicitly handled
-            data.put(VALUE, bv.toString());
-        }
-        data.put(JsonSensor.SENSOR, block.getSensor() != null ? block.getSensor().getSystemName() : null);
-        data.put(JsonReporter.REPORTER, block.getReporter() != null ? block.getReporter().getSystemName() : null);
+        // the train in the block, and the train it is allocated to
+        data.set(VALUE, valueNode(block.getValue(), name, request));
+        data.set(JsonBlock.ALLOCATED_VALUE, valueNode(block.getAllocatedValue(), name, request));
+        var sens = block.getSensor();
+        data.put(JsonSensor.SENSOR, sens != null ? sens.getSystemName() : null);
+        var rep = block.getReporter();
+        data.put(JsonReporter.REPORTER, rep != null ? rep.getSystemName() : null);
         data.put(JSON.SPEED, block.getBlockSpeed());
         data.put(JsonBlock.CURVATURE, block.getCurvature());
         data.put(JSON.DIRECTION, block.getDirection());
@@ -87,6 +75,30 @@ public class JsonBlockHttpService extends JsonNamedBeanHttpService<Block> {
         ArrayNode array = data.putArray(JsonBlock.DENIED);
         block.getDeniedBlocks().forEach(array::add);
         return root;
+    }
+
+    /**
+     * Encode a value held by a block: an idTag, reporter or roster entry as
+     * its JSON object, anything else as its string form.
+     *
+     * @param bv      the value, or null
+     * @param name    the name of the block
+     * @param request the request being answered
+     * @return the encoded value
+     * @throws JsonException if the value can't be encoded
+     */
+    private JsonNode valueNode(Object bv, String name, JsonRequest request) throws JsonException {
+        if (bv == null) {
+            return mapper.nullNode();
+        } else if (bv instanceof jmri.IdTag) {
+            return idTagService.doGet((jmri.IdTag) bv, name, IDTAG, request);
+        } else if (bv instanceof jmri.Reporter) {
+            return reporterService.doGet((jmri.Reporter) bv, name, REPORTER, request);
+        } else if (bv instanceof jmri.BasicRosterEntry) {
+            return rosterService.getRosterEntry(request.locale, ((BasicRosterEntry) bv).getId(), request.id);
+        }
+        // send string for types not explicitly handled
+        return mapper.getNodeFactory().textNode(bv.toString());
     }
 
     @Override
@@ -191,7 +203,7 @@ public class JsonBlockHttpService extends JsonNamedBeanHttpService<Block> {
     }
 
     @Override
-    protected ProvidingManager<Block> getManager() {
+    protected ProvidingManager<Block> getProvidingManager() {
         return InstanceManager.getDefault(BlockManager.class);
     }
 

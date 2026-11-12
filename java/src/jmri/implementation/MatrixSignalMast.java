@@ -1,15 +1,13 @@
 package jmri.implementation;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+
 import jmri.NamedBeanHandle;
 import jmri.Turnout;
 import jmri.util.ThreadingUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * SignalMast implemented via a Binary Matrix (Truth Table) of Apects x Turnout objects.
@@ -56,7 +54,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
         configureFromName(systemName);
     }
 
-    private static final String mastType = "IF$xsm";
+    private static final String THE_MAST_TYPE = "IF$xsm";
 
     private void configureFromName(@Nonnull String systemName) {
         // split out the basic information
@@ -65,15 +63,15 @@ public class MatrixSignalMast extends AbstractSignalMast {
             log.error("SignalMast system name needs at least three parts: {}", systemName);
             throw new IllegalArgumentException("System name needs at least three parts: " + systemName);
         }
-        if (!parts[0].equals(mastType)) {
-            log.warn("SignalMast system name should start with \"{}\" but is \"{}\"", mastType, systemName);
+        if (!parts[0].equals(THE_MAST_TYPE)) {
+            log.warn("SignalMast system name should start with \"{}\" but is \"{}\"", THE_MAST_TYPE, systemName);
         }
         String system = parts[1];
         String mast = parts[2];
 
         mast = mast.substring(0, mast.indexOf("("));
         setMastType(mast);
-        
+
         String tmp = parts[2].substring(parts[2].indexOf("($") + 2, parts[2].indexOf(")")); // retrieve ordinal from name
         try {
             int autoNumber = Integer.parseInt(tmp);
@@ -101,7 +99,9 @@ public class MatrixSignalMast extends AbstractSignalMast {
     */
     public synchronized void setBitsForAspect(String aspect, char[] bitArray) {
         if (aspectToOutput.containsKey(aspect)) {
-            if (log.isDebugEnabled()) log.debug("Aspect {} is already defined as {}", aspect, java.util.Arrays.toString(aspectToOutput.get(aspect)));
+            if (log.isDebugEnabled()) {
+                log.debug("Aspect {} is already defined as {}", aspect, java.util.Arrays.toString(aspectToOutput.get(aspect)));
+            }
             aspectToOutput.remove(aspect);
         }
         aspectToOutput.put(aspect, bitArray); // store keypair aspectname - bitArray in hashmap
@@ -171,8 +171,9 @@ public class MatrixSignalMast extends AbstractSignalMast {
         }
         super.setLit(newLit);
         if (newLit) {
-            if (getAspect() != null) {
-                setAspect(getAspect());
+            String litAspect = getAspect();
+            if (litAspect != null) {
+                setAspect(litAspect);
             }
             // if true, activate prior aspect
         } else {
@@ -323,7 +324,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
         // to do: use for loop
         ArrayList<String> outputlist = new ArrayList<>();
         //list = outputsToBeans.keySet();
-        
+
         int index = 1;
         while (outputsToBeans.containsKey("output" + index)) {
             outputlist.add(outputsToBeans.get("output" + index).getName());
@@ -394,7 +395,9 @@ public class MatrixSignalMast extends AbstractSignalMast {
                     try {
                         Thread.sleep(mDelay); // only the Mast specific user defined delay is applied here
                     } catch (InterruptedException e) {
+                        log.debug("interrupted in updateOutputs");
                         Thread.currentThread().interrupt(); // retain if needed later
+                        return;
                     }
                 }
             }
@@ -439,7 +442,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
         return null;
     }*/
 
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         for (int i = 1; i <= outputsToBeans.size(); i++) {
             if (t.equals(getOutputBean(i))) {
                 return true;
@@ -470,13 +473,11 @@ public class MatrixSignalMast extends AbstractSignalMast {
 
     @Override
     public void vetoableChange(java.beans.PropertyChangeEvent evt) throws java.beans.PropertyVetoException {
-        if ("CanDelete".equals(evt.getPropertyName())) { // NOI18N
-            if (evt.getOldValue() instanceof Turnout) {
-                if (isTurnoutUsed((Turnout) evt.getOldValue())) {
-                    java.beans.PropertyChangeEvent e = new java.beans.PropertyChangeEvent(this, "DoNotDelete", null, null);
-                    throw new java.beans.PropertyVetoException(Bundle.getMessage("InUseTurnoutSignalMastVeto", getDisplayName()), e);
-                }
-            }
+        if (jmri.Manager.PROPERTY_CAN_DELETE.equals(evt.getPropertyName())
+                && (evt.getOldValue() instanceof Turnout) && (isTurnoutUsed((Turnout) evt.getOldValue()))) {
+            var e = new java.beans.PropertyChangeEvent(this, jmri.Manager.PROPERTY_DO_NOT_DELETE, null, null);
+            throw new java.beans.PropertyVetoException(
+                Bundle.getMessage("InUseTurnoutSignalMastVeto", getDisplayName()), e);
         }
     }
 
@@ -486,6 +487,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
      * @param number int for the number of outputs defined for this mast
      * @see #mastBitNum
      */
+    @SuppressWarnings("javadoc")
     public void setBitNum(int number) {
             mastBitNum = number;
     }
@@ -496,6 +498,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
      * @param bits char[] for outputs defined for this mast
      * @see #mastBitNum
      */
+    @SuppressWarnings("javadoc")
     public void setBitNum(char[] bits) {
         mastBitNum = bits.length;
     }
@@ -506,7 +509,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
 
     @Override
     public void setAspectDisabled(String aspect) {
-        if (aspect == null || aspect.equals("")) {
+        if (aspect == null || aspect.isEmpty()) {
             return;
         }
         if (!map.checkAspect(aspect)) {
@@ -515,7 +518,7 @@ public class MatrixSignalMast extends AbstractSignalMast {
         }
         if (!disabledAspects.contains(aspect)) {
             disabledAspects.add(aspect);
-            firePropertyChange("aspectDisabled", null, aspect);
+            firePropertyChange(PROPERTY_ASPECT_DISABLED, null, aspect);
         }
     }
 
@@ -543,11 +546,6 @@ public class MatrixSignalMast extends AbstractSignalMast {
         return mDelay;
     }
 
-    @Override
-    public void dispose() {
-        super.dispose();
-    }
-
-    private final static Logger log = LoggerFactory.getLogger(MatrixSignalMast.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MatrixSignalMast.class);
 
 }

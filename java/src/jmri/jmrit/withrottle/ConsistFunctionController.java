@@ -3,7 +3,6 @@ package jmri.jmrit.withrottle;
 import jmri.LocoAddress;
 import jmri.DccLocoAddress;
 import jmri.DccThrottle;
-import jmri.InstanceManager;
 import jmri.ThrottleListener;
 import jmri.jmrit.roster.RosterEntry;
 import org.slf4j.Logger;
@@ -69,6 +68,6 @@ public class ConsistFunctionController implements ThrottleListener {
         return jmri.InstanceManager.throttleManagerInstance().requestThrottle(loco, this, true);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ConsistFunctionController.class);
+    private static final Logger log = LoggerFactory.getLogger(ConsistFunctionController.class);
 
 }

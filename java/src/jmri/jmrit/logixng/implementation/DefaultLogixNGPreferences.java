@@ -5,28 +5,42 @@ import java.util.prefs.Preferences;
 import jmri.beans.PreferencesBean;
 import jmri.jmrit.logixng.LogixNGPreferences;
 import jmri.jmrit.logixng.MaleSocket.ErrorHandlingType;
+import jmri.jmrit.logixng.actions.IfThenElse;
 import jmri.profile.ProfileManager;
 import jmri.profile.ProfileUtils;
 
 /**
  * Preferences for LogixNG
- * 
+ *
  * @author Daniel Bergqvist Copyright 2018
  */
 public final class DefaultLogixNGPreferences extends PreferencesBean implements LogixNGPreferences {
 
-    public static final String START_LOGIXNG_ON_LOAD = "startLogixNGOnStartup";
-    public static final String USE_GENERIC_FEMALE_SOCKETS = "useGenericFemaleSockets";
-    public static final String INSTALL_DEBUGGER = "installDebugger";
-    public static final String SHOW_SYSTEM_USER_NAMES = "showSystemUserNames";
-    public static final String ERROR_HANDLING_TYPE = "errorHandlingType";
-    
+    private static final String START_LOGIXNG_ON_LOAD = "startLogixNGOnStartup";
+    private static final String INSTALL_DEBUGGER = "installDebugger";
+    private static final String SHOW_SYSTEM_USER_NAMES = "showSystemUserNames";
+    private static final String ERROR_HANDLING_TYPE = "errorHandlingType";
+    private static final String TREE_EDITOR_HIGHLIGHT_ROW = "treeEditorHighlightRow";
+    private static final String SHOW_SYSTEM_NAME_IN_EXCEPTION = "showSystemNameInExceptions";
+    private static final String STRICT_TYPING_GLOBAL_VARIABLES = "strictTypingGlobalVariables";
+    private static final String STRICT_TYPING_LOCAL_VARIABLES = "strictTypingLocalVariables";
+    private static final String IF_THEN_ELSE_EXECUTE_TYPE_DEFAULT = "ifThenElseExecuteTypeDefault";
+    private static final String LOG_ALL_BEFORE = "logAllBefore";
+    private static final String LOG_ALL_AFTER = "logAllAfter";
+
     private boolean _startLogixNGOnLoad = true;
     private boolean _showSystemUserNames = false;
     private boolean _installDebugger = true;
     private ErrorHandlingType _errorHandlingType = ErrorHandlingType.ShowDialogBox;
-    
-    
+    private boolean _treeEditorHighlightRow = false;
+    private boolean _showSystemNameInException = false;
+    private boolean _strictTypingGlobalVariables = false;
+    private boolean _strictTypingLocalVariables = false;
+    private IfThenElse.ExecuteType _ifThenElseExecuteTypeDefault = IfThenElse.ExecuteType.ExecuteOnChange;
+    private boolean _logAllBefore = false;
+    private boolean _logAllAfter = false;
+
+
     public DefaultLogixNGPreferences() {
         super(ProfileManager.getDefault().getActiveProfile());
 //        System.out.format("LogixNG preferences%n");
@@ -41,35 +55,15 @@ public final class DefaultLogixNGPreferences extends PreferencesBean implements 
         _showSystemUserNames = sharedPreferences.getBoolean(SHOW_SYSTEM_USER_NAMES, _showSystemUserNames);
         _errorHandlingType = ErrorHandlingType.valueOf(
                 sharedPreferences.get(ERROR_HANDLING_TYPE, _errorHandlingType.name()));
-        
-/*        
-        this.allowRemoteConfig = sharedPreferences.getBoolean(ALLOW_REMOTE_CONFIG, this.allowRemoteConfig);
-        this.clickDelay = sharedPreferences.getInt(CLICK_DELAY, this.clickDelay);
-        this.simple = sharedPreferences.getBoolean(SIMPLE, this.simple);
-        this.railroadName = sharedPreferences.get(RAILROAD_NAME, this.railroadName);
-        this.readonlyPower = sharedPreferences.getBoolean(READONLY_POWER, this.readonlyPower);
-        this.refreshDelay = sharedPreferences.getInt(REFRESH_DELAY, this.refreshDelay);
-        this.useAjax = sharedPreferences.getBoolean(USE_AJAX, this.useAjax);
-        this.disableFrames = sharedPreferences.getBoolean(DISABLE_FRAME_SERVER, this.disableFrames);
-        this.redirectFramesToPanels = sharedPreferences.getBoolean(REDIRECT_FRAMES, this.redirectFramesToPanels);
-        try {
-            Preferences frames = sharedPreferences.node(DISALLOWED_FRAMES);
-            if (frames.keys().length != 0) {
-                this.disallowedFrames.clear();
-                for (String key : frames.keys()) { // throws BackingStoreException
-                    String frame = frames.get(key, null);
-                    if (frame != null && !frame.trim().isEmpty()) {
-                        this.disallowedFrames.add(frame);
-                    }
-                }
-            }
-        } catch (BackingStoreException ex) {
-            // this is expected if sharedPreferences have not been written previously,
-            // so do nothing.
-        }
-        this.port = sharedPreferences.getInt(PORT, this.port);
-        this.useZeroConf = sharedPreferences.getBoolean(USE_ZERO_CONF, this.useZeroConf);
-*/
+        _treeEditorHighlightRow = sharedPreferences.getBoolean(TREE_EDITOR_HIGHLIGHT_ROW, _treeEditorHighlightRow);
+        _showSystemNameInException = sharedPreferences.getBoolean(SHOW_SYSTEM_NAME_IN_EXCEPTION, _showSystemNameInException);
+        _strictTypingGlobalVariables = sharedPreferences.getBoolean(STRICT_TYPING_GLOBAL_VARIABLES, _strictTypingGlobalVariables);
+        _strictTypingLocalVariables = sharedPreferences.getBoolean(STRICT_TYPING_LOCAL_VARIABLES, _strictTypingLocalVariables);
+        _ifThenElseExecuteTypeDefault = IfThenElse.ExecuteType.valueOf(
+                sharedPreferences.get(IF_THEN_ELSE_EXECUTE_TYPE_DEFAULT, _ifThenElseExecuteTypeDefault.name()));
+        _logAllBefore = sharedPreferences.getBoolean(LOG_ALL_BEFORE, _logAllBefore);
+        _logAllAfter = sharedPreferences.getBoolean(LOG_ALL_AFTER, _logAllAfter);
+
         setIsDirty(false);
     }
 
@@ -84,6 +78,27 @@ public final class DefaultLogixNGPreferences extends PreferencesBean implements 
         if (getShowSystemUserNames() != prefs.getShowSystemUserNames()) {
             return true;
         }
+        if (getTreeEditorHighlightRow() != prefs.getTreeEditorHighlightRow()) {
+            return true;
+        }
+        if (getShowSystemNameInException() != prefs.getShowSystemNameInException()) {
+            return true;
+        }
+        if (getStrictTypingGlobalVariables() != prefs.getStrictTypingGlobalVariables()) {
+            return true;
+        }
+        if (getStrictTypingLocalVariables() != prefs.getStrictTypingLocalVariables()) {
+            return true;
+        }
+        if (getIfThenElseExecuteTypeDefault() != prefs.getIfThenElseExecuteTypeDefault()) {
+            return true;
+        }
+        if (getLogAllBefore() != prefs.getLogAllBefore()) {
+            return true;
+        }
+        if (getLogAllAfter() != prefs.getLogAllAfter()) {
+            return true;
+        }
         return (getErrorHandlingType() != prefs.getErrorHandlingType());
     }
 
@@ -93,6 +108,13 @@ public final class DefaultLogixNGPreferences extends PreferencesBean implements 
         setInstallDebugger(prefs.getInstallDebugger());
         setShowSystemUserNames(prefs.getShowSystemUserNames());
         this.setErrorHandlingType(prefs.getErrorHandlingType());
+        setTreeEditorHighlightRow(prefs.getTreeEditorHighlightRow());
+        setShowSystemNameInException(prefs.getShowSystemNameInException());
+        setStrictTypingGlobalVariables(prefs.getStrictTypingGlobalVariables());
+        setStrictTypingLocalVariables(prefs.getStrictTypingLocalVariables());
+        setIfThenElseExecuteTypeDefault(prefs.getIfThenElseExecuteTypeDefault());
+        setLogAllBefore(prefs.getLogAllBefore());
+        setLogAllAfter(prefs.getLogAllAfter());
     }
 
     @Override
@@ -102,8 +124,16 @@ public final class DefaultLogixNGPreferences extends PreferencesBean implements 
         sharedPreferences.putBoolean(INSTALL_DEBUGGER, this.getInstallDebugger());
         sharedPreferences.putBoolean(SHOW_SYSTEM_USER_NAMES, this.getShowSystemUserNames());
         sharedPreferences.put(ERROR_HANDLING_TYPE, this.getErrorHandlingType().name());
+        sharedPreferences.putBoolean(TREE_EDITOR_HIGHLIGHT_ROW, this.getTreeEditorHighlightRow());
+        sharedPreferences.putBoolean(SHOW_SYSTEM_NAME_IN_EXCEPTION, this.getShowSystemNameInException());
+        sharedPreferences.putBoolean(STRICT_TYPING_GLOBAL_VARIABLES, this.getStrictTypingGlobalVariables());
+        sharedPreferences.putBoolean(STRICT_TYPING_LOCAL_VARIABLES, this.getStrictTypingLocalVariables());
+        sharedPreferences.put(IF_THEN_ELSE_EXECUTE_TYPE_DEFAULT, this.getIfThenElseExecuteTypeDefault().name());
+        sharedPreferences.putBoolean(LOG_ALL_BEFORE, this.getLogAllBefore());
+        sharedPreferences.putBoolean(LOG_ALL_AFTER, this.getLogAllAfter());
+        setIsDirty(false);
     }
-    
+
     @Override
     public void setStartLogixNGOnStartup(boolean value) {
         _startLogixNGOnLoad = value;
@@ -148,5 +178,82 @@ public final class DefaultLogixNGPreferences extends PreferencesBean implements 
         return _errorHandlingType;
     }
 
-//    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGPreferences.class);
+    @Override
+    public void setTreeEditorHighlightRow(boolean value) {
+        _treeEditorHighlightRow = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getTreeEditorHighlightRow() {
+        return _treeEditorHighlightRow;
+    }
+
+    @Override
+    public void setShowSystemNameInException(boolean value) {
+        _showSystemNameInException = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getShowSystemNameInException() {
+        return _showSystemNameInException;
+    }
+
+    @Override
+    public void setStrictTypingGlobalVariables(boolean value) {
+        _strictTypingGlobalVariables = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getStrictTypingGlobalVariables() {
+        return _strictTypingGlobalVariables;
+    }
+
+    @Override
+    public void setStrictTypingLocalVariables(boolean value) {
+        _strictTypingLocalVariables = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getStrictTypingLocalVariables() {
+        return _strictTypingLocalVariables;
+    }
+
+    @Override
+    public void setIfThenElseExecuteTypeDefault(IfThenElse.ExecuteType value) {
+        _ifThenElseExecuteTypeDefault = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public IfThenElse.ExecuteType getIfThenElseExecuteTypeDefault() {
+        return _ifThenElseExecuteTypeDefault;
+    }
+
+    @Override
+    public void setLogAllBefore(boolean value) {
+        _logAllBefore = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getLogAllBefore() {
+        return _logAllBefore;
+    }
+
+    @Override
+    public void setLogAllAfter(boolean value) {
+        _logAllAfter = value;
+        setIsDirty(true);
+    }
+
+    @Override
+    public boolean getLogAllAfter() {
+        return _logAllAfter;
+    }
+
+//    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LogixNGPreferences.class);
 }

@@ -33,6 +33,22 @@ public class TrainCustomManifestTest extends OperationsTestCase {
     }
     
     @Test
+    public void testAddCvsFile() {
+        TrainCustomManifest t = new TrainCustomManifest();
+        Assert.assertFalse("null file", t.addCsvFile(null));
+    }
+    
+    @Test
+    public void testWaitForProcessToComplete() {
+        TrainCustomManifest t = new TrainCustomManifest();
+        try {
+            Assert.assertTrue("no process", t.waitForProcessToComplete());
+        } catch (InterruptedException e) {
+            Assert.fail("Unexpected exception");
+        }
+    }
+    
+    @Test
     public void testProcess() {
         TrainCustomManifest t = new TrainCustomManifest();
         Assert.assertFalse("should return false", t.process());
@@ -40,6 +56,6 @@ public class TrainCustomManifestTest extends OperationsTestCase {
         JUnitOperationsUtil.checkOperationsShutDownTask();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(TrainCustomManifestTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(TrainCustomManifestTest.class);
 
 }

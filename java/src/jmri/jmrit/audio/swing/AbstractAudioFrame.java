@@ -2,13 +2,15 @@ package jmri.jmrit.audio.swing;
 
 import java.awt.FlowLayout;
 import java.util.Hashtable;
+
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
 import javax.vecmath.Vector3f;
+
 import jmri.Audio;
 import jmri.implementation.AbstractAudio;
 import jmri.jmrit.beantable.AudioTableAction.AudioTableDataModel;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Abstract GUI to edit Audio objects
@@ -26,7 +28,7 @@ import jmri.util.JmriJFrame;
  *
  * @author Matthew Harris copyright (c) 2009
  */
-abstract public class AbstractAudioFrame extends JmriJFrame {
+public abstract class AbstractAudioFrame extends JmriJFrame {
 
     AbstractAudioFrame frame = this;
 
@@ -36,7 +38,7 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
                     ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
                     ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-    AudioTableDataModel model;
+    final AudioTableDataModel model;
 
     private static final int INT_PRECISION = (int) Math.pow(10, Audio.DECIMAL_PLACES);
     static final float FLT_PRECISION = 1 / (float) INT_PRECISION;
@@ -90,7 +92,7 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
     /**
      * Populate the Audio frame with default values.
      */
-    abstract public void resetFrame();
+    public abstract void resetFrame();
 
     /**
      * Populate the Audio frame with current values.
@@ -112,15 +114,16 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
      */
     protected boolean entryError(String entry, String prefix, String counter) {
         if (!entry.startsWith(prefix)) {
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("AudioCreateError", prefix),
-                    Bundle.getMessage("AudioCreateErrorTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("AudioCreateError", prefix),
+                    Bundle.getMessage("AudioCreateErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
             sysName.setText(prefix + counter);
             return true;
         }
         return false;
     }
 
-    //private static final Logger log = LoggerFactory.getLogger(AbstractAudioFrame.class);
+    // private static final Logger log = LoggerFactory.getLogger(AbstractAudioFrame.class);
+
     /**
      * Convenience class to create a JPanel to edit a Vector3f object using 3
      * separate JSpinner Swing objects.
@@ -150,7 +153,6 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
             layoutPanel(title, units);
         }
 
-        @SuppressWarnings("UnnecessaryBoxing")
         private void layoutPanel(String title, String units) {
             this.setLayout(new FlowLayout());
             if (title.length() != 0) {
@@ -161,21 +163,27 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
             this.add(xLabel);
             xValue.setPreferredSize(new JTextField(8).getPreferredSize());
             xValue.setModel(
-                    new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE), Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+                new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE),
+                    Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+            // TODO - I18N of format
             xValue.setEditor(new JSpinner.NumberEditor(xValue, "0.00"));
             this.add(xValue);
 
             this.add(yLabel);
             yValue.setPreferredSize(new JTextField(8).getPreferredSize());
             yValue.setModel(
-                    new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE), Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+                new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE),
+                    Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+            // TODO - I18N of format
             yValue.setEditor(new JSpinner.NumberEditor(yValue, "0.00"));
             this.add(yValue);
 
             this.add(zLabel);
             zValue.setPreferredSize(new JTextField(8).getPreferredSize());
             zValue.setModel(
-                    new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE), Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+                new SpinnerNumberModel(Float.valueOf(0f), Float.valueOf(-Audio.MAX_DISTANCE),
+                    Float.valueOf(Audio.MAX_DISTANCE), Float.valueOf(FLT_PRECISION)));
+            // TODO - I18N of format
             zValue.setEditor(new JSpinner.NumberEditor(zValue, "0.00"));
             this.add(zValue);
 
@@ -213,13 +221,12 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
      * A convenience class to create a JPanel for editing a float value using
      * combined JSlider and JSPinner Swing objects.
      */
-    protected static class JPanelSliderf extends JPanel {
+    static class JPanelSliderf extends JPanel {
 
-        JSlider slider = new JSlider();
+        private JSlider slider = new JSlider();
 
-        JSpinner spinner = new JSpinner();
+        private JSpinner spinner = new JSpinner();
 
-        @SuppressWarnings({"UnnecessaryBoxing", "OverridableMethodCallInConstructor"})
         JPanelSliderf(String title, Float min, Float max, int majorTicks, int minorTicks) {
             super();
             int iMin = Math.round(min * INT_PRECISION);
@@ -234,18 +241,19 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
             slider.setMaximum(Math.round(max * INT_PRECISION));
             slider.setMajorTickSpacing(iInterval);
             slider.setMinorTickSpacing(iInterval / minorTicks);
-            @SuppressWarnings("UseOfObsoleteCollectionType")
+//            @SuppressWarnings("UseOfObsoleteCollectionType")
             // Need to use Hashtable for JSlider labels
             Hashtable<Integer, JLabel> labelTable = new Hashtable<>();
             for (int i = iMin; i <= iMax; i += iInterval) {
                 float f = i;
                 f /= INT_PRECISION;
+                // TODO - I18N of format
                 labelTable.put(i, new JLabel(Float.toString(f)));
             }
             slider.setLabelTable(labelTable);
             slider.setPaintTicks(true);
             slider.setPaintLabels(true);
-            slider.addChangeListener((ChangeEvent e) -> {
+            slider.addChangeListener( e -> {
                 float f = slider.getValue();
                 f /= INT_PRECISION;
                 spinner.setValue(f);
@@ -253,11 +261,11 @@ abstract public class AbstractAudioFrame extends JmriJFrame {
             spinner.setPreferredSize(new JTextField(5).getPreferredSize());
             spinner.setModel(
                     new SpinnerNumberModel(min, min, max, Float.valueOf(FLT_PRECISION)));
+            // TODO - I18N of format
             spinner.setEditor(new JSpinner.NumberEditor(spinner, "0.00"));
-            spinner.addChangeListener((ChangeEvent e) -> {
+            spinner.addChangeListener( e ->
                 slider.setValue(
-                        Math.round((Float) spinner.getValue() * INT_PRECISION));
-            });
+                        Math.round((Float) spinner.getValue() * INT_PRECISION)));
             this.add(slider);
             this.add(spinner);
         }

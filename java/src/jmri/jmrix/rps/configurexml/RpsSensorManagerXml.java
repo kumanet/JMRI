@@ -2,8 +2,6 @@ package jmri.jmrix.rps.configurexml;
 
 import jmri.configurexml.JmriConfigureXmlException;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring RpsSensorManagers.
@@ -30,6 +28,6 @@ public class RpsSensorManagerXml extends jmri.managers.configurexml.AbstractSens
         return loadSensors(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(RpsSensorManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(RpsSensorManagerXml.class);
 
 }

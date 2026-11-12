@@ -1,12 +1,12 @@
 package jmri.implementation;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 
 import jmri.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract class providing the basic logic of the Sensor interface.
@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractSensor extends AbstractNamedBean implements Sensor {
 
-    private static final Logger log = LoggerFactory.getLogger(AbstractSensor.class);
 
     // ctor takes a system-name string for initialization
     public AbstractSensor(String systemName) {
@@ -57,7 +56,7 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         }
         long oldValue = sensorDebounceGoingActive;
         sensorDebounceGoingActive = time;
-        firePropertyChange("ActiveTimer", oldValue, sensorDebounceGoingActive);
+        firePropertyChange(PROPERTY_ACTIVE_TIMER, oldValue, sensorDebounceGoingActive);
     }
 
     /**
@@ -78,7 +77,7 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         }
         long oldValue = sensorDebounceGoingInActive;
         sensorDebounceGoingInActive = time;
-        firePropertyChange("InActiveTimer", oldValue, sensorDebounceGoingInActive);
+        firePropertyChange(PROPERTY_INACTIVE_TIMER, oldValue, sensorDebounceGoingInActive);
     }
 
     /**
@@ -96,10 +95,10 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         }
         useDefaultTimerSettings = boo;
         if (useDefaultTimerSettings) {
-            sensorDebounceGoingActive = jmri.InstanceManager.sensorManagerInstance().getDefaultSensorDebounceGoingActive();
-            sensorDebounceGoingInActive = jmri.InstanceManager.sensorManagerInstance().getDefaultSensorDebounceGoingInActive();
+            sensorDebounceGoingActive = InstanceManager.sensorManagerInstance().getDefaultSensorDebounceGoingActive();
+            sensorDebounceGoingInActive = InstanceManager.sensorManagerInstance().getDefaultSensorDebounceGoingInActive();
         }
-        firePropertyChange("GlobalTimer", !boo, boo);
+        firePropertyChange(PROPERTY_GLOBAL_TIMER, !boo, boo);
     }
 
     @Override
@@ -107,37 +106,50 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         return useDefaultTimerSettings;
     }
 
-    protected Thread thr;
-    protected Runnable r;
+    /**
+     * Counts the raw state changes, so that a debounce timer started for an
+     * earlier raw state does nothing once the raw state has changed again.
+     */
+    private final java.util.concurrent.atomic.AtomicInteger debounceCount
+            = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile boolean debouncePending = false;
 
     /**
      * Before going active or inactive or checking that we can go active, we will wait for
      * sensorDebounceGoing(In)Active for things to settle down to help prevent a race condition.
+     * <p>
+     * The known state is set and the change is sent to listeners together on
+     * the layout thread, and only if the raw state has not changed meanwhile.
      */
     protected void sensorDebounce() {
-        final int lastKnownState = _knownState;
-        r = () -> {
-            try {
-                long sensorDebounceTimer = sensorDebounceGoingInActive;
-                if (_rawState == ACTIVE) {
-                    sensorDebounceTimer = sensorDebounceGoingActive;
-                }
-                Thread.sleep(sensorDebounceTimer);
-                restartcount = 0;
-                _knownState = _rawState;
-
-                javax.swing.SwingUtilities.invokeAndWait(
-                        () -> firePropertyChange("KnownState", lastKnownState, _knownState)
-                );
-            } catch (InterruptedException ex) {
-                restartcount++;
-            } catch (java.lang.reflect.InvocationTargetException ex) {
-                log.error("failed to start debounced Sensor update for \"{}\" due to {}", getDisplayName(), ex.getCause());
+        final int count = debounceCount.incrementAndGet();
+        final int newState = _rawState;
+        long sensorDebounceTimer = sensorDebounceGoingInActive;
+        if (newState == ACTIVE) {
+            sensorDebounceTimer = sensorDebounceGoingActive;
+        }
+        debouncePending = true;
+        jmri.util.ThreadingUtil.runOnLayoutDelayed( () -> {
+            if (count != debounceCount.get()) {
+                return; // the raw state has changed again
             }
-        };
+            debouncePending = false;
+            restartcount = 0;
+            int oldState = _knownState;
+            _knownState = newState;
+            firePropertyChange(PROPERTY_KNOWN_STATE, oldState, _knownState);
+        }, (int) sensorDebounceTimer );
+    }
 
-        thr = jmri.util.ThreadingUtil.newThread(r);
-        thr.start();
+    /**
+     * Stop a debounce timer that has not yet run.
+     */
+    private void cancelDebounce() {
+        debounceCount.incrementAndGet();
+        if (debouncePending) {
+            debouncePending = false;
+            restartcount++;
+        }
     }
 
     int restartcount = 0;
@@ -171,6 +183,7 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
      *
      * @param newState the Sensor state command value passed
      * @return true if a Sensor.ACTIVE was requested and Sensor is not set to _inverted
+     * @throws IllegalArgumentException when needed
      */
     protected boolean stateChangeCheck(int newState) throws IllegalArgumentException {
         // sort out states
@@ -189,47 +202,96 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         }
     }
 
+    private static final String PROPERTY_RAW_STATE = "RawState";
+
     /**
-     * Set our internal state information, and notify bean listeners.
+     * Set our internal state information, and notify bean listeners. The
+     * change is taken to have happened now.
      *
      * @param s the new state
      */
     public void setOwnState(int s) {
+        setOwnState(s, System.nanoTime());
+    }
+
+    /**
+     * Set our internal state information, and notify bean listeners, giving
+     * when the change was received. For a connection that records when it
+     * read each message from the layout, so that {@link jmri.Sensor.RawStateListener}s
+     * are given that time rather than the later time the message reached
+     * this Sensor.
+     *
+     * @param s         the new state
+     * @param timeNanos when the change was received, on the
+     *                  {@link System#nanoTime()} scale
+     * @since 5.17.5
+     */
+    public void setOwnState(int s, long timeNanos) {
         if (_rawState != s) {
+            int oldRawState = _rawState;
             if (((s == ACTIVE) && (sensorDebounceGoingActive > 0))
                     || ((s == INACTIVE) && (sensorDebounceGoingInActive > 0))) {
 
-                int oldRawState = _rawState;
                 _rawState = s;
-                if (thr != null) {
-                    thr.interrupt();
-                }
+                cancelDebounce();
+                fireRawStateChanged(oldRawState, s, timeNanos);
 
                 if ((restartcount != 0) && (restartcount % 10 == 0)) {
                     log.warn("Sensor \"{}\" state keeps flapping: {}", getDisplayName(), restartcount);
                 }
-                firePropertyChange("RawState", oldRawState, s);
+                firePropertyChange(PROPERTY_RAW_STATE, oldRawState, s);
                 sensorDebounce();
                 return;
             } else {
-                // we shall try to stop the thread as one of the state changes
-                // might start the thread, while the other may not.
-                if (thr != null) {
-                    thr.interrupt();
-                }
+                // we shall stop the debounce timer as one of the state changes
+                // might start the timer, while the other may not.
+                cancelDebounce();
                 _rawState = s;
+                fireRawStateChanged(oldRawState, s, timeNanos);
             }
         }
         if (_knownState != s) {
             int oldState = _knownState;
             _knownState = s;
-            firePropertyChange("KnownState", oldState, _knownState);
+            firePropertyChange(PROPERTY_KNOWN_STATE, oldState, _knownState);
         }
     }
 
     @Override
     public int getRawState() {
         return _rawState;
+    }
+
+    private final List<RawStateListener> rawStateListeners = new CopyOnWriteArrayList<>();
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addRawStateListener(@Nonnull RawStateListener listener) {
+        rawStateListeners.add(listener);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void removeRawStateListener(@Nonnull RawStateListener listener) {
+        rawStateListeners.remove(listener);
+    }
+
+    /**
+     * Tell the raw state listeners of a change. One that throws is logged and
+     * does not stop the others, or the Sensor's own update.
+     */
+    private void fireRawStateChanged(int oldState, int newState, long timeNanos) {
+        for (RawStateListener l : rawStateListeners) {
+            try {
+                l.rawStateChanged(this, oldState, newState, timeNanos);
+            } catch (RuntimeException e) {
+                log.error("Raw state listener of Sensor \"{}\" failed", getDisplayName(), e);
+            }
+        }
     }
 
     /**
@@ -264,7 +326,7 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
         boolean oldInverted = _inverted;
         _inverted = inverted;
         if (oldInverted != _inverted) {
-            firePropertyChange("inverted", oldInverted, _inverted);
+            firePropertyChange(PROPERTY_SENSOR_INVERTED, oldInverted, _inverted);
             int state = _knownState;
             if (state == ACTIVE) {
                 setOwnState(INACTIVE);
@@ -332,12 +394,21 @@ public abstract class AbstractSensor extends AbstractNamedBean implements Sensor
     /**
      * Get the pull resistance.
      *
-     * @return the currently set PullResistance value.  In this default 
+     * @return the currently set PullResistance value.  In this default
      * implementation, PullResistance.PULL_OFF is always returned.
      */
     @Override
     public PullResistance getPullResistance(){
        return PullResistance.PULL_OFF;
     }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        cancelDebounce(); // stop the debounce timer
+        rawStateListeners.clear();
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractSensor.class);
 
 }

@@ -43,7 +43,7 @@ public class AnalogFormulaSwing extends AbstractAnalogExpressionSwing {
             parser.parseExpression(_formula.getText());
         } catch (ParserException ex) {
             errorMessages.add(Bundle.getMessage("AnalogFormula_InvalidFormula", _formula.getText()));
-            log.error("Invalid formula '"+_formula.getText()+"'. Error: "+ex.getMessage(), ex);
+            log.error("Invalid formula '{}'. Error: ", _formula.getText(), ex);
             return false;
         }
         return true;
@@ -84,6 +84,6 @@ public class AnalogFormulaSwing extends AbstractAnalogExpressionSwing {
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnalogFormulaSwing.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnalogFormulaSwing.class);
     
 }

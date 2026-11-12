@@ -1,18 +1,16 @@
 package jmri.jmrit.logix;
 
-import java.awt.BorderLayout;
 import java.awt.Font;
 
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.WindowConstants;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jmri.DccThrottle;
+import jmri.DccLocoAddress;
 import jmri.Throttle;
 import jmri.implementation.SignalSpeedMap;
 
@@ -24,10 +22,9 @@ import jmri.implementation.SignalSpeedMap;
  */
 public class LearnSpeedPanel extends JInternalFrame implements java.beans.PropertyChangeListener {
 
-    private Warrant _warrant;
-    private DccThrottle _throttle;
-    private float _currentThrottleValue = 0.0f;
+    private final Warrant _warrant;
     private JLabel _scaleSpeed;
+    private JLabel _direction;
 
     LearnSpeedPanel(Warrant w) {
         _warrant = w;
@@ -37,7 +34,6 @@ public class LearnSpeedPanel extends JInternalFrame implements java.beans.Proper
     private void initGUI() {
         JPanel mainPanel = new JPanel();
         this.setContentPane(mainPanel);
-        mainPanel.setLayout(new BorderLayout());
         this.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 
         JPanel panel = new JPanel();
@@ -51,37 +47,43 @@ public class LearnSpeedPanel extends JInternalFrame implements java.beans.Proper
         } else {
             name = _warrant.getDisplayName();
         }
+        _direction = new JLabel(Bundle.getMessage("forward"));
+        panel.add(_direction);
+        panel.add(Box.createHorizontalStrut(WarrantRoute.STRUT_SIZE));
         _scaleSpeed = new JLabel(Bundle.getMessage("TrainReady", _warrant.getTrainName(), name));
         panel.add(_scaleSpeed);
 
-        mainPanel.add(panel, BorderLayout.CENTER);
+        mainPanel.add(panel);
     }
 
-    public void notifyAddressThrottleFound(DccThrottle t) {
-        if (log.isDebugEnabled()) {
-            log.debug("control panel received new throttle");
-        }
-        _throttle = t;
-        _warrant.getSpeedUtil().setIsForward(_throttle.getIsForward());
+    public void notifyAddressThrottleFound(DccThrottle throttle) {
+        _warrant.getSpeedUtil().setThrottle(throttle);
 
-        _throttle.addPropertyChangeListener(this);
+        throttle.addPropertyChangeListener(this);
+        _scaleSpeed.setText(setSpeed(throttle.getSpeedSetting()));
         if (log.isDebugEnabled()) {
-            jmri.DccLocoAddress Address = (jmri.DccLocoAddress) _throttle.getLocoAddress();
-            log.debug("new address is {}", Address.toString());
+            DccLocoAddress address = (DccLocoAddress) throttle.getLocoAddress();
+            log.debug("new address is {}", address );
         }
+        setSpeed(0);
     }
 
     /**
-     * update the state of this panel if direction or speed change
+     * Update the state of this panel if direction or speed change.
+     * {@inheritDoc }
      */
     @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
         if (e.getPropertyName().equals(Throttle.SPEEDSETTING)) {
-            _currentThrottleValue = ((Float) e.getNewValue()).floatValue();
-            _scaleSpeed.setText(setSpeed());
+            _scaleSpeed.setText(setSpeed((Float) e.getNewValue()));
         } else if (e.getPropertyName().equals(Throttle.ISFORWARD)) {
-            _warrant.getSpeedUtil().setIsForward((boolean) e.getNewValue());
-            _scaleSpeed.setText(setSpeed());
+            String direction;
+            if ( Boolean.TRUE.equals(e.getNewValue()) ) {
+                direction = Bundle.getMessage("forward");
+            } else {
+                direction = Bundle.getMessage("reverse");
+            }
+            _direction.setText(direction);
         }
         if (log.isDebugEnabled()) {
             log.debug("Property change event received {} / {}", e.getPropertyName(), e.getNewValue());
@@ -91,8 +93,8 @@ public class LearnSpeedPanel extends JInternalFrame implements java.beans.Proper
     /**
      * @return a string for displaying speed if available
      */
-    private String setSpeed() {
-        float trackSpeed = _warrant.getSpeedUtil().getTrackSpeed(_currentThrottleValue);
+    private String setSpeed(float throttleValue) {
+        float trackSpeed = _warrant.getSpeedUtil().getTrackSpeed(throttleValue);
         float speed = 0;
         String units;
         SignalSpeedMap speedMap = jmri.InstanceManager.getDefault(SignalSpeedMap.class);
@@ -100,7 +102,7 @@ public class LearnSpeedPanel extends JInternalFrame implements java.beans.Proper
             case SignalSpeedMap.PERCENT_NORMAL:
             case SignalSpeedMap.PERCENT_THROTTLE:
                 units = Bundle.getMessage("percentThrottle");
-                speed = _currentThrottleValue * 100;
+                speed = throttleValue * 100;
                 break;
             case SignalSpeedMap.SPEED_MPH:
                 units = Bundle.getMessage("speedMph");
@@ -122,17 +124,19 @@ public class LearnSpeedPanel extends JInternalFrame implements java.beans.Proper
     /**
      * "Destructor"
      */
-    public void destroy() {
-        if (_throttle != null) {
-            _throttle.removePropertyChangeListener(this);
+    @Override
+    public void dispose() {
+        DccThrottle throttle = _warrant.getSpeedUtil().getThrottle();
+        if (throttle != null) {
+            throttle.removePropertyChangeListener(this);
             if (log.isDebugEnabled()) {
-                jmri.DccLocoAddress Address = (jmri.DccLocoAddress) _throttle.getLocoAddress();
-                log.debug("Address {} destroyed", Address.toString());
+                DccLocoAddress address = (DccLocoAddress) throttle.getLocoAddress();
+                log.debug("Address {} destroyed", address);
             }
-            _throttle = null;
+//            _throttle = null;
         }
     }
-    
 
-    private static final Logger log = LoggerFactory.getLogger(LearnSpeedPanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LearnSpeedPanel.class);
+
 }

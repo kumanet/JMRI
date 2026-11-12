@@ -69,10 +69,10 @@ public class DefaultMaleDigitalExpressionSocket extends AbstractMaleSocket imple
         } catch (RuntimeException e) {
             handleError(this, Bundle.getMessage("ExceptionEvaluateExpression", e.getLocalizedMessage()), e, log);
             lastEvaluationResult = false;
+        } finally {
+            conditionalNG.getStack().setCount(currentStackPos);
+            conditionalNG.getSymbolTable().removeSymbols(_localVariables);
         }
-        
-        conditionalNG.getStack().setCount(currentStackPos);
-        conditionalNG.getSymbolTable().removeSymbols(_localVariables);
         
         checkChangedLastResult(saveLastResult);
         return lastEvaluationResult;
@@ -179,7 +179,7 @@ public class DefaultMaleDigitalExpressionSocket extends AbstractMaleSocket imple
      */
     @Override
     public void registerListenersForThisClass() {
-        ((DigitalExpressionBean)getObject()).registerListeners();
+        getObject().registerListeners();
     }
     
     /**
@@ -187,7 +187,7 @@ public class DefaultMaleDigitalExpressionSocket extends AbstractMaleSocket imple
      */
     @Override
     public void unregisterListenersForThisClass() {
-        ((DigitalExpressionBean)getObject()).unregisterListeners();
+        getObject().unregisterListeners();
     }
     
     @Override
@@ -217,6 +217,6 @@ public class DefaultMaleDigitalExpressionSocket extends AbstractMaleSocket imple
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleDigitalExpressionSocket.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultMaleDigitalExpressionSocket.class);
 
 }

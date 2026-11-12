@@ -6,14 +6,12 @@ import jmri.jmrix.AbstractMRListener;
 import jmri.jmrix.AbstractMRMessage;
 import jmri.jmrix.AbstractMRReply;
 import jmri.jmrix.AbstractMRTrafficController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Converts Stream-based I/O to/from Marklin CS2 messages. The
+ * Converts Stream-based I/O to/from Marklin CS2 / CS3 / CC-Schnittstelle messages. The
  * "MarklinInterface" side sends/receives message objects.
  * <p>
- * The connection to a MarklinPortController is via a pair of UDP Streams, which
+ * The connection to a MarklinPortController is via a pair of TCP or UDP Streams which
  * then carry sequences of characters for transmission. Note that this
  * processing is handled in an independent thread.
  * <p>
@@ -33,7 +31,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
         super();
         log.debug("creating a new MarklinTrafficController object");
         // set as command station too
-        jmri.InstanceManager.store(this, jmri.CommandStation.class);
+        jmri.InstanceManager.store(MarklinTrafficController.this, CommandStation.class);
         this.setAllowUnexpectedReply(true);
     }
 
@@ -42,6 +40,21 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
     }
 
     MarklinSystemConnectionMemo adaptermemo;
+    protected String defaultUserName = "Marklin-CS2";
+
+    private final CdBClassFilter cdBFilter = new CdBClassFilter();
+
+    /**
+     * Provide access to the CdB config frame dispatcher.
+     * <p>
+     * CdB device management code registers a {@link CdBConfigListener} here
+     * to receive typed ping, read, write and read-reply frames.
+     *
+     * @return the shared CdB dispatcher for this traffic controller
+     */
+    public CdBClassFilter getCdBFilter() {
+        return cdBFilter;
+    }
 
     // The methods to implement the MarklinInterface
     @Override
@@ -62,6 +75,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
 
     /**
      * CommandStation implementation, not yet supported.
+     * {@inheritDoc }
      */
     @Override
     public boolean sendPacket(byte[] packet, int count) {
@@ -78,7 +92,31 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
     }
 
     /**
-     * Forward a MarklinReply to all registered MarklinInterface listeners.
+     * Distribute a reply: CdB configuration frames are first handed once to the
+     * {@link CdBClassFilter}'s {@link CdBConfigListener}.
+     *
+     * Then every reply regardless of its protocol goes to all ordinary {@link MarklinListener}s.
+     * <p>
+     * Ordinary listeners are not shielded from CdB frames.
+     *
+     * They decode through {@link MarklinReply#getFrame()} or the CS2 header check.
+     * {@inheritDoc }
+     */
+    @Override
+    protected void notifyReply(AbstractMRReply r, AbstractMRListener dest) {
+        if (r instanceof MarklinReply) {
+            try {
+                cdBFilter.offer((MarklinReply) r);
+            } catch (RuntimeException e) {
+                log.warn("CdB dispatch failed for {}", r, e);
+            }
+        }
+        super.notifyReply(r, dest);
+    }
+
+    /**
+     * Forward a MarklinReply to one registered MarklinInterface listener.
+     * {@inheritDoc }
      */
     @Override
     protected void forwardReply(AbstractMRListener client, AbstractMRReply r) {
@@ -87,23 +125,26 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
 
     /**
      * Forward a preformatted message to the actual interface.
+     * {@inheritDoc }
      */
     @Override
     public void sendMarklinMessage(MarklinMessage m, MarklinListener reply) {
         sendMessage(m, reply);
     }
 
-    /*@Override
-     protected void forwardToPort(AbstractMRMessage m, AbstractMRListener reply) {
-     super.forwardToPort(m, reply);
-     }*/
-    //Marklin doesn't support this function.
+    /**
+     * Marklin doesn't support this function.
+     * @return null as no message is needed.
+     */
     @Override
     protected AbstractMRMessage enterProgMode() {
         return MarklinMessage.getProgMode();
     }
 
-    //Marklin doesn't support this function!
+    /**
+     * Marklin doesn't support this function.
+     * @return null as no message is needed.
+     */
     @Override
     protected AbstractMRMessage enterNormalMode() {
         return MarklinMessage.getExitProgMode();
@@ -111,8 +152,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
 
     @Override
     protected AbstractMRReply newReply() {
-        MarklinReply reply = new MarklinReply();
-        return reply;
+        return new MarklinReply();
     }
 
     // for now, receive always OK
@@ -121,13 +161,13 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
         return true;
     }
 
-    //In theory the replies should only be 13bytes long, so the EOM is completed when the reply can take no more data
+    // In theory the replies should only be 13 bytes long so the EOM is completed when the reply can take no more data
     @Override
     protected boolean endOfMessage(AbstractMRReply msg) {
         return false;
     }
 
-    static class PollMessage {
+    private static class PollMessage {
 
         MarklinListener ml;
         MarklinMessage mm;
@@ -146,9 +186,9 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
         }
     }
 
-    ConcurrentLinkedQueue<PollMessage> pollQueue = new ConcurrentLinkedQueue<PollMessage>();
+    private final ConcurrentLinkedQueue<PollMessage> pollQueue = new ConcurrentLinkedQueue<>();
 
-    boolean disablePoll = false;
+    private boolean disablePoll = false;
 
     public boolean getPollQueueDisabled() {
         return disablePoll;
@@ -159,8 +199,8 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
     }
 
     /**
-     * As we have to poll the tams system to get updates we put request into a
-     * queue and allow the abstrct traffic controller to handle them when it
+     * As we have to poll the system to get updates we put request into a
+     * queue and allow the abstract traffic controller to handle them when it
      * is free.
      * @param mm marklin message to add.
      * @param ml marklin listener.
@@ -195,10 +235,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
      */
     @Override
     protected AbstractMRMessage pollMessage() {
-        if (disablePoll) {
-            return null;
-        }
-        if (!pollQueue.isEmpty()) {
+        if ( !disablePoll && !pollQueue.isEmpty()) {
             PollMessage pm = pollQueue.peek();
             if (pm != null) {
                 return pm.getMessage();
@@ -209,10 +246,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
 
     @Override
     protected AbstractMRListener pollReplyHandler() {
-        if (disablePoll) {
-            return null;
-        }
-        if (!pollQueue.isEmpty()) {
+        if ( !disablePoll && !pollQueue.isEmpty()) {
             PollMessage pm = pollQueue.poll();
             if (pm != null) {
                 pollQueue.offer(pm);
@@ -225,7 +259,7 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
     @Override
     public String getUserName() {
         if (adaptermemo == null) {
-            return "Marklin-CS2";
+            return defaultUserName;
         }
         return adaptermemo.getUserName();
     }
@@ -238,6 +272,11 @@ public class MarklinTrafficController extends AbstractMRTrafficController implem
         return adaptermemo.getSystemPrefix();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(MarklinTrafficController.class);
+    public void dispose() {
+        this.terminateThreads();
+        jmri.InstanceManager.deregister(MarklinTrafficController.this, CommandStation.class);
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MarklinTrafficController.class);
 
 }

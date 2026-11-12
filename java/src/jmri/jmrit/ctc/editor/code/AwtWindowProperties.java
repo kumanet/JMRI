@@ -6,8 +6,6 @@ import java.awt.Rectangle;
 
 import jmri.InstanceManager;
 import jmri.UserPreferencesManager;
-import jmri.jmrit.ctc.CTCFiles;
-import jmri.jmrit.ctc.ctcserialdata.ProjectsCommonSubs;
 
 /**
  * Use the JMRI UserPreferencesManager to store the size and location for
@@ -35,7 +33,7 @@ public class AwtWindowProperties {
             pt = prefMgr.getWindowLocation(CTC_PACKAGE + windowName);
             dim = prefMgr.getWindowSize(CTC_PACKAGE + windowName);
         });
-        log.debug("{} :: {} :: {}", windowName, pt, dim);
+        log.debug("window {} :: {} :: {}", windowName, pt, dim);
         if (pt == null) {
             pt = new Point(_mMasterWindow.getX(), _mMasterWindow.getY());
         }

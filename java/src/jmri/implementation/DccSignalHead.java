@@ -147,14 +147,12 @@ public class DccSignalHead extends AbstractSignalHead {
                  }*/
             }
 
-            byte[] sigPacket;
+
             if (useAddressOffSet) {
-                sigPacket = NmraPacket.accSignalDecoderPkt(dccSignalDecoderAddress, aspect);
+                c.sendAccSignalDecoderPkt(dccSignalDecoderAddress, aspect, packetSendCount);
             } else {
-                sigPacket = NmraPacket.altAccSignalDecoderPkt(dccSignalDecoderAddress, aspect);
-            }
-            if (sigPacket != null) {
-                c.sendPacket(sigPacket, packetSendCount);
+                c.sendAltAccSignalDecoderPkt(dccSignalDecoderAddress, aspect, packetSendCount);
+
             }
         }
     }
@@ -256,10 +254,10 @@ public class DccSignalHead extends AbstractSignalHead {
     private int dccSignalDecoderAddress;
 
     @Override
-    boolean isTurnoutUsed(Turnout t) {
+    public boolean isTurnoutUsed(Turnout t) {
         return false;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DccSignalHead.class);
+    private static final Logger log = LoggerFactory.getLogger(DccSignalHead.class);
 
 }

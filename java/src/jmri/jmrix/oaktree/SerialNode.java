@@ -72,7 +72,7 @@ public class SerialNode extends AbstractNode {
      * Create a new SerialNode without a name supplied.
      * <p>
      * Assumes a node address of 0, and a node type of 0 (IO24).
-     * If this constructor is used, actual node address must be set using 
+     * If this constructor is used, actual node address must be set using
      * setNodeAddress, and actual node type using 'setNodeType'
      * @param memo system connection.
      */
@@ -82,7 +82,7 @@ public class SerialNode extends AbstractNode {
 
     /**
      * Create a new SerialNode and initialize default instance variables
-     * 
+     *
      * @param address Address of node on serial bus (0-255).
      * @param type type constant from the class.
      * @param memo system connection.
@@ -250,6 +250,8 @@ public class SerialNode extends AbstractNode {
 
     boolean warned = false;
 
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification = "only logging 1st warning string passed")
     void warn(String s) {
         if (warned) {
             return;
@@ -296,7 +298,7 @@ public class SerialNode extends AbstractNode {
                 }
             }
         } catch (JmriException e) {
-            log.error("exception in markChanges: {}", e);
+            log.error("exception in markChanges", e);
         }
     }
 
@@ -361,6 +363,6 @@ public class SerialNode extends AbstractNode {
         timeout = 0;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SerialNode.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialNode.class);
 
 }

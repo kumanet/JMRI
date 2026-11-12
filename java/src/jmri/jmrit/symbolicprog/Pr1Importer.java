@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Pr1Importer {
 
-    private final static Logger log = LoggerFactory.getLogger(Pr1Importer.class);
+    private static final Logger log = LoggerFactory.getLogger(Pr1Importer.class);
     private static final String VERSION_KEY = "Version";
     private static final String CV_PREFIX = "CV";
     private static final int CV_INDEX_OFFSET = 2;
@@ -118,7 +118,8 @@ public class Pr1Importer {
                 throw new JmriException("CV not found");
             }
 
-            int shiftBits = ((cvNumber - 1) % 4) * 8;
+            int shiftBits = ((cvNumber - 1) % 4) << 3;
+
             long cvValue = Long.parseLong(cvValueStr);
 
             if (cvValue < 0) {

@@ -1,21 +1,23 @@
 package jmri.jmrit.logixng.actions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import jmri.jmrit.logixng.FakeParent;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import jmri.InstanceManager;
-import jmri.JmriException;
+import jmri.*;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.implementation.AbstractFemaleSocket;
 import jmri.util.JUnitUtil;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test AbstractDigitalAction
@@ -26,21 +28,16 @@ public class AbstractDigitalActionTest {
     @Test
     public void testGetNewSocketName() {
         MyAction action = new MyAction();
-        boolean hasThrown = false;
-        try {
+        RuntimeException e = assertThrows( RuntimeException.class, () -> {
             // Create a bean with bad system name. This must throw an exception
             String socketName = action.getNewSocketName();
             // We should never get here.
-            Assert.assertNotNull("Name is not null", socketName);
-        } catch (RuntimeException e) {
-            Assert.assertEquals("Exception is correct", "Unable to find a new socket name", e.getMessage());
-            hasThrown = true;
-        }
-        Assert.assertTrue("Exception is thrown", hasThrown);
+            fail("Name is not null " + socketName);
+        }, "Exception is thrown");
+        assertEquals( "Unable to find a new socket name", e.getMessage(), "Exception is correct");
     }
 
-    // The minimal setup for log4J
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -49,13 +46,14 @@ public class AbstractDigitalActionTest {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
-    
+
+
     // The purpose of this class is to test the method
     // AbstractDigitalAction.getNewSocketName(). We want
     // to test that the method throws an exception if no
@@ -68,11 +66,11 @@ public class AbstractDigitalActionTest {
     private static class MyAction extends AbstractDigitalAction implements FemaleSocketListener {
 
         private final MyFemaleSocket child = new MyFemaleSocket(this, this, "A1");
-        
-        public MyAction() {
+
+        MyAction() {
             super(InstanceManager.getDefault(DigitalActionManager.class).getAutoSystemName(), null);
         }
-        
+
         @Override
         protected void registerListenersForThisClass() {
             throw new UnsupportedOperationException("Not supported.");
@@ -126,11 +124,6 @@ public class AbstractDigitalActionTest {
         }
 
         @Override
-        public boolean isExternal() {
-            throw new UnsupportedOperationException("Not supported.");
-        }
-
-        @Override
         public void setup() {
             throw new UnsupportedOperationException("Not supported.");
         }
@@ -159,16 +152,16 @@ public class AbstractDigitalActionTest {
         public Base deepCopyChildren(Base base, Map<String, String> map, Map<String, String> map1) throws JmriException {
             throw new UnsupportedOperationException("Not supported");
         }
-        
+
     }
-    
-    
+
+
     private static class MyFemaleSocket extends AbstractFemaleSocket {
-    
-        public MyFemaleSocket(Base parent, FemaleSocketListener listener, String name) {
+
+        MyFemaleSocket(Base parent, FemaleSocketListener listener, String name) {
             super(parent, listener, name);
         }
-        
+
         @Override
         public void disposeMe() {
             throw new UnsupportedOperationException("Not supported.");
@@ -193,9 +186,9 @@ public class AbstractDigitalActionTest {
         public String getLongDescription(Locale locale) {
             throw new UnsupportedOperationException("Not supported.");
         }
-    
+
     }
-    
-    
-    
+
+
+
 }

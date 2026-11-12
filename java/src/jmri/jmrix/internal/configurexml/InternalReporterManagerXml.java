@@ -1,8 +1,6 @@
 package jmri.jmrix.internal.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring
@@ -31,5 +29,5 @@ public class InternalReporterManagerXml extends jmri.managers.configurexml.Abstr
         return loadReporters(shared);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(InternalReporterManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(InternalReporterManagerXml.class);
 }

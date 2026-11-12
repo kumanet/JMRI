@@ -12,18 +12,20 @@ import jmri.implementation.NoFeedbackTurnoutOperator;
 public class NoFeedbackTurnoutOperation extends CommonTurnoutOperation {
 
     // This class can deal with ANY feedback mode, although it may not be the best one
-    final int feedbackModes
-            = AbstractTurnout.DIRECT | AbstractTurnout.ONESENSOR | AbstractTurnout.TWOSENSOR | AbstractTurnout.INDIRECT | AbstractTurnout.EXACT | AbstractTurnout.MONITORING;
+    static final int SUPPORTED_FEEDBACK_MODES
+            = AbstractTurnout.DIRECT | AbstractTurnout.ONESENSOR | AbstractTurnout.TWOSENSOR
+            | AbstractTurnout.INDIRECT | AbstractTurnout.EXACT | AbstractTurnout.DELAYED
+            | AbstractTurnout.MONITORING | AbstractTurnout.LNALTERNATE ;
 
     /*
      * Default values and constraints.
      */
-    static public final int defaultInterval = 300;
-    static public final int defaultMaxTries = 2;
+    public static final int defaultInterval = 300;
+    public static final int defaultMaxTries = 2;
 
     public NoFeedbackTurnoutOperation(String n, int i, int mt) {
         super(n, i, mt);
-        setFeedbackModes(feedbackModes);
+        setFeedbackModes(SUPPORTED_FEEDBACK_MODES);
     }
 
     /**
@@ -50,11 +52,11 @@ public class NoFeedbackTurnoutOperation extends CommonTurnoutOperation {
         return defaultMaxTries;
     }
 
-    static public int getDefaultIntervalStatic() {
+    public static int getDefaultIntervalStatic() {
         return defaultInterval;
     }
 
-    static public int getDefaultMaxTriesStatic() {
+    public static int getDefaultMaxTriesStatic() {
         return defaultMaxTries;
     }
 
@@ -66,6 +68,11 @@ public class NoFeedbackTurnoutOperation extends CommonTurnoutOperation {
     @Override
     public TurnoutOperator getOperator(AbstractTurnout t) {
         return new NoFeedbackTurnoutOperator(t, interval, maxTries);
+    }
+
+    @Override
+    public String getToolTip(){
+        return Bundle.getMessage("TurnoutOperationNoFeedbackTip");
     }
 
 }

@@ -48,18 +48,18 @@ public class BeanTableDataModelTest extends AbstractBeanTableDataModelBase<Senso
     
     @Override
     public int getModelColumnCount(){
-        return 13;
+        return 14;
     }
 
     // An implementation of BeanTableModel which can be used in testing.
-    private class BeanTableDataModelImpl extends SensorTableDataModel {
+    private static class BeanTableDataModelImpl extends SensorTableDataModel {
 
-        public BeanTableDataModelImpl(Manager<Sensor> mgr){
+        private BeanTableDataModelImpl(Manager<Sensor> mgr){
             super(mgr);
         }
         
     }
     
-    // private final static Logger log = LoggerFactory.getLogger(BeanTableDataModelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(BeanTableDataModelTest.class);
     
 }

@@ -2,6 +2,10 @@ package jmri.implementation;
 
 import java.awt.event.ActionListener;
 import javax.swing.Timer;
+
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+
 import jmri.Audio;
 import jmri.Conditional;
 import jmri.ConditionalAction;
@@ -20,8 +24,6 @@ import jmri.jmrit.beantable.LogixTableAction;
 import jmri.jmrit.logix.OBlockManager;
 import jmri.jmrit.logix.Warrant;
 import jmri.jmrit.logix.WarrantManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The consequent of the antecedent of the conditional proposition. The data for
@@ -50,12 +52,13 @@ public class DefaultConditionalAction implements ConditionalAction {
     private Sound _sound = null;
 
     static final java.util.ResourceBundle rbx = java.util.ResourceBundle.getBundle("jmri.jmrit.conditional.ConditionalBundle");
-    protected jmri.NamedBeanHandleManager nbhm = jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class);
+    private final jmri.NamedBeanHandleManager nbhm = InstanceManager.getDefault(jmri.NamedBeanHandleManager.class);
 
     public DefaultConditionalAction() {
     }
 
-    public DefaultConditionalAction(int option, Conditional.Action type, String name, int actionData, String actionStr) {
+    public DefaultConditionalAction( int option, @Nonnull Conditional.Action type,
+            String name, int actionData, String actionStr ) {
         _option = option;
         _type = type;
         _deviceName = name;
@@ -82,13 +85,13 @@ public class DefaultConditionalAction implements ConditionalAction {
             return false;
         }
 
-        if (!(getClass() == obj.getClass())) {
+        if (getClass() != obj.getClass()) {
             return false;
         } else {
             DefaultConditionalAction p = (DefaultConditionalAction) obj;
-            if ((p._option != this._option)
-                    || (p._type != this._type)
-                    || (p._actionData != this._actionData)) {
+            if ((p.getOption() != this.getOption())
+                    || (p.getType() != this.getType())
+                    || (p.getActionData() != this.getActionData())) {
                 return false;
             }
 
@@ -127,7 +130,8 @@ public class DefaultConditionalAction implements ConditionalAction {
      * If this is an indirect reference, return the Memory bean.
      *
      */
-    private Memory getIndirectBean(String devName) {
+    @CheckForNull
+    private Memory getIndirectBean(@CheckForNull String devName) {
         if (devName != null && devName.length() > 0 && devName.charAt(0) == '@') {
             String memName = devName.substring(1);
             Memory m = InstanceManager.memoryManagerInstance().getMemory(memName);
@@ -146,7 +150,11 @@ public class DefaultConditionalAction implements ConditionalAction {
      * Return the device bean that will do the action.
      *
      */
-    private NamedBean getActionBean(String devName) {
+    @CheckForNull
+    private NamedBean getActionBean(@CheckForNull String devName) {
+        if (devName == null) {
+            return null;
+        }
         NamedBean bean = null;
         try {
             switch (_type.getItemType()) {
@@ -216,10 +224,18 @@ public class DefaultConditionalAction implements ConditionalAction {
                     break;
                 case ENTRYEXIT:
                     try {
-                        bean = jmri.InstanceManager.getDefault(jmri.jmrit.entryexit.EntryExitPairs.class).getNamedBean(devName);
+                        bean = InstanceManager.getDefault(jmri.jmrit.entryexit.EntryExitPairs.class).getNamedBean(devName);
                     } catch (IllegalArgumentException e) {
                         bean = null;
                         log.error("invalid NX name= \"{}\" in conditional action", devName);
+                    }
+                    break;
+                case LOGIX:
+                    try {
+                        bean = InstanceManager.getDefault(jmri.LogixManager.class).getLogix(devName);
+                    } catch (IllegalArgumentException e) {
+                        bean = null;
+                        log.error("invalid Logix name= \"{}\" in conditional action", devName);
                     }
                     break;
                 default:
@@ -242,12 +258,13 @@ public class DefaultConditionalAction implements ConditionalAction {
      * The consequent device or element type.
      */
     @Override
+    @Nonnull
     public Conditional.Action getType() {
         return _type;
     }
 
     @Override
-    public void setType(Conditional.Action type) {
+    public void setType(@Nonnull Conditional.Action type) {
         _type = type;
     }
 
@@ -289,6 +306,7 @@ public class DefaultConditionalAction implements ConditionalAction {
     }
 
     @Override
+    @CheckForNull
     public NamedBeanHandle<?> getNamedBean() {
         if (_indirectAction) {
             Memory m = (Memory) (_namedBean.getBean());
@@ -304,13 +322,21 @@ public class DefaultConditionalAction implements ConditionalAction {
     }
 
     @Override
+    @CheckForNull
     public NamedBean getBean() {
-        if (_namedBean != null) {
-            return getNamedBean().getBean();
+        NamedBean x = beanFromHandle();
+        if (x != null) {
+            return x;
         }
         setDeviceName(_deviceName); //ReApply name as that will create namedBean, save replicating it here
-        if (_namedBean != null) {
-            return getNamedBean().getBean();
+        return beanFromHandle();
+    }
+
+    @CheckForNull
+    private NamedBean beanFromHandle(){
+        var handle = getNamedBean();
+        if (handle != null) {
+            return handle.getBean();
         }
         return null;
     }
@@ -342,7 +368,7 @@ public class DefaultConditionalAction implements ConditionalAction {
     }
 
     /**
-     * Set action data from user name for it.
+     * Set action data from I18N name for it.
      */
     @Override
     public void setActionData(String actionData) {
@@ -352,6 +378,7 @@ public class DefaultConditionalAction implements ConditionalAction {
     /**
      * String data for action.
      */
+    @Nonnull
     @Override
     public String getActionString() {
         if (_actionString == null) {
@@ -369,6 +396,7 @@ public class DefaultConditionalAction implements ConditionalAction {
      * Get timer for delays and other timed events.
      */
     @Override
+    @CheckForNull
     public Timer getTimer() {
         return _timer;
     }
@@ -392,7 +420,7 @@ public class DefaultConditionalAction implements ConditionalAction {
             _timer.start();
             _timerActive = true;
         } else {
-            log.error("timer is null for {] of type {}", _deviceName, getTypeString());
+            log.error("timer is null for {} of type {}", _deviceName, getTypeString());
         }
     }
 
@@ -408,6 +436,7 @@ public class DefaultConditionalAction implements ConditionalAction {
      * Set listener for delays and other timed events.
      */
     @Override
+    @CheckForNull
     public ActionListener getListener() {
         return _listener;
     }
@@ -424,6 +453,7 @@ public class DefaultConditionalAction implements ConditionalAction {
      * Get Sound file.
      */
     @Override
+    @CheckForNull
     public Sound getSound() {
         return _sound;
     }
@@ -444,6 +474,7 @@ public class DefaultConditionalAction implements ConditionalAction {
     /**
      * @return name of this consequent type
      */
+    @Nonnull
     @Override
     public String getTypeString() {
         return _type.toString();
@@ -452,11 +483,13 @@ public class DefaultConditionalAction implements ConditionalAction {
     /**
      * @return name of the option for this consequent type
      */
+    @Nonnull
     @Override
     public String getOptionString(boolean type) {
         return getOptionString(_option, type);
     }
 
+    @Nonnull
     @Override
     public String getActionDataString() {
         return getActionDataString(_type, _actionData);
@@ -628,12 +661,13 @@ public class DefaultConditionalAction implements ConditionalAction {
     }
 */
     /**
-     * Convert consequent option to String.
+     * Convert consequent option to I18N String.
      *
-     * @param opt  the option
-     * @param type true if option is a change; false if option is a trigger
-     * @return a human readable description of the option or an empty String
+     * @param opt  the option.
+     * @param type true if option is a change; false if option is a trigger.
+     * @return a human readable description of the option or an empty String.
      */
+    @Nonnull
     public static String getOptionString(int opt, boolean type) {
         switch (opt) {
             case Conditional.ACTION_OPTION_ON_CHANGE_TO_TRUE:
@@ -668,7 +702,8 @@ public class DefaultConditionalAction implements ConditionalAction {
      * @param str the string to get the type for
      * @return the type or 0 if str is not a recognized action
      */
-    public static Conditional.Action stringToActionType(String str) {
+    @Nonnull
+    public static Conditional.Action stringToActionType(@CheckForNull String str) {
         if (str != null) {
             for (Conditional.Action action : Conditional.Action.values()) {
                 if (str.equals(action.toString())) {
@@ -681,12 +716,12 @@ public class DefaultConditionalAction implements ConditionalAction {
     }
 
     /**
-     * Get action Data from a String.
+     * Get action Data from an I18N String.
      *
-     * @param str the string to get the action data for
-     * @return the action data of -1 is str is not recognized
+     * @param str the I18N string to get the action data for.
+     * @return the action data of -1 is str is not recognized.
      */
-    public static int stringToActionData(String str) {
+    public static int stringToActionData(@Nonnull String str) {
         if (str.equals(Bundle.getMessage("TurnoutStateClosed"))) {
             return Turnout.CLOSED;
         } else if (str.equals(Bundle.getMessage("TurnoutStateThrown"))) {
@@ -749,17 +784,27 @@ public class DefaultConditionalAction implements ConditionalAction {
         return -1;
     }
 
-    public static String getActionDataString(Conditional.Action t, int data) {
+    /**
+     * Get the Action Data String in I18N form.
+     * @param t the Condition.Action, must be null.
+     * @param data the constant for the action command type.
+     * @return the action / data string.
+     */
+    @Nonnull
+    public static String getActionDataString(@Nonnull Conditional.Action t, int data) {
         switch (t) {
             case SET_TURNOUT:
             case DELAYED_TURNOUT:
             case RESET_DELAYED_TURNOUT:
-                if (data == Turnout.CLOSED) {
-                    return (Bundle.getMessage("TurnoutStateClosed"));
-                } else if (data == Turnout.THROWN) {
-                    return (Bundle.getMessage("TurnoutStateThrown"));
-                } else if (data == Route.TOGGLE) {
-                    return (Bundle.getMessage("Toggle"));
+                switch (data) {
+                    case Turnout.CLOSED:
+                        return (Bundle.getMessage("TurnoutStateClosed"));
+                    case Turnout.THROWN:
+                        return (Bundle.getMessage("TurnoutStateThrown"));
+                    case Route.TOGGLE:
+                        return (Bundle.getMessage("Toggle"));
+                    default:
+                        break;
                 }
                 break;
             case SET_SIGNAL_APPEARANCE:
@@ -767,30 +812,39 @@ public class DefaultConditionalAction implements ConditionalAction {
             case SET_SENSOR:
             case DELAYED_SENSOR:
             case RESET_DELAYED_SENSOR:
-                if (data == Sensor.ACTIVE) {
-                    return (Bundle.getMessage("SensorStateActive"));
-                } else if (data == Sensor.INACTIVE) {
-                    return (Bundle.getMessage("SensorStateInactive"));
-                } else if (data == Route.TOGGLE) {
-                    return (Bundle.getMessage("Toggle"));
+                switch (data) {
+                    case Sensor.ACTIVE:
+                        return (Bundle.getMessage("SensorStateActive"));
+                    case Sensor.INACTIVE:
+                        return (Bundle.getMessage("SensorStateInactive"));
+                    case Route.TOGGLE:
+                        return (Bundle.getMessage("Toggle"));
+                    default:
+                        break;
                 }
                 break;
             case SET_LIGHT:
-                if (data == Light.ON) {
-                    return (rbx.getString("LightOn"));
-                } else if (data == Light.OFF) {
-                    return (rbx.getString("LightOff"));
-                } else if (data == Route.TOGGLE) {
-                    return (Bundle.getMessage("Toggle"));
+                switch (data) {
+                    case Light.ON:
+                        return (rbx.getString("LightOn"));
+                    case Light.OFF:
+                        return (rbx.getString("LightOff"));
+                    case Route.TOGGLE:
+                        return (Bundle.getMessage("Toggle"));
+                    default:
+                        break;
                 }
                 break;
             case LOCK_TURNOUT:
-                if (data == Turnout.UNLOCKED) {
-                    return (rbx.getString("TurnoutUnlock"));
-                } else if (data == Turnout.LOCKED) {
-                    return (rbx.getString("TurnoutLock"));
-                } else if (data == Route.TOGGLE) {
-                    return (Bundle.getMessage("Toggle"));
+                switch (data) {
+                    case Turnout.UNLOCKED:
+                        return (rbx.getString("TurnoutUnlock"));
+                    case Turnout.LOCKED:
+                        return (rbx.getString("TurnoutLock"));
+                    case Route.TOGGLE:
+                        return (Bundle.getMessage("Toggle"));
+                    default:
+                        break;
                 }
                 break;
             case CONTROL_AUDIO:
@@ -821,13 +875,25 @@ public class DefaultConditionalAction implements ConditionalAction {
                 }
                 break;
             case CONTROL_TRAIN:
-                if (data == Warrant.HALT) {
-                    return (rbx.getString("WarrantHalt"));
-                } else if (data == Warrant.RESUME) {
-                    return (rbx.getString("WarrantResume"));
-                } else {
-                    return (rbx.getString("WarrantAbort"));
+                switch (data) {
+                    case Warrant.HALT:
+                        return (rbx.getString("WarrantHalt"));
+                    case Warrant.RESUME:
+                        return (rbx.getString("WarrantResume"));
+                    case Warrant.RETRY_FWD:
+                        return (rbx.getString("WarrantMoveToNext"));
+                    case Warrant.SPEED_UP:
+                        return (rbx.getString("WarrantSpeedUp"));
+                    case Warrant.STOP:
+                        return (rbx.getString("WarrantStop"));
+                    case Warrant.ESTOP:
+                        return (rbx.getString("WarrantEStop"));
+                    case Warrant.ABORT:
+                        return (rbx.getString("WarrantAbort"));
+                    default:
+                        log.error("Unhandled Warrant control: {}", data);
                 }
+                break;
             default:
                 // fall through
                 break;
@@ -835,6 +901,10 @@ public class DefaultConditionalAction implements ConditionalAction {
         return "";
     }
 
+    /**
+     * {@inheritDoc }
+     */
+    @Nonnull
     @Override
     public String description(boolean triggerType) {
         String str = getOptionString(triggerType) + ", " + getTypeString();
@@ -869,7 +939,8 @@ public class DefaultConditionalAction implements ConditionalAction {
                 case SET_NXPAIR_ENABLED:
                 case SET_NXPAIR_DISABLED:
                 case SET_NXPAIR_SEGMENT:
-                    str = str + ", \"" + getBean().getUserName() + "\".";
+                    NamedBean bean = getBean();
+                    str = str + ", \"" + ( bean == null ? "<NULL>" : bean.getUserName() )+ "\".";
                     break;
                 case SET_ROUTE_TURNOUTS:
                 case AUTO_RUN_WARRANT:
@@ -888,6 +959,12 @@ public class DefaultConditionalAction implements ConditionalAction {
                 case CONTROL_AUDIO:
                     str = str + ", \"" + _deviceName + "\" " + rbx.getString("to")
                             + " " + getActionDataString();
+                    break;
+                case GET_TRAIN_LOCATION:
+                case GET_BLOCK_WARRANT:
+                case GET_BLOCK_TRAIN_NAME:
+                    str = str + " \"" + _deviceName + "\" " + rbx.getString("intoMemory")
+                              + " " + _actionString;
                     break;
                 case SET_SIGNALMAST_ASPECT:
                     str = str + ", \"" + _deviceName + "\" " + rbx.getString("to")
@@ -917,7 +994,7 @@ public class DefaultConditionalAction implements ConditionalAction {
                 case DELAYED_SENSOR:
                     str = str + rbx.getString("After") + " ";
                     try {
-                        Float.parseFloat(_actionString);
+                        Float.valueOf(_actionString);
                         str = str + _actionString + " " + rbx.getString("Seconds") + ".";
                     } catch (NumberFormatException nfe) {
                         str = str + _actionString + " " + rbx.getString("ValueInMemory")
@@ -939,7 +1016,6 @@ public class DefaultConditionalAction implements ConditionalAction {
                     break;
                 case SET_TRAIN_ID:
                 case SET_TRAIN_NAME:
-                case THROTTLE_FACTOR:
                     str = str + ", \"" + _actionString + "\" " + rbx.getString("onWarrant")
                             + " \"" + _deviceName + "\".";
                     break;
@@ -966,6 +1042,14 @@ public class DefaultConditionalAction implements ConditionalAction {
         return str;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DefaultConditionalAction.class);
+    /** {@inheritDoc} */
+    @Override
+    public void dispose() {
+        if (_sound != null) {
+            _sound.dispose();
+        }
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultConditionalAction.class);
 
 }

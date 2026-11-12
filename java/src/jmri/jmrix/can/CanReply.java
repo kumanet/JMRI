@@ -75,6 +75,9 @@ public class CanReply extends AbstractMRReply implements CanMutableFrame {
         super.setBinary(true);
         setData(m.getData());
         setNumDataElements(m.getNumDataElements());
+        if (m.hasReceivedTime()) {
+            setReceivedTime(m.getReceivedTime());
+        }
     }
 
     /**
@@ -223,6 +226,10 @@ public class CanReply extends AbstractMRReply implements CanMutableFrame {
         return monString();
     }
 
+    public void setSourceLetter(String source) {
+        sourceLetter = source;
+    }
+    
     // contents (package access)
     int _header;
     boolean _isExtended;

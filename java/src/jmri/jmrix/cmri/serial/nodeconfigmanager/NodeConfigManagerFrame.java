@@ -1,24 +1,23 @@
 package jmri.jmrix.cmri.serial.nodeconfigmanager;
 
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
+import java.awt.event.*;
 import java.io.IOException;
 import java.util.ArrayList;
+
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.*;
+
 import jmri.jmrix.cmri.CMRISystemConnectionMemo;
 import jmri.jmrix.cmri.serial.SerialNode;
 import jmri.jmrix.cmri.serial.nodeiolist.NodeIOListFrame;
-import jmri.util.davidflanagan.HardcopyWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.davidflanagan.CompatibleHardcopyWriter;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
- * 
+ *
  * Frames for a table view to manage CMRInet node configuration management. c2
  * Created a table view for node configuration operations. Add, Edit, Delete and
  * Update are executed from the NodeTableManager. This class was derived from
@@ -370,10 +369,10 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         // set up a page title
         String head = "CMRInet Node Table";
         // initialize a printer writer
-        HardcopyWriter writer = null;
+        CompatibleHardcopyWriter writer = null;
         try {
-            writer = new HardcopyWriter(curFrame, head, 10, .8, .5, .5, .5, false);
-        } catch (HardcopyWriter.PrintCanceledException ex) {
+            writer = new CompatibleHardcopyWriter(curFrame, head, 10, .8, .5, .5, .5, false);
+        } catch (CompatibleHardcopyWriter.PrintCanceledException ex) {
             return;
         }
         writer.increaseLineSpacing(20);
@@ -615,10 +614,10 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
          * vertical lines between each column. Data is word wrapped within a
          * column. Can only handle 4 columns of data as strings. Adapted from
          * routines in BeanTableDataModel.java by Bob Jacobsen and Dennis Miller
-         * @param w hardcopywriter instance.
+         * @param w CompatibleHardcopyWriter instance.
          * @param colWidth column width array.
         */
-        public void printTable(HardcopyWriter w, int colWidth[]) {
+        public void printTable(CompatibleHardcopyWriter w, int colWidth[]) {
             // determine the column sizes - proportionately sized, with space between for lines
             int[] columnSize = new int[NUM_COLUMNS];
             int charPerLine = w.getCharactersPerLine();
@@ -652,7 +651,7 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
             }
             //          w.setFontStyle(Font.BOLD);
             printColumns(w, columnStrings, columnSize);
-            w.setFontStyle(0);
+            w.setFontStyle(Font.PLAIN);
 
             // draw horizontal line
             w.write(w.getCurrentLineNumber(), 0, w.getCurrentLineNumber(), tableLineWidth);
@@ -686,7 +685,7 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
             w.close();
         }
 
-        protected void printColumns(HardcopyWriter w, String columnStrings[], int columnSize[]) {
+        protected void printColumns(CompatibleHardcopyWriter w, String columnStrings[], int columnSize[]) {
             String columnString = "";
             StringBuilder lineString = new StringBuilder("");
             String[] spaces = new String[NUM_COLUMNS];
@@ -763,7 +762,7 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
     private String[] nodeTableColumnsNames
             = {"Address", "   Type", "Bits per Card", "IN Cards", "OUT Cards", "IN Bits", "OUT Bits", " ", "  Description"};
 
-    private String[] nodeTableTypes = {"--", "SMINI", "SUSIC", "CPNODE", "CPMEGA"};
+    private String[] nodeTableTypes = {"--", "SMINI", "SUSIC", "CPNODE", "CPMEGA", "ESP32Node"};
 
     /*
      * ----------------------------------------------------------
@@ -822,7 +821,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         nodeTypeBox.addItem("USIC_SUSIC");
         nodeTypeBox.addItem("CPNODE");
         nodeTypeBox.addItem("CPMEGA");
-     
+        nodeTypeBox.addItem("ESP32Node");
+
         /*
          * Here add code for other types of nodes
          */
@@ -875,6 +875,7 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                     panelnetOptBox.setVisible(true);
                     panelnodeOpt.setVisible(true);
                     nodeType = SerialNode.CPNODE;
+                    cpNodeOnboard = 4;
                     onBoardBytesText.setText(Bundle.getMessage("LabelOnBoardBytes") + " 2 Bytes");
                 } else if (s.equals("CPMEGA")) {
                     panel2.setVisible(false);
@@ -890,7 +891,24 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                     panelnetOptBox.setVisible(true);
                     panelnodeOpt.setVisible(true);
                     nodeType = SerialNode.CPMEGA;
+                    cpNodeOnboard = 4;
                     onBoardBytesText.setText(Bundle.getMessage("LabelOnBoardBytes") + " 8 Bytes");
+                } else if (s.equals("ESP32Node")) {
+                    panel2.setVisible(false);
+                    panel2a.setVisible(false);
+                    panel2b.setVisible(true);   // IOX-style card grid -- ALL 16 cards, no onboard reservation
+                    panel2c.setVisible(false);  // no separate onboard-byte grid -- ESP32Node has no onboard I/O
+                    cardSizeText.setVisible(true);
+                    cardSizeBox.setVisible(false);
+                    cardSize8Box.setVisible(true);
+                    panelnodeDescBox.setVisible(true);
+                    panelnodeDesc.setVisible(true);
+                    panelnetOpt.setVisible(true);
+                    panelnetOptBox.setVisible(true);
+                    panelnodeOpt.setVisible(true);
+                    nodeType = SerialNode.ESP32NODE;
+                    cpNodeOnboard = 0;
+                    onBoardBytesText.setText(Bundle.getMessage("LabelOnBoardBytes") + " None -- 8 MCP23017 chips (0x20-0x27), 16 bytes");
                 }
                 /*
                  * Here add code for other types of nodes
@@ -1292,8 +1310,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         // curNode can never be null at this point. Was this intended to catch
         // an exception?
         if (curNode != null) {
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error1", Integer.toString(nodeAddress)),
-                    "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error1", Integer.toString(nodeAddress)),
+                "", JmriJOptionPane.ERROR_MESSAGE);
 
             statusText1.setText(Bundle.getMessage("Error1", Integer.toString(nodeAddress)));
             statusText1.setVisible(true);
@@ -1436,6 +1454,22 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                 cbx_cpnodeopt_BIT15.setSelected(curNode.iscpnodeBit(SerialNode.optbitNode_BIT15));
                 break;
 
+            // ESP32Node
+            case SerialNode.ESP32NODE:
+                nodeTypeBox.setSelectedItem("ESP32Node");
+                bitsPerCard = 8;
+                cardSize8Box.setSelectedItem(Bundle.getMessage("CardSize8"));
+                cpNodeOnboard = 0;
+                onBoardBytesText.setText(Bundle.getMessage("LabelOnBoardBytes") + " None -- 8 MCP23017 chips (0x20-0x27), 16 bytes");
+
+                // ESP32Node Options -- same option bits as CPNODE/CPMEGA
+                cbx_cpnodeopt_SENDEOT.setSelected(curNode.iscpnodeBit(SerialNode.optbitNode_SENDEOT));
+                cbx_cpnodeopt_BIT1.setSelected(false);
+                cbx_cpnodeopt_BIT2.setSelected(false);
+                cbx_cpnodeopt_BIT8.setSelected(curNode.iscpnodeBit(SerialNode.optbitNode_BIT8));
+                cbx_cpnodeopt_BIT15.setSelected(curNode.iscpnodeBit(SerialNode.optbitNode_BIT15));
+                break;
+
             default:
                 log.error("Unknown Node Type {}", nodeType);
                 break;
@@ -1497,6 +1531,9 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         } else if (nodeType == SerialNode.CPMEGA) {
             panel2c.setVisible(true);
             panel2b.setVisible(false);
+        } else if (nodeType == SerialNode.ESP32NODE) {
+            panel2c.setVisible(false);
+            panel2b.setVisible(true);
         }
 
     }
@@ -1586,11 +1623,11 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
     public void deleteNodeButtonActionConfirm() {
         // confirm deletion with the user
 
-        if (JOptionPane.OK_OPTION == JOptionPane.showConfirmDialog(
+        if (JmriJOptionPane.OK_OPTION == JmriJOptionPane.showConfirmDialog(
                 this, Bundle.getMessage("ConfirmDelete1") + "\n"
                 + Bundle.getMessage("ConfirmDelete2"), Bundle.getMessage("ConfirmDeleteTitle"),
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.WARNING_MESSAGE)) {
+                JmriJOptionPane.OK_CANCEL_OPTION,
+                JmriJOptionPane.WARNING_MESSAGE)) {
 
             // delete this node
             _memo.getTrafficController().deleteNode(deleteNodeAddress);
@@ -1670,15 +1707,15 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
             nodeAddrStatic.setVisible(false);
         }
         if (changedNode) {
-            JOptionPane.showMessageDialog(this,
+            JmriJOptionPane.showMessageDialog(this,
                     Bundle.getMessage("Reminder1") + "\n" + Bundle.getMessage("Reminder2"),
                     Bundle.getMessage("ReminderTitle"),
-                    JOptionPane.INFORMATION_MESSAGE);
+                    JmriJOptionPane.INFORMATION_MESSAGE);
         }
         changedNode = false;
 
         setVisible(false);
-        dispose();        
+        dispose();
     }
 
     /**
@@ -1762,9 +1799,6 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                 if (numSet != num2LSearchLights) {
                     log.error("Inconsistent numbers of 2-lead searchlights. numSet = {}, num2LSearchLights = {}", Integer.toString(numSet), Integer.toString(num2LSearchLights));
                 }
-
-                // Force created node to be polled as the default
-                curNode.setOptNet_AUTOPOLL(1);
                 break;
 
             // USIC/SUSIC
@@ -1880,6 +1914,42 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
 
                 break;
 
+            // ESP32Node -- no onboard bytes at all (cpNodeOnboard=0, see the
+            // ActionListener above), so every one of the 16 cards comes from
+            // cardType[] with no skip, unlike CPNODE (skips 4) or CPMEGA
+            // (onboard bytes handled separately, IOX skips 8).
+            case SerialNode.ESP32NODE:
+                // set number of bits per card
+                bitsPerCard = 8;
+                curNode.setNumBitsPerCard(bitsPerCard);
+                numInput = 0;
+                numOutput = 0;
+
+                for (int i = 0; i < 64; i++) {
+                    if ("No Card".equals(cardType[i])) {
+                        curNode.setCardTypeByAddress(i, SerialNode.NO_CARD);
+                    } else if ("Input Card".equals(cardType[i])) {
+                        curNode.setCardTypeByAddress(i, SerialNode.INPUT_CARD);
+                        numInput++;
+                    } else if ("Output Card".equals(cardType[i])) {
+                        curNode.setCardTypeByAddress(i, SerialNode.OUTPUT_CARD);
+                        numOutput++;
+                    } else {
+                        log.error("Unexpected card type - {}", cardType[i]);
+                    }
+                }
+
+                // Set the node option bits.  Some are moved from the CMRInet options
+                curNode.setOptNet_AUTOPOLL(1);  // Default node to be polled
+
+                curNode.setOptNode_SENDEOT(cbx_cpnodeopt_SENDEOT.isSelected() ? 1 : 0);
+                curNode.setOptNode_USECMRIX(cbx_cmrinetopt_USECMRIX.isSelected() ? 1 : 0); // Copy from CMRInet
+                curNode.setOptNode_USEBCC(cbx_cmrinetopt_USEBCC.isSelected() ? 1 : 0);     // Copy from CMRInet
+                curNode.setOptNode_BIT8(cbx_cpnodeopt_BIT8.isSelected() ? 1 : 0);
+                curNode.setOptNode_BIT15(cbx_cpnodeopt_BIT15.isSelected() ? 1 : 0);
+
+                break;
+
             default:
                 log.error("Unexpected node type in setNodeParameters- {}", Integer.toString(nodeType));
                 break;
@@ -1943,7 +2013,7 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
 //            statusText1.setText(Bundle.getMessage("Error6"));
 //            statusText1.setVisible(true);
             errorInStatus1 = true;
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error6"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error6"), "", JmriJOptionPane.ERROR_MESSAGE);
             resetNotes2();
             return -1;
         }
@@ -1963,7 +2033,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         } catch (NumberFormatException e) {
             statusText1.setText(Bundle.getMessage("Error7"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error7"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error7"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             receiveDelay = 0;
             errorInStatus1 = true;
             resetNotes2();
@@ -1972,7 +2043,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         if (receiveDelay < 0) {
             statusText1.setText(Bundle.getMessage("Error8"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error8"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error8"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             receiveDelay = 0;
             errorInStatus1 = true;
             resetNotes2();
@@ -1981,7 +2053,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         if (receiveDelay > 65535) {
             statusText1.setText(Bundle.getMessage("Error9"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error9"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error9"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             receiveDelay = 0;
             errorInStatus1 = true;
             resetNotes2();
@@ -2004,7 +2077,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         } catch (NumberFormatException e) {
             statusText1.setText(Bundle.getMessage("Error18"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error18"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error18"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             pulseWidth = 500;
             errorInStatus1 = true;
             resetNotes2();
@@ -2013,7 +2087,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         if (pulseWidth < 100) {
             statusText1.setText(Bundle.getMessage("Error16"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error16"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error16"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             pulseWidth = 100;
             pulseWidthField.setText(Integer.toString(pulseWidth));
             errorInStatus1 = true;
@@ -2023,7 +2098,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         if (pulseWidth > 10000) {
             statusText1.setText(Bundle.getMessage("Error17"));
             statusText1.setVisible(true);
-            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error17"), "", JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error17"),
+                "", JmriJOptionPane.ERROR_MESSAGE);
             pulseWidth = 500;
             pulseWidthField.setText(Integer.toString(pulseWidth));
             errorInStatus1 = true;
@@ -2053,7 +2129,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                 if ((2 * num2LSearchLights) != numBits) {
                     statusText1.setText(Bundle.getMessage("Error10"));
                     statusText1.setVisible(true);
-                    JOptionPane.showMessageDialog(this, Bundle.getMessage("Error10"), "", JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error10"),
+                        "", JmriJOptionPane.ERROR_MESSAGE);
                     errorInStatus1 = true;
                     resetNotes2();
                     return (false);
@@ -2071,7 +2148,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                             statusText1.setText(Bundle.getMessage("Error11"));
                             statusText1.setVisible(true);
                             statusText2.setText(Bundle.getMessage("Error12"));
-                            JOptionPane.showMessageDialog(this, Bundle.getMessage("Error11") + Bundle.getMessage("Error12"), "", JOptionPane.ERROR_MESSAGE);
+                            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error11") + Bundle.getMessage("Error12"),
+                                "", JmriJOptionPane.ERROR_MESSAGE);
                             errorInStatus1 = true;
                             errorInStatus2 = true;
                             return (false);
@@ -2088,7 +2166,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                     statusText1.setText(Bundle.getMessage("Error13"));
                     statusText2.setText(Bundle.getMessage("Error14"));
                     statusText1.setVisible(true);
-                    JOptionPane.showMessageDialog(this, Bundle.getMessage("Error13") + Bundle.getMessage("Error14"), "", JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error13") + Bundle.getMessage("Error14"),
+                        "", JmriJOptionPane.ERROR_MESSAGE);
                     errorInStatus1 = true;
                     errorInStatus2 = true;
                     return (false);
@@ -2099,7 +2178,8 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                     statusText1.setText(Bundle.getMessage("Error15"));
                     statusText1.setVisible(true);
                     errorInStatus1 = true;
-                    JOptionPane.showMessageDialog(this, Bundle.getMessage("Error15"), "", JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("Error15"),
+                        "", JmriJOptionPane.ERROR_MESSAGE);
                     resetNotes2();
                     return (false);
                 }
@@ -2110,14 +2190,14 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                     int numInput = curNode.numInputCards();
                     // will the number of cards be reduced by this edit?
                     if (numCards < (numOutput + numInput)) {
-                        if (JOptionPane.NO_OPTION == JOptionPane.showConfirmDialog(this,
+                        if ( JmriJOptionPane.YES_OPTION != JmriJOptionPane.showConfirmDialog(this,
                                 Bundle.getMessage("ConfirmUpdate1") + "\n"
                                 + Bundle.getMessage("ConfirmUpdate2") + "\n"
                                 + Bundle.getMessage("ConfirmUpdate3"),
                                 Bundle.getMessage("ConfirmUpdateTitle"),
-                                JOptionPane.YES_NO_OPTION,
-                                JOptionPane.WARNING_MESSAGE)) {
-                            // user said don't update - cancel the update
+                                JmriJOptionPane.YES_NO_OPTION,
+                                JmriJOptionPane.WARNING_MESSAGE)) {
+                            // user did not click yes - cancel the update
                             return (false);
                         }
                     }
@@ -2132,6 +2212,14 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
                 }
                 break;
             case SerialNode.CPMEGA:
+                for (int j = 0; j < 64; j++) {
+                    if ((cardType[j].equals(Bundle.getMessage("CardTypeOutput")))
+                            || (cardType[j].equals(Bundle.getMessage("CardTypeInput")))) {
+                        numCards++;
+                    }
+                }
+                break;
+            case SerialNode.ESP32NODE:
                 for (int j = 0; j < 64; j++) {
                     if ((cardType[j].equals(Bundle.getMessage("CardTypeOutput")))
                             || (cardType[j].equals(Bundle.getMessage("CardTypeInput")))) {
@@ -2369,9 +2457,16 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
         public Object getValueAt(int r, int c) {
             String[] cdPort = {"  A", "  B"};
             String val = "     ";
+            // ESP32Node has no onboard-reserved cards (unlike CPNODE's 2 onboard
+            // OUTPUT bytes, which is why the diagnostic dialog and this label both
+            // add 2 for CPNODE) -- but it's still numbered 1-based (Card 1 = first
+            // real card) to match how people naturally count cards, hence +1 here
+            // (cpNodeOnboard, the actual array-index skip used below for cardType[],
+            // stays 0 for ESP32Node -- this offset is display-only).
+            int cardLabelOffset = (nodeType == SerialNode.ESP32NODE) ? 1 : 2;
             switch (c) {
                 case CARD_COLUMN:
-                    val = Integer.toString(r+2);
+                    val = Integer.toString(r+cardLabelOffset);
                     return "   " + val;
                 case CARDNUM_COLUMN:
                     int i = r / 2;
@@ -2462,6 +2557,6 @@ public class NodeConfigManagerFrame extends jmri.util.JmriJFrame {
     private final int[] cpnodeOpts = new int[16];  // Local storage for node options
     private final int[] cmrinetOpts = new int[16];  // Local storage for node options
 
-    private final static Logger log = LoggerFactory.getLogger(NodeConfigManagerFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NodeConfigManagerFrame.class);
 
 }

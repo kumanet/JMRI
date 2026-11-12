@@ -1,17 +1,12 @@
 package jmri.jmrix.sprog.simulator;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
+
+// no special xSimulatorController
+import jmri.jmrix.sprog.*;
 import jmri.jmrix.sprog.SprogConstants.SprogMode;
-import jmri.jmrix.sprog.SprogMessage;
-import jmri.jmrix.sprog.SprogPortController; // no special xSimulatorController
-import jmri.jmrix.sprog.SprogReply;
-import jmri.jmrix.sprog.SprogSystemConnectionMemo;
-import jmri.jmrix.sprog.SprogTrafficController;
 import jmri.util.ImmediatePipedOutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +26,8 @@ import org.slf4j.LoggerFactory;
 public class SimulatorAdapter extends SprogPortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
-    private SprogTrafficController control;
+    private final SprogTrafficController control;
 
     private boolean outputBufferEmpty = true;
     private boolean checkBuffer = true;
@@ -74,7 +68,7 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
             log.debug("tempPipeI created");
             pout = new DataOutputStream(tempPipeI);
             inpipe = new DataInputStream(new PipedInputStream(tempPipeI));
-            log.debug("inpipe created {}", inpipe != null);
+            log.debug("inpipe created");
             PipedOutputStream tempPipeO = new ImmediatePipedOutputStream();
             outpipe = new DataOutputStream(tempPipeO);
             pin = new DataInputStream(new PipedInputStream(tempPipeO));
@@ -116,6 +110,8 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
     /**
      * Set up all of the other objects to operate with a Sprog Simulator.
      */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "SLF4J_FORMAT_SHOULD_BE_CONST",
+        justification = "passing exception text")
     @Override
     public void configure() {
         // connect to the traffic controller
@@ -126,7 +122,7 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
         } else { // default, also used after Locale change
             operatingMode = SprogMode.OPS;
         }
-        
+
         String slots = getOptionState("NumSlots");
         int numSlots;
         try {
@@ -135,7 +131,7 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
         catch (NumberFormatException e) {
             numSlots = 16;
         }
-        
+
         this.getSystemConnectionMemo().setSprogMode(operatingMode);         // first update mode in memo
         this.getSystemConnectionMemo().configureCommandStation(numSlots);   // CS only if in OPS mode, memo will take care of that
         this.getSystemConnectionMemo().configureManagers();                 // wait for mode to be correct
@@ -424,6 +420,12 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
         return msg;
     }
 
+    @Override
+    public void dispose() {
+        super.dispose();
+        control.dispose();
+    }
+
     // streams to share with user class
     private DataOutputStream pout = null;    // this is provided to classes who want to write to us
     private DataInputStream pin = null;      // this is provided to classes who want data from us
@@ -431,6 +433,6 @@ public class SimulatorAdapter extends SprogPortController implements Runnable {
     private DataOutputStream outpipe = null; // feed pin
     private DataInputStream inpipe = null;   // feed pout
 
-    private final static Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
 
 }

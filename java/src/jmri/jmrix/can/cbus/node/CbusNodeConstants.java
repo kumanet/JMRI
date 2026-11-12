@@ -6,7 +6,7 @@ import java.util.Map;
 
 import javax.annotation.Nonnull;
 
-import jmri.jmrix.can.cbus.simulator.CbusDummyNode;
+import static jmri.jmrix.can.cbus.CbusConstants.*;
 
 // import org.slf4j.Logger;
 // import org.slf4j.LoggerFactory;
@@ -36,9 +36,34 @@ public class CbusNodeConstants {
      * Para 15 CPU manufacturer's id as read from the chip config space, 4 bytes
      * Para 19 CPU manufacturer code
      * Para 20 Beta revision (numeric), or 0 if release
-     *                
+     * Para 21 - 24 Zero filled spare
+     * Not readable by index:
+     * Para 25 - 26 Number of paranmeters can be read as parameter 0
+     * Para 27 - 30 Name string base address
+     * Para 31 - 32 Checksum. Para 1 - 32 must sum to zero
      */
-
+    public static final int NUM_PARAM_IDX = 0;      // Para 0 Number of parameters
+    public static final int MANU_ID_IDX = 1;        // Para 1 The manufacturer ID
+    public static final int MINOR_VER_IDX = 2;      // Para 2 Minor code version as an alphabetic character (ASCII)
+    public static final int MODULE_ID_IDX = 3;      // Para 3 Manufacturer module identifier as a HEX numeric
+    public static final int NUM_EV_IDX = 4;         // Para 4 Number of supported events as a HEX numeric
+    public static final int EV_PER_EN_IDX = 5;      // Para 5 Number of Event Variables per event as a HEX numeric
+    public static final int NUM_NV_IDX = 6;         // Para 6 Number of supported Node Variables as a HEX numeric
+    public static final int MAJOR_VER_IDX = 7;      // Para 7 Major version
+    public static final int FLAGS_IDX = 8;          // Para 8 Node flags
+    public static final int PROC_TYPE_IDX = 9;      // Para 9 Processor type
+    public static final int BUS_TYPE_IDX = 10;      // Para 10 Bus type
+    public static final int LOAD_ADDR_IDX = 11;     // Para 11 load address, 4 bytes
+    public static final int CPU_ID_IDX = 15;        // Para 15 CPU manufacturer's id as read from the chip config space, 4 bytes, only firs two used for PIC18
+    public static final int CPU_CODE_IDX = 19;      // Para 19 CPU manufacturer code
+    public static final int BETA_REV_IDX = 20;      // Para 20 Beta revision (numeric), or 0 if release
+    public static final int SPARE_IDX = 21;         // Para 21 - 24 
+    // Following are available from hex data but not readable by index
+    public static final int PARAM_COUNT_IDX = 25;    // Para 25 - 26 parameter count high byte
+    public static final int NAME_STRING_BASE_IDX = 27; // Para 27 - 30 parameter count high byte
+    public static final int PARAM_CHECK_IDX = 31;    // Para 31 - 32 parameter count high byte
+   
+    
     /**
      * Set traits for a node where there is a minor deviance to MERG CBUS protocol
      * or provide extra info. which is missing for a known module firmware.
@@ -49,177 +74,51 @@ public class CbusNodeConstants {
         // defaults
         node.setsendsWRACKonNVSET(true);
         
-        if ( node.getNodeParamManager().getParameter(1) == 165 ) { // MERG MODULE
-            switch (node.getNodeParamManager().getParameter(3)) { // Module Type ID Number
+        if ( node.getNodeParamManager().getParameter(MANU_ID_IDX) == MANU_MERG ) { // MERG MODULE
+            switch (node.getNodeParamManager().getParameter(MODULE_ID_IDX)) { // Module Type ID Number
+                case 1: // CANACC4
+                case 8: // CANACC4_2
                 case 29: // CANPAN
+                case 34: // CANSOL
+                case 37: // CANACC4CDU
                     node.setsendsWRACKonNVSET(false);
                     break;
                 case 10 : // CANCMD
                 case 55 : // or CANCSB 
                 case 12 : // or CANBC
-                    if ( node.getNodeParamManager().getParameter(7) == 4 ) { // v4 Firmware
+                case 83 : // or CANCMDB
+                    if ( node.getNodeParamManager().getParameter(MAJOR_VER_IDX) == 4 ) { // v4 Firmware
                         node.getNodeEventManager().resetNodeEventsToZero(); // sets num events to 0 as does not respond to RQEVN
                         node.setStatResponseFlagsAccurate(false);
                     }
                     break;
                 case 46: // CANPiWi
-                    if ( node.getNodeParamManager().getParameter(7) == 1 ) { // v1 Firmware
+                    if ( node.getNodeParamManager().getParameter(MAJOR_VER_IDX) == 1 ) { // v1 Firmware
                         node.getNodeEventManager().resetNodeEventsToZero(); // sets num events to 0 as does not respond to RQEVN
                     }
                     break;
+                case 9: // CANCAB
+                    node.getNodeEventManager().resetNodeEventsToZero(); // sets num events to 0 as does not respond to RQEVN
+                    break;
+                case 50: // CANMIO-SVO
+                case 19: // CANSERVO8C
+                    node.setnvWriteInLearnOnly(true);
+                    break;
+                default:
+                    break;
+            }
+        } else if ( node.getNodeParamManager().getParameter(MANU_ID_IDX) == SPROG_DCC ) {    // SPROG DCC module
+            switch (node.getNodeParamManager().getParameter(MODULE_ID_IDX)) {           // Module Type ID Number
+                case MTYP_CANSERVOIO:
+                    node.setnvWriteInLearnOnly(true);
+                    break;
+                    
                 default:
                     break;
             }
         }
     }
-    
-    // reset a Dummy Node to its virgin condition
-    public static void setDummyNodeParameters( CbusDummyNode thisNode, int manu, int type ){
-        
-        if ( manu == 165 ) { // MERG MODULE
-            if ( type == 29 ) { // CANPAN
-                
-                int[] _params = new int[]{ 
-                20, /* 0 num parameters   */
-                165, /* 1 manufacturer ID   */
-                89, /* 2 Minor code version   */
-                29, /* 3 Manufacturer module identifier   */
-                128, /* 4 Number of supported events   */
-                13, /* 5 Number of Event Variables per event   */
-                1, /* 6 Number of Node Variables   */
-                1, /* 7 Major version   */
-                13, /* 8 Node flags   */ 
-                13, /* 9 Processor type   */
-                1, /* 10 Bus type   */
-                0, /* 11 load address, 1/4 bytes   */
-                8, /* 12 load address, 2/4 bytes   */
-                0, /* 13 load address, 3/4 bytes   */
-                0, /* 14 load address, 4/4 bytes   */
-                0, /* 15 CPU manufacturer's id 1/4  */
-                0, /* 16 CPU manufacturer's id 2/4  */
-                0, /* 17 CPU manufacturer's id 3/4  */
-                0, /* 18 CPU manufacturer's id 4/4  */
-                1, /* 19 CPU manufacturer code   */
-                1, /* 20 Beta revision   */
-                };
-                
-                thisNode.getNodeParamManager().setParameters(_params);
-                thisNode.getNodeNvManager().setNVs( new int[]{ 1 , 0 } ); // 1 NV, NV1 set at 0
-                thisNode.setNodeNameFromName("PAN");
-            }
-            
-            else if ( type == 255 ) {
-                
-                // 255 parameters could have unintended future
-                // consequences so staying with the standard 20
-                // for now
-                int[] _params = new int[]{ 
-                20, /* 0 num parameters   */
-                165, /* 1 manufacturer ID   */
-                89, /* 2 Minor code version   */
-                255, /* 3 Manufacturer module identifier   */
-                255, /* 4 Number of supported events   */
-                255, /* 5 Number of Event Variables per event   */
-                255, /* 6 Number of Node Variables   */
-                1, /* 7 Major version   */
-                13, /* 8 Node flags   */ 
-                13, /* 9 Processor type   */
-                1, /* 10 Bus type   */
-                0, /* 11 load address, 1/4 bytes   */
-                8, /* 12 load address, 2/4 bytes   */
-                0, /* 13 load address, 3/4 bytes   */
-                0, /* 14 load address, 4/4 bytes   */
-                0, /* 15 CPU manufacturer's id 1/4  */
-                0, /* 16 CPU manufacturer's id 2/4  */
-                0, /* 17 CPU manufacturer's id 3/4  */
-                0, /* 18 CPU manufacturer's id 4/4  */
-                1, /* 19 CPU manufacturer code   */
-                1, /* 20 Beta revision   */
-                };
-                
-                thisNode.getNodeParamManager().setParameters(_params);
-                
-                int[] nvArray = new int[256];
-                nvArray[0]=255;
-                for (int i = 1; i < nvArray.length; i++) {
-                    nvArray[i] = i;
-                }
-                
-                // create array of event variables
-                int[] evVarArray = new int[255];
-                for (int i = 0; i < evVarArray.length; i++) {
-                    evVarArray[i] = i+1;
-                }
-                
-                for (int i = 1; i < 256; i++) {
-                    
-                    CbusNodeEvent singleEv = new CbusNodeEvent(thisNode._memo,i,i,-1,i,255);
-                    singleEv.setEvArr(evVarArray);
-                    thisNode.getNodeEventManager().addNewEvent(singleEv);
-                    
-                }
-                
-                thisNode.getNodeNvManager().setNVs( nvArray );
-                thisNode.setNodeNameFromName("TSTMAXND");
-                
-            }
-            
-            else {
-            
-                // default MERG module in SLiM mode
-                thisNode.getNodeParamManager().setParameters( new int[]{ 8,165,0,0,0,0,0,0,0 } );
-                thisNode.getNodeNvManager().setNVs( new int[]{ 0 } );
-            }
-        }
-        
-        else if ( manu == 44 ) { // SPROG DCC MODULE
-            if ( type == 1 ) { // Pi-SPROG 3
-                
-                int[] _params = new int[]{ 
-                20, /* 0 num parameters   */
-                44, /* 1 manufacturer ID   */
-                'f', /* 2 Minor code version   */
-                1, /* 3 Manufacturer module identifier   */
-                0, /* 4 Number of supported events   */
-                0, /* 5 Number of Event Variables per event   */
-                1, /* 6 Number of Node Variables   */
-                3, /* 7 Major version   */
-                0, /* 8 Node flags   */ 
-                25, /* 9 Processor type   */
-                0, /* 10 Bus type   */
-                0, /* 11 load address, 1/4 bytes   */
-                8, /* 12 load address, 2/4 bytes   */
-                4, /* 13 load address, 3/4 bytes   */
-                0, /* 14 load address, 4/4 bytes   */
-                0, /* 15 CPU manufacturer's id 1/4  */
-                0, /* 16 CPU manufacturer's id 2/4  */
-                0, /* 17 CPU manufacturer's id 3/4  */
-                0, /* 18 CPU manufacturer's id 4/4  */
-                1, /* 19 CPU manufacturer code   */
-                1, /* 20 Beta revision   */
-                };
-                
-                thisNode.getNodeParamManager().setParameters(_params);
-                thisNode.getNodeNvManager().setNVs( new int[]{ 1 , 0 } ); // 1 NV, NV1 set at 0
-                thisNode.setNodeNameFromName("PSPROG3");
-            }
-            
-            else {
-                // default SPROG DCC module in SLiM mode
-                thisNode.getNodeParamManager().setParameters( new int[]{ 8,44,0,0,0,0,0,0,0 } );
-                thisNode.getNodeNvManager().setNVs( new int[]{ 0 } );
-            }
-        }
-        
-        else {
-            thisNode.getNodeParamManager().setParameters( new int[]{ 8,165,0,0,0,0,0,0,0 } );
-            thisNode.getNodeNvManager().setNVs( new int[]{ 0 } );
-        }
-        
-        setTraits( thisNode );
-        
-    }
-    
+
     /**
      * Return a string representation of a decoded Module Manufacturer
      * @param man manufacturer int
@@ -243,16 +142,16 @@ public class CbusNodeConstants {
      */
     private static final Map<Integer, String> manMap = createManMap();
 
-    /*
+    /**
      * Populate hashmap with format strings
      *
      */
     private static Map<Integer, String> createManMap() {
         Map<Integer, String> result = new HashMap<>();
-        result.put(70, "ROCRAIL"); // NOI18N
-        result.put(80, "SPECTRUM"); // NOI18N
-        result.put(165, "MERG"); // NOI18N
-        result.put(44, "SPROG DCC"); // NOI18N
+        result.put(MANU_ROCRAIL, "ROCRAIL"); // NOI18N
+        result.put(MANU_SPECTRUM, "SPECTRUM"); // NOI18N
+        result.put(MANU_MERG, "MERG"); // NOI18N
+        result.put(SPROG_DCC, "SPROG DCC"); // NOI18N
         return Collections.unmodifiableMap(result);
     }
     
@@ -276,7 +175,7 @@ public class CbusNodeConstants {
      */
     private static final Map<Integer, String> busMap = createBusMap();
 
-    /*
+    /**
      * Populate hashmap with format strings
      *
      */
@@ -286,6 +185,7 @@ public class CbusNodeConstants {
         result.put(1, "CAN"); // NOI18N
         result.put(2, "ETH"); // NOI18N
         result.put(3, "MIWI"); // NOI18N
+        result.put(4, "USB"); // NOI18N
         return Collections.unmodifiableMap(result);
     }
     
@@ -297,23 +197,23 @@ public class CbusNodeConstants {
 
     /**
      * Return a string representation of a decoded Module Name for
-     * manufacturer 165 MERG.
+     * manufacturer MERG.
      * @param man int manufacturer
      * @param type module type int
      * @return decoded String module type name else empty string
      */
     public static String getModuleType(int man, int type) {
         String format="";
-        if (man == 165) {
+        if (man == MANU_MERG) {
             format = type165Map.get(type);
         }
-        else if (man == 70) {
+        else if (man == MANU_ROCRAIL) {
             format = type70Map.get(type);
         }
-        else if (man == 80) {
+        else if (man == MANU_SPECTRUM) {
             format = type80Map.get(type);
         }
-        else if (man == 44) {
+        else if (man == SPROG_DCC) {
             format = type44Map.get(type);
         }
         
@@ -333,8 +233,8 @@ public class CbusNodeConstants {
     private static final Map<Integer, String> type80Map = createType80Map();
     private static final Map<Integer, String> type44Map = createType44Map();
     
-    /*
-     * Populate hashmap with format strings for manufacturer 165 MERG
+    /**
+     * Populate hashmap with format strings for manufacturer MERG
      */
     private static Map<Integer, String> createType165Map() {
         Map<Integer, String> result = new HashMap<>();
@@ -405,7 +305,32 @@ public class CbusNodeConstants {
         result.put(64, "CANEMIO"); // NOI18N
         result.put(65, "CANCABDC"); // NOI18N
         result.put(66, "CANRCOM"); // NOI18N
-        
+        result.put(67, "CANMP3");
+        result.put(68, "CANXMAS");
+        result.put(69, "CANSVOSET");
+        result.put(70, "CANCMDDC");
+        result.put(71, "CANTEXT");
+        result.put(72, "CANASIGNAL");
+        result.put(73, "CANSLIDER");
+        result.put(74, "CANDCATC");
+        result.put(75, "CANGATE");
+        result.put(76, "CANSINP");
+        result.put(77, "CANSOUT");
+        result.put(78, "CANSBIP");
+        result.put(79, "CANBUFFER");
+        result.put(80, "CANLEVER");
+        result.put(81, "CANSHIELD");
+        result.put(82, "CAN4IN4OUT");
+        result.put(83, "CANCMDB");
+        result.put(84, "CANPIXEL");
+        result.put(85, "CANCABPE");
+        result.put(86, "CANSMARTTD");
+        result.put(87, "CANARGB");
+        result.put(88, "CANCDU_U");
+        result.put(89, "CANGATEX");
+        result.put(90, "CANGATEXL");
+
+        result.put(252, "VLCB");
         result.put(253, "CANUSB"); // NOI18N
         result.put(254, "EMPTY"); // NOI18N
         result.put(255, "CAN_SW"); // NOI18N
@@ -443,17 +368,22 @@ public class CbusNodeConstants {
     
     
     /*
-     * Populate hashmap with format strings
-     *
+     * Populate hashmap with format strings.
+     * Visible name of module, not the CBUS NAME OPC Response.
      */
     private static Map<Integer, String> createType44Map() {
         Map<Integer, String> result = new HashMap<>();
         result.put(1, "Pi-SPROG 3"); // NOI18N
-        result.put(2, "SPROG 3 Plus/PI-SPROG 3 Plus/Pi-SPROG 3 v2"); // NOI18N
-        result.put(3, "CAN SPROG"); // NOI18N
-        result.put(4, "System Booster"); // NOI18N
-        result.put(5, "Error"); // NOI18N
-        result.put(6, "CAN ISB"); // NOI18N
+        result.put(2, "CANSPROG3P"); // NOI18N
+        result.put(3, "CANSPROG"); // NOI18N
+        result.put(4, "SBOOST"); // NOI18N
+        result.put(5, "Unsupported"); // NOI18N
+
+        result.put(8, "CANSOLNOID"); // NOI18N. Matches MERG CANSOL
+        result.put(50, "CANSERVOIO"); // NOI18N. Matches MERG canmio-svo
+        
+        result.put(100, "CANISB"); // NOI18N
+        result.put(101, "CANSOLIO"); // NOI18N
         return Collections.unmodifiableMap(result);
     }
     
@@ -466,17 +396,21 @@ public class CbusNodeConstants {
      */
     public static String getModuleTypeExtra(int man, int type) {
         String format="";
-        if (man == 165) {
-            format = extra165Map.get(type);
-        }
-        else if (man == 70) {
-            format = extra70Map.get(type);
-        }
-        else if (man == 80) {
-            format = extra80Map.get(type);
-        }
-        else if (man == 44) {
-            format = extra44Map.get(type);
+        switch (man) {
+            case MANU_MERG:
+                format = extra165Map.get(type);
+                break;
+            case MANU_ROCRAIL:
+                format = extra70Map.get(type);
+                break;
+            case MANU_SPECTRUM:
+                format = extra80Map.get(type);
+                break;
+            case SPROG_DCC:
+                format = extra44Map.get(type);
+                break;
+            default:
+                break;
         }
         return format;
     }
@@ -561,7 +495,32 @@ public class CbusNodeConstants {
         result.put(64, "Extended CANMIO (24 I/O ports)");
         result.put(65, "DC cab");
         result.put(66, "DCC Railcom detector/reader");
-        
+        result.put(67, "MP3 sound player in response to events (eg: station announcements)");
+        result.put(68, "Addressed RGB LED driver");
+        result.put(69, "Servo setting box");
+        result.put(70, "DC Command station");
+        result.put(71, "Text message display");
+        result.put(72, "Signal controller");
+        result.put(73, "DCC cab with slider control");
+        result.put(74, "DC ATC module");
+        result.put(75, "Logic module using and/or gates");
+        result.put(76, "Q series PIC input module");
+        result.put(77, "Q series PIC output module");
+        result.put(78, "Q series PIC BIP module");
+        result.put(79, "Message buffer");
+        result.put(80, "Lever frame module");
+        result.put(81, "Kit 110 Arduino shield test firmware");
+        result.put(82, "4 inputs 4 outputs (Arduino module)");
+        result.put(83, "CANCMD with built in booster");
+        result.put(84, "neopixel driver");
+        result.put(85, "Cab2 with pot or encoder");
+        result.put(86, "Smart train detector");
+        result.put(87, "Addressable LEDs");
+        result.put(88, "CANCDU (universal)");
+        result.put(89, "Logic module using boolean logic gates");
+        result.put(90, "Extended version of CANGATEX");
+
+        result.put(252, "All VLCB modules have the same ID");
         result.put(253, "USB interface");
         result.put(254, "Empty module, bootloader only");
         result.put(255, "Software nodes");
@@ -603,16 +562,21 @@ public class CbusNodeConstants {
      */
     private static Map<Integer, String> createExtra44Map() {
         Map<Integer, String> result = new HashMap<>();
-        result.put(1, "Programmer/Command Station.");
-        result.put(2, "Programmer/Command Station.");
-        result.put(3, "Programmer/Command Station.");
+        result.put(1, "Pi-SPROG 3 programmer/command station.");
+        result.put(2, "SPROG 3 Plus programmer/command station.");
+        result.put(3, "CAN SPROG programmer/command station.");
         result.put(4, "System booster");
-        result.put(5, "Unsupported module type.");
-        result.put(6, "Isolated CANUSB and CBUS node.");
+        result.put(5, "Unsupported module type");
+        
+        result.put(8, "8-channel twin-coil solenoid, like MERG CANACC4_2.");
+        result.put(50, "8-channel servo I/O, like MERG CANMIO_SVO.");
+        
+        result.put(100, "Isolated USB to CAN interface with CBUS node.");
+        result.put(101, "8-channel twin-coil solenoid I/O.");
         return Collections.unmodifiableMap(result);
     }   
 
-    
+  
     /**
      * Return a string representation of Module Support Link
      * @param man int manufacturer ID
@@ -621,13 +585,13 @@ public class CbusNodeConstants {
      */
     public static String getModuleSupportLink(int man, int type) {
         String format="";
-        if (man == 165) {
+        if (man == MANU_MERG) {
             format = link165Map.get(type);
         }
-        else if (man == 70) {
+        else if (man == MANU_ROCRAIL) {
             format = link70Map.get(type);
         }
-        else if (man == 44) {
+        else if (man == SPROG_DCC) {
             format = link44Map.get(type);
         }
         if ( format == null ){
@@ -712,7 +676,29 @@ public class CbusNodeConstants {
         // result.put(64, "CANEMIO"); // NOI18N
         result.put(65, "https://merg.org.uk/merg_wiki/doku.php?id=cbus:cancabdc"); // NOI18N
         result.put(66, "https://www.merg.org.uk/merg_wiki/doku.php?id=cbus:canrcom"); // NOI18N
-        
+        // result.put(67, "CANMP3");
+        result.put(68, "https://www.merg.org.uk/merg_wiki/doku.php?id=projects:canxmas");
+        // result.put(69, "CANSVOSET");
+        // result.put(70, "CANCMDDC");
+        // result.put(71, "CANTEXT");
+        // result.put(72, "CANASIGNAL");
+        result.put(73, "https://www.merg.org.uk/merg_wiki/doku.php?id=projects:canslider");
+        // result.put(74, "CANDCATC");
+        result.put(75, "https://www.merg.org.uk/merg_wiki/doku.php?id=cbus:cangate");
+        // result.put(76, "CANSINP");
+        // result.put(77, "CANSOUT");
+        // result.put(78, "CANSBIP");
+        // result.put(79, "CANBUFFER");
+        // result.put(80, "CANLEVER");
+        // result.put(81, "CANSHIELD");
+        // result.put(82, "CAN4IN4OUT");
+        result.put(83, "https://www.merg.org.uk/merg_wiki/doku.php?id=cbus:cancmdb");
+        // result.put(84, "CANPIXEL");
+        // result.put(85, "CANCABPE");
+        // result.put(86, "CANSMARTTD");
+        // result.put(87, "CANARGB");
+
+        // result.put(252, "VLCB");
         // result.put(253, "CANUSB"); // NOI18N
         // result.put(254, "EMPTY"); // NOI18N
         // result.put(255, "CAN_SW"); // NOI18N        
@@ -738,7 +724,7 @@ public class CbusNodeConstants {
     
     
     /*
-     * Populate hashmap with rocrail module support links
+     * Populate hashmap with SPROG module support links
      */
     private static Map<Integer, String> createLink44Map() {
         Map<Integer, String> result = new HashMap<>();
@@ -747,6 +733,10 @@ public class CbusNodeConstants {
         result.put(3, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
         result.put(4, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
         result.put(5, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
+        result.put(8, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
+        result.put(50, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
+        result.put(100, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
+        result.put(101, "https://www.sprog-dcc.co.uk/download-page"); // NOI18N
         return Collections.unmodifiableMap(result);
     }
     
@@ -777,28 +767,33 @@ public class CbusNodeConstants {
      */
     private static Map<Integer, String> createModMap() {
         Map<Integer, String> result = new HashMap<>();
-        // Opcodes with no data
-        
+
         for (int i = 100; i < 126; i++) {
             result.put(i, Bundle.getMessage("NdNumReserveFixed")); // NOI18N
         }
+        // use html with br so text fits into dialogue
+        result.put(120, "Reserved / Command Station Shuttles");
         result.put(126, "Reserved for CAN_RS Modules");
         result.put(127, "Reserved for CAN_USB Modules");
+        result.put(162, "Used in Command Station Shuttles");
+        result.put(163, "Used in Command Station Shuttles");
+        result.put(164, "Used in Command Station Shuttles");
+        result.put(167, "Used in Command Station Shuttles");
         result.put(65534, "Reserved for Command Station");
         result.put(65535, "Reserved, used by all CABS");
         return Collections.unmodifiableMap(result);
     }
-    
+
     private static final Map<String, BackupType> nameIndex =
-            new HashMap<String, BackupType>(BackupType.values().length);
+            new HashMap<>(BackupType.values().length);
     static {
         for (BackupType t : BackupType.values()) {
             nameIndex.put(t.name(), t);
         }
     }
-    
+
     private static final Map<BackupType, String> displayPhraseIndex =
-            new HashMap<BackupType, String>(BackupType.values().length);
+            new HashMap<>(BackupType.values().length);
     static {
         displayPhraseIndex.put(BackupType.INCOMPLETE, Bundle.getMessage("BackupIncomplete"));
         displayPhraseIndex.put(BackupType.COMPLETE, Bundle.getMessage("BackupComplete"));
@@ -848,7 +843,7 @@ public class CbusNodeConstants {
         
         private final int v;
 
-        private BackupType(final int v) {
+        BackupType(final int v) {
             this.v = v;
         }
     
@@ -858,5 +853,5 @@ public class CbusNodeConstants {
     
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusNodeConstants.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusNodeConstants.class);
 }

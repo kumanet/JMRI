@@ -12,6 +12,7 @@ import jmri.NamedBean.DisplayOptions;
 import jmri.jmrit.display.layoutEditor.*;
 import jmri.swing.NamedBeanComboBox;
 import jmri.util.JmriJFrame;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * MVC Editor component for TrackSegment objects.
@@ -202,9 +203,9 @@ public class TrackSegmentEditor extends LayoutTrackEditor {
         }
         // check if a block exists to edit
         if (trackSegment.getLayoutBlock() == null) {
-            JOptionPane.showMessageDialog(editTrackSegmentFrame,
+            JmriJOptionPane.showMessageDialog(editTrackSegmentFrame,
                     Bundle.getMessage("Error1"), // NOI18N
-                    Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);  // NOI18N
+                    Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);  // NOI18N
             return;
         }
         trackSegment.getLayoutBlock().editLayoutBlock(editTrackSegmentFrame);
@@ -281,5 +282,5 @@ public class TrackSegmentEditor extends LayoutTrackEditor {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegmentEditor.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegmentEditor.class);
 }

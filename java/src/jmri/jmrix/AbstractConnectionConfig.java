@@ -1,6 +1,5 @@
 package jmri.jmrix;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.awt.*;
 import java.awt.event.FocusEvent;
@@ -8,11 +7,13 @@ import java.awt.event.FocusListener;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
+
 import javax.annotation.Nonnull;
 import javax.swing.*;
 
 import jmri.InstanceManager;
 import jmri.jmrix.configurexml.AbstractConnectionConfigXml;
+import jmri.util.swing.JmriJOptionPane;
 import jmri.util.swing.ValidatedTextField;
 
 /**
@@ -52,8 +53,7 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
 
     abstract public void updateAdapter();
 
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "Field used by implementing classes")
-    protected int NUMOPTIONS = 2;
+    private int numOptions = 2;
 
     // Load localized field names
     protected JCheckBox showAdvanced = new JCheckBox(Bundle.getMessage("AdditionalConnectionSettings"));
@@ -65,6 +65,22 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
     protected JPanel _details = null;
 
     protected final Map<String, Option> options = new TreeMap<>();
+
+    /**
+     * Increase the number of options.
+     * @param num how many to increase
+     */
+    protected void increaseNumOptions(int num) {
+        numOptions += num;
+    }
+
+    /**
+     * Get the number of options.
+     * @return num options
+     */
+    protected int getNumOptions() {
+        return numOptions;
+    }
 
     /**
      * Determine if configuration needs to be written to disk.
@@ -149,8 +165,15 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
     @Override
     abstract public String getInfo();
 
-    @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "Field used by implementing classes")
-    protected ArrayList<JComponent> additionalItems = new ArrayList<>(0);
+    private ArrayList<JComponent> additionalItems = new ArrayList<>(0);
+
+    /**
+     * Get the list of additional items.
+     * @return the list
+     */
+    protected ArrayList<JComponent> getAdditionalItems() {
+        return additionalItems;
+    }
 
     /**
      * Load the Swing widgets needed to configure this connection into a
@@ -184,6 +207,10 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
         }
 
         if (adapter.getSystemConnectionMemo() != null) {
+            // Labels are field initializers created before the L&F is fully set up on some
+            // platforms (e.g. GTK); updateUI() resets the font/paint delegate to the current L&F.
+            systemPrefixLabel.updateUI();
+            connectionNameLabel.updateUI();
             cR.gridy = i;
             cL.gridy = i;
             gbLayout.setConstraints(systemPrefixLabel, cL);
@@ -282,18 +309,18 @@ abstract public class AbstractConnectionConfig implements ConnectionConfig {
             systemPrefixField.setText(adapter.getSystemConnectionMemo().getSystemPrefix());
         }
         if (!adapter.getSystemConnectionMemo().setSystemPrefix(systemPrefixField.getText())) { // in use
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("ConnectionPrefixDialog", systemPrefixField.getText()));
+            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("ConnectionPrefixDialog", systemPrefixField.getText()));
             systemPrefixField.setText(adapter.getSystemConnectionMemo().getSystemPrefix());
         }
     }
 
     private void checkNameEntry(@Nonnull PortAdapter adapter) {
         if (!adapter.getSystemConnectionMemo().setUserName(connectionNameField.getText())) {
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("ConnectionNameDialog", connectionNameField.getText()));
+            JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("ConnectionNameDialog", connectionNameField.getText()));
             connectionNameField.setText(adapter.getSystemConnectionMemo().getUserName());
         }
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractConnectionConfig.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractConnectionConfig.class);
 
 }

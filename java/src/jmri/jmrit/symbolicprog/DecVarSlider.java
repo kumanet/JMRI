@@ -19,6 +19,9 @@ public class DecVarSlider extends JSlider implements ChangeListener {
     DecVarSlider(DecVariableValue var, int min, int max) {
         super(new DefaultBoundedRangeModel(min, 0, min, max));
         _var = var;
+
+        this.getAccessibleContext().setAccessibleName(_var.label());
+
         // get the original color right
         setBackground(_var.getColor());
         if (_var.getColor() == _var.getDefaultColor()) {
@@ -47,7 +50,7 @@ public class DecVarSlider extends JSlider implements ChangeListener {
         BoundedRangeModel r = j.getModel();
 
         _var.setIntValue(r.getValue());
-        _var.setState(AbstractValue.EDITED);
+        _var.setState(AbstractValue.ValueState.EDITED);
     }
 
     DecVariableValue _var;
@@ -72,6 +75,6 @@ public class DecVarSlider extends JSlider implements ChangeListener {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(DecVarSlider.class);
+    private static final Logger log = LoggerFactory.getLogger(DecVarSlider.class);
 
 }

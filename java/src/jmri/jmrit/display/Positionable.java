@@ -6,11 +6,16 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.event.MouseEvent;
+import java.util.Set;
+
 import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 import javax.swing.border.Border;
+
 import jmri.JmriException;
+import jmri.NamedBean;
+import jmri.jmrit.logixng.InlineLogixNG;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * Defines display objects.
@@ -38,7 +43,7 @@ import jmri.JmriException;
  * @author Bob Jacobsen Copyright (c) 2002
  * @author Pete Cressman Copyright (c) 2010
  */
-public interface Positionable extends Cloneable {
+public interface Positionable extends Cloneable, InlineLogixNG {
 
     /**
      * Sets the Id of this Positionable
@@ -50,9 +55,33 @@ public interface Positionable extends Cloneable {
 
     /**
      * Gets the Id of this Positionable
-     * @return id the id or null if no id
+     * @return the id or null if no id
      */
     String getId();
+
+    /**
+     * Add a class name to this Positionable
+     * @param className the class name
+     * @throws IllegalArgumentException className is null or has a comma
+     */
+    public void addClass(String className);
+
+    /**
+     * Remove a class name to this Positionable
+     * @param className the class name
+     */
+    public void removeClass(String className);
+
+    /**
+     * Remove a class name to this Positionable
+     */
+    public void removeAllClasses();
+
+    /**
+     * Gets the class names of this Positionable
+     * @return the classes
+     */
+    Set<String> getClasses();
 
     void setPositionable(boolean enabled);
 
@@ -83,6 +112,14 @@ public interface Positionable extends Cloneable {
     boolean isHidden();
 
     void showHidden();
+
+    void setEmptyHidden(boolean enabled);
+
+    boolean isEmptyHidden();
+
+    void setValueEditDisabled(boolean disabled);
+
+    boolean isValueEditDisabled();
 
     int getDisplayLevel();
 
@@ -118,12 +155,29 @@ public interface Positionable extends Cloneable {
     Positionable deepClone();
 
     /**
+     * Get the type of the positional as a String.
+     *
+     * @return the type to display
+     */
+    String getTypeString();
+
+    /**
      * Get the name of the positional as a String. This is often the display
      * name of the NamedBean being positioned.
      *
      * @return the name to display
      */
+    @Override
     String getNameString();
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public default String getTypeName() {
+        NamedBean nb = getNamedBean();
+        return nb != null ? nb.getBeanType() : null;
+    }
 
     /**
      * Add additional menu items to the menu.
@@ -224,27 +278,31 @@ public interface Positionable extends Cloneable {
 
     // Mouse-handling events.  See
     // Editor class for more information on how these are used.
-    void doMousePressed(MouseEvent event);
+    void doMousePressed(JmriMouseEvent event);
 
-    void doMouseReleased(MouseEvent event);
+    void doMouseReleased(JmriMouseEvent event);
 
-    void doMouseClicked(MouseEvent event);
+    void doMouseClicked(JmriMouseEvent event);
 
-    void doMouseDragged(MouseEvent event);
+    void doMouseDragged(JmriMouseEvent event);
 
-    void doMouseMoved(MouseEvent event);
+    void doMouseMoved(JmriMouseEvent event);
 
-    void doMouseEntered(MouseEvent event);
+    void doMouseEntered(JmriMouseEvent event);
 
-    void doMouseExited(MouseEvent event);
+    void doMouseExited(JmriMouseEvent event);
 
     // The following are common for all JComponents
+    Rectangle getBounds();
+
     Rectangle getBounds(Rectangle r);
 
     boolean contains(int x, int y);
 
+    @Override
     int getX();
 
+    @Override
     int getY();
 
     Point getLocation();
@@ -254,6 +312,8 @@ public interface Positionable extends Cloneable {
     void setLocation(Point p);
 
     void setSize(int width, int height);
+
+    void setSize(Dimension d);
 
     void setVisible(boolean b);
 
@@ -287,6 +347,10 @@ public interface Positionable extends Cloneable {
 
     boolean requestFocusInWindow();
 
+    @Override
+    public default String getEditorName() {
+        return getEditor().getName();
+    }
 
 
     public static class DuplicateIdException extends JmriException {

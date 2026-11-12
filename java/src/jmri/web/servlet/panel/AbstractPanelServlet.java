@@ -7,8 +7,7 @@ import static jmri.web.servlet.ServletUtil.UTF8_TEXT_HTML;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import java.awt.Container;
-import java.awt.Frame;
+
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,20 +23,19 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.swing.JComponent;
-import jmri.InstanceManager;
-import jmri.Sensor;
-import jmri.SignalMast;
-import jmri.SignalMastManager;
+import javax.swing.JFrame;
+
+import jmri.*;
 import jmri.configurexml.ConfigXmlManager;
-import jmri.jmrit.display.Editor;
-import jmri.jmrit.display.EditorManager;
-import jmri.jmrit.display.MultiSensorIcon;
-import jmri.jmrit.display.Positionable;
+import jmri.jmrit.display.*;
 import jmri.server.json.JSON;
 import jmri.server.json.util.JsonUtilHttpService;
 import jmri.util.FileUtil;
+import jmri.util.ColorUtil;
 import jmri.web.server.WebServer;
 import jmri.web.servlet.ServletUtil;
+import jmri.web.servlet.permission.PermissionServlet;
+
 import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractPanelServlet extends HttpServlet {
 
     protected ObjectMapper mapper;
-    private final static Logger log = LoggerFactory.getLogger(AbstractPanelServlet.class);
+    private static final Logger log = LoggerFactory.getLogger(AbstractPanelServlet.class);
 
     abstract protected String getPanelType();
 
@@ -95,6 +93,14 @@ public abstract class AbstractPanelServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         log.debug("Handling GET request for {}", request.getRequestURI());
+
+        String sessionId = PermissionServlet.getSessionId(request);
+        if (! InstanceManager.getDefault(PermissionManager.class)
+                .hasAtLeastRemotePermission(sessionId, EditorPermissions.EDITOR_PERMISSION,
+                        EditorPermissions.EditorPermissionEnum.View)) {
+            PermissionServlet.permissionDenied(request, response);
+            return;
+        }
         if (request.getRequestURI().equals("/web/showPanel.html")) { // NOI18N
             response.sendRedirect("/panel/"); // NOI18N
             return;
@@ -210,11 +216,9 @@ public abstract class AbstractPanelServlet extends HttpServlet {
     @CheckForNull
     protected Editor getEditor(String name) {
         for (Editor editor : InstanceManager.getDefault(EditorManager.class).getAll()) {
-            Container container = editor.getTargetPanel().getTopLevelAncestor();
-            if (container instanceof Frame) {
-                if (((Frame) container).getTitle().equals(name)) {
-                    return editor;
-                }
+            JFrame frame = editor.getTargetFrame();
+            if (frame.getTitle().equals(name)) {
+                return editor;
             }
         }
         return null;
@@ -241,20 +245,6 @@ public abstract class AbstractPanelServlet extends HttpServlet {
         }
     }
 
-    /**
-     * Build and return an "icons" element containing icon URLs for all
-     * SignalMast states. Element names are cleaned-up aspect names, aspect
-     * attribute is actual name of aspect.
-     *
-     * @param name user/system name of the signalMast using the icons
-     * @return an icons element containing icon URLs for SignalMast states
-     * @deprecated since 4.15.4 use {@link #getSignalMastIconsElement(String, String)} instead
-     */
-    @Deprecated  
-    protected Element getSignalMastIconsElement(String name) {
-        return getSignalMastIconsElement(name, "default") ;
-    }
-    
     /**
      * Build and return an "icons" element containing icon URLs for all
      * SignalMast states. Element names are cleaned-up aspect names, aspect
@@ -358,6 +348,28 @@ public abstract class AbstractPanelServlet extends HttpServlet {
             parsePortableURIs(e);
         }
         return e;
+    }
+
+    /** Convert named colors in a panel response to CSS-compatible RGB hex values. */
+    protected void convertNamedColors(@Nonnull Element element) {
+        for (org.jdom2.Attribute attribute : element.getAttributes()) {
+            if (attribute.getName().toLowerCase(java.util.Locale.ROOT).contains("color")) {
+                String value = attribute.getValue();
+                if (value != null && !value.startsWith("#")) {
+                    try {
+                        java.awt.Color color = ColorUtil.stringToColor(value);
+                        if (color != null) {
+                            attribute.setValue(ColorUtil.colorToHexString(color));
+                        }
+                    } catch (IllegalArgumentException ex) {
+                        // Preserve non-color values such as the special "track" value.
+                    }
+                }
+            }
+        }
+        for (Element child : element.getChildren()) {
+            convertNamedColors(child);
+        }
     }
 
 }

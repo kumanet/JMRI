@@ -86,7 +86,7 @@ public class InputBits {
                 try {
                     sensorArray[i].setKnownState(Sensor.UNKNOWN);
                 } catch (jmri.JmriException ex) {
-                    log.error("unexpected exception setting sensor i={}, ex:{}", i, ex);
+                    log.error("unexpected exception setting sensor i={}", i, ex);
                 }
             }
         }
@@ -156,7 +156,7 @@ public class InputBits {
                 }
             }
         } catch (JmriException e) {
-            log.error("exception in makeChanges: {}", e);
+            log.error("exception in makeChanges", e);
         }
 
         // clear the accumulation array;
@@ -188,6 +188,6 @@ public class InputBits {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(InputBits.class);
+    private static final Logger log = LoggerFactory.getLogger(InputBits.class);
 
 }

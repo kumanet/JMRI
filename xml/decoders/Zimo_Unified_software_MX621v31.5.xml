@@ -11,10 +11,10 @@
 <!-- ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or  -->
 <!-- FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License  -->
 <!-- for more details.                                                      -->
-<decoder-config xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder.xsd">
-  <version author="ronald@wirkuhns.de" version="3" lastUpdated="2017/09/24"/>
+<decoder-config xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder-4-15-2.xsd">
+  <version author="Ronald Kuhn" version="3" lastUpdated="2017/09/24"/>
   <!-- add new CV=20 by FW 31.5 for extended consist adress -->
-  <version author="ronald@wirkuhns.de" version="2" lastUpdated="2016/05/06"/>
+  <version author="Ronald Kuhn" version="2" lastUpdated="2016/05/06"/>
   <!-- add translation to german in splitted files -->
   <version author="Mark Waters mark16w-jmri@yahoo.co.uk" version="1" lastUpdated="20121202"/>
   <!-- This decoder configuration file is based on the Zimo_MX640_v9.xml                     -->
@@ -127,6 +127,7 @@
         <decVal/>
         <label>Decoder ID 1</label>
         <label xml:lang="it">ID 1 Decoder: </label>
+        <label xml:lang="cs">ID 1 Dekodéru </label>
       </variable>
       <!--xi:include href="http://jmri.org/xml/decoders/zimo/CV400-CV428.xml"/-->
     </variables>

@@ -10,11 +10,10 @@ import javax.swing.JTextField;
 
 import jmri.progdebugger.ProgDebugger;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.NotApplicable;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test CompositeVariableValue class.
@@ -44,7 +43,7 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
 
     @Override
     void setReadOnlyValue(VariableValue var, String val) {
-        ((CompositeVariableValue) var).setValue(Integer.valueOf(val));
+        ((CompositeVariableValue) var).setValue(Integer.parseInt(val));
     }
 
     @Override
@@ -62,87 +61,99 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
     // (This is removing the majority of the tests, which seems rather much)
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreate() {
-    }// mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeValue() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue256() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("mask is ignored")
     public void testVariableValueCreateLargeMaskValue2up16() {
-    } // mask is ignored 
+    }
 
     @Override
     @Test
+    @NotApplicable("low CV is upper part of address")
     public void testVariableSynch() {
-    }     // low CV is upper part of address
+    }
 
     @Override
     @Test
+    @NotApplicable("low CV is upper part of address")
     public void testVariableReadOnly() {
-    }     // low CV is upper part of address
+    }
 
     @Override
     @Test
+    @NotApplicable("low CV is upper part of address")
     public void testVariableFromCV() {
-    }     // low CV is upper part of address
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableValueRead() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableValueStates() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableValueStateColor() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableRepStateColor() {
-    } // due to multi-cv nature
-
-    @Test
-    public void testVariableValueRepStateColor() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableVarChangeColorRep() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableValueWrite() {
-    } // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("due to multi-cv nature")
     public void testVariableCvWrite() {
-    }    // due to multi-cv nature
+    }
 
     @Override
     @Test
+    @NotApplicable("programmer synch is different")
     public void testWriteSynch2() {
-    }        // programmer synch is different
+    }
 
     // rest of tests are new, for just this type of variable
     // can we create three variables, then manipulate the composite variable to change them?
@@ -183,7 +194,7 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("composite index when set to first via CV", 0, ((JComboBox<?>) testVar.getCommonRep()).getSelectedIndex());
     }
 
-    List<java.beans.PropertyChangeEvent> evtList = null;  // holds a list of ParameterChange events
+    private List<java.beans.PropertyChangeEvent> evtList = null;  // holds a list of ParameterChange events
 
     @Test
     public void testRead() {
@@ -194,16 +205,13 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         ((JComboBox<?>) testVar.getCommonRep()).setSelectedIndex(1);
 
         // register a listener for parameter changes
-        java.beans.PropertyChangeListener listen = new java.beans.PropertyChangeListener() {
-            @Override
-            public void propertyChange(java.beans.PropertyChangeEvent e) {
-                evtList.add(e);
-                if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
-                    log.debug("=============== Busy false seen in test scaffold =================");
-                }
+        java.beans.PropertyChangeListener listen = (java.beans.PropertyChangeEvent e) -> {
+            evtList.add(e);
+            if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
+                log.debug("=============== Busy false seen in test scaffold =================");
             }
         };
-        evtList = new ArrayList<java.beans.PropertyChangeEvent>();
+        evtList = new ArrayList<>();
         testVar.addPropertyChangeListener(listen);
 
         // execute the test read
@@ -229,7 +237,7 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("CV 18 value ", 123, cv18.getValue());
         Assert.assertEquals("CV 19 value ", 123, cv19.getValue());
         Assert.assertEquals("var value after read", 2, ((JComboBox<?>) testVar.getCommonRep()).getSelectedIndex());
-        Assert.assertEquals("Var state", AbstractValue.READ, testVar.getState());
+        Assert.assertEquals("Var state", AbstractValue.ValueState.READ, testVar.getState());
         log.debug("end testRead");
     }
 
@@ -242,16 +250,13 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         ((JComboBox<?>) testVar.getCommonRep()).setSelectedIndex(1);
 
         // register a listener for parameter changes
-        java.beans.PropertyChangeListener listen = new java.beans.PropertyChangeListener() {
-            @Override
-            public void propertyChange(java.beans.PropertyChangeEvent e) {
-                evtList.add(e);
-                if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
-                    log.debug("Busy false seen in test");
-                }
+        java.beans.PropertyChangeListener listen = (java.beans.PropertyChangeEvent e) -> {
+            evtList.add(e);
+            if (e.getPropertyName().equals("Busy") && ((Boolean) e.getNewValue()).equals(Boolean.FALSE)) {
+                log.debug("Busy false seen in test");
             }
         };
-        evtList = new ArrayList<java.beans.PropertyChangeEvent>();
+        evtList = new ArrayList<>();
         testVar.addPropertyChangeListener(listen);
 
         testVar.setToWrite(true);
@@ -269,7 +274,7 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("only one Busy -> false transition ", 1, nBusyFalse);
 
         Assert.assertEquals("value after write", 1, ((JComboBox<?>) testVar.getCommonRep()).getSelectedIndex());
-        Assert.assertEquals("Var state", AbstractValue.STORED, testVar.getState());
+        Assert.assertEquals("Var state", AbstractValue.ValueState.STORED, testVar.getState());
 
         Assert.assertEquals("CV 17 value ", 21, cv17.getValue());
         Assert.assertEquals("CV 18 value ", 22, cv18.getValue());
@@ -294,19 +299,20 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         Assert.assertEquals("main changed", true, testVar.isChanged());
 
     }
-    // variables for checking the results of manipulating a test CompositeVariableValue
-    CvValue cv17;
-    CvValue cv18;
-    CvValue cv19;
 
-    DecVariableValue var17;
-    DecVariableValue var18;
-    DecVariableValue var19;
+    // variables for checking the results of manipulating a test CompositeVariableValue
+    private CvValue cv17;
+    private CvValue cv18;
+    private CvValue cv19;
+
+    private DecVariableValue var17;
+    private DecVariableValue var18;
+    private DecVariableValue var19;
 
     // create and load the an object to test
     protected CompositeVariableValue createTestVar() {
 
-        ProgDebugger p = new ProgDebugger();
+        p = new ProgDebugger();
 
         // create 3 CVs
         HashMap<String, CvValue> v = createCvMap();
@@ -349,7 +355,7 @@ public class CompositeVariableValueTest extends AbstractVariableValueTestBase {
         return testVar;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CompositeVariableValueTest.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CompositeVariableValueTest.class);
 
     @BeforeEach
     @Override

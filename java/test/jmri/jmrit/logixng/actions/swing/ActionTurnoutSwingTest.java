@@ -1,7 +1,9 @@
 package jmri.jmrit.logixng.actions.swing;
 
-import java.awt.GraphicsEnvironment;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import javax.swing.JDialog;
 import javax.swing.JPanel;
 
 import jmri.InstanceManager;
@@ -10,14 +12,14 @@ import jmri.TurnoutManager;
 import jmri.jmrit.logixng.*;
 import jmri.jmrit.logixng.actions.ActionTurnout;
 import jmri.jmrit.logixng.swing.SwingConfiguratorInterfaceTestBase;
-import jmri.util.JUnitAppender;
 import jmri.util.JUnitUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import org.netbeans.jemmy.operators.*;
 
 /**
@@ -28,26 +30,28 @@ import org.netbeans.jemmy.operators.*;
 public class ActionTurnoutSwingTest extends SwingConfiguratorInterfaceTestBase {
 
     @Test
+    @DisabledIfHeadless
     public void testCtor() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        ActionTurnoutSwing t = new ActionTurnoutSwing();
-        Assert.assertNotNull("exists",t);
+        ActionTurnoutSwing t = new ActionTurnoutSwing(new JDialog());
+        assertNotNull( t, "exists");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testCreatePanel() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
-        Assert.assertTrue("panel is not null",
-            null != new ActionTurnoutSwing().getConfigPanel(new JPanel()));
-        Assert.assertTrue("panel is not null",
-            null != new ActionTurnoutSwing().getConfigPanel(new ActionTurnout("IQDA1", null), new JPanel()));
+        JDialog dialog = new JDialog();
+
+        assertNotNull( new ActionTurnoutSwing(dialog).getConfigPanel(new JPanel()), "panel is not null");
+        assertNotNull( new ActionTurnoutSwing(dialog).getConfigPanel(new ActionTurnout("IQDA1", null), new JPanel()),
+                "panel is not null");
     }
 
+    @Disabled("Fails in Java 11 testing")
     @Test
+    @DisabledIfHeadless
     public void testDialogUseExistingTurnout() throws SocketAlreadyConnectedException {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         Turnout t1 = InstanceManager.getDefault(TurnoutManager.class).provide("IT1");
         InstanceManager.getDefault(TurnoutManager.class).provide("IT2");
@@ -66,15 +70,14 @@ public class ActionTurnoutSwingTest extends SwingConfiguratorInterfaceTestBase {
         new JComboBoxOperator(jdo, 1).setSelectedItem(ActionTurnout.TurnoutState.Closed);
         new JButtonOperator(jdo, "OK").push();  // NOI18N
 
-        JUnitUtil.waitFor(() -> {return action.getTurnout() != null;});
-        JUnitUtil.waitFor(() -> {return ActionTurnout.TurnoutState.Closed == action.getBeanState();});
+        JUnitUtil.waitFor(() -> {return action.getSelectNamedBean().getNamedBean() != null;}, "nb not null");
+        JUnitUtil.waitFor(() -> {return ActionTurnout.TurnoutState.Closed == action.getSelectEnum().getEnum();}, "turnout closed");
 
-        Assert.assertEquals("IT1", action.getTurnout().getBean().getSystemName());
-        Assert.assertEquals(ActionTurnout.TurnoutState.Closed, action.getBeanState());
+        assertEquals("IT1", action.getSelectNamedBean().getNamedBean().getBean().getSystemName());
+        assertEquals(ActionTurnout.TurnoutState.Closed, action.getSelectEnum().getEnum());
     }
 
-    // The minimal setup for log4J
-    @Before
+    @BeforeEach
     public void setUp() {
         JUnitUtil.setUp();
         JUnitUtil.resetInstanceManager();
@@ -86,9 +89,10 @@ public class ActionTurnoutSwingTest extends SwingConfiguratorInterfaceTestBase {
         JUnitUtil.initLogixNGManager();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 

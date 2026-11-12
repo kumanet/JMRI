@@ -54,6 +54,7 @@ public class SerialTurnoutTest extends AbstractTurnoutTestBase {
     }
 
     // reset objects
+    @Override
     @AfterEach
     public void tearDown() {
         tcis.terminateThreads();
@@ -63,6 +64,6 @@ public class SerialTurnoutTest extends AbstractTurnoutTestBase {
         JUnitUtil.tearDown();
     }
 
-    //private final static Logger log = LoggerFactory.getLogger(SerialTurnoutTest.class);
+    //private static final Logger log = LoggerFactory.getLogger(SerialTurnoutTest.class);
 
 }

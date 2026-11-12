@@ -14,8 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import jmri.ConfigureManager;
 import jmri.InstanceManager;
-import jmri.configurexml.AbstractXmlAdapter;
-import jmri.configurexml.XmlAdapter;
+import jmri.configurexml.*;
 import jmri.jmrit.display.EditorManager;
 import jmri.jmrit.display.Positionable;
 import jmri.jmrit.display.panelEditor.PanelEditor;
@@ -56,7 +55,7 @@ public class PanelEditorXml extends AbstractXmlAdapter {
         //panel.setAttribute("showcoordinates", ""+(p.showCoordinates()?"yes":"no"));
         panel.setAttribute("showtooltips", "" + (p.showToolTip() ? "yes" : "no"));
         panel.setAttribute("controlling", "" + (p.allControlling() ? "yes" : "no"));
-        panel.setAttribute("hide", p.isVisible() ? "no" : "yes");
+        panel.setAttribute("hide", p.showHidden() ? "no" : "yes");  // hide=no means showHidden enabled
         panel.setAttribute("panelmenu", p.isPanelMenuVisible() ? "yes" : "no");
         panel.setAttribute("scrollable", p.getScrollable());
         if (p.getBackgroundColor() != null) {
@@ -91,10 +90,19 @@ public class PanelEditorXml extends AbstractXmlAdapter {
      * JFrame.
      *
      * @param shared Top level Element to unpack.
+     * @param perNode Top-level XML element containing the private, single-node
+     *                elements of the description
      * @return true if successful
+     * @throws JmriConfigureXmlException when a error prevents creating the objects as as
+     *                   required by the input XML
      */
     @Override
-    public boolean load(Element shared, Element perNode) {
+    public boolean load(Element shared, Element perNode) throws JmriConfigureXmlException {
+
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return true;
+        }
+
         boolean result = true;
         Attribute a;
         // find coordinates
@@ -151,6 +159,7 @@ public class PanelEditorXml extends AbstractXmlAdapter {
 
         PanelEditor panel = new PanelEditor(name);
         panel.setTitle();
+        panel.setKeepSize(false);
         panel.getTargetFrame().setLocation(x, y);
         panel.getTargetFrame().setSize(width, height);
         //Panel already added to EditorManager with new PanelEditor(name)
@@ -163,7 +172,7 @@ public class PanelEditorXml extends AbstractXmlAdapter {
         //panel.setShowCoordinates(shared.getAttributeValue("showcoordinates","no").equals("yes"));
         panel.setAllShowToolTip(!shared.getAttributeValue("showtooltips","yes").equals("no"));
         panel.setAllControlling(!shared.getAttributeValue("controlling", "yes").equals("no"));
-        panel.setShowHidden(shared.getAttributeValue("hide","no").equals("yes"));
+        panel.setShowHidden(!shared.getAttributeValue("hide","no").equals("yes"));
         panel.setPanelMenuVisible(!shared.getAttributeValue("panelmenu","yes").equals("no"));
         panel.setScroll(shared.getAttributeValue("scrollable","both"));
 
@@ -194,7 +203,7 @@ public class PanelEditorXml extends AbstractXmlAdapter {
                     result = false;
                 }
             } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException
-                    | jmri.configurexml.JmriConfigureXmlException | java.lang.reflect.InvocationTargetException e) {
+                    | java.lang.reflect.InvocationTargetException e) {
                 log.error("Exception while loading {}", item.getName(), e);
                 result = false;
             }
@@ -227,6 +236,6 @@ public class PanelEditorXml extends AbstractXmlAdapter {
         return jmri.Manager.PANELFILES;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PanelEditorXml.class);
+    private static final Logger log = LoggerFactory.getLogger(PanelEditorXml.class);
 
 }

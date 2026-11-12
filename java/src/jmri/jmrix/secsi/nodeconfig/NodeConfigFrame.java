@@ -1,5 +1,7 @@
 package jmri.jmrix.secsi.nodeconfig;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.awt.Container;
 import java.awt.FlowLayout;
 import javax.swing.BorderFactory;
@@ -11,8 +13,7 @@ import javax.swing.border.Border;
 import jmri.jmrix.secsi.SerialNode;
 import jmri.jmrix.secsi.SerialSensorManager;
 import jmri.jmrix.secsi.SecsiSystemConnectionMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Frame for user configuration of serial nodes.
@@ -41,6 +42,7 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
 
     protected boolean changedNode = false;  // true if a node was changed, deleted, or added
     protected boolean editMode = false;     // true if in edit mode
+    private boolean checkEnabled = jmri.InstanceManager.getDefault(jmri.configurexml.ShutdownPreferences.class).isStoreCheckEnabled();
 
     protected SerialNode curNode = null;    // Serial Node being editted
     protected int nodeAddress = 0;          // Node address
@@ -289,11 +291,11 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
             return;
         }
         // confirm deletion with the user
-        if (javax.swing.JOptionPane.OK_OPTION == javax.swing.JOptionPane.showConfirmDialog(
+        if (JmriJOptionPane.OK_OPTION == JmriJOptionPane.showConfirmDialog(
                 this, Bundle.getMessage("ConfirmDelete1") + "\n"
                 + Bundle.getMessage("ConfirmDelete2"), Bundle.getMessage("ConfirmDeleteTitle"),
-                javax.swing.JOptionPane.OK_CANCEL_OPTION,
-                javax.swing.JOptionPane.WARNING_MESSAGE)) {
+                JmriJOptionPane.OK_CANCEL_OPTION,
+                JmriJOptionPane.WARNING_MESSAGE)) {
             // delete this node
             memo.getTrafficController().deleteNode(nodeAddress);
             // provide user feedback
@@ -313,7 +315,7 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
      */
     public void doneButtonActionPerformed() {
         if (editMode) {
-            // Reset 
+            // Reset
             editMode = false;
             curNode = null;
             // Switch buttons
@@ -326,12 +328,12 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
             nodeAddrField.setVisible(true);
             nodeAddrStatic.setVisible(false);
         }
-        if (changedNode) {
+        if (changedNode && !checkEnabled) {
             // Remind user to Save new configuration
-            javax.swing.JOptionPane.showMessageDialog(this,
+            JmriJOptionPane.showMessageDialog(this,
                     Bundle.getMessage("ReminderNode1") + "\n" + Bundle.getMessage("Reminder2"),
                     Bundle.getMessage("ReminderTitle"),
-                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    JmriJOptionPane.INFORMATION_MESSAGE);
         }
         setVisible(false);
         dispose();
@@ -376,7 +378,7 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
      * Handle Cancel button.
      */
     public void cancelButtonActionPerformed() {
-        // Reset 
+        // Reset
         editMode = false;
         curNode = null;
         // Switch buttons
@@ -399,6 +401,8 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
      * Do the done action if the window is closed early.
      */
     @Override
+    @SuppressFBWarnings(value = "OVERRIDING_METHODS_MUST_INVOKE_SUPER",
+            justification = "This calls doneButtonActionPerformed which handles window closing")
     public void windowClosing(java.awt.event.WindowEvent e) {
         doneButtonActionPerformed();
     }
@@ -469,6 +473,6 @@ public class NodeConfigFrame extends jmri.util.JmriJFrame {
         return (addr);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(NodeConfigFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NodeConfigFrame.class);
 
 }

@@ -6,30 +6,19 @@ import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Locale;
-import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
-import javax.swing.DefaultComboBoxModel;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
+import java.util.*;
+
+import javax.swing.*;
 import javax.swing.event.ChangeEvent;
+
+import org.openide.util.lookup.ServiceProvider;
+
 import jmri.InstanceManager;
 import jmri.profile.Profile;
 import jmri.profile.ProfileManager;
 import jmri.swing.PreferencesPanel;
 import jmri.util.gui.GuiLafPreferencesManager;
-import org.openide.util.lookup.ServiceProvider;
+import jmri.util.swing.JComboBoxUtil;
 
 /**
  * Provide GUI to configure Swing GUI LAF defaults
@@ -61,7 +50,7 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
      *
      * @see GuiLafPreferencesManager#MAX_FONT_SIZE
      */
-    public static final int MAX_DISPLAYED_FONT_SIZE = 20;
+    public static final int MAX_DISPLAYED_FONT_SIZE = 28;
 
     private final JComboBox<String> localeBox = new JComboBox<>(new String[]{
         Locale.getDefault().getDisplayName(),
@@ -73,6 +62,8 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
     public JCheckBox graphicStateDisplay;
     public JCheckBox tabbedOblockEditor;
     public JCheckBox editorUseOldLocSizeDisplay;
+    public ButtonGroup fileChooserGroup= new ButtonGroup();
+    public JCheckBox force100percentScaling;
 
     public GuiLafConfigPane() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -81,6 +72,8 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         add(p);
         doFontSize(p = new JPanel());
         add(p);
+        doFileChooserLayoutType(p = new JPanel());
+        add(p);
         doClickSelection(p = new JPanel());
         add(p);
         doGraphicState(p = new JPanel());
@@ -88,6 +81,8 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         doTabbedOblockEditor(p = new JPanel());
         add(p);
         doEditorUseOldLocSize(p = new JPanel());
+        add(p);
+        doForce100percentScaling(p = new JPanel());
         add(p);
         doMaxComboRows(p = new JPanel());
         add(p);
@@ -135,14 +130,85 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         panel.add(editorUseOldLocSizeDisplay);
     }
 
+    void doFileChooserLayoutType(JPanel panel) {
+        panel.setLayout(new FlowLayout());
+        JLabel fileChooserLabel = new JLabel(ConfigBundle.getMessage("GUIJChooserUseOption"));
+        panel.add(fileChooserLabel);
+                // make the radio buttons
+        JRadioButton jButDefault = new JRadioButton(ConfigBundle.getMessage("GUIJChooserUseDefault"));
+        panel.add(jButDefault);
+        fileChooserGroup.add(jButDefault);
+        jButDefault.addActionListener((ActionEvent e) -> {
+            if (((JRadioButton)e.getSource()).isSelected() ) {
+                InstanceManager.getDefault(GuiLafPreferencesManager.class).setJFileChooserFormat(0);
+            }
+        });
+        JRadioButton jButList = new JRadioButton(ConfigBundle.getMessage("GUIJChooserUseList"));
+        panel.add(jButList);
+        fileChooserGroup.add(jButList);
+        jButList.addActionListener((ActionEvent e) -> {
+            if (((JRadioButton)e.getSource()).isSelected() ) {
+                InstanceManager.getDefault(GuiLafPreferencesManager.class).setJFileChooserFormat(1);
+            }
+        });
+        JRadioButton jButDetail = new JRadioButton(ConfigBundle.getMessage("GUIJChooserUseDetail"));
+        panel.add(jButDetail);
+        fileChooserGroup.add(jButDetail);
+        jButDetail.addActionListener((ActionEvent e) -> {
+            if (((JRadioButton)e.getSource()).isSelected() ) {
+                InstanceManager.getDefault(GuiLafPreferencesManager.class).setJFileChooserFormat(2);
+            }
+        });
+        switch (InstanceManager.getDefault(GuiLafPreferencesManager.class).getJFileChooserFormat()) {
+            case 0:
+                jButDefault.setSelected(true);
+                break;
+            case 1:
+                jButList.setSelected(true);
+                break;
+            case 2:
+                jButDetail.setSelected(true);
+                break;
+            default:
+                jButDefault.setSelected(true);
+        }
+    }
+
+    void doForce100percentScaling(JPanel panel) {
+        jmri.util.EarlyInitializationPreferences eip =
+                jmri.util.EarlyInitializationPreferences.getInstance();
+
+        panel.setLayout(new FlowLayout());
+        force100percentScaling = new JCheckBox(ConfigBundle.getMessage("GUIForce100percentScaling"));
+        force100percentScaling.setSelected(eip.getGUIForce100percentScaling());
+        force100percentScaling.addItemListener((ItemEvent e) -> {
+            eip.setGUIForce100percentScaling(force100percentScaling.isSelected());
+        });
+        panel.add(force100percentScaling);
+    }
+
     void doLAF(JPanel panel) {
-        // find L&F definitions
+        // find L&F definitions from Swing
         panel.setLayout(new FlowLayout());
         UIManager.LookAndFeelInfo[] plafs = UIManager.getInstalledLookAndFeels();
         HashMap<String, String> installedLAFs = new HashMap<>(plafs.length);
         for (UIManager.LookAndFeelInfo plaf : plafs) {
             installedLAFs.put(plaf.getName(), plaf.getClassName());
         }
+        
+        // explicitly add the desired DarkLaf LaFs
+        installedLAFs.put("DarkLAF HC", "com.github.weisj.darklaf.theme.HighContrastDarkTheme");
+        // The LaFs available are
+        //  com/github/weisj/darklaf/theme/DarculaTheme
+        //  com/github/weisj/darklaf/theme/HighContrastDarkTheme
+        //  com/github/weisj/darklaf/theme/HighContrastLightTheme
+        //  com/github/weisj/darklaf/theme/IntelliJTheme
+        //  com/github/weisj/darklaf/theme/OneDarkTheme
+        //  com/github/weisj/darklaf/theme/SolarizedDarkTheme
+        //  com/github/weisj/darklaf/theme/SolarizedLightTheme
+        // But we're only listing a subset to avoid overwhelming the user
+        // See GuiLafPreferencesManager.applyLookAndFeel(..) for matching code
+
         // make the radio buttons
         for (java.util.Map.Entry<String, String> entry : installedLAFs.entrySet()) {
             String name = entry.getKey();
@@ -153,7 +219,10 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
             jmi.addActionListener((ActionEvent e) -> {
                 InstanceManager.getDefault(GuiLafPreferencesManager.class).setLookAndFeel(installedLAFs.get(name));
             });
-            if ( entry.getValue().equals(UIManager.getLookAndFeel().getClass().getName())) {
+            if ( entry.getValue().equals(UIManager.getLookAndFeel().getClass().getName())
+                // matching com.github.weisj.darklaf.theme.HighContrastDarkTheme with com.github.weisj.darklaf.DarkLaf
+                || ( entry.getValue().contains("darklaf")
+                    && UIManager.getLookAndFeel().getClass().getName().contains("darklaf") ) ) {
                 jmi.setSelected(true);
             }
         }
@@ -172,6 +241,7 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         // add JComboBoxen for language and country
         panel.setLayout(new FlowLayout());
         panel.add(localeBox);
+        JComboBoxUtil.setupComboBoxMaxRows(localeBox);
 
         // create object to find locales in new Thread
         Runnable r = () -> {
@@ -230,6 +300,8 @@ public final class GuiLafConfigPane extends JPanel implements PreferencesPanel {
         panel.add(fontSizeComboBox);
         panel.add(fontSizeUoM);
         panel.add(resetButton);
+
+        JComboBoxUtil.setupComboBoxMaxRows(fontSizeComboBox);
 
         fontSizeComboBox.addActionListener((ActionEvent e) -> {
             manager.setFontSize((int) fontSizeComboBox.getSelectedItem());

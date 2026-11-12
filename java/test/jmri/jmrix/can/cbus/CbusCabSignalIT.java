@@ -17,8 +17,8 @@ import org.junit.jupiter.api.*;
  */
 public class CbusCabSignalIT extends jmri.implementation.DefaultCabSignalIT {
 
-    private CanSystemConnectionMemo memo;
-    private TrafficController tc;
+    private CanSystemConnectionMemo memo = null;
+    private TrafficController tc = null;
 
     @BeforeEach
     @Override
@@ -45,18 +45,22 @@ public class CbusCabSignalIT extends jmri.implementation.DefaultCabSignalIT {
     @AfterEach
     @Override
     public void tearDown() {
+        Assertions.assertNotNull(memo);
         memo.dispose();
-        tc.terminateThreads();
         memo = null;
+        Assertions.assertNotNull(tc);
+        tc.terminateThreads();
         tc = null;
         cs.dispose();
         cs = null;
+        InstanceManager.getDefault(jmri.IdTagManager.class).dispose();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
+        jmri.jmrit.display.EditorFrameOperator.clearEditorFrameOperatorThreads();
+        JUnitUtil.resetWindows(false, false);
         JUnitUtil.tearDown();
 
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(CbusCabSignalTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(CbusCabSignalTest.class);
 
 }

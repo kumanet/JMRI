@@ -11,10 +11,11 @@ import org.junit.jupiter.api.*;
  *
  * @author Paul Bender Copyright (C) 2017
  */
+@SuppressWarnings("deprecation")
 public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
 
     private LocoNetSystemConnectionMemo memo;
- 
+
     @Test
     public void testCTor() {
         Assert.assertNotNull("exists",instance);
@@ -52,16 +53,30 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     public void testGetSpeed_float() {
         // set speed step mode to 28 (PR2Throttle does not support 128?)
         instance.setSpeedStepMode(jmri.SpeedStepMode.NMRA_DCC_28);
+        Assert.assertEquals("Idle", 0, ((Pr2Throttle)instance).intSpeed(0.0F));
+        Assert.assertEquals("Emergency", 1, ((Pr2Throttle)instance).intSpeed(-1.0F));
+        Assert.assertEquals("Emergency", 1, ((Pr2Throttle)instance).intSpeed(-0.001F));
         Assert.assertEquals("Full Speed", 124, ((Pr2Throttle)instance).intSpeed(1.0F)); // 124 from class source
-        float incre = 1.F/(112F-1F); // not clear where the -1 comes from
+
+        float incre = 1.F/111F;
         float speed = incre;
-        // Shouldn't be able to get get speeedStep 1., but this class code allows it.
-        int i = 1;
-        while (speed < 0.999f) {
-            int result = ((Pr2Throttle)instance).intSpeed(speed) -12 ; // -12 from class source
-            Assert.assertEquals("speed step from "+speed, i++, result);
+        for ( int i=1; i < 112; i++ ) {
+            int result = ((Pr2Throttle)instance).intSpeed(speed);
+            // System.out.println("speed="+speed+" step="+result+" i="+i);
+            Assert.assertNotSame(speed + "(28 steps) should not idle", 0, result);
+            Assert.assertNotSame(speed + "(28 steps) should not eStop", 1, result);
+            Assert.assertTrue(speed + " should be 16 or larger ", result >= 16);
+            if(i>4)
+            {
+                Assert.assertEquals("loconet speed from " + speed, i+12, result);
+            }
+            else
+            {
+                Assert.assertEquals("loconet speed from " + speed, 16, result);
+            }
             speed += incre;
         }
+
     }
 
     /**
@@ -359,6 +374,7 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup1() {
     }
 
@@ -367,6 +383,7 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup2() {
     }
 
@@ -375,6 +392,7 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup3() {
     }
 
@@ -383,6 +401,7 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup4() {
     }
 
@@ -391,6 +410,7 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
      */
     @Test
     @Override
+    @Disabled("Test requires further development")
     public void testSendFunctionGroup5() {
     }
 
@@ -402,7 +422,9 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
         SlotManager slotmanager = new SlotManager(lnis);
         memo = new LocoNetSystemConnectionMemo(lnis,slotmanager);
         memo.store(slotmanager, CommandStation.class);
-        jmri.InstanceManager.setDefault(jmri.ThrottleManager.class,new LnPr2ThrottleManager(memo));
+        var tm = new LnPr2ThrottleManager(memo);
+        jmri.InstanceManager.setDefault(jmri.ThrottleManager.class, tm);
+        memo.store(tm, jmri.ThrottleManager.class);
         instance = new Pr2Throttle(memo,new jmri.DccLocoAddress(5,false));
     }
 
@@ -410,9 +432,10 @@ public class Pr2ThrottleTest extends jmri.jmrix.AbstractThrottleTest {
     @Override
     public void tearDown() {
         memo.dispose();
+        memo = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(Pr2ThrottleTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(Pr2ThrottleTest.class);
 
 }

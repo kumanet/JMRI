@@ -319,9 +319,6 @@ public class TrackSegment extends LayoutTrack {
      * PositionablePointXml, then the following method is called after the
      * entire LayoutEditor is loaded to set the specific TrackSegment objects.
      */
-    @SuppressWarnings("deprecation")
-    // NOTE: findObjectByTypeAndName is @Deprecated;
-    // we're using it here for backwards compatibility until it can be removed
     @Override
     @SuppressFBWarnings(value = "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE", justification = "Null check performed before using return value")
     public void setObjects(LayoutEditor p) {
@@ -775,5 +772,13 @@ public class TrackSegment extends LayoutTrack {
         setLayoutBlock(layoutBlock);
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegment.class);
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getTypeName() {
+        return Bundle.getMessage("TypeName_TrackSegment");
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrackSegment.class);
 }

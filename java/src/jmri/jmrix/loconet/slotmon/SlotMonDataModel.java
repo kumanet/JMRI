@@ -1,19 +1,25 @@
 package jmri.jmrix.loconet.slotmon;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+
 import jmri.Throttle;
 import jmri.jmrix.loconet.LnConstants;
 import jmri.jmrix.loconet.LocoNetMessage;
 import jmri.jmrix.loconet.LocoNetSlot;
 import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.jmrix.loconet.SlotListener;
+import jmri.jmrix.loconet.SlotMapEntry.SlotType;
 import jmri.util.StringUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Table data model for display of slot manager contents.
@@ -23,35 +29,70 @@ import org.slf4j.LoggerFactory;
  */
 public class SlotMonDataModel extends javax.swing.table.AbstractTableModel implements SlotListener {
 
-    static public final int SLOTCOLUMN = 0;
-    static public final int ESTOPCOLUMN = 1;
-    static public final int ADDRCOLUMN = 2;
-    static public final int SPDCOLUMN = 3;
-    static public final int TYPECOLUMN = 4;
-    static public final int STATCOLUMN = 5;  // status: free, common, etc
-    static public final int DISPCOLUMN = 6;  // originally "dispatch" button, now "free"
-    static public final int CONSCOLUMN = 7;  // consist state
-    static public final int THROTCOLUMN = 8;
-    static public final int DIRCOLUMN = 9;
-    static public final int F0COLUMN = 10;
-    static public final int F1COLUMN = 11;
-    static public final int F2COLUMN = 12;
-    static public final int F3COLUMN = 13;
-    static public final int F4COLUMN = 14;
-    static public final int F5COLUMN = 15;
-    static public final int F6COLUMN = 16;
-    static public final int F7COLUMN = 17;
-    static public final int F8COLUMN = 18;
+/**
+ * ColumnNumber
+ * This enum defines the default column order.
+ * F0COLUMN thru F28COLUMN must be kept in a block and in order.
+ */
+    enum ColumnNumber {SLOTCOLUMN,
+    ESTOPCOLUMN,
+    ADDRCOLUMN,
+    SPDCOLUMN,
+    TYPECOLUMN,
+    STATCOLUMN,
+    LASTUPDATE,
+    DISPCOLUMN,
+    CONSCOLUMN,
+    CONSISTADDRESS,
+    THROTCOLUMN,
+    JMRITHROTTLECOUNT,
+    DIRCOLUMN,
+    F0COLUMN,
+    F1COLUMN,
+    F2COLUMN,
+    F3COLUMN,
+    F4COLUMN,
+    F5COLUMN,
+    F6COLUMN,
+    F7COLUMN,
+    F8COLUMN,
+    F9COLUMN,
+    F10COLUMN,
+    F11COLUMN,
+    F12COLUMN,
+    F13COLUMN,
+    F14COLUMN,
+    F15COLUMN,
+    F16COLUMN,
+    F17COLUMN,
+    F18COLUMN,
+    F19COLUMN,
+    F20COLUMN,
+    F21COLUMN,
+    F22COLUMN,
+    F23COLUMN,
+    F24COLUMN,
+    F25COLUMN,
+    F26COLUMN,
+    F27COLUMN,
+    F28COLUMN,
+    MAXCOLUMN}
 
-    static public final int NUMCOLUMN = 19;
+    private int numRows = 128;
+    private int columns;
 
     private final transient LocoNetSystemConnectionMemo memo;
 
-    SlotMonDataModel(int row, int column, LocoNetSystemConnectionMemo memo) {
+    SlotMonDataModel(int row, LocoNetSystemConnectionMemo memo) {
         this.memo = memo;
 
+        // number of columns
+        this.columns = ColumnNumber.MAXCOLUMN.ordinal();
+        // set number of rows;
+        numRows = row;
+
         // connect to SlotManager for updates
-        memo.getSlotManager().addSlotListener(this);
+        memo.getSlotManager().addSlotListener(SlotMonDataModel.this);
 
         // start update process
         memo.getSlotManager().update();
@@ -76,21 +117,22 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
      */
     @Override
     public int getRowCount() {
-        return 128;
+        return numRows;
     }
 
     @Override
     public int getColumnCount() {
-        return NUMCOLUMN;
+        return columns;
     }
 
     @Override
     public String getColumnName(int col) {
-        switch (col) {
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case SLOTCOLUMN:
                 return Bundle.getMessage("SlotCol");
             case ESTOPCOLUMN:
-                return "";     // no heading, as button is clear
+                return Bundle.getMessage("ButtonEstop");     // no heading, as button is clear
             case ADDRCOLUMN:
                 return Bundle.getMessage("AddressCol");
             case SPDCOLUMN:
@@ -101,30 +143,76 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                 return Bundle.getMessage("UseCol");
             case CONSCOLUMN:
                 return Bundle.getMessage("ConsistedCol");
+            case CONSISTADDRESS:
+                return Bundle.getMessage("ConsistAddress");
             case DIRCOLUMN:
                 return Bundle.getMessage("DirectionCol");
             case DISPCOLUMN:
-                return "";     // no heading, as button is clear
+                return Bundle.getMessage("ButtonRelease");
             case F0COLUMN:
-                return Throttle.F0;
+                return Throttle.getFunctionString(0);
             case F1COLUMN:
-                return Throttle.F1;
+                return Throttle.getFunctionString(1);
             case F2COLUMN:
-                return Throttle.F2;
+                return Throttle.getFunctionString(2);
             case F3COLUMN:
-                return Throttle.F3;
+                return Throttle.getFunctionString(3);
             case F4COLUMN:
-                return Throttle.F4;
+                return Throttle.getFunctionString(4);
             case F5COLUMN:
-                return Throttle.F5;
+                return Throttle.getFunctionString(5);
             case F6COLUMN:
-                return Throttle.F6;
+                return Throttle.getFunctionString(6);
             case F7COLUMN:
-                return Throttle.F7;
+                return Throttle.getFunctionString(7);
             case F8COLUMN:
-                return Throttle.F8;
+                return Throttle.getFunctionString(8);
+            case F9COLUMN:
+                return Throttle.getFunctionString(9);
+            case F10COLUMN:
+                return Throttle.getFunctionString(10);
+            case F11COLUMN:
+                return Throttle.getFunctionString(11);
+            case F12COLUMN:
+                return Throttle.getFunctionString(12);
+            case F13COLUMN:
+                return Throttle.getFunctionString(13);
+            case F14COLUMN:
+                return Throttle.getFunctionString(14);
+            case F15COLUMN:
+                return Throttle.getFunctionString(15);
+            case F16COLUMN:
+                return Throttle.getFunctionString(16);
+            case F17COLUMN:
+                return Throttle.getFunctionString(17);
+            case F18COLUMN:
+                return Throttle.getFunctionString(18);
+            case F19COLUMN:
+                return Throttle.getFunctionString(19);
+            case F20COLUMN:
+                return Throttle.getFunctionString(20);
+            case F21COLUMN:
+                return Throttle.getFunctionString(21);
+            case F22COLUMN:
+                return Throttle.getFunctionString(22);
+            case F23COLUMN:
+                return Throttle.getFunctionString(23);
+            case F24COLUMN:
+                return Throttle.getFunctionString(24);
+            case F25COLUMN:
+                return Throttle.getFunctionString(25);
+            case F26COLUMN:
+                return Throttle.getFunctionString(26);
+            case F27COLUMN:
+                return Throttle.getFunctionString(27);
+            case F28COLUMN:
+                return Throttle.getFunctionString(28);
             case THROTCOLUMN:
                 return Bundle.getMessage("ThrottleIDCol");
+            case JMRITHROTTLECOUNT:
+                return Bundle.getMessage("JMRIThrottleCount");
+            case LASTUPDATE:
+                return Bundle.getMessage("LastUpdate");
             default:
                 return "unknown"; // NOI18N
         }
@@ -132,9 +220,12 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
 
     @Override
     public Class<?> getColumnClass(int col) {
-        switch (col) {
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case SLOTCOLUMN:
             case ADDRCOLUMN:
+            case CONSISTADDRESS:
+            case JMRITHROTTLECOUNT:
                 return Integer.class;
             case SPDCOLUMN:
             case TYPECOLUMN:
@@ -142,6 +233,7 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             case CONSCOLUMN:
             case DIRCOLUMN:
             case THROTCOLUMN:
+            case LASTUPDATE:
                 return String.class;
             case ESTOPCOLUMN:
             case DISPCOLUMN:
@@ -155,6 +247,26 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             case F6COLUMN:
             case F7COLUMN:
             case F8COLUMN:
+            case F9COLUMN:
+            case F10COLUMN:
+            case F11COLUMN:
+            case F12COLUMN:
+            case F13COLUMN:
+            case F14COLUMN:
+            case F15COLUMN:
+            case F16COLUMN:
+            case F17COLUMN:
+            case F18COLUMN:
+            case F19COLUMN:
+            case F20COLUMN:
+            case F21COLUMN:
+            case F22COLUMN:
+            case F23COLUMN:
+            case F24COLUMN:
+            case F25COLUMN:
+            case F26COLUMN:
+            case F27COLUMN:
+            case F28COLUMN:
                 return Boolean.class;
             default:
                 return null;
@@ -163,7 +275,9 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
 
     @Override
     public boolean isCellEditable(int row, int col) {
-        switch (col) {
+        LocoNetSlot s = memo.getSlotManager().slot(row);
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case ESTOPCOLUMN:
             case DISPCOLUMN:
             case F0COLUMN:
@@ -175,8 +289,28 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             case F6COLUMN:
             case F7COLUMN:
             case F8COLUMN:
-                // only loco slots (1-120 incl) to be marked writeable only, system slot are read only
-                return ((row > 0) && (row < 121));
+            case F9COLUMN:
+            case F10COLUMN:
+            case F11COLUMN:
+            case F12COLUMN:
+            case F13COLUMN:
+            case F14COLUMN:
+            case F15COLUMN:
+            case F16COLUMN:
+            case F17COLUMN:
+            case F18COLUMN:
+            case F19COLUMN:
+            case F20COLUMN:
+            case F21COLUMN:
+            case F22COLUMN:
+            case F23COLUMN:
+            case F24COLUMN:
+            case F25COLUMN:
+            case F26COLUMN:
+            case F27COLUMN:
+            case F28COLUMN:
+                // only loco slots to be marked writeable only, system slot are read only
+                return !s.isSystemSlot();
             default:
                 return false;
         }
@@ -191,7 +325,8 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             return null;
         }
 
-        switch (col) {
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case SLOTCOLUMN:  // slot number
                 return row;
             case ESTOPCOLUMN:
@@ -245,19 +380,48 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                         return Bundle.getMessage("StateError");
                 }
             case CONSCOLUMN:
+                if (s.isSystemSlot()) {
+                    // makes no sense to decode
+                    return Bundle.getMessage("SlotDataNotApplicable");
+                }
                 switch (s.consistStatus()) {
                     case LnConstants.CONSIST_MID:
+                        if (s.getProtocol() == LnConstants.LOCONETPROTOCOL_TWO) {
+                            return Bundle.getMessage("SlotConsistMidX", s.getLeadSlot());
+                        }
                         t = Bundle.getMessage("SlotConsistMidX", s.speed());
                         return t;
                     case LnConstants.CONSIST_TOP:
                         return Bundle.getMessage("SlotConsistTop");
                     case LnConstants.CONSIST_SUB:
+                        if (s.getProtocol() == LnConstants.LOCONETPROTOCOL_TWO) {
+                            return Bundle.getMessage("SlotConsistSubX", s.getLeadSlot());
+                        }
                         t = Bundle.getMessage("SlotConsistSubX", s.speed());
                         return t;
                     case LnConstants.CONSIST_NO:
                         return Bundle.getMessage("SlotConsistNone");
                     default:
                         return Bundle.getMessage("StateError");
+                }
+            case CONSISTADDRESS:
+                if (s.isSystemSlot()) {
+                    // makes no sense to decode flag to rendered NA
+                    return -1;
+                }
+                switch (s.consistStatus()) {
+                    case LnConstants.CONSIST_TOP:
+                        return s.locoAddr();
+                    case LnConstants.CONSIST_MID:
+                    case LnConstants.CONSIST_SUB:
+                        if (s.getProtocol() == LnConstants.LOCONETPROTOCOL_TWO) {
+                            return memo.getSlotManager().slot(s.getLeadSlot()).locoAddr();
+                        }
+                        return memo.getSlotManager().slot(s.speed()).locoAddr();
+                    case LnConstants.CONSIST_NO:
+                        return 0;
+                    default:
+                        return 0;
                 }
             case DISPCOLUMN:
                 return Bundle.getMessage("ButtonRelease"); // will be name of button in default GUI
@@ -281,11 +445,61 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                 return s.isF7();
             case F8COLUMN:
                 return s.isF8();
+            case F9COLUMN:
+                return s.isF9();
+            case F10COLUMN:
+                return s.isF10();
+            case F11COLUMN:
+                return s.isF11();
+            case F12COLUMN:
+                return s.isF12();
+            case F13COLUMN:
+                return s.isF13();
+            case F14COLUMN:
+                return s.isF14();
+            case F15COLUMN:
+                return s.isF15();
+            case F16COLUMN:
+                return s.isF16();
+            case F17COLUMN:
+                return s.isF17();
+            case F18COLUMN:
+                return s.isF18();
+            case F19COLUMN:
+                return s.isF19();
+            case F20COLUMN:
+                return s.isF20();
+            case F21COLUMN:
+                return s.isF21();
+            case F22COLUMN:
+                return s.isF22();
+            case F23COLUMN:
+                return s.isF23();
+            case F24COLUMN:
+                return s.isF24();
+            case F25COLUMN:
+                return s.isF25();
+            case F26COLUMN:
+                return s.isF26();
+            case F27COLUMN:
+                return s.isF27();
+            case F28COLUMN:
+                return s.isF28();
             case THROTCOLUMN:
                 int upper = (s.id() >> 7) & 0x7F;
                 int lower = s.id() & 0x7F;
                 return StringUtil.twoHexFromInt(upper) + " " + StringUtil.twoHexFromInt(lower);
-
+            case JMRITHROTTLECOUNT:
+                return(memo.getThrottleManager().getThrottleUsageCount(s.locoAddr()));
+            case LASTUPDATE:
+                Instant instant = Instant.ofEpochMilli(s.getLastUpdateTime());
+                ZonedDateTime dateTime = instant.atZone(ZoneId.systemDefault());
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                String formattedDateTime = dateTime.format(formatter);
+                if (s.getSlowScanStartedAt() != 0) {
+                    formattedDateTime=Bundle.getMessage("LastUpdateSlowScan",formattedDateTime);
+                }
+                return formattedDateTime;
             default:
                 log.error("internal state inconsistent with table requst for {} {}", row, col);
                 return null;
@@ -293,8 +507,10 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
     }
 
     public int getPreferredWidth(int col) {
-        switch (col) {
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case SLOTCOLUMN:
+            case JMRITHROTTLECOUNT:
                 return new JTextField(3).getPreferredSize().width;
             case ESTOPCOLUMN:
                 return new JButton(Bundle.getMessage("ButtonEstop")).getPreferredSize().width;
@@ -307,12 +523,19 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                 return new JTextField(12).getPreferredSize().width;
             case CONSCOLUMN:
                 return new JTextField(4).getPreferredSize().width;
+            case CONSISTADDRESS:
+                return new JTextField(" 0000 ").getPreferredSize().width;
             case DIRCOLUMN:
-                return new JLabel(Bundle.getMessage("DirectionCol")).getPreferredSize().width;
+                // the length of an empty JTextField works on more GUIs
+                int m = Math.max(Bundle.getMessage("DirColForward").length(), Bundle.getMessage("DirColReverse").length());
+                m = Math.max(m, Bundle.getMessage("DirectionCol").length());
+                return new JTextField(m).getPreferredSize().width;
             case DISPCOLUMN:
                 return new JButton(Bundle.getMessage("ButtonRelease")).getPreferredSize().width;
             case THROTCOLUMN:
                 return new JTextField(7).getPreferredSize().width;
+            case LASTUPDATE:
+                return new JTextField("SS HH:MM:SS ").getPreferredSize().width;
             case F0COLUMN:
             case F1COLUMN:
             case F2COLUMN:
@@ -322,7 +545,28 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             case F6COLUMN:
             case F7COLUMN:
             case F8COLUMN:
-                return new JLabel("       ").getPreferredSize().width; // to show checkboxes
+            case F9COLUMN:
+            case F10COLUMN:
+            case F11COLUMN:
+            case F12COLUMN:
+            case F13COLUMN:
+            case F14COLUMN:
+            case F15COLUMN:
+            case F16COLUMN:
+            case F17COLUMN:
+            case F18COLUMN:
+            case F19COLUMN:
+            case F20COLUMN:
+            case F21COLUMN:
+            case F22COLUMN:
+            case F23COLUMN:
+            case F24COLUMN:
+            case F25COLUMN:
+            case F26COLUMN:
+            case F27COLUMN:
+            case F28COLUMN:
+                // to show checkboxes and Text
+                return Math.max(new JCheckBox().getPreferredSize().width, new JTextField("F99").getPreferredSize().width);
             default:
                 return new JLabel(" <unknown> ").getPreferredSize().width; // NOI18N
         }
@@ -330,7 +574,6 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
 
     @Override
     public void setValueAt(Object value, int row, int col) {
-        int status;
         LocoNetMessage msg;
         LocoNetSlot s = memo.getSlotManager().slot(row);
         if (s == null) {
@@ -338,121 +581,257 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
             return;
         }
 
-        switch (col) {
+        ColumnNumber colorder = ColumnNumber.values()[col];
+        switch (colorder) {
             case ESTOPCOLUMN:
                 log.debug("Start estop in slot {}", row);
                 if ((s.consistStatus() == LnConstants.CONSIST_SUB)
                         || (s.consistStatus() == LnConstants.CONSIST_MID)) {
                     Object[] options = {Bundle.getMessage("ButtonOK"), Bundle.getMessage("ButtonCancel")};
-                    int result
-                            = JOptionPane.showOptionDialog(null,
+                    int result = JmriJOptionPane.showOptionDialog(null,
                                     Bundle.getMessage("SlotEstopWarning"),
                                     Bundle.getMessage("WarningTitle"),
-                                    JOptionPane.DEFAULT_OPTION,
-                                    JOptionPane.WARNING_MESSAGE,
+                                    JmriJOptionPane.DEFAULT_OPTION,
+                                    JmriJOptionPane.WARNING_MESSAGE,
                                     null, options, options[1]);
-                    if (result == 1) {
+                    if ( result != 0 ) { // not array position 0 ButtonOK
                         return;
                     }
                 }
-                msg = new LocoNetMessage(4);
-                msg.setOpCode(LnConstants.OPC_LOCO_SPD);
-                msg.setElement(1, s.getSlot());
-                msg.setElement(2, 1);       // 1 here is estop
+                msg = s.writeSpeed(1);
                 memo.getLnTrafficController().sendLocoNetMessage(msg);
                 fireTableRowsUpdated(row, row);
                 break;
             case F0COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup1(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F1COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup1(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F2COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup1(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F3COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup1(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F4COLUMN:
-                log.debug("F0-F4 change requested {}", row);
-                s = memo.getSlotManager().slot(row);
-                if (s == null) {
-                    log.error("slot pointer was null for slot row: {} col: {}", row, col);
-                    return;
-                }
-                boolean tempF0 = (col == F0COLUMN) ? !s.isF0() : s.isF0();
-                boolean tempF1 = (col == F1COLUMN) ? !s.isF1() : s.isF1();
-                boolean tempF2 = (col == F2COLUMN) ? !s.isF2() : s.isF2();
-                boolean tempF3 = (col == F3COLUMN) ? !s.isF3() : s.isF3();
-                boolean tempF4 = (col == F4COLUMN) ? !s.isF4() : s.isF4();
-
-                int new_dirf = ((s.isForward() ? 0 : LnConstants.DIRF_DIR)
-                        | (tempF0 ? LnConstants.DIRF_F0 : 0)
-                        | (tempF1 ? LnConstants.DIRF_F1 : 0)
-                        | (tempF2 ? LnConstants.DIRF_F2 : 0)
-                        | (tempF3 ? LnConstants.DIRF_F3 : 0)
-                        | (tempF4 ? LnConstants.DIRF_F4 : 0));
-
-                // set status to 'In Use' if other
-                status = s.slotStatus();
-                if (status != LnConstants.LOCO_IN_USE) {
-                    memo.getLnTrafficController().sendLocoNetMessage(
-                            s.writeStatus(LnConstants.LOCO_IN_USE
-                            ));
-                }
-                msg = new LocoNetMessage(4);
-                msg.setOpCode(LnConstants.OPC_LOCO_DIRF);
-                msg.setElement(1, s.getSlot());
-                msg.setElement(2, new_dirf);       // 1 here is estop
-                memo.getLnTrafficController().sendLocoNetMessage(msg);
-                // Delay here allows command station time to xmit on the rails.
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ex) {
-                    log.error(null, ex);
-                }
-                // reset status to original value if not previously 'in use'
-                if (status != LnConstants.LOCO_IN_USE) {
-                    memo.getLnTrafficController().sendLocoNetMessage(
-                            s.writeStatus(status));
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup1(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
                 }
                 fireTableRowsUpdated(row, row);
                 break;
             case F5COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup2(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F6COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup2(s, col, row);
+                } else {
+                    sendExpFunctionGroup1(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F7COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup2(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
             case F8COLUMN:
-                log.debug("F5-F8 change requested {}", row);
-
-                boolean tempF5 = (col == F5COLUMN) ? !s.isF5() : s.isF5();
-                boolean tempF6 = (col == F6COLUMN) ? !s.isF6() : s.isF6();
-                boolean tempF7 = (col == F7COLUMN) ? !s.isF7() : s.isF7();
-                boolean tempF8 = (col == F8COLUMN) ? !s.isF8() : s.isF8();
-
-                int new_snd = ((tempF8 ? LnConstants.SND_F8 : 0)
-                        | (tempF7 ? LnConstants.SND_F7 : 0)
-                        | (tempF6 ? LnConstants.SND_F6 : 0)
-                        | (tempF5 ? LnConstants.SND_F5 : 0));
-
-                // set status to 'In Use' if other
-                status = s.slotStatus();
-                if (status != LnConstants.LOCO_IN_USE) {
-                    memo.getLnTrafficController().sendLocoNetMessage(
-                            s.writeStatus(LnConstants.LOCO_IN_USE
-                            ));
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup2(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
                 }
-
-                msg = new LocoNetMessage(4);
-                msg.setOpCode(LnConstants.OPC_LOCO_SND);
-                msg.setElement(1, s.getSlot());
-                msg.setElement(2, new_snd);       // 1 here is estop
-                memo.getLnTrafficController().sendLocoNetMessage(msg);
-                // Delay here allows command station time to xmit on the rails.
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ex) {
-                    log.error(null, ex);
+                fireTableRowsUpdated(row, row);
+                break;
+            case F9COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup3(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
                 }
-
-                // reset status to original value if not previously 'in use'
-                if (status != LnConstants.LOCO_IN_USE) {
-                    memo.getLnTrafficController().sendLocoNetMessage(
-                            s.writeStatus(status));
+                fireTableRowsUpdated(row, row);
+                break;
+            case F10COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup3(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
                 }
-
+                fireTableRowsUpdated(row, row);
+                break;
+            case F11COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup3(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F12COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup3(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F13COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup2(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F14COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F15COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F16COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F17COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F18COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F19COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F20COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup4(s, col, row);
+                } else {
+                    sendExpFunctionGroup3(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F21COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F22COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F23COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F24COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F25COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F26COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F27COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
+                fireTableRowsUpdated(row, row);
+                break;
+            case F28COLUMN:
+                if (s.getProtocol() != LnConstants.LOCONETPROTOCOL_TWO) {
+                    sendFunctionGroup5(s, col, row);
+                } else {
+                    sendExpFunctionGroup4(s, col, row);
+                }
                 fireTableRowsUpdated(row, row);
                 break;
             case DISPCOLUMN:
@@ -465,15 +844,14 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                         // the next time that loco is selected, it comes
                         // back as CONSIST_NO).  Freeing the CONSIST_TOP
                         // will kill the entire consist.
-                        Object[] options = {"OK", "Cancel"};
-                        int result
-                                = JOptionPane.showOptionDialog(null,
+                        Object[] options = {Bundle.getMessage("ButtonOK"), Bundle.getMessage("ButtonCancel")};
+                        int result = JmriJOptionPane.showOptionDialog(null,
                                         "Freeing a consist member will destroy the consist.\n\nAre you sure you want to do that?",
-                                        "Warning",
-                                        JOptionPane.DEFAULT_OPTION,
-                                        JOptionPane.WARNING_MESSAGE,
+                                        Bundle.getMessage("WarningTitle"),
+                                        JmriJOptionPane.DEFAULT_OPTION,
+                                        JmriJOptionPane.WARNING_MESSAGE,
                                         null, options, options[1]);
-                        if (result == 1) {
+                        if ( result != 0 ) { // not array position 0, ButtonOK
                             return;
                         }
                     }
@@ -499,7 +877,8 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
         for (int row = 0; row < (count - 1); row++) {
             LocoNetSlot s = memo.getSlotManager().slot(row);
 
-            if ((s.slotStatus() != LnConstants.LOCO_IN_USE) && (s.consistStatus() == LnConstants.CONSIST_NO)) {
+            if (s.getSlotType() == SlotType.LOCO
+                    && ((s.slotStatus() != LnConstants.LOCO_IN_USE) && (s.consistStatus() == LnConstants.CONSIST_NO))) {
                 log.debug("Freeing {} from slot {}, old status: {}", s.locoAddr(), s.getSlot(), s.slotStatus());
                 memo.getLnTrafficController().sendLocoNetMessage(
                         s.writeStatus(LnConstants.LOCO_FREE
@@ -540,7 +919,7 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
         javax.swing.SwingUtilities.invokeLater(new Notify(slotNum, this));
     }
 
-    static private class Notify implements Runnable {
+    private static class Notify implements Runnable {
 
         private final int _row;
         javax.swing.table.AbstractTableModel _model;
@@ -577,19 +956,307 @@ public class SlotMonDataModel extends javax.swing.table.AbstractTableModel imple
                     || s.consistStatus() == LnConstants.CONSIST_TOP)
                     && s.speed() != 1) {
                 // send message to estop this loco
-                LocoNetMessage msg = new LocoNetMessage(4);
-                msg.setOpCode(LnConstants.OPC_LOCO_SPD);
-                msg.setElement(1, s.getSlot());
-                msg.setElement(2, 1);  // emergency stop
+                LocoNetMessage msg = s.writeSpeed(1) ; // emergency stop
                 memo.getLnTrafficController().sendLocoNetMessage(msg);
             }
         }
     }
 
+    /**
+     * Send the LocoNet message to set the state of locomotive direction and
+     * functions F0, F1, F2, F3, F4
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendFunctionGroup1(LocoNetSlot slot, int col, int row) {
+        log.debug("F0-F4 change requested {}", row);
+        if (slot == null) {
+            log.error("slot pointer was null for slot row: {} col: {}", row, col);
+            return;
+        }
+        boolean tempF0 = (col == ColumnNumber.F0COLUMN.ordinal()) ? !slot.isF0() : slot.isF0();
+        boolean tempF1 = (col == ColumnNumber.F1COLUMN.ordinal()) ? !slot.isF1() : slot.isF1();
+        boolean tempF2 = (col == ColumnNumber.F2COLUMN.ordinal()) ? !slot.isF2() : slot.isF2();
+        boolean tempF3 = (col == ColumnNumber.F3COLUMN.ordinal()) ? !slot.isF3() : slot.isF3();
+        boolean tempF4 = (col == ColumnNumber.F4COLUMN.ordinal()) ? !slot.isF4() : slot.isF4();
+
+        int new_dirf = ((slot.isForward() ? 0 : LnConstants.DIRF_DIR)
+                | (tempF0 ? LnConstants.DIRF_F0 : 0)
+                | (tempF1 ? LnConstants.DIRF_F1 : 0)
+                | (tempF2 ? LnConstants.DIRF_F2 : 0)
+                | (tempF3 ? LnConstants.DIRF_F3 : 0)
+                | (tempF4 ? LnConstants.DIRF_F4 : 0));
+
+        // set status to 'In Use' if other
+        int status = slot.slotStatus();
+        if (status != LnConstants.LOCO_IN_USE) {
+            memo.getLnTrafficController().sendLocoNetMessage(
+                    slot.writeStatus(LnConstants.LOCO_IN_USE
+                    ));
+        }
+        LocoNetMessage msg = new LocoNetMessage(4);
+        msg.setOpCode(LnConstants.OPC_LOCO_DIRF);
+        msg.setElement(1, slot.getSlot());
+        msg.setElement(2, new_dirf);       // 1 here is estop
+        memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+        // Delay here allows command station time to xmit on the rails.
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ex) {
+            log.error("Interuppted Sleep", ex);
+        }
+        // reset status to original value if not previously 'in use'
+        if (status != LnConstants.LOCO_IN_USE) {
+            memo.getLnTrafficController().sendLocoNetMessage(
+                    slot.writeStatus(status));
+        }
+    }
+
+    /**
+     * Send the LocoNet message to set the state of functions F5, F6, F7, F8
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendFunctionGroup2(LocoNetSlot slot, int col, int row) {
+        boolean tempF5 = (col == ColumnNumber.F5COLUMN.ordinal()) ? !slot.isF5() : slot.isF5();
+        boolean tempF6 = (col == ColumnNumber.F6COLUMN.ordinal()) ? !slot.isF6() : slot.isF6();
+        boolean tempF7 = (col == ColumnNumber.F7COLUMN.ordinal()) ? !slot.isF7() : slot.isF7();
+        boolean tempF8 = (col == ColumnNumber.F8COLUMN.ordinal()) ? !slot.isF8() : slot.isF8();
+
+        int new_snd = ((tempF8 ? LnConstants.SND_F8 : 0)
+                | (tempF7 ? LnConstants.SND_F7 : 0)
+                | (tempF6 ? LnConstants.SND_F6 : 0)
+                | (tempF5 ? LnConstants.SND_F5 : 0));
+
+        // set status to 'In Use' if other
+        int status = slot.slotStatus();
+        if (status != LnConstants.LOCO_IN_USE) {
+            memo.getLnTrafficController().sendLocoNetMessage(
+                    slot.writeStatus(LnConstants.LOCO_IN_USE
+                    ));
+        }
+
+        LocoNetMessage msg = new LocoNetMessage(4);
+        msg.setOpCode(LnConstants.OPC_LOCO_SND);
+        msg.setElement(1, slot.getSlot());
+        msg.setElement(2, new_snd);       // 1 here is estop
+        memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+        // Delay here allows command station time to xmit on the rails.
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ex) {
+            log.error("Interuppted Sleep", ex);
+        }
+
+        // reset status to original value if not previously 'in use'
+        if (status != LnConstants.LOCO_IN_USE) {
+            memo.getLnTrafficController().sendLocoNetMessage(
+                    slot.writeStatus(status));
+        }
+    }
+
+    /**
+     * Sends Function Group 3 values - F9 thru F12, using an "OPC_IMM_PACKET" LocoNet
+     * Message.
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+     protected void sendFunctionGroup3(LocoNetSlot slot, int col, int row) {
+        // LocoNet practice is to send F9-F12 as a DCC packet
+        boolean tempF9 = (col == ColumnNumber.F9COLUMN.ordinal()) ? !slot.isF9() : slot.isF9();
+        boolean tempF10 = (col == ColumnNumber.F10COLUMN.ordinal()) ? !slot.isF10() : slot.isF10();
+        boolean tempF11 = (col == ColumnNumber.F11COLUMN.ordinal()) ? !slot.isF11() : slot.isF11();
+        boolean tempF12 = (col == ColumnNumber.F12COLUMN.ordinal()) ? !slot.isF12() : slot.isF12();
+        byte[] result = jmri.NmraPacket.function9Through12Packet(slot.locoAddr(), (slot.locoAddr() >= 128),
+                tempF9, tempF10, tempF11, tempF12);
+
+        log.debug("sendFunctionGroup3 sending {} to LocoNet slot {}", result, slot.getSlot());
+        memo.get(jmri.CommandStation.class).sendPacket(result, 4); // repeat = 4
+    }
+
+    /**
+     * Sends Function Group 4 values - F13 thru F20, using an "OPC_IMM_PACKET" LocoNet
+     * Message.
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendFunctionGroup4(LocoNetSlot slot, int col, int row) {
+        // LocoNet practice is to send F13-F20 as a DCC packet
+        boolean tempF13 = (col == ColumnNumber.F13COLUMN.ordinal()) ? !slot.isF13() : slot.isF13();
+        boolean tempF14 = (col == ColumnNumber.F14COLUMN.ordinal()) ? !slot.isF14() : slot.isF14();
+        boolean tempF15 = (col == ColumnNumber.F15COLUMN.ordinal()) ? !slot.isF15() : slot.isF15();
+        boolean tempF16 = (col == ColumnNumber.F16COLUMN.ordinal()) ? !slot.isF16() : slot.isF16();
+        boolean tempF17 = (col == ColumnNumber.F17COLUMN.ordinal()) ? !slot.isF17() : slot.isF17();
+        boolean tempF18 = (col == ColumnNumber.F18COLUMN.ordinal()) ? !slot.isF18() : slot.isF18();
+        boolean tempF19 = (col == ColumnNumber.F19COLUMN.ordinal()) ? !slot.isF19() : slot.isF19();
+        boolean tempF20 = (col == ColumnNumber.F20COLUMN.ordinal()) ? !slot.isF20() : slot.isF20();
+        byte[] result = jmri.NmraPacket.function13Through20Packet(slot.locoAddr(), (slot.locoAddr() >= 128),
+                tempF13, tempF14, tempF15, tempF16,
+                tempF17, tempF18, tempF19, tempF20);
+
+        log.debug("sendFunctionGroup4 sending {} to LocoNet slot {}", result, slot.getSlot());
+        memo.get(jmri.CommandStation.class).sendPacket(result, 4); // repeat = 4
+    }
+
+    /**
+     * Sends Function Group 5 values - F21 thru F28, using an "OPC_IMM_PACKET" LocoNet
+     * Message.
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendFunctionGroup5(LocoNetSlot slot, int col, int row) {
+        // LocoNet practice is to send F21-F28 as a DCC packet
+        // LocoNet practice is to send F13-F20 as a DCC packet
+        boolean tempF21 = (col == ColumnNumber.F21COLUMN.ordinal()) ? !slot.isF21() : slot.isF21();
+        boolean tempF22 = (col == ColumnNumber.F22COLUMN.ordinal()) ? !slot.isF22() : slot.isF22();
+        boolean tempF23 = (col == ColumnNumber.F23COLUMN.ordinal()) ? !slot.isF23() : slot.isF23();
+        boolean tempF24 = (col == ColumnNumber.F24COLUMN.ordinal()) ? !slot.isF24() : slot.isF24();
+        boolean tempF25 = (col == ColumnNumber.F25COLUMN.ordinal()) ? !slot.isF25() : slot.isF25();
+        boolean tempF26 = (col == ColumnNumber.F26COLUMN.ordinal()) ? !slot.isF26() : slot.isF26();
+        boolean tempF27 = (col == ColumnNumber.F27COLUMN.ordinal()) ? !slot.isF27() : slot.isF27();
+        boolean tempF28 = (col == ColumnNumber.F28COLUMN.ordinal()) ? !slot.isF28() : slot.isF28();
+        byte[] result = jmri.NmraPacket.function21Through28Packet(slot.locoAddr(), (slot.locoAddr() >= 128),
+                tempF21, tempF22, tempF23, tempF24,
+                tempF25, tempF26, tempF27, tempF28);
+
+        log.debug("sendFunctionGroup5 sending {} to LocoNet slot {}", result, slot.getSlot());
+        memo.get(jmri.CommandStation.class).sendPacket(result, 4); // repeat = 4
+    }
+
+    /**
+     * Send the Expanded LocoNet message to set the state of locomotive direction and
+     * functions F0, F1, F2, F3, F4, F5, F6
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendExpFunctionGroup1(LocoNetSlot slot, int col, int row) {
+        boolean tempF0 = (col == ColumnNumber.F0COLUMN.ordinal()) ? !slot.isF0() : slot.isF0();
+        boolean tempF1 = (col == ColumnNumber.F1COLUMN.ordinal()) ? !slot.isF1() : slot.isF1();
+        boolean tempF2 = (col == ColumnNumber.F2COLUMN.ordinal()) ? !slot.isF2() : slot.isF2();
+        boolean tempF3 = (col == ColumnNumber.F3COLUMN.ordinal()) ? !slot.isF3() : slot.isF3();
+        boolean tempF4 = (col == ColumnNumber.F4COLUMN.ordinal()) ? !slot.isF4() : slot.isF4();
+        boolean tempF5 = (col == ColumnNumber.F5COLUMN.ordinal()) ? !slot.isF5() : slot.isF5();
+        boolean tempF6 = (col == ColumnNumber.F6COLUMN.ordinal()) ? !slot.isF6() : slot.isF6();
+        int new_F0F6 = ((tempF5 ? 0b00100000 : 0) | (tempF6 ? 0b01000000 : 0)
+                | (tempF0 ? LnConstants.DIRF_F0 : 0)
+                | (tempF1 ? LnConstants.DIRF_F1 : 0)
+                | (tempF2 ? LnConstants.DIRF_F2 : 0)
+                | (tempF3 ? LnConstants.DIRF_F3 : 0)
+                | (tempF4 ? LnConstants.DIRF_F4 : 0));
+            LocoNetMessage msg = new LocoNetMessage(6);
+            msg.setOpCode(0xd5);
+            msg.setElement(1, (slot.getSlot() / 128) | 0b00010000 );
+            msg.setElement(2,slot.getSlot() & 0b01111111);
+            msg.setElement(3,slot.id() & 0x7F);
+            msg.setElement(4, new_F0F6);
+            memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+    }
+
+    /**
+     * Send the Expanded LocoNet message to set the state of functions F7, F8, F8, F9, F10, F11, F12, F13
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendExpFunctionGroup2(LocoNetSlot slot, int col, int row) {
+        boolean tempF7 = (col == ColumnNumber.F7COLUMN.ordinal()) ? !slot.isF7() : slot.isF7();
+        boolean tempF8 = (col == ColumnNumber.F8COLUMN.ordinal()) ? !slot.isF8() : slot.isF8();
+        boolean tempF9 = (col == ColumnNumber.F9COLUMN.ordinal()) ? !slot.isF9() : slot.isF9();
+        boolean tempF10 = (col == ColumnNumber.F10COLUMN.ordinal()) ? !slot.isF10() : slot.isF10();
+        boolean tempF11 = (col == ColumnNumber.F11COLUMN.ordinal()) ? !slot.isF11() : slot.isF11();
+        boolean tempF12 = (col == ColumnNumber.F12COLUMN.ordinal()) ? !slot.isF12() : slot.isF12();
+        boolean tempF13 = (col == ColumnNumber.F13COLUMN.ordinal()) ? !slot.isF13() : slot.isF13();
+            int new_F7F13 = ((tempF7 ? 0b00000001 : 0) | (tempF8 ? 0b00000010 : 0)
+                    | (tempF9  ? 0b00000100 : 0)
+                    | (tempF10 ? 0b00001000 : 0)
+                    | (tempF11 ? 0b00010000 : 0)
+                    | (tempF12 ? 0b00100000 : 0)
+                    | (tempF13 ? 0b01000000 : 0));
+                LocoNetMessage msg = new LocoNetMessage(6);
+                msg.setOpCode(0xd5);
+                msg.setElement(1, (slot.getSlot() / 128) | 0b00011000 );
+                msg.setElement(2,slot.getSlot() & 0b01111111);
+                msg.setElement(3,slot.id() & 0x7F);
+                msg.setElement(4, new_F7F13);
+                memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+    }
+
+    /**
+     * Sends expanded loconet message F14 thru F20
+     * Message.
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendExpFunctionGroup3(LocoNetSlot slot, int col, int row) {
+        boolean tempF14 = (col == ColumnNumber.F14COLUMN.ordinal()) ? !slot.isF14() : slot.isF14();
+        boolean tempF15 = (col == ColumnNumber.F15COLUMN.ordinal()) ? !slot.isF15() : slot.isF15();
+        boolean tempF16 = (col == ColumnNumber.F16COLUMN.ordinal()) ? !slot.isF16() : slot.isF16();
+        boolean tempF17 = (col == ColumnNumber.F17COLUMN.ordinal()) ? !slot.isF17() : slot.isF17();
+        boolean tempF18 = (col == ColumnNumber.F18COLUMN.ordinal()) ? !slot.isF18() : slot.isF18();
+        boolean tempF19 = (col == ColumnNumber.F19COLUMN.ordinal()) ? !slot.isF19() : slot.isF19();
+        boolean tempF20 = (col == ColumnNumber.F20COLUMN.ordinal()) ? !slot.isF20() : slot.isF20();
+        int new_F14F20 = ((tempF14 ? 0b00000001 : 0) | (tempF15 ? 0b00000010 : 0)
+                | (tempF16  ? 0b00000100 : 0)
+                | (tempF17 ? 0b00001000 : 0)
+                | (tempF18 ? 0b00010000 : 0)
+                | (tempF19 ? 0b00100000 : 0)
+                | (tempF20 ? 0b01000000 : 0));
+            LocoNetMessage msg = new LocoNetMessage(6);
+            msg.setOpCode(0xd5);
+            msg.setElement(1, (slot.getSlot() / 128) | 0b00100000 );
+            msg.setElement(2,slot.getSlot() & 0b01111111);
+            msg.setElement(3,slot.id() & 0x7F);
+            msg.setElement(4, new_F14F20);
+            memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+    }
+
+    /**
+     * Sends Expanded loconet message F21 thru F28 Message.
+     * @param slot loconet slot
+     * @param col  grid col
+     * @param row  grid row
+     */
+    protected void sendExpFunctionGroup4(LocoNetSlot slot, int col, int row) {
+        boolean tempF21 = (col == ColumnNumber.F21COLUMN.ordinal()) ? !slot.isF21() : slot.isF21();
+        boolean tempF22 = (col == ColumnNumber.F22COLUMN.ordinal()) ? !slot.isF22() : slot.isF22();
+        boolean tempF23 = (col == ColumnNumber.F23COLUMN.ordinal()) ? !slot.isF23() : slot.isF23();
+        boolean tempF24 = (col == ColumnNumber.F24COLUMN.ordinal()) ? !slot.isF24() : slot.isF24();
+        boolean tempF25 = (col == ColumnNumber.F25COLUMN.ordinal()) ? !slot.isF25() : slot.isF25();
+        boolean tempF26 = (col == ColumnNumber.F26COLUMN.ordinal()) ? !slot.isF26() : slot.isF26();
+        boolean tempF27 = (col == ColumnNumber.F27COLUMN.ordinal()) ? !slot.isF27() : slot.isF27();
+        boolean tempF28 = (col == ColumnNumber.F28COLUMN.ordinal()) ? !slot.isF28() : slot.isF28();
+        int new_F14F20 = ((tempF21 ? 0b00000001 : 0) |
+                (tempF22 ? 0b00000010 : 0) |
+                (tempF23 ? 0b00000100 : 0) |
+                (tempF24 ? 0b00001000 : 0) |
+                (tempF25 ? 0b00010000 : 0) |
+                (tempF26 ? 0b00100000 : 0) |
+                (tempF27 ? 0b01000000 : 0));
+        LocoNetMessage msg = new LocoNetMessage(6);
+        msg.setOpCode(0xd5);
+        if (!tempF28) {
+            msg.setElement(1, (slot.getSlot() / 128) | LnConstants.OPC_EXP_SEND_FUNCTION_GROUP_F21F28_F28OFF);
+        } else {
+            msg.setElement(1, (slot.getSlot() / 128) | LnConstants.OPC_EXP_SEND_FUNCTION_GROUP_F21F28_F28ON);
+        }
+        msg.setElement(2, slot.getSlot() &  0x7F);
+        msg.setElement(3, slot.id() & 0x7F);
+        msg.setElement(4, new_F14F20);
+        memo.getLnTrafficController().sendLocoNetMessage(msg, true);
+    }
+
+    // gets called on SlotMonPane.dispose
     public void dispose() {
         memo.getSlotManager().removeSlotListener(this);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SlotMonDataModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SlotMonDataModel.class);
 
 }

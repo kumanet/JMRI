@@ -1,15 +1,11 @@
 package jmri.jmrix.secsi.simulator;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
-import jmri.jmrix.secsi.SerialMessage;
-import jmri.jmrix.secsi.SerialPortController; // no special xSimulatorController
-import jmri.jmrix.secsi.SerialReply;
-import jmri.jmrix.secsi.SecsiSystemConnectionMemo;
+import java.io.*;
+
+// no special xSimulatorController
+import jmri.jmrix.secsi.*;
 import jmri.util.ImmediatePipedOutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +27,10 @@ import org.slf4j.LoggerFactory;
  * @author Mark Underwood, Copyright (C) 2015
  * @author Egbert Broerse, Copyright (C) 2018
  */
+@SuppressWarnings("javadoc")
 public class SimulatorAdapter extends SerialPortController implements Runnable {
 
     // private control members
-    private boolean opened = false;
     private Thread sourceThread;
 
     private boolean outputBufferEmpty = true;
@@ -59,7 +55,7 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
             log.debug("tempPipeI created");
             pout = new DataOutputStream(tempPipeI);
             inpipe = new DataInputStream(new PipedInputStream(tempPipeI));
-            log.debug("inpipe created {}", inpipe != null);
+            log.debug("inpipe created");
             PipedOutputStream tempPipeO = new ImmediatePipedOutputStream();
             outpipe = new DataOutputStream(tempPipeO);
             pin = new DataInputStream(new PipedInputStream(tempPipeO));
@@ -207,29 +203,27 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
             }
             SerialMessage m = readMessage();
             SerialReply r;
-            if (log.isDebugEnabled()) {
-                StringBuffer buf = new StringBuffer();
-                buf.append("Secsi Simulator Thread received message: ");
+            if (log.isTraceEnabled()) {
+                StringBuilder buf = new StringBuilder();
                 if (m != null) {
                     for (int i = 0; i < m.getNumDataElements(); i++) {
-                        buf.append(Integer.toHexString(0xFF & m.getElement(i)) + " ");
+                        buf.append(Integer.toHexString(0xFF & m.getElement(i))).append(" ");
                     }
                 } else {
                     buf.append("null message buffer");
                 }
-                log.trace(buf.toString()); // generates a lot of traffic
+                log.trace("Secsi Simulator Thread received message: {}", buf ); // generates a lot of traffic
             }
             if (m != null) {
                 r = generateReply(m);
                 if (r != null) { // ignore errors and null replies
                     writeReply(r);
                     if (log.isDebugEnabled()) {
-                        StringBuffer buf = new StringBuffer();
-                        buf.append("Secsi Simulator Thread sent reply: ");
+                        StringBuilder buf = new StringBuilder();
                         for (int i = 0; i < r.getNumDataElements(); i++) {
-                            buf.append(Integer.toHexString(0xFF & r.getElement(i)) + " ");
+                            buf.append(Integer.toHexString(0xFF & r.getElement(i))).append(" ");
                         }
-                        log.debug(buf.toString());
+                        log.debug("Secsi Simulator Thread sent reply: {}", buf );
                     }
                 }
             }
@@ -448,6 +442,6 @@ public class SimulatorAdapter extends SerialPortController implements Runnable {
     private DataOutputStream outpipe = null; // feed pin
     private DataInputStream inpipe = null; // feed pout
 
-    private final static Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SimulatorAdapter.class);
 
 }

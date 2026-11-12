@@ -1,11 +1,14 @@
 package jmri.jmrit.operations.trains.tools;
 
 import java.awt.GraphicsEnvironment;
-import jmri.jmrit.operations.OperationsTestCase;
-import jmri.util.JUnitUtil;
+
 import org.junit.Assert;
-import org.junit.jupiter.api.*;
 import org.junit.Assume;
+import org.junit.jupiter.api.Test;
+
+import jmri.jmrit.operations.OperationsTestCase;
+import jmri.util.JUnitOperationsUtil;
+import jmri.util.JUnitUtil;
 
 /**
  *
@@ -22,7 +25,15 @@ public class TrainsScriptFrameTest extends OperationsTestCase {
         Assert.assertTrue(t.isShowing());
         JUnitUtil.dispose(t);
     }
+    
+    @Test
+    public void testCloseWindowOnSave() {
+        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
+        TrainsScriptFrame f = new TrainsScriptFrame();
+        f.initComponents();
+        JUnitOperationsUtil.testCloseWindowOnSave(f.getTitle());
+    }
 
-    // private final static Logger log = LoggerFactory.getLogger(TrainsScriptFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(TrainsScriptFrameTest.class);
 
 }

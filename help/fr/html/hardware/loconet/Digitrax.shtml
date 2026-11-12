@@ -1,25 +1,18 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<!-- Updated by Blorec Herv&#233; le 2017-01-27; -->
+<!DOCTYPE html>
 <html lang="fr">
+<!-- Updated by Blorec Herv&#233; le 2017-01-27; -->
 <head>
   <title>JMRI Hardware Support - Digitrax LocoNet</title>
-    <meta name="keywords" content="Digitrax LocoNet LocoBuffer LocoBuffer-II
+  <meta name="keywords" content="Digitrax LocoNet LocoBuffer LocoBuffer-II
           LocoBuffer-USB MS100 PR2 PR3 DCS100 DCS50 DCS51 DB150 JMRI">
-
-  <!-- Style -->
-  <meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
-  <link rel="stylesheet" type="text/css" href="/css/default.css" media="screen">
-  <link rel="stylesheet" type="text/css" href="/css/print.css" media="print">
-  <link rel="icon" href="/images/jmri.ico" type="image/png">
-  <link rel="home" title="Home" href="/">
-  <!-- /Style -->
+  <!--#include virtual="/help/fr/parts/Style.shtml" -->
 </head>
 
 <body>
-<!--#include virtual="/Header.shtml" -->
+<!--#include virtual="/help/fr/parts/Header_fr.shtml" -->
 <div id="mBody">
-    <!--#include virtual="Sidebar" -->
-    <div id="mainContent">
+  <!--#include virtual="Sidebar.shtml" -->
+  <div id="mainContent">
 
     <h1>Support: Digitrax LocoNet&reg;</h1>
 
@@ -440,16 +433,17 @@ pour plus d'informations.
   <li><a href="LocoNetTools.shtml">Outils pour les &#233;quipements LocoNet&reg; </a></li>
 <li> Outils relatifs &#224; LocoNet
     <ul>
-      <li><a href="../../../package/jmri/jmrix/loconet/locomon/LocoMonFrame.shtml">Moniteurr LocoNet</a></li>
+      <li><a href="../../../package/jmri/jmrix/loconet/locomon/LocoMonFrame.shtml">Moniteur LocoNet</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/slotmon/SlotMonFrame.shtml">Moniteur Slots</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/clockmon/ClockMonFrame.shtml">Moniteur Horloge</a></li>
-      <li><a href="../../../package/jmri/jmrix/loconet/locostats/LocoStatsFrame.shtml">Moniteurr Statistiques LocoNet</a></li>
+      <li><a href="../../../package/jmri/jmrix/loconet/locostats/LocoStatsFrame.shtml">Moniteur Statistiques LocoNet</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/bdl16/BDL16Frame.shtml">Configuration de BDL16x</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/ds64/DS64Frame.shtml">Configuration de DS64</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/pm4/PM4Frame.shtml">Configuration de PM4x</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/se8/SE8Frame.shtml">Configuration de SE8C</a></li>
-      <li><a href="../../../package/jmri/jmrix/loconet/locoio/LocoIOFrame.shtml">Configuration de LocoIO</a> (d&#233;sapprouv&#233;, utilisez <a href="../../apps/DecoderPro/index.shtml">DecoderPro</a>)</li>
-      <li><a href="../../../package/jmri/jmrix/loconet/cmdstnconfig/CmdStnConfigFrame.shtml">Configuration de la centrale </a></li>
+      <li><a href="../../../package/jmri/jmrix/loconet/swing/lnsv1prog/Lnsv1ProgPane.shtml">Gestion des Modules LocoIO</a></li>
+      <li><a href="../../../package/jmri/jmrix/loconet/swing/lncvprog/LncvProgPane.shtml">Gestion des Modules LNCV</a></li>
+      <li><a href="../../../package/jmri/jmrix/loconet/cmdstnconfig/CmdStnConfigFrame.shtml">Configuration de la centrale</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/locoid/LocoIdFrame.shtml">Configuration de LocoNet ID</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/duplexgroup/DuplexGroupTabbedPanel.shtml">Configuration de Duplex Group</a></li>
       <li><a href="../../../package/jmri/jmrix/loconet/swing/throttlemsg/MessageFrame.shtml">Envoi de Message R&#233;gulateur</a></li>
@@ -459,7 +453,7 @@ pour plus d'informations.
       <li><a href="../../../package/jmri/jmrix/loconet/soundloader/LoaderFrame.shtml">T&#233;l&#233;charger des Sons</a></li>
     </ul>
   </li>
-   <li>autres Centrales
+   <li>Autres Centrales
    <ul>
         <li><a href="Fleischmann.shtml">Fleischmann Twin Centre</a></li>
         <li><a href="Uhlenbrock.shtml">Uhlenbrock Command Station</a></li>
@@ -475,7 +469,6 @@ pour plus d'informations.
       <li><a href="LocoNetworking.shtml">Connection de Multiple Ordinateurs &#224; un r&#233;seau LocoNet&reg;</a>
         <ul>
         <li><a href="LbServer.shtml">Connection de Multiple Ordinateurs &#224; LocoNet&reg; via LBServer</a></li>
-        <li><a href="LocoNetServer.shtml">Connection de Multiple Ordinateurs &#224; LocoNet via LocoNet&reg; Server</a></li>
         </ul>
       </li>
       <li>Une &#233;tude technique ax&#233;e sur <a href="DigitraxPower/index.shtml">les questions d'alimentation</a> dans certains produits Digitrax</li>
@@ -486,8 +479,9 @@ pour plus d'informations.
 
 <p>LocoNet&reg; est une marque d&#233;pos&#233;e de <a href="http://www.digitrax.com">Digitrax, Inc.</a></p>
 
-<!--#include virtual="/Footer.shtml" -->
- </div><!-- closes #mainContent-->
-</div> <!-- closes #mBody-->
+    <!--#include virtual="/help/fr/parts/Footer_fr.shtml" -->
+    </div><!-- closes #mainContent-->
+  </div> <!-- closes #mBody-->
+  <script src="/js/help.js"></script>
 </body>
 </html>

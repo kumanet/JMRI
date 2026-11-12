@@ -1,11 +1,12 @@
 package jmri.jmrix;
 
+import javax.annotation.Nonnull;
 import javax.swing.JPanel;
 
 /**
  * Interface for objects that handle configuring a layout connection.
  * <p>
- * General design documentation is available on the 
+ * General design documentation is available on the
  * <a href="http://jmri.org/help/en/html/doc/Technical/SystemStructure.shtml">Structure of External System Connections page</a>.
  *
  * @author Bob Jacobsen Copyright (C) 2001, 2003
@@ -14,30 +15,30 @@ import javax.swing.JPanel;
  */
 public interface ConnectionConfig {
 
-    public String name();
+    String name();
 
-    public String getInfo();
+    String getInfo();
 
-    public PortAdapter getAdapter();
+    PortAdapter getAdapter();
 
-    public String getConnectionName();
+    String getConnectionName();
 
-    public String getManufacturer();
+    String getManufacturer();
 
-    public void setManufacturer(String Manufacturer);
+    void setManufacturer(String Manufacturer);
 
-    /** 
+    /**
      * Load the Swing widgets needed to configure
      * this connection into a specified JPanel.
-     * Used during the configuration process to 
-     * fill out the preferences window with 
+     * Used during the configuration process to
+     * fill out the preferences window with
      * content specific to this Connection type.
      * The JPanel contents need to handle their own
      * gets/sets to the underlying Connection content.
      *
      * @param details the specific Swing object to be configured and filled
      */
-    public void loadDetails(JPanel details);
+    void loadDetails(JPanel details);
 
     /**
      * Register the ConnectionConfig with the running JMRI process.
@@ -48,25 +49,25 @@ public interface ConnectionConfig {
      * <li>Adding this object to the default (@link ConnectionConfigManager}
      * </ul>
      */
-    public void register();
-    
-    /** 
+    void register();
+
+    /**
      * Done with this ConnectionConfig object.
      * Invoked in {@link JmrixConfigPane} when switching
-     * away from this particular mode. 
+     * away from this particular mode.
      */
-    public void dispose();
+    void dispose();
 
-    public boolean getDisabled();
+    boolean getDisabled();
 
-    public void setDisabled(boolean disabled);
+    void setDisabled(boolean disabled);
 
     /**
      * Determine if configuration needs to be written to disk.
      *
      * @return true if configuration needs to be saved, false otherwise
      */
-    public boolean isDirty();
+    boolean isDirty();
 
     /**
      * Determine if application needs to be restarted for configuration changes
@@ -74,5 +75,44 @@ public interface ConnectionConfig {
      *
      * @return true if application needs to restart, false otherwise
      */
-    public boolean isRestartRequired();
+    boolean isRestartRequired();
+
+    /**
+     * Say whether this connection is a simulator, with no real layout
+     * hardware behind it. A profile whose connections are all simulators
+     * can have simulated trains placed on it.
+     *
+     * @return true for a simulator connection; false by default
+     * @since 5.19.1
+     */
+    default boolean isSimulator() {
+        return false;
+    }
+
+    /**
+     * Get the configuration for the ConnectionConfig.
+     *
+     * @return the configuration or null if not supported
+     */
+    default Config getConfig() {
+        return null;
+    }
+
+    /**
+     * Set the configuration for the ConnectionConfig.
+     * The method MUST check if the configuration is of a supported type
+     * and if not, ignore it. An unsupported connection type is not an error.
+     *
+     * @param config the configuration
+     */
+    default void setConfig(@Nonnull Config config) {
+        // Do nothing
+    }
+
+    /**
+     * Configuration for a ConnectionConfig.
+     */
+    interface Config {
+    }
+
 }

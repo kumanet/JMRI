@@ -2,35 +2,115 @@ package jmri.jmrix.marklin;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
- *
+ * Tests for MarklinPowerManager.
  * @author Paul Bender Copyright (C) 2017
+ * @author Steve Young Copyright (C) 2024
  */
-public class MarklinPowerManagerTest {
+public class MarklinPowerManagerTest extends jmri.jmrix.AbstractPowerManagerTestBase {
+
+    private MarklinSystemConnectionMemo memo;
+    private MarklinTrafficControlScaffold tc;
+    private MarklinPowerManager pwr;
 
     @Test
     public void testCTor() {
-        MarklinTrafficController tc = new MarklinTrafficController();
-        new MarklinSystemConnectionMemo(tc);
-        MarklinPowerManager t = new MarklinPowerManager(tc);
-        Assert.assertNotNull("exists",t);
+        Assertions.assertNotNull(p, "exists");
     }
 
+    @Override
+    protected void hearOn() {
+        int[] frame = jmri.jmrix.marklin.mcan.cs2.Cs2SystemCommands.buildSystemGoReply();
+        MarklinReply r = new MarklinReply(frame);
+        pwr.reply(r);
+    }
+
+    @Override
+    protected void hearOff() {
+        int[] frame = jmri.jmrix.marklin.mcan.cs2.Cs2SystemCommands.buildSystemStopReply();
+        MarklinReply r = new MarklinReply(frame);
+        pwr.reply(r);
+    }
+
+    @Override
+    protected void hearIdle() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected void sendOnReply() {
+        hearOn();
+    }
+
+    @Override
+    protected void sendOffReply() {
+        hearOff();
+    }
+
+    @Override
+    protected void sendIdleReply() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    protected int numListeners() {
+        return tc.getNumberListeners();
+    }
+
+    @Override
+    protected int outboundSize() {
+        return tc.getSentMessages().size();
+    }
+
+    @Override
+    protected boolean outboundOnOK(int index) {
+        MarklinMessage m = tc.getLastMessageSent();
+        return m != null && "00 00 03 00 05 00 00 00 00 01 00 00 00".equals(m.toString());
+    }
+
+    @Override
+    protected boolean outboundOffOK(int index) {
+        MarklinMessage m = tc.getLastMessageSent();
+        return m != null && "00 00 03 00 05 00 00 00 00 00 00 00 00".equals(m.toString());
+    }
+
+    @Override
+    protected boolean outboundIdleOK(int index) {
+        return false;
+    }
+
+    @Test
+    @Disabled("Tested class does not throw exception if dispose called twice")
+    @Override
+    public void testDispose2() {}
+
+
     @BeforeEach
+    @Override
     public void setUp() {
         JUnitUtil.setUp();
+        tc = new MarklinTrafficControlScaffold();
+        memo = new MarklinSystemConnectionMemo(tc);
+        pwr = new MarklinPowerManager(tc);
+        p = pwr;
     }
 
     @AfterEach
     public void tearDown() {
-        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
-        JUnitUtil.tearDown();
+        Assertions.assertNotNull(tc);
+        Assertions.assertNotNull(memo);
+        tc.dispose();
+        tc = null;
+        memo.dispose();
+        memo = null;
+        pwr = null;
+        p = null;
 
+        JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(MarklinPowerManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(MarklinPowerManagerTest.class);
 
 }

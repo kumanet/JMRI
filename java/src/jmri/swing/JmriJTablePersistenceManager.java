@@ -48,10 +48,10 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
     private boolean paused = false;
     private boolean dirty = false;
     public final String PAUSED = "paused";
-    public final static String TABLES_NAMESPACE = "http://jmri.org/xml/schema/auxiliary-configuration/table-details-4-3-5.xsd"; // NOI18N
-    public final static String TABLES_ELEMENT = "tableDetails"; // NOI18N
-    public final static String SORT_ORDER = "sortOrder"; // NOI18N
-    private final static Logger log = LoggerFactory.getLogger(JmriJTablePersistenceManager.class);
+    public static final String TABLES_NAMESPACE = "http://jmri.org/xml/schema/auxiliary-configuration/table-details-4-3-5.xsd"; // NOI18N
+    public static final String TABLES_ELEMENT = "tableDetails"; // NOI18N
+    public static final String SORT_ORDER = "sortOrder"; // NOI18N
+    private static final Logger log = LoggerFactory.getLogger(JmriJTablePersistenceManager.class);
 
     /**
      * {@inheritDoc}
@@ -394,36 +394,6 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
     }
 
     /**
-     * Transition support for the standard {@link jmri.UserPreferencesManager}
-     * instance (a {@link jmri.managers.JmriUserPreferencesManager}) so it does not
-     * need to maintain separate knowledge of table column state.
-     *
-     * @param table  the table name
-     * @param column the column name
-     * @param order  order of the column
-     * @param width  column preferredWidth
-     * @param sort   how the column is sorted
-     * @param hidden true if column is hidden
-     * @throws NullPointerException if either name is null
-     * @deprecated since 4.5.2; not to be removed; used by
-     *             {@link jmri.managers.configurexml.DefaultUserMessagePreferencesXml}
-     *             to allow tabled preferences from JMRI 4.4 and earlier to be read
-     *             when a user is upgrading to a newer version; not to be used
-     *             elsewhere
-     */
-    @Deprecated
-    public void setTableColumnPreferences(String table, String column, int order, int width, SortOrder sort,
-            boolean hidden) {
-        Objects.requireNonNull(table, "table name must be nonnull");
-        if (sort != SortOrder.UNSORTED) {
-            List<SortKey> keys = new ArrayList<>();
-            keys.add(new SortKey(order, sort));
-            this.sortKeys.put(table, keys);
-        }
-        this.setPersistedState(table, column, order, width, sort, hidden);
-    }
-
-    /**
      * Set the persisted state for the given column in the given table. The
      * persisted state is not saved until
      * {@link #savePreferences(jmri.profile.Profile)} is called.
@@ -523,7 +493,7 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
     /**
      * Handler for individual column preferences.
      */
-    public final static class TableColumnPreferences {
+    public static final class TableColumnPreferences {
 
         private final int order;
         private final int preferredWidth;
@@ -554,7 +524,7 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
         }
     }
 
-    protected final static class JTableListener
+    protected static final class JTableListener
             implements PropertyChangeListener, RowSorterListener, TableColumnModelListener {
 
         private final JTable table;
@@ -653,7 +623,7 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
 
         private TimerTask delay;
 
-        protected void cancelDelay() {
+        synchronized private void cancelDelay() {
             if (this.delay != null) {
                 this.delay.cancel(); // cancel complete before dropping reference
                 this.delay = null;
@@ -668,18 +638,28 @@ public class JmriJTablePersistenceManager extends AbstractPreferencesManager
          * {@link JmriJTablePersistenceManager#savePreferences(jmri.profile.Profile)} is
          * not subject to this timer.
          */
-        private void saveState() {
+        synchronized private void saveState() {
             cancelDelay();
-            jmri.util.TimerUtil.schedule(delay = new TimerTask() {
+            jmri.util.TimerUtil.schedule(delay = new TimerTask() { // use schedule instead of scheduleOnGUIThread so we can cancel
                 @Override
                 public void run() {
-                    JTableListener.this.manager.cacheState(JTableListener.this.table);
-                    if (!JTableListener.this.manager.isPaused() && JTableListener.this.manager.isDirty()) {
-                        JTableListener.this.manager.savePreferences(ProfileManager.getDefault().getActiveProfile());
-                    }
-                    JTableListener.this.cancelDelay();
+                    jmri.util.ThreadingUtil.runOnGUIEventually(() -> {
+                        try {
+                            JTableListener.this.manager.cacheState(JTableListener.this.table);
+                            if (!JTableListener.this.manager.isPaused() && JTableListener.this.manager.isDirty()) {
+                                JTableListener.this.manager.savePreferences(ProfileManager.getDefault().getActiveProfile());
+                            }
+                            JTableListener.this.cancelDelay();
+                        } catch (Throwable e) { // we want to catch _everything_ that goes wrong to avoid killing the Timer
+                            log.warn("during timer run", e);
+                        }
+                    });
                 }
             }, 500); // milliseconds
         }
+
+        @SuppressWarnings("hiding")     // Field has same name as a field in the outer class
+        private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JTableListener.class);
+
     }
 }

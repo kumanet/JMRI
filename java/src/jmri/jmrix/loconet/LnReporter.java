@@ -18,17 +18,18 @@ import org.slf4j.LoggerFactory;
  * Extend jmri.AbstractIdTagReporter for LocoNet layouts.
  * <p>
  * This implementation reports Transponding messages from LocoNet-based "Reporters".
- * 
- * For LocoNet connections, a "Reporter" represents either a Digitrax "transponding zone" or a 
- * Lissy "measurement zone".  The messages from these Reporters are handled by this code.
- * 
+ * <p>
+ * For LocoNet connections, a "Reporter" represents either a Digitrax "transponding zone", a
+ * Lissy "measurement zone" or a Lissy RFID reader location.
+ * <br>
+ * The messages from these Reporters are handled by this code.
+ * <br>
  * The LnReporterManager is responsible for decode of appropriate LocoNet messages
  * and passing only those messages to the Reporter which match its Reporter address.
- * 
- * <p>
+ * <br>
  * Each transponding message creates a new current report. The last report is
  * always available, and is the same as the contents of the last transponding
- * message received.
+ * message received. Based on the report, for new tags a new Id Tag is created by the LnReporter.
  * <p>
  * Reports are Strings, formatted as
  * <ul>
@@ -54,7 +55,7 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
         log.debug("new Reporter {}", number);
         _number = number;
         // At construction, register for messages
-        entrySet = new HashSet<TranspondingTag>();
+        entrySet = new HashSet<>();
     }
 
 
@@ -66,27 +67,30 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
     }
 
     /**
-      * Process loconet message handed to us from the LnReporterManager
-      * @param l - a loconetmessage.
+      * Process LocoNet message handed to us from the LnReporterManager
+      * @param l - a LocoNetMessage.
       */
     public void messageFromManager(LocoNetMessage l) {
         // check message type
         if (isTranspondingLocationReport(l) || isTranspondingFindReport(l)) {
             transpondingReport(l);
         }
-        if ((l.getOpCode() == LnConstants.OPC_LISSY_UPDATE) && (l.getElement(1) == 0x08)) {
-            lissyReport(l);
-        } else {
-            return; // nothing
-        }
+        if (l.getOpCode() == LnConstants.OPC_LISSY_UPDATE) {
+            if (l.getElement(1) == 0x08) {
+                lissyReport(l);
+            } else if (l.getElement(2) == 0x41) {
+                lissyRfidReport(l);
+            }
+        }  // else nothing
+
     }
 
     /**
      * Check if message is a Transponding Location Report message
-     * 
+     *
      * A Transponding Location Report message is sent by transponding hardware
      * when a transponding mobile decoder enters or leaves a transponding zone.
-     * 
+     *
      * @param l LocoNet message to check
      * @return true if message is a Transponding Location Report, else false.
      */
@@ -97,11 +101,11 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
 
     /**
      * Check if message is a Transponding Find Report message
-     * 
+     *
      * A Transponding Location Report message is sent by transponding hardware
      * in response to a Transponding Find Request message when the addressed
      * decoder is within a transponding zone and the decoder is transponding-enabled.
-     * 
+     *
      * @param l LocoNet message to check
      * @return true if message is a Transponding Find Report, else false.
      */
@@ -115,7 +119,7 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
      * Handle transponding message passed to us by the LnReporting Manager
      *
      * Assumes that the LocoNet message is a valid transponding message.
-     * 
+     *
      * @param l - incoming loconetmessage
      */
     void transpondingReport(LocoNetMessage l) {
@@ -129,6 +133,7 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
         }
         loco = getLocoAddrFromTranspondingMsg(l); // get loco address
 
+        log.debug("Transponding Report at {} for {}",_number, loco);
         notify(null); // set report to null to make sure listeners update
 
         idTag = InstanceManager.getDefault(TranspondingTagManager.class).provideIdTag("" + loco);
@@ -136,7 +141,7 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
         if (enter) {
             idTag.setProperty("entryexit", "enter");
             if (!entrySet.contains(idTag)) {
-                entrySet.add((TranspondingTag) idTag);
+                entrySet.add(idTag);
             }
         } else {
             idTag.setProperty("entryexit", "exits");
@@ -144,16 +149,16 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
                 entrySet.remove(idTag);
             }
         }
-        log.debug("Tag: {}", idTag);
+        log.debug("Tag: {} entry {}", idTag, enter);
         notify(idTag);
         setState(enter ? loco : -1);
     }
 
     /**
      * extract long or short address from transponding message
-     * 
+     *
      * Assumes that the LocoNet message is a valid transponding message.
-     * 
+     *
      * @param l LocoNet message
      * @return loco address
      */
@@ -162,7 +167,7 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
             return l.getElement(4);
         }
         return l.getElement(3) * 128 + l.getElement(4);
-        
+
     }
 
     /**
@@ -170,22 +175,59 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
      * @param l Message from which to extract LISSY content
      */
     void lissyReport(LocoNetMessage l) {
-        int loco = (l.getElement(6) & 0x7F) + 128 * (l.getElement(5) & 0x7F);
 
-        // get direction
-        boolean north = ((l.getElement(3) & 0x20) == 0);
+        // Only report messages where bit 6 is set in element 3,
+        // because these are the only messages with valid loco addresses
+        if ((l.getElement(3) & 0x40) != 0) {
+            int loco = (l.getElement(6) & 0x7F) + 128 * (l.getElement(5) & 0x7F);
+
+            // train category - Perhaps add to idTag as property?
+            int category = l.getElement(2) + 1;
+
+            // get direction
+            // north assumes loco is passing sensors S1->S2
+            boolean north = ((l.getElement(3) & 0x20) == 0);
+
+            notify(null); // set report to null to make sure listeners update
+            // get loco address
+            IdTag idTag = InstanceManager.getDefault(TranspondingTagManager.class).provideIdTag(""+loco+":"+category);
+            if(north) {
+               idTag.setProperty("seen", "seen northbound");
+            } else {
+               idTag.setProperty("seen", "seen southbound");
+            }
+            log.debug("Tag: {}", idTag);
+            notify(idTag);
+            setState(loco);
+        }
+    }
+
+    /**
+     * Handle LISSY RFID-7 and RFID-5 messages
+     * @param l Message from which to extract RFID content (UID)
+     */
+    void lissyRfidReport(LocoNetMessage l) {
+        String tag;
+        StringBuilder tg = new StringBuilder();
+        int max = l.getElement(1) - 2; // GCA51 RFID-7 elem(3) = size = 0x0E; RFID-5 elem(3) = size = 0x0C
+        int rfidHi = l.getElement(max); // MSbits are transmitted via element(max)
+        for (int j = 5; j < max; j++) {
+            int shift = j-5;
+            int hi = 0x0;
+            if(((rfidHi >> shift) & 0x1) == 1) hi = 0x80;
+            tg.append(String.format("%1$02X", l.getElement(j) + hi));
+        }
+        tag = tg.toString();
+
+        int rfidSensorAddress = l.getElement(3) << 7 | l.getElement(4);
 
         notify(null); // set report to null to make sure listeners update
-        // get loco address
-        IdTag idTag = InstanceManager.getDefault(TranspondingTagManager.class).provideIdTag(""+loco);
-        if(north) {
-           idTag.setProperty("seen", "seen northbound");
-        } else {
-           idTag.setProperty("seen", "seen southbound");
-        }
+        // get rfid tag
+        IdTag idTag = InstanceManager.getDefault(TranspondingTagManager.class).provideIdTag(""+tag);
+        // add info from reader
+        idTag.setProperty("rfid", rfidSensorAddress);
         log.debug("Tag: {}", idTag);
-        notify(idTag);
-        setState(loco);
+        notify(idTag); // sets report of this reporter to tag
     }
 
     /**
@@ -261,13 +303,8 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
         if (m.find()) {
             log.debug("Parsed direction: {}", m.group(2)); // NOI18N
             switch (m.group(2)) {
-                case "enter":
-                    // NOI18N
-                    // LocoNet Enter message
-                    return (PhysicalLocationReporter.Direction.ENTER);
-                case "seen":
-                    // NOI18N
-                    // Lissy message.  Treat them all as "entry" messages.
+                case "enter":  // LocoNet Enter message // NOI18N
+                case "seen":   // Lissy message. Treat both as "entry" messages. // NOI18N
                     return (PhysicalLocationReporter.Direction.ENTER);
                 default:
                     return (PhysicalLocationReporter.Direction.EXIT);
@@ -300,14 +337,14 @@ public class LnReporter extends AbstractIdTagReporter implements CollectingRepor
       * {@inheritDoc}
       */
      @Override
-     public java.util.Collection getCollection(){
+     public java.util.Collection<Object> getCollection(){
         return entrySet;
      }
 
     // data members
-    private int _number;   // LocoNet Reporter number
-    private HashSet<TranspondingTag> entrySet=null;
+    private final int _number;   // LocoNet Reporter number
+    private final HashSet<Object> entrySet;
 
-    private final static Logger log = LoggerFactory.getLogger(LnReporter.class);
+    private static final Logger log = LoggerFactory.getLogger(LnReporter.class);
 
 }

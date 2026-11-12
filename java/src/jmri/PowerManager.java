@@ -38,41 +38,57 @@ import jmri.beans.PropertyChangeProvider;
  */
 public interface PowerManager extends PropertyChangeProvider {
 
-    static final int UNKNOWN = NamedBean.UNKNOWN;
-    static final int ON = 0x02;
-    static final int OFF = 0x04;
-    static final int IDLE = 0x08; // not supported by some connection types
+    int UNKNOWN = NamedBean.UNKNOWN;
+    int ON = 0x02;
+    int OFF = 0x04;
+    int IDLE = 0x08; // not supported by some connection types
 
-    /**
-     * {@link java.beans.PropertyChangeEvent}s are fired with this property name
-     * to ensure backwards compatibility for scripts.
-     * <p>
-     * {@value #POWER_OPN}
-     * 
-     * @deprecated since 4.19.7; use {@link #POWER} instead
-     */
-    @Deprecated
-    static final String POWER_OPN = "Power"; // OPN == "Old Property Name" // NOI18N
     /**
      * {@link java.beans.PropertyChangeEvent}s are fired with this property name.
      * <p>
      * {@value #POWER}
      */
-    static final String POWER = "power"; // as recommended in JavaBeans Spec // NOI18N
+    String POWER = "power"; // as recommended in JavaBeans Spec // NOI18N
 
-    public void setPower(int v) throws JmriException;
+    /**
+     * Set the Power.
+     * @param v the new power status.
+     * @throws jmri.JmriException if unable to send request.
+     */
+    void setPower(int v) throws JmriException;
 
+    /**
+     * Get the current power state.
+     * @return int value of state.
+     */
     @CheckReturnValue
-    public int getPower();
+    int getPower();
 
-    // to free resources when no longer used
-    public void dispose() throws JmriException;
-    
-    public default boolean implementsIdle() {
-        // By default the Power Manager does not implement the IDLE power state
+    /**
+     * Free resources when no longer used.
+     * @throws jmri.JmriException if unable to dispose.
+     */
+    void dispose() throws JmriException;
+
+    /**
+     * Check if the connection supports the Idle power state.
+     * By default the Power Manager does not implement the IDLE power state.
+     * @return true if the connection implements Idle, else false.
+     */
+    default boolean implementsIdle() {
         return false;
     }
 
+    /**
+     * Request Track Power Status Update.
+     * Default implementation does nothing.
+     */
+    default void requestUpdateFromLayout() {}
+
+    /**
+     * Get the PowerManager UserName.
+     * @return a nonNull userName.
+     */
     @CheckReturnValue
-    @Nonnull public String getUserName();
+    @Nonnull String getUserName();
 }

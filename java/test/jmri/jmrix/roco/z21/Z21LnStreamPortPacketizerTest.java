@@ -1,15 +1,12 @@
 package jmri.jmrix.roco.z21;
 
+import java.io.*;
+
 import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.util.JUnitUtil;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 
 /**
  * Tests for jmri.jmrix.loconet.streamport.StreamPortPacketizer
@@ -21,15 +18,9 @@ public class Z21LnStreamPortPacketizerTest extends jmri.jmrix.loconet.streamport
 
     private LocoNetSystemConnectionMemo memo;
     private Z21LnStreamPortController apc;
-           
-    private DataOutputStream ostream;  // Traffic controller writes to this
-    
-    @SuppressWarnings("unused") // partial implementation of test? See jmri.jmrix.AbstractPortControllerScaffold
-    private DataInputStream tostream; // so we can read it from this
 
-    @SuppressWarnings("unused") // partial implementation of test? See jmri.jmrix.AbstractPortControllerScaffold
-    private DataOutputStream tistream; // tests write to this
-    
+    private DataOutputStream ostream;  // Traffic controller writes to this
+
     private DataInputStream istream;   // so the traffic controller can read from this
 
     @Override
@@ -42,12 +33,11 @@ public class Z21LnStreamPortPacketizerTest extends jmri.jmrix.loconet.streamport
         try {
            PipedInputStream tempPipe;
            tempPipe = new PipedInputStream();
-           tostream = new DataInputStream(tempPipe);
-           ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
+           PipedOutputStream tempPipeOut = new PipedOutputStream(tempPipe);
+           ostream = new DataOutputStream(tempPipeOut);
 
            tempPipe = new PipedInputStream();
            istream = new DataInputStream(tempPipe);
-           tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
            apc = new Z21LnStreamPortController(memo, istream, ostream, "Test Stream Port");
        } catch (java.io.IOException ioe) {
            Assert.fail("failed to initialize port controller");
@@ -64,9 +54,7 @@ public class Z21LnStreamPortPacketizerTest extends jmri.jmrix.loconet.streamport
         apc.dispose();
         apc = null;
         istream = null;
-        tistream = null;
         ostream = null;
-        tostream = null;
         JUnitUtil.tearDown();
     }
 

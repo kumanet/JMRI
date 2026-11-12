@@ -2,7 +2,7 @@ package jmri.jmrix;
 
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
@@ -21,8 +21,7 @@ import javax.swing.JToggleButton;
 import jmri.util.FileUtil;
 import jmri.util.JmriJFrame;
 import jmri.util.swing.TextAreaFIFO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 
 /**
@@ -47,12 +46,13 @@ public abstract class AbstractMonFrame extends JmriJFrame {
     @OverridingMethodsMustInvokeSuper
     @Override
     public void dispose() {
-        if (p!=null) {
-           p.setSimplePreferenceState(timeStampCheck, timeCheckBox.isSelected());
-           p.setSimplePreferenceState(rawDataCheck, rawCheckBox.isSelected());
-           p.setSimplePreferenceState(alwaysOnTopCheck, alwaysOnTopCheckBox.isSelected());
-           p.setSimplePreferenceState(autoScrollCheck, !autoScrollCheckBox.isSelected());
+        if (userPrefs!=null) {
+           userPrefs.setSimplePreferenceState(timeStampCheck, timeCheckBox.isSelected());
+           userPrefs.setSimplePreferenceState(rawDataCheck, rawCheckBox.isSelected());
+           userPrefs.setSimplePreferenceState(alwaysOnTopCheck, alwaysOnTopCheckBox.isSelected());
+           userPrefs.setSimplePreferenceState(autoScrollCheck, !autoScrollCheckBox.isSelected());
         }
+        stopLogButtonActionPerformed(null);
         monTextPane.dispose();
         super.dispose();
     }
@@ -60,30 +60,36 @@ public abstract class AbstractMonFrame extends JmriJFrame {
     // these should call nextLine(String line, String raw) with their updates
 
     // member declarations
-    protected JButton clearButton = new JButton();
-    protected JToggleButton freezeButton = new JToggleButton();
+    protected JButton clearButton = new JButton(Bundle.getMessage("ButtonClearScreen"));
+    protected JToggleButton freezeButton = new JToggleButton(Bundle.getMessage("ButtonFreezeScreen"));
     protected JScrollPane jScrollPane1 = new JScrollPane();
     protected TextAreaFIFO monTextPane = new TextAreaFIFO(MAX_LINES);
-    protected JButton startLogButton = new JButton();
-    protected JButton stopLogButton = new JButton();
-    protected JCheckBox rawCheckBox = new JCheckBox();
-    protected JCheckBox timeCheckBox = new JCheckBox();
-    protected JCheckBox alwaysOnTopCheckBox = new JCheckBox();
-    protected JCheckBox autoScrollCheckBox = new JCheckBox();
-    protected JButton openFileChooserButton = new JButton();
+    protected JButton startLogButton = new JButton(Bundle.getMessage("ButtonStartLogging"));
+    protected JButton stopLogButton = new JButton(Bundle.getMessage("ButtonStopLogging"));
+
+    protected JCheckBox rawCheckBox = new JCheckBox(Bundle.getMessage("ButtonShowRaw"));
+    protected JCheckBox timeCheckBox = new JCheckBox(Bundle.getMessage("ButtonShowTimestamps"));
+    protected JCheckBox alwaysOnTopCheckBox = new JCheckBox(Bundle.getMessage("ButtonWindowOnTop"));
+    protected JCheckBox autoScrollCheckBox = new JCheckBox(Bundle.getMessage("ButtonAutoScroll"));
+    protected JButton openFileChooserButton = new JButton(Bundle.getMessage("ButtonChooseLogFile"));
     protected JTextField entryField = new JTextField();
-    protected JButton enterButton = new JButton();
-    String rawDataCheck = this.getClass().getName() + ".RawData"; // NOI18N
-    String timeStampCheck = this.getClass().getName() + ".TimeStamp"; // NOI18N
-    String alwaysOnTopCheck = this.getClass().getName() + ".alwaysOnTop"; // NOI18N
-    String autoScrollCheck = this.getClass().getName() + ".AutoScroll"; // NOI18N
-    jmri.UserPreferencesManager p;
+    protected JButton enterButton = new JButton(Bundle.getMessage("ButtonAddMessage"));
+
+    /** Bracket characters wrapping the raw data in the displayed line; subclasses may override. */
+    protected String rawOpenBracket = "[";
+    protected String rawCloseBracket = "]";
+
+    private final String rawDataCheck = this.getClass().getName() + ".RawData"; // NOI18N
+    private final String timeStampCheck = this.getClass().getName() + ".TimeStamp"; // NOI18N
+    private final String alwaysOnTopCheck = this.getClass().getName() + ".alwaysOnTop"; // NOI18N
+    private final String autoScrollCheck = this.getClass().getName() + ".AutoScroll"; // NOI18N
+    public jmri.UserPreferencesManager userPrefs;
 
     // for locking
-    AbstractMonFrame self;
+    final AbstractMonFrame self;
 
     // to find and remember the log file
-    public final javax.swing.JFileChooser logFileChooser = new JFileChooser(FileUtil.getUserFilesPath());
+    public final javax.swing.JFileChooser logFileChooser = new jmri.util.swing.JmriJFileChooser(FileUtil.getUserFilesPath());
 
     public AbstractMonFrame() {
         super();
@@ -96,26 +102,12 @@ public abstract class AbstractMonFrame extends JmriJFrame {
     @Override
     public void initComponents() {
 
-        p = jmri.InstanceManager.getDefault(jmri.UserPreferencesManager.class);
+        userPrefs = jmri.InstanceManager.getDefault(jmri.UserPreferencesManager.class);
         // the following code sets the frame's initial state
-
-        clearButton.setText(Bundle.getMessage("ButtonClearScreen")); // NOI18N
-        clearButton.setVisible(true);
-        clearButton.setToolTipText(Bundle.getMessage("TooltipClearMonHistory")); // NOI18N
-
-        freezeButton.setText(Bundle.getMessage("ButtonFreezeScreen")); // NOI18N
-        freezeButton.setVisible(true);
-        freezeButton.setToolTipText(Bundle.getMessage("TooltipStopScroll")); // NOI18N
-
-        enterButton.setText(Bundle.getMessage("ButtonAddMessage")); // NOI18N
-        enterButton.setVisible(true);
-        enterButton.setToolTipText(Bundle.getMessage("TooltipAddMessage")); // NOI18N
 
         monTextPane.setVisible(true);
         monTextPane.setToolTipText(Bundle.getMessage("TooltipMonTextPane")); // NOI18N
         monTextPane.setEditable(false);
-
-        entryField.setToolTipText(Bundle.getMessage("TooltipEntryPane", Bundle.getMessage("ButtonAddMessage"))); // NOI18N
 
         // fix a width for current character set
         JTextField t = new JTextField(200);
@@ -126,121 +118,50 @@ public abstract class AbstractMonFrame extends JmriJFrame {
         jScrollPane1.setPreferredSize(new Dimension(x, y));
         jScrollPane1.setVisible(true);
 
-        startLogButton.setText(Bundle.getMessage("ButtonStartLogging")); // NOI18N
-        startLogButton.setVisible(true);
-        startLogButton.setToolTipText(Bundle.getMessage("TooltipStartLogging")); // NOI18N
-
-        stopLogButton.setText(Bundle.getMessage("ButtonStopLogging")); // NOI18N
-        stopLogButton.setVisible(true);
-        stopLogButton.setToolTipText(Bundle.getMessage("TooltipStopLogging")); // NOI18N
-
-        rawCheckBox.setText(Bundle.getMessage("ButtonShowRaw")); // NOI18N
-        rawCheckBox.setVisible(true);
-        rawCheckBox.setToolTipText(Bundle.getMessage("TooltipShowRaw")); // NOI18N
-        rawCheckBox.setSelected(p.getSimplePreferenceState(rawDataCheck));
-
-        timeCheckBox.setText(Bundle.getMessage("ButtonShowTimestamps")); // NOI18N
-        timeCheckBox.setVisible(true);
-        timeCheckBox.setToolTipText(Bundle.getMessage("TooltipShowTimestamps")); // NOI18N
-        timeCheckBox.setSelected(p.getSimplePreferenceState(timeStampCheck));
-
-        alwaysOnTopCheckBox.setText(Bundle.getMessage("ButtonWindowOnTop")); // NOI18N
-        alwaysOnTopCheckBox.setVisible(true);
-        alwaysOnTopCheckBox.setToolTipText(Bundle.getMessage("TooltipWindowOnTop")); // NOI18N
-        alwaysOnTopCheckBox.setSelected(p.getSimplePreferenceState(alwaysOnTopCheck));
-        setAlwaysOnTop(alwaysOnTopCheckBox.isSelected());
-
-        autoScrollCheckBox.setText(Bundle.getMessage("ButtonAutoScroll")); // NOI18N
-        autoScrollCheckBox.setVisible(true);
-        autoScrollCheckBox.setToolTipText(Bundle.getMessage("TooltipAutoScroll")); // NOI18N
-        autoScrollCheckBox.setSelected(!p.getSimplePreferenceState(autoScrollCheck));
-
-        openFileChooserButton.setText(Bundle.getMessage("ButtonChooseLogFile")); // NOI18N
-        openFileChooserButton.setVisible(true);
-        openFileChooserButton.setToolTipText(Bundle.getMessage("TooltipChooseLogFile")); // NOI18N
-
         setTitle(title());
         getContentPane().setLayout(new BoxLayout(getContentPane(), BoxLayout.Y_AXIS));
 
         // add items to GUI
         getContentPane().add(jScrollPane1);
 
-        JPanel paneA = new JPanel();
+        JPanel paneA;
+        if (useStackedControlsLayout()) {
+            // Track preferred height so WrapLayout-based control rows can grow when
+            // the window narrows; unconstrained width lets the area stretch.
+            paneA = new JPanel() {
+                @Override
+                public Dimension getMaximumSize() {
+                    return new Dimension(Short.MAX_VALUE, getPreferredSize().height);
+                }
+            };
+        } else {
+            paneA = new JPanel();
+        }
         paneA.setLayout(new BoxLayout(paneA, BoxLayout.Y_AXIS));
 
-        JPanel pane1 = new JPanel();
-        pane1.setLayout(new BoxLayout(pane1, BoxLayout.X_AXIS));
-        pane1.add(clearButton);
-        pane1.add(freezeButton);
-        pane1.add(rawCheckBox);
-        pane1.add(timeCheckBox);
-        pane1.add(alwaysOnTopCheckBox);
-        paneA.add(pane1);
-
-        JPanel pane2 = new JPanel();
-        pane2.setLayout(new BoxLayout(pane2, BoxLayout.X_AXIS));
-        pane2.add(openFileChooserButton);
-        pane2.add(startLogButton);
-        pane2.add(stopLogButton);
-        paneA.add(pane2);
+        if (useStackedControlsLayout()) {
+            paneA.add(getActionButtonsPanel());
+            paneA.add(getCheckBoxPanel());
+            paneA.add(getLogToFilePanel());
+        } else {
+            JPanel topActions = new JPanel();
+            topActions.add(getActionButtonsPanel());
+            topActions.add(getCheckBoxPanel());
+            paneA.add(topActions);
+            paneA.add(getLogToFilePanel());
+        }
 
         JPanel pane3 = new JPanel();
         pane3.setLayout(new BoxLayout(pane3, BoxLayout.X_AXIS));
+        enterButton.setVisible(true);
+        enterButton.setToolTipText(Bundle.getMessage("TooltipAddMessage")); // NOI18N
+        enterButton.addActionListener(this::enterButtonActionPerformed);
+        entryField.setToolTipText(Bundle.getMessage("TooltipEntryPane", Bundle.getMessage("ButtonAddMessage"))); // NOI18N
         pane3.add(enterButton);
         pane3.add(entryField);
         paneA.add(pane3);
 
         getContentPane().add(paneA);
-
-        // connect actions to buttons
-        clearButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                clearButtonActionPerformed(e);
-            }
-        });
-        startLogButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                startLogButtonActionPerformed(e);
-            }
-        });
-        stopLogButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                stopLogButtonActionPerformed(e);
-            }
-        });
-        openFileChooserButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                openFileChooserButtonActionPerformed(e);
-            }
-        });
-
-        enterButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                enterButtonActionPerformed(e);
-            }
-        });
-
-        alwaysOnTopCheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                setAlwaysOnTop(alwaysOnTopCheckBox.isSelected());
-            }
-        });
-
-        autoScrollCheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                monTextPane.setAutoScroll(autoScrollCheckBox.isSelected());
-            }
-        });
-
-        // set file chooser to a default
-        logFileChooser.setSelectedFile(new File("monitorLog.txt")); // NOI18N
 
         // connect to data source
         init();
@@ -248,10 +169,105 @@ public abstract class AbstractMonFrame extends JmriJFrame {
         // add help menu to window
         setHelp();
 
-        // prevent button areas from expanding
         pack();
-        paneA.setMaximumSize(paneA.getSize());
-        pack();
+        if (!useStackedControlsLayout()) {
+            // Legacy path pins the controls area at its packed size; the stacked
+            // path handles this via paneA's getMaximumSize override above.
+            paneA.setMaximumSize(paneA.getSize());
+            pack();
+        }
+    }
+
+    /**
+     * Whether to lay out the action, checkbox, and log button panels as separate
+     * stacked rows directly inside paneA (with paneA's height tracking its
+     * preferred so {@code WrapLayout}-based rows can grow when the window is
+     * narrowed). Defaults to {@code false} — legacy side-by-side layout with a
+     * FlowLayout wrapper and a static max-size pin. Subclasses opt in.
+     *
+     * @return true for stacked rows, false for the legacy layout
+     */
+    protected boolean useStackedControlsLayout() {
+        return false;
+    }
+
+    protected JPanel getCheckBoxPanel() {
+        JPanel pane1 = new JPanel();
+        pane1.setLayout(new BoxLayout(pane1, BoxLayout.X_AXIS));
+
+        rawCheckBox.setVisible(true);
+        rawCheckBox.setToolTipText(Bundle.getMessage("TooltipShowRaw")); // NOI18N
+        rawCheckBox.setSelected(userPrefs.getSimplePreferenceState(rawDataCheck));
+
+        timeCheckBox.setVisible(true);
+        timeCheckBox.setToolTipText(Bundle.getMessage("TooltipShowTimestamps")); // NOI18N
+        timeCheckBox.setSelected(userPrefs.getSimplePreferenceState(timeStampCheck));
+
+        alwaysOnTopCheckBox.setVisible(true);
+        alwaysOnTopCheckBox.setToolTipText(Bundle.getMessage("TooltipWindowOnTop")); // NOI18N
+        alwaysOnTopCheckBox.setSelected(userPrefs.getSimplePreferenceState(alwaysOnTopCheck));
+        setAlwaysOnTop(alwaysOnTopCheckBox.isSelected());
+
+        alwaysOnTopCheckBox.addActionListener((ActionEvent e) -> {
+            setAlwaysOnTop(alwaysOnTopCheckBox.isSelected());
+        });
+
+        autoScrollCheckBox.setVisible(true);
+        autoScrollCheckBox.setToolTipText(Bundle.getMessage("TooltipAutoScroll")); // NOI18N
+        autoScrollCheckBox.setSelected(!userPrefs.getSimplePreferenceState(autoScrollCheck));
+
+        autoScrollCheckBox.addActionListener((ActionEvent e) -> {
+            monTextPane.setAutoScroll(autoScrollCheckBox.isSelected());
+        });
+
+        pane1.add(rawCheckBox);
+        pane1.add(timeCheckBox);
+        pane1.add(alwaysOnTopCheckBox);
+        pane1.add(autoScrollCheckBox);
+        return pane1;
+    }
+
+    protected JPanel getActionButtonsPanel() {
+
+        JPanel pane1 = new JPanel();
+        pane1.setLayout(new BoxLayout(pane1, BoxLayout.X_AXIS));
+
+        clearButton.setVisible(true);
+        clearButton.setToolTipText(Bundle.getMessage("TooltipClearMonHistory")); // NOI18N
+        clearButton.addActionListener(this::clearButtonActionPerformed);
+
+        freezeButton.setVisible(true);
+        freezeButton.setToolTipText(Bundle.getMessage("TooltipStopScroll")); // NOI18N
+
+        pane1.add(clearButton);
+        pane1.add(freezeButton);
+        return pane1;
+    }
+
+    protected JPanel getLogToFilePanel() {
+        JPanel pane1 = new JPanel();
+        pane1.setLayout(new BoxLayout(pane1, BoxLayout.X_AXIS));
+
+        startLogButton.setVisible(true);
+        startLogButton.setToolTipText(Bundle.getMessage("TooltipStartLogging"));
+
+        stopLogButton.setVisible(false);
+        stopLogButton.setToolTipText(Bundle.getMessage("TooltipStopLogging"));
+
+        openFileChooserButton.setVisible(true);
+        openFileChooserButton.setToolTipText(Bundle.getMessage("TooltipChooseLogFile"));
+
+        startLogButton.addActionListener(this::startLogButtonActionPerformed);
+        stopLogButton.addActionListener(this::stopLogButtonActionPerformed);
+
+        // set file chooser to a default
+        logFileChooser.setSelectedFile(new File("monitorLog.txt"));
+        openFileChooserButton.addActionListener(this::openFileChooserButtonActionPerformed);
+
+        pane1.add(openFileChooserButton);
+        pane1.add(startLogButton);
+        pane1.add(stopLogButton);
+        return pane1;
     }
 
     /**
@@ -265,20 +281,37 @@ public abstract class AbstractMonFrame extends JmriJFrame {
         addHelpMenu("package.jmri.jmrix.AbstractMonFrame", true); // NOI18N
     }
 
+    /**
+     * Handle display of traffic.
+     * @param line is the traffic in 'normal form'. Should end with \n
+     * @param raw is the "raw form" , should NOT end with \n
+     */
     public void nextLine(String line, String raw) {
-        // handle display of traffic
-        // line is the traffic in 'normal form', raw is the "raw form"
-        // Both should be one or more well-formed lines, e.g. end with \n
-        StringBuffer sb = new StringBuffer(120);
+        nextLine(line, raw, null);
+    }
+
+    /**
+     * Handle display of traffic with an explicit direction marker (e.g. "TX:" or "RX:")
+     * that is shown regardless of which display checkboxes are selected.
+     * @param line is the traffic in 'normal form'. Should end with \n
+     * @param raw is the "raw form", should NOT end with \n
+     * @param direction direction marker to display, or null/empty to omit
+     */
+    public void nextLine(String line, String raw, String direction) {
+        StringBuilder sb = new StringBuilder(120);
 
         // display the timestamp if requested
         if (timeCheckBox.isSelected()) {
             sb.append(df.format(new Date())).append(": "); // NOI18N
         }
 
+        if (direction != null && !direction.isEmpty()) {
+            sb.append(direction).append(' ');
+        }
+
         // display the raw data if requested
         if (rawCheckBox.isSelected()) {
-            sb.append('[').append(raw).append("]  "); // NOI18N
+            sb.append(rawOpenBracket).append(raw).append(rawCloseBracket).append("  "); // NOI18N
         }
 
         // display decoded data
@@ -289,13 +322,10 @@ public abstract class AbstractMonFrame extends JmriJFrame {
 
         // if not frozen, display it in the Swing thread
         if (!freezeButton.isSelected()) {
-            Runnable r = new Runnable() {
-                @Override
-                public void run() {
-                    synchronized (self) {
-                        monTextPane.append(linesBuffer.toString());
-                        linesBuffer.setLength(0);
-                    }
+            Runnable r = () -> {
+                synchronized (self) {
+                    monTextPane.append(linesBuffer.toString());
+                    linesBuffer.setLength(0);
                 }
             };
             javax.swing.SwingUtilities.invokeLater(r);
@@ -307,10 +337,9 @@ public abstract class AbstractMonFrame extends JmriJFrame {
                 String logLine = sb.toString();
                 if (!newline.equals("\n")) {
                     // have to massage the line-ends
-                    int i = 0;
                     int lim = sb.length();
-                    StringBuffer out = new StringBuffer(sb.length() + 10);  // arbitrary guess at space
-                    for (i = 0; i < lim; i++) {
+                    StringBuilder out = new StringBuilder(sb.length() + 10);  // arbitrary guess at space
+                    for (int i = 0; i < lim; i++) {
                         if (sb.charAt(i) == '\n') {
                             out.append(newline);
                         } else {
@@ -341,20 +370,25 @@ public abstract class AbstractMonFrame extends JmriJFrame {
             try {
                 logStream = new PrintStream(new FileOutputStream(logFileChooser.getSelectedFile()));
             } catch (java.io.FileNotFoundException ex) {
-                log.error("exception {}", ex);
+                log.error("exception", ex);
             }
         }
+        updateLoggingButtons();
     }
 
     public synchronized void stopLogButtonActionPerformed(java.awt.event.ActionEvent e) {
         // stop logging by removing the stream
         if (logStream != null) {
-            synchronized (logStream) {
-                logStream.flush();
-                logStream.close();
-            }
+            logStream.flush();
+            logStream.close();
             logStream = null;
         }
+        updateLoggingButtons();
+    }
+
+    private void updateLoggingButtons(){
+        this.startLogButton.setVisible(logStream == null);
+        this.stopLogButton.setVisible(logStream != null);
     }
 
     public void openFileChooserButtonActionPerformed(java.awt.event.ActionEvent e) {
@@ -377,13 +411,9 @@ public abstract class AbstractMonFrame extends JmriJFrame {
         nextLine(entryField.getText() + "\n", ""); // NOI18N
     }
 
-    public synchronized String getFrameText() {
-        return linesBuffer.toString();
-    }
-
-    /** 
+    /**
      * Get access to the main text area.
-     * This is intended for use in e.g. scripting 
+     * This is intended for use in e.g. scripting
      * to extend the behaviour of the window.
      * @return the text area.
      */
@@ -391,14 +421,14 @@ public abstract class AbstractMonFrame extends JmriJFrame {
         return monTextPane;
     }
 
-    volatile PrintStream logStream = null;
+    private volatile PrintStream logStream = null;
 
     // to get a time string
     DateFormat df = new SimpleDateFormat("HH:mm:ss.SSS");
 
     StringBuffer linesBuffer = new StringBuffer();
-    static private int MAX_LINES = 500;
+    private static int MAX_LINES = 500;
 
-    private static final Logger log = LoggerFactory.getLogger(AbstractMonFrame.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbstractMonFrame.class);
 
 }

@@ -1,7 +1,5 @@
 package jmri.jmrit.logixng.implementation;
 
-import static jmri.NamedBean.UNKNOWN;
-
 import java.io.PrintWriter;
 import java.util.*;
 
@@ -10,15 +8,8 @@ import jmri.JmriException;
 import jmri.Manager;
 import jmri.NamedBean;
 import jmri.NamedBeanUsageReport;
-// import jmri.implementation.JmriSimplePropertyListener;
 import jmri.implementation.AbstractNamedBean;
-import jmri.jmrit.logixng.Base;
-import jmri.jmrit.logixng.Category;
-import jmri.jmrit.logixng.ConditionalNG;
-import jmri.jmrit.logixng.ConditionalNG_Manager;
-import jmri.jmrit.logixng.FemaleSocket;
-import jmri.jmrit.logixng.LogixNG;
-import jmri.jmrit.logixng.LogixNG_Manager;
+import jmri.jmrit.logixng.*;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
@@ -32,12 +23,28 @@ public class DefaultLogixNG extends AbstractNamedBean
         implements LogixNG {
 
     private final LogixNG_Manager _manager = InstanceManager.getDefault(LogixNG_Manager.class);
+    private boolean _startup = true;
+    private boolean _inline = false;
+    private InlineLogixNG _inlineLogixNG = null;
     private boolean _enabled = false;
+    private boolean _isActive = false;
     private final List<ConditionalNG_Entry> _conditionalNG_Entries = new ArrayList<>();
 
 
     public DefaultLogixNG(String sys, String user) throws BadUserNameException, BadSystemNameException  {
         super(sys, user);
+
+        // Do this test here to ensure all the tests are using correct system names
+        Manager.NameValidity isNameValid = InstanceManager.getDefault(LogixNG_Manager.class).validSystemNameFormat(mSystemName);
+        if (isNameValid != Manager.NameValidity.VALID) {
+            throw new IllegalArgumentException("system name is not valid");
+        }
+    }
+
+    public DefaultLogixNG(String sys, String user, boolean inline) throws BadUserNameException, BadSystemNameException  {
+        super(sys, user);
+
+        _inline = inline;
 
         // Do this test here to ensure all the tests are using correct system names
         Manager.NameValidity isNameValid = InstanceManager.getDefault(LogixNG_Manager.class).validSystemNameFormat(mSystemName);
@@ -95,18 +102,13 @@ public class DefaultLogixNG extends AbstractNamedBean
     }
 
     @Override
-    public Category getCategory() {
-        throw new UnsupportedOperationException("Not supported.");
-    }
-
-    @Override
-    public boolean isExternal() {
+    public LogixNG_Category getCategory() {
         throw new UnsupportedOperationException("Not supported.");
     }
 
     /** {@inheritDoc} */
     @Override
-    final public void setup() {
+    public final void setup() {
         for (ConditionalNG_Entry entry : _conditionalNG_Entries) {
             if ( entry._conditionalNG == null
                     || !entry._conditionalNG.getSystemName()
@@ -120,7 +122,7 @@ public class DefaultLogixNG extends AbstractNamedBean
                     if (entry._conditionalNG != null) {
                         entry._conditionalNG.setup();
                     } else {
-                        log.error("cannot load conditionalNG " + systemName);
+                        log.error("cannot load conditionalNG {}", systemName);
                     }
                 }
             } else {
@@ -131,11 +133,68 @@ public class DefaultLogixNG extends AbstractNamedBean
 
     /** {@inheritDoc} */
     @Override
+    public void clearStartup() {
+        _startup = false;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean isStartup() {
+        return _startup;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setInline(boolean inline) {
+        boolean old = _inline;
+        _inline = inline;
+        firePropertyChange(LogixNG.PROPERTY_INLINE, old, _inline);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean isInline() {
+        return _inline;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setInlineLogixNG(InlineLogixNG inlineLogixNG) {
+        _inlineLogixNG = inlineLogixNG;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public InlineLogixNG getInlineLogixNG() {
+        return _inlineLogixNG;
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public void setEnabled(boolean enable) {
+        boolean old = _enabled;
         _enabled = enable;
+        checkIfActiveAndEnabled();
+        firePropertyChange(PROPERTY_ENABLED, old, _enabled);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void activate() {
+        _isActive = true;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setActive(boolean active) {
+        _isActive = active;
+        checkIfActiveAndEnabled();
+    }
+
+    private void checkIfActiveAndEnabled() {
         if (isActive()) {
             registerListeners();
-            execute(true);
+            execute(true, true);
         } else {
             unregisterListeners();
         }
@@ -258,14 +317,19 @@ public class DefaultLogixNG extends AbstractNamedBean
         }
         if (!found) {
             log.error("attempt to delete ConditionalNG not in LogixNG: {}", conditionalNG.getSystemName());  // NOI18N
-            return;
         }
     }
 
     /** {@inheritDoc} */
     @Override
     public boolean isActive() {
-        return _enabled && _manager.isActive();
+        return _enabled && _isActive && _manager.isActive();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean isActivated() {
+        return _isActive;
     }
 
     /** {@inheritDoc} */
@@ -279,8 +343,17 @@ public class DefaultLogixNG extends AbstractNamedBean
     /** {@inheritDoc} */
     @Override
     public void execute(boolean allowRunDelayed) {
+        execute(allowRunDelayed, false);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void execute(boolean allowRunDelayed, boolean isStartup) {
         for (ConditionalNG_Entry entry : _conditionalNG_Entries) {
-            entry._conditionalNG.execute(allowRunDelayed);
+            ConditionalNG cng = entry._conditionalNG;
+            if (cng.isEnabled() && (!isStartup || cng.isExecuteAtStartup())) {
+                cng.execute(allowRunDelayed);
+            }
         }
     }
 
@@ -343,6 +416,12 @@ public class DefaultLogixNG extends AbstractNamedBean
         }
         writer.append(currentIndent);
         writer.append(getLongDescription(locale));
+        if (isInline()) {
+            writer.append(" ::: ").append(Bundle.getMessage("Inline"));
+        }
+        if (settings._printDisabled && !isEnabled()) {
+            writer.append(" ::: ").append(Bundle.getMessage("Disabled"));
+        }
         writer.println();
     }
 
@@ -436,6 +515,8 @@ public class DefaultLogixNG extends AbstractNamedBean
 
     /** {@inheritDoc} */
     @Override
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value="SLF4J_SIGN_ONLY_FORMAT",
+                                                        justification="Specific log message format")
     public void getUsageTree(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl) {
         log.debug("** {} :: {}", level, this.getClass().getName());
 
@@ -450,5 +531,14 @@ public class DefaultLogixNG extends AbstractNamedBean
     public void getUsageDetail(int level, NamedBean bean, List<jmri.NamedBeanUsageReport> report, NamedBean cdl) {
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultLogixNG.class);
+    /** {@inheritDoc} */
+    @Override
+    public void getListenerRefsIncludingChildren(List<String> list) {
+        list.addAll(getListenerRefs());
+        for (int i=0; i < getNumConditionalNGs(); i++) {
+            getConditionalNG(i).getListenerRefsIncludingChildren(list);
+        }
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DefaultLogixNG.class);
 }

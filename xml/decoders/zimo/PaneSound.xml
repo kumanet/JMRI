@@ -11,6 +11,10 @@
 <!-- ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or  -->
 <!-- FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License  -->
 <!-- for more details.                                                      -->
+<!-- version 2.0 - Pierre Billon - 2026-07-31 - add switch input 4 playback time (CV392) -->
+<!-- version 2.1 - Pierre Billon - 2026-08-06 - Added French and German translations -->
+<!-- version 1.9 - Ronald Kuhn - small visual improvement -->
+<!-- version 1.8 - Ronald Kuhn - add CVs from v40+ -->
 <!-- version 1.7 - Ronald Kuhn - add CVs from v37+ -->
 <!-- version 1.6 - Ronald Kuhn - add Brake squel suppressed, Quick Select Shift key -->
 <!-- version 1.5 - Ronald Kuhn - add german translation -->
@@ -19,8 +23,16 @@
 <!-- version 1.2, Nigel Cliffe, added "Standing Sound on premature shutdown" and "Chuff rate at higher speed steps" -->
 <!-- version 1.1, Nigel Cliffe, added "Steam chuff frequency at speed step 1" -->
 <!-- version 1, Mark Waters - for Unified Software -->
-<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder.xsd">
+<pane xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder-4-15-2.xsd">
+  <name>Sound</name>
+  <name xml:lang="fr">Son</name>
+  <name xml:lang="de">Sound</name>
+  <name xml:lang="it">Suono</name>
+  <name xml:lang="cs">Zvuk</name>
   <column>
+    <label>
+      <text> </text>
+    </label>
     <display item="Set sound program"/>
     <label>
       <text> </text>
@@ -50,6 +62,7 @@
     <display item="Switch input 1 playback time"/>
     <display item="Switch input 2 playback time"/>
     <display item="Switch input 3 playback time"/>
+    <display item="Switch input 4 playback time"/>
     <label>
       <text> </text>
     </label>
@@ -66,9 +79,16 @@
       <text> </text>
     </label>
     <display item="Steam Impact Stroke"/>
+    <label>
+      <text> </text>
+    </label>
   </column>
   <column>
+    <label>
+      <text> </text>
+    </label>
     <display item="Virtual cam chuff frequency"/>
+    <display item="Slower Steam Strokes"/>
     <display item="Steam chuff frequency at speed step 1"/>
     <display item="Real cam sensor chuff rate"/>
     <display item="Real cam sensor chuff rate 1"/>
@@ -105,8 +125,14 @@
     <display item="Load change threshold"/>
     <display item="Reaction time to load change"/>
     <display item="Load influence for diesel engines"/>
+    <label>
+      <text> </text>
+    </label>
   </column>
   <column>
+    <label>
+      <text> </text>
+    </label>
     <display item="Acceleration threshold for full load sound"/>
     <display item="Duration of acceleration sound"/>
     <display item="Engine volume at full acceleration"/>
@@ -144,13 +170,8 @@
       <text> </text>
     </label>
     <display item="Switch-over"/>
-  </column>
-  <column>
     <label>
-      <text>      </text>
+      <text> </text>
     </label>
   </column>
-  <name>Sound</name>
-  <name xml:lang="it">Suono</name>
-  <name xml:lang="cs">Zvuk</name>
 </pane>

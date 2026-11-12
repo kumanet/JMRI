@@ -23,7 +23,6 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.KeyStroke;
@@ -33,14 +32,13 @@ import jmri.jmrit.catalog.NamedIcon;
 import jmri.jmrit.display.DisplayFrame;
 import jmri.jmrit.display.Editor;
 import jmri.util.swing.ImagePanel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * ItemPanel general implementation for placement of CPE items having sets of
  * icons (families). The "family" is the set of icons that represent the various
  * states and/or status of the item.
- * 
+ *
  * @see ItemPanel palette class diagram
  * @author Pete Cressman Copyright (c) 2010, 2011, 2018
  * @author Egbert Broerse 2017
@@ -125,7 +123,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
 
     /**
      * Needed by CPE ConvertDialog.java
-     * 
+     *
      * @return JPanel
      */
     public JPanel getBottomPanel() {
@@ -231,10 +229,10 @@ public abstract class FamilyItemPanel extends ItemPanel {
 
         if (_isUnstoredMap) {
             _unstoredMap = iconMap;
-            int result = JOptionPane.showConfirmDialog(_frame.getEditor(), Bundle.getMessage("UnkownFamilyName", family),
-                    Bundle.getMessage("QuestionTitle"), JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE);
-            if (result == JOptionPane.YES_OPTION) {
+            int result = JmriJOptionPane.showConfirmDialog(_frame.getEditor(), Bundle.getMessage("UnkownFamilyName", family),
+                    Bundle.getMessage("QuestionTitle"), JmriJOptionPane.YES_NO_OPTION,
+                    JmriJOptionPane.QUESTION_MESSAGE);
+            if (result == JmriJOptionPane.YES_OPTION) {
                 ItemPalette.addFamily(_itemType, family, iconMap);
             }
             _family = family;
@@ -255,7 +253,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
      * Check that family name proposed by user for an icon family 1. name is not
      * a duplicate key 2. icon family is already stored. (Sets "_isUnstoredMap"
      * flag.)
-     * 
+     *
      * @param family  name for icon set
      * @param iconMap map the family name refers to.
      * @return valid family name or null if user declines to provide a valid
@@ -288,8 +286,8 @@ public abstract class FamilyItemPanel extends ItemPanel {
                 } else {
                     fr = this;
                 }
-                mapFamily = JOptionPane.showInputDialog(fr, Bundle.getMessage("EnterFamilyName"),
-                        Bundle.getMessage("createNewFamily"), JOptionPane.QUESTION_MESSAGE);
+                mapFamily = JmriJOptionPane.showInputDialog(fr, Bundle.getMessage("EnterFamilyName"), 
+                    Bundle.getMessage("createNewFamily"), JmriJOptionPane.QUESTION_MESSAGE );
                 if (mapFamily == null) { // user quit
                     return null;
                 }
@@ -301,7 +299,9 @@ public abstract class FamilyItemPanel extends ItemPanel {
                 if (mapFamily.equals(fam)) {
                     if (_update) {
                         String thisType = NAME_MAP.get(_itemType);
-                        JOptionPane.showMessageDialog(_frame, Bundle.getMessage("DuplicateFamilyName", mapFamily, Bundle.getMessage(thisType), Bundle.getMessage("UseAnotherName")), Bundle.getMessage("WarningTitle"), JOptionPane.WARNING_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(_frame,
+                            Bundle.getMessage("DuplicateFamilyName", mapFamily, Bundle.getMessage(thisType),
+                            Bundle.getMessage("UseAnotherName")), Bundle.getMessage("WarningTitle"), JmriJOptionPane.WARNING_MESSAGE);
                         mapFamily = null;
                         nameOK = false;
                         break;
@@ -346,7 +346,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
         HashMap<String, HashMap<String, NamedIcon>> families = ItemPalette.getFamilyMaps(_itemType);
         return families.containsKey(family);
     }
-    
+
     /*
      * Entry point when returning from result of familiesMissing() call
      */
@@ -431,7 +431,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
     /**
      * Make the _familyButtonPanel panel of buttons to select a family. Create
      * and set actions of radioButtons to change family on pane.
-     * 
+     *
      * @param keySet of icon family names
      */
     protected void makeFamilyButtons(java.util.Set<String> keySet) {
@@ -525,7 +525,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
         } else {
             _dragIconPanel.removeAll();
         }
-        _dragIconPanel.setImage(_frame.getPreviewBackground()); 
+        _dragIconPanel.setImage(_frame.getPreviewBackground());
         if (_iconPanel != null) {
             _iconPanel.setImage(_frame.getPreviewBackground());
         }
@@ -569,7 +569,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
             }
              if (icon != null) {
                 icon = new NamedIcon(icon);
-                double scale = icon.reduceTo(CatalogPanel.ICON_WIDTH, 
+                double scale = icon.reduceTo(CatalogPanel.ICON_WIDTH,
                         CatalogPanel.ICON_HEIGHT, CatalogPanel.ICON_SCALE);
                 scaleText = java.text.MessageFormat.format(Bundle.getMessage("scale"),
                         CatalogPanel.printDbl(scale, 2));
@@ -579,7 +579,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
             try {
                 label = getDragger(new DataFlavor(Editor.POSITIONABLE_FLAVOR), iconMap, icon);
             } catch (java.lang.ClassNotFoundException cnfe) {
-                log.warn("no DndIconPanel for {}, {} created. {}", _itemType, displayKey, cnfe);
+                log.warn("no DndIconPanel for {}, {} created", _itemType, displayKey, cnfe);
                 label = new JLabel(scaleText);
             }
         } else {
@@ -592,7 +592,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
 
     /**
      * Get the key to display the icon to be used for dragging to the panel
-     * 
+     *
      * @return key for desired icon
      */
     abstract protected String getDisplayKey();
@@ -680,9 +680,9 @@ public abstract class FamilyItemPanel extends ItemPanel {
      * Action item for deletion of an icon family.
      */
     protected void deleteFamilySet() {
-        if (JOptionPane.showConfirmDialog(_frame, Bundle.getMessage("confirmDelete", _family),
-                Bundle.getMessage("QuestionTitle"), JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
+        if (JmriJOptionPane.showConfirmDialog(_frame, Bundle.getMessage("confirmDelete", _family),
+                Bundle.getMessage("QuestionTitle"), JmriJOptionPane.YES_NO_OPTION,
+                JmriJOptionPane.QUESTION_MESSAGE) == JmriJOptionPane.YES_OPTION) {
             ItemPalette.removeIconMap(_itemType, _family);
             _family = null;
             _currentIconMap = null;
@@ -719,8 +719,8 @@ public abstract class FamilyItemPanel extends ItemPanel {
             _cntlDown = false;
             return true;
         }
-        String family = JOptionPane.showInputDialog(_frame, Bundle.getMessage("EnterFamilyName"),
-                Bundle.getMessage("createNewFamily"), JOptionPane.QUESTION_MESSAGE);
+        String family = JmriJOptionPane.showInputDialog(_frame, Bundle.getMessage("EnterFamilyName"),
+            Bundle.getMessage("createNewFamily"), JmriJOptionPane.QUESTION_MESSAGE );
         if (family == null) {
             return false;
         }
@@ -743,7 +743,7 @@ public abstract class FamilyItemPanel extends ItemPanel {
     /**
      * IconDialog calls this method to make any changes 'permanent'. It is
      * responsible for testing that the changes are valid.
-     * 
+     *
      * @param family  family name, possibly changed
      * @param iconMap family map, possibly changed
      */
@@ -885,6 +885,6 @@ public abstract class FamilyItemPanel extends ItemPanel {
         return _family;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(FamilyItemPanel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FamilyItemPanel.class);
 
 }

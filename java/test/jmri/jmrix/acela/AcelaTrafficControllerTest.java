@@ -1,14 +1,14 @@
 package jmri.jmrix.acela;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.*;
 import java.util.Vector;
 
 import jmri.util.JUnitUtil;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -18,16 +18,15 @@ import org.junit.jupiter.api.*;
  */
 public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTrafficControllerTest {
 
-    public void testCreate() {
-        AcelaTrafficController m = new AcelaTrafficController();
-        Assert.assertNotNull("exists", m);
-    }
-
-    public void testSendThenRcvReply() throws Exception {
+    @Test
+    @Disabled("Test requires further development, times out in 5.13.4+")
+    public void testSendThenRcvReply() throws IOException {
         AcelaTrafficController c = (AcelaTrafficController)tc;
         // connect to iostream via port controller
-        AcelaPortControllerScaffold p = new AcelaPortControllerScaffold();
-        c.connectPort(p);
+        assertDoesNotThrow( () -> {
+            AcelaPortControllerScaffold p = new AcelaPortControllerScaffold();
+            c.connectPort(p);
+        });
 
         // object to receive reply
         AcelaListener l = new AcelaListenerScaffold();
@@ -44,11 +43,11 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
         JUnitUtil.waitFor(()->{return tostream.available() == 4;}, "total length");
         
         // test the result of sending
-        Assert.assertEquals("total length ", 4, tostream.available());
-        Assert.assertEquals("Char 0", '0', tostream.readByte());
-        Assert.assertEquals("Char 1", '1', tostream.readByte());
-        Assert.assertEquals("Char 2", '2', tostream.readByte());
-        Assert.assertEquals("EOM", 0x0d, tostream.readByte());
+        assertEquals( 4, tostream.available(), "total length ");
+        assertEquals( (byte)'0', tostream.readByte(), "Char 0");
+        assertEquals( (byte)'1', tostream.readByte(), "Char 1");
+        assertEquals( (byte)'2', tostream.readByte(), "Char 2");
+        assertEquals( 0x0d, tostream.readByte(), "EOM");
 
 
         // now send reply
@@ -60,14 +59,26 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
 
         JUnitUtil.waitFor(()->{return rcvdReply != null;}, "reply received");
 
-        Assert.assertTrue("reply received ", rcvdReply != null);
-        Assert.assertEquals("first char of reply ", 'P', rcvdReply.getOpCode());
+        assertNotNull( rcvdReply, "reply received ");
+        assertEquals( 'P', rcvdReply.getOpCode(), "first char of reply ");
+    }
+
+    @Test
+    public void testListenerRcvdMsg() {
+        AcelaMessage m = new AcelaMessage(3);
+        m.setOpCode('0');
+        m.setElement(1, '1');
+        m.setElement(2, '2');
+
+        AcelaListener l = new AcelaListenerScaffold();
+        l.message(m);
+        assertEquals(m, rcvdMsg);
     }
 
     // internal class to simulate an AcelaListener
-    class AcelaListenerScaffold implements AcelaListener {
+    private class AcelaListenerScaffold implements AcelaListener {
 
-        public AcelaListenerScaffold() {
+        AcelaListenerScaffold() {
             rcvdReply = null;
             rcvdMsg = null;
         }
@@ -82,11 +93,23 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
             rcvdReply = r;
         }
     }
-    AcelaReply rcvdReply;
-    AcelaMessage rcvdMsg;
+
+    private AcelaReply rcvdReply;
+    private AcelaMessage rcvdMsg;
 
     // internal class to simulate an AcelaPortController
-    class AcelaPortControllerScaffold extends AcelaPortController {
+    private class AcelaPortControllerScaffold extends AcelaPortController {
+
+        AcelaPortControllerScaffold() throws IOException {
+            super(new AcelaSystemConnectionMemo());
+            PipedInputStream tempPipe;
+            tempPipe = new PipedInputStream();
+            tostream = new DataInputStream(tempPipe);
+            ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
+            tempPipe = new PipedInputStream();
+            istream = new DataInputStream(tempPipe);
+            tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
+        }
 
         @Override
         public Vector<String> getPortNames() {
@@ -113,17 +136,6 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
             return new int[] {};
         }
 
-        protected AcelaPortControllerScaffold() throws Exception {
-            super(new AcelaSystemConnectionMemo());
-            PipedInputStream tempPipe;
-            tempPipe = new PipedInputStream();
-            tostream = new DataInputStream(tempPipe);
-            ostream = new DataOutputStream(new PipedOutputStream(tempPipe));
-            tempPipe = new PipedInputStream();
-            istream = new DataInputStream(tempPipe);
-            tistream = new DataOutputStream(new PipedOutputStream(tempPipe));
-        }
-
         // returns the InputStream from the port
         @Override
         public DataInputStream getInputStream() {
@@ -142,11 +154,12 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
             return true;
         }
     }
-    DataOutputStream ostream;  // Traffic controller writes to this
-    DataInputStream tostream; // so we can read it from this
 
-    DataOutputStream tistream; // tests write to this
-    DataInputStream istream;  // so the traffic controller can read from this
+    private DataOutputStream ostream;  // Traffic controller writes to this
+    private DataInputStream tostream; // so we can read it from this
+
+    private DataOutputStream tistream; // tests write to this
+    private DataInputStream istream;  // so the traffic controller can read from this
 
     @Override
     @BeforeEach
@@ -158,7 +171,8 @@ public class AcelaTrafficControllerTest extends jmri.jmrix.AbstractMRNodeTraffic
     @Override
     @AfterEach
     public void tearDown() {
-        JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
+        tc.terminateThreads();
+        tc = null;
         JUnitUtil.tearDown();
 
     }

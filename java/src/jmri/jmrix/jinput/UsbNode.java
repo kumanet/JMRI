@@ -71,7 +71,7 @@ public class UsbNode extends DefaultMutableTreeNode {
                         val > 0.0 ? Sensor.ACTIVE : Sensor.INACTIVE);
             }
         } catch (IllegalArgumentException | JmriException e1) {
-            log.error("Can't set sensor: {}", e1);
+            log.error("Can't set sensor", e1);
         }
         try {
             if ((attachedMemory != null) && (!attachedMemory.equals(""))) {
@@ -79,7 +79,7 @@ public class UsbNode extends DefaultMutableTreeNode {
                         .provideMemory(attachedMemory).setValue("" + val);
             }
         } catch (IllegalArgumentException e2) {
-            log.error("Can't set memory: {}", e2);
+            log.error("Can't set memory", e2);
         }
     }
 
@@ -122,7 +122,7 @@ public class UsbNode extends DefaultMutableTreeNode {
      * @return the node, either an existing node with the same controller or
      *         component, or newly created
      */
-    static public UsbNode getNode(String name, Controller controller, Component component) {
+    public static UsbNode getNode(String name, Controller controller, Component component) {
         Object key = (component != null) ? component : controller;
         UsbNode result = NODES.get(key);
         if (result == null) {
@@ -134,5 +134,5 @@ public class UsbNode extends DefaultMutableTreeNode {
 
     private static final HashMap<Object, UsbNode> NODES = new HashMap<>();
 
-    private final static Logger log = LoggerFactory.getLogger(UsbNode.class);
+    private static final Logger log = LoggerFactory.getLogger(UsbNode.class);
 }

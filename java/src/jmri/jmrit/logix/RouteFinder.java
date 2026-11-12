@@ -10,24 +10,25 @@ import org.slf4j.LoggerFactory;
 
 public class RouteFinder implements Runnable {
 
-    WarrantRoute _caller;
-    BlockOrder _originBlockOrder;
-    BlockOrder _destBlockOrder;
-    BlockOrder _viaBlockOrder;
-    BlockOrder _avoidBlockOrder;
-    ArrayList<DefaultMutableTreeNode> _destNodes;
-    DefaultTreeModel _tree;
+    private WarrantRoute _caller;
+    private BlockOrder _originBlockOrder;
+    private BlockOrder _destBlockOrder;
+    private BlockOrder _viaBlockOrder;
+    private BlockOrder _avoidBlockOrder;
+    private ArrayList<DefaultMutableTreeNode> _destNodes;
+    private DefaultTreeModel _tree;
 
-    OBlock _destBlock;
-    String _dPathName;
-    String _dEntryName;
-    OBlock _viaBlock;
-    String _vPathName;
-    OBlock _avoidBlock;
-    String _aPathName;
+    private OBlock _destBlock;
+    private String _dPathName;
+    private String _dEntryName;
+    private OBlock _viaBlock;
+    private String _vPathName;
+    private OBlock _avoidBlock;
+    private String _aPathName;
 
-    int _maxBlocks;
-    boolean _quit = false;
+    private int _maxBlocks;
+    private volatile boolean _quit = false;
+    private volatile boolean _cancelled = false;
 
     protected RouteFinder(WarrantRoute f, BlockOrder origin, BlockOrder dest,
             BlockOrder via, BlockOrder avoid, int maxB) {
@@ -41,6 +42,16 @@ public class RouteFinder implements Runnable {
 
     protected synchronized void quit() {
         log.debug("quit= {}", _quit);
+        _quit = true;
+    }
+
+    /**
+     * Stop the search without reporting any result, e.g. because a new
+     * search has replaced it.
+     */
+    protected synchronized void cancel() {
+        log.debug("cancel");
+        _cancelled = true;
         _quit = true;
     }
 
@@ -86,7 +97,6 @@ public class RouteFinder implements Runnable {
         }
 
         _destNodes = new ArrayList<>();
-        _quit = false;
         int level = 0;
         if (log.isDebugEnabled()) {
             log.debug("Origin= \"{}\" Path= \"{}\" Exit= \"{}\"",  _originBlockOrder.getBlock().getDisplayName(),
@@ -99,12 +109,17 @@ public class RouteFinder implements Runnable {
         nodes.add(root);
         while (level < _maxBlocks && !_quit) {
             nodes = makeLevel(nodes, level);
-            if (log.isDebugEnabled()) {
-                log.debug("level {} has {} nodes. quit= {}", level, nodes.size(), _quit);
-            }
+            log.debug("level {} has {} nodes. quit= {}", level, nodes.size(), _quit);
             level++;
         }
+        if (_cancelled) {
+            log.debug("search cancelled at level {}", level);
+            return;
+        }
         jmri.util.ThreadingUtil.runOnLayout(() -> {
+            if (_cancelled) {    // cancelled while waiting to report
+                return;
+            }
             if (_destNodes.isEmpty()) {
                 _caller.debugRoute(_tree, _originBlockOrder, _destBlockOrder);
             } else {
@@ -180,9 +195,7 @@ public class RouteFinder implements Runnable {
                     }
                 }
             } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Dead branch: block= \"{}\" has no exit portal", pBlock.getDisplayName());
-                }
+                log.debug("Dead branch: block= \"{}\" has no exit portal", pBlock.getDisplayName());
             }
             if (_quit) {
                 break;

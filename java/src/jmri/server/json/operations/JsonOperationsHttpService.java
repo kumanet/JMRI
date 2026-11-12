@@ -1,73 +1,44 @@
 package jmri.server.json.operations;
 
-import static jmri.server.json.JSON.COLOR;
+import static jmri.server.json.JSON.*;
 import static jmri.server.json.JSON.COMMENT;
+import static jmri.server.json.JSON.DESTINATION;
 import static jmri.server.json.JSON.ENGINES;
-import static jmri.server.json.JSON.FORCE_DELETE;
-import static jmri.server.json.JSON.HAZARDOUS;
+import static jmri.server.json.JSON.KERNEL;
 import static jmri.server.json.JSON.LENGTH;
+import static jmri.server.json.JSON.LOCATION;
 import static jmri.server.json.JSON.MODEL;
-import static jmri.server.json.JSON.NAME;
 import static jmri.server.json.JSON.NUMBER;
-import static jmri.server.json.JSON.OWNER;
-import static jmri.server.json.JSON.RENAME;
-import static jmri.server.json.JSON.RFID;
 import static jmri.server.json.JSON.ROAD;
+import static jmri.server.json.JSON.TRACK;
 import static jmri.server.json.JSON.TYPE;
-import static jmri.server.json.JSON.USERNAME;
-import static jmri.server.json.JSON.UTILITY;
-import static jmri.server.json.operations.JsonOperations.BUILT;
-import static jmri.server.json.operations.JsonOperations.CABOOSE;
-import static jmri.server.json.operations.JsonOperations.CAR;
-import static jmri.server.json.operations.JsonOperations.CARS;
-import static jmri.server.json.operations.JsonOperations.CAR_TYPE;
-import static jmri.server.json.operations.JsonOperations.DESTINATION;
-import static jmri.server.json.operations.JsonOperations.ENGINE;
-import static jmri.server.json.operations.JsonOperations.FRED;
-import static jmri.server.json.operations.JsonOperations.KERNEL;
-import static jmri.server.json.operations.JsonOperations.LEAD;
-import static jmri.server.json.operations.JsonOperations.LOCATION;
-import static jmri.server.json.operations.JsonOperations.LOCATIONS;
+import static jmri.server.json.JSON.WEIGHT;
+import static jmri.server.json.operations.JsonOperations.*;
 import static jmri.server.json.operations.JsonOperations.OUT_OF_SERVICE;
-import static jmri.server.json.operations.JsonOperations.PASSENGER;
-import static jmri.server.json.operations.JsonOperations.ROLLING_STOCK;
-import static jmri.server.json.operations.JsonOperations.TRACK;
-import static jmri.server.json.operations.JsonOperations.TRAIN;
-import static jmri.server.json.operations.JsonOperations.TRAINS;
-import static jmri.server.json.operations.JsonOperations.WEIGHT;
-import static jmri.server.json.operations.JsonOperations.WEIGHT_TONS;
 import static jmri.server.json.reporter.JsonReporter.REPORTER;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 import javax.annotation.Nonnull;
 import javax.servlet.http.HttpServletResponse;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import jmri.InstanceManager;
-import jmri.Reporter;
-import jmri.ReporterManager;
-import jmri.jmrit.operations.locations.Location;
-import jmri.jmrit.operations.locations.LocationManager;
-import jmri.jmrit.operations.locations.Track;
+import jmri.*;
+import jmri.jmrit.operations.locations.*;
 import jmri.jmrit.operations.rollingstock.RollingStock;
-import jmri.jmrit.operations.rollingstock.cars.Car;
-import jmri.jmrit.operations.rollingstock.cars.CarManager;
-import jmri.jmrit.operations.rollingstock.cars.CarTypes;
-import jmri.jmrit.operations.rollingstock.cars.Kernel;
+import jmri.jmrit.operations.rollingstock.cars.*;
 import jmri.jmrit.operations.rollingstock.engines.Engine;
 import jmri.jmrit.operations.rollingstock.engines.EngineManager;
 import jmri.jmrit.operations.trains.Train;
 import jmri.jmrit.operations.trains.TrainManager;
-import jmri.server.json.JsonException;
-import jmri.server.json.JsonHttpService;
-import jmri.server.json.JsonRequest;
+import jmri.server.json.*;
 
 /**
  * @author Randall Wood (C) 2016, 2018, 2019, 2020
@@ -76,6 +47,8 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     private final JsonUtil utilities;
 
+    private static final Logger log = LoggerFactory.getLogger(JsonOperationsHttpService.class);    
+
     public JsonOperationsHttpService(ObjectMapper mapper) {
         super(mapper);
         utilities = new JsonUtil(mapper);
@@ -83,6 +56,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     @Override
     public JsonNode doGet(String type, String name, JsonNode data, JsonRequest request) throws JsonException {
+        log.debug("doGet(type='{}', name='{}', data='{}')", type, name, data);
         Locale locale = request.locale;
         int id = request.id;
         ObjectNode result;
@@ -97,7 +71,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
                 result = utilities.getEngine(name, locale, id);
                 break;
             case KERNEL:
-                Kernel kernel = carManager().getKernelByName(name);
+                Kernel kernel = InstanceManager.getDefault(KernelManager.class).getKernelByName(name);
                 if (kernel == null) {
                     throw new JsonException(HttpServletResponse.SC_NOT_FOUND,
                             Bundle.getMessage(locale, JsonException.ERROR_NOT_FOUND, type, name), id);
@@ -127,6 +101,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     @Override
     public JsonNode doPost(String type, String name, JsonNode data, JsonRequest request) throws JsonException {
+        log.debug("doPost(type='{}', name='{}', data='{}')", type, name, data);
         Locale locale = request.locale;
         int id = request.id;
         String newName = name;
@@ -144,10 +119,10 @@ public class JsonOperationsHttpService extends JsonHttpService {
             case KERNEL:
                 if (data.path(RENAME).isTextual()) {
                     newName = data.path(RENAME).asText();
-                    carManager().replaceKernelName(name, newName);
-                    carManager().deleteKernel(name);
+                    InstanceManager.getDefault(KernelManager.class).replaceKernelName(name, newName);
+                    InstanceManager.getDefault(KernelManager.class).deleteKernel(name);
                 }
-                return message(type, getKernel(carManager().getKernelByName(newName), locale, id).put(RENAME, name), id);
+                return message(type, getKernel(InstanceManager.getDefault(KernelManager.class).getKernelByName(newName), locale, id).put(RENAME, name), id);
             case LOCATION:
                 return message(type, postLocation(name, data, locale, id), id);
             case TRAIN:
@@ -168,6 +143,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
     @Override
     public JsonNode doPut(String type, String name, JsonNode data, JsonRequest request)
             throws JsonException {
+        log.debug("doPut(type='{}', name='{}', data='{}')", type, name, data);
         Locale locale = request.locale;
         int id = request.id;
         switch (type) {
@@ -215,7 +191,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
                     throw new JsonException(HttpServletResponse.SC_BAD_REQUEST,
                             Bundle.getMessage(locale, JsonException.ERROR_MISSING_PROPERTY_PUT, NAME, type), id); // NOI18N
                 }
-                return message(type, getKernel(carManager().newKernel(name), locale, id), id);
+                return message(type, getKernel(InstanceManager.getDefault(KernelManager.class).newKernel(name), locale, id), id);
             case LOCATION:
                 if (data.path(USERNAME).isMissingNode()) {
                     throw new JsonException(HttpServletResponse.SC_BAD_REQUEST,
@@ -268,6 +244,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     @Override
     public JsonNode doGetList(String type, JsonNode data, JsonRequest request) throws JsonException {
+        log.debug("doGetList(type='{}', data='{}')", type, data);
         Locale locale = request.locale;
         int id = request.id;
         switch (type) {
@@ -297,6 +274,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     @Override
     public void doDelete(String type, String name, JsonNode data, JsonRequest request) throws JsonException {
+        log.debug("doDelete(type='{}', name='{}', data='{}')", type, name, data);
         Locale locale = request.locale;
         int id = request.id;
         String token = data.path(FORCE_DELETE).asText();
@@ -323,7 +301,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
                 deleteEngine(name, locale, id);
                 break;
             case KERNEL:
-                Kernel kernel = carManager().getKernelByName(name);
+                Kernel kernel = InstanceManager.getDefault(KernelManager.class).getKernelByName(name);
                 if (kernel == null) {
                     throw new JsonException(HttpServletResponse.SC_NOT_FOUND,
                             Bundle.getMessage(locale, JsonException.ERROR_NOT_FOUND, type, name), id);
@@ -331,7 +309,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
                 if (kernel.getSize() != 0 && !acceptForceDeleteToken(type, name, token)) {
                     throwDeleteConflictException(type, name, getKernelCars(kernel, true, locale), request);
                 }
-                carManager().deleteKernel(name);
+                InstanceManager.getDefault(KernelManager.class).deleteKernel(name);
                 break;
             case LOCATION:
                 // TODO: do not remove an in use location
@@ -400,11 +378,11 @@ public class JsonOperationsHttpService extends JsonHttpService {
 
     private JsonNode getKernels(Locale locale, int id) {
         ArrayNode array = mapper.createArrayNode();
-        carManager().getKernelNameList()
+        InstanceManager.getDefault(KernelManager.class).getNameList()
                 // individual kernels should not have id in array, but same
                 // method is used to get single kernels as requested, so pass
                 // additive inverse of id to allow errors
-                .forEach(kernel -> array.add(message(KERNEL, getKernel(carManager().getKernelByName(kernel), locale, id * -1), id * -1)));
+                .forEach(kernel -> array.add(message(KERNEL, getKernel(InstanceManager.getDefault(KernelManager.class).getKernelByName(kernel), locale, id * -1), id * -1)));
         return message(array, id);
     }
 
@@ -440,8 +418,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
      * Set the properties in the data parameter for the train with the given id.
      * <p>
      * Currently only moves the train to the location given with the key
-     * {@value jmri.server.json.operations.JsonOperations#LOCATION}. If the move
-     * cannot be completed, throws error code 428.
+     * LOCATION. If the move cannot be completed, throws error code 428.
      *
      * @param name   id of the train
      * @param data   train data to change
@@ -480,7 +457,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
             }
         }
         location.setName(data.path(USERNAME).asText(location.getName()));
-        location.setComment(data.path(COMMENT).asText(location.getComment()));
+        location.setComment(data.path(COMMENT).asText(location.getCommentWithColor()));
         return utilities.getLocation(location, locale);
     }
 
@@ -539,7 +516,7 @@ public class JsonOperationsHttpService extends JsonHttpService {
     public ObjectNode postCar(@Nonnull Car car, JsonNode data, Locale locale, int id) throws JsonException {
         ObjectNode result = postRollingStock(car, data, locale, id);
         car.setCaboose(data.path(CABOOSE).asBoolean(car.isCaboose()));
-        car.setHazardous(data.path(HAZARDOUS).asBoolean(car.isHazardous()));
+        car.setCarHazardous(data.path(HAZARDOUS).asBoolean(car.isHazardous()));
         car.setPassenger(data.path(PASSENGER).asBoolean(car.isPassenger()));
         car.setFred(data.path(FRED).asBoolean(car.hasFred()));
         car.setUtility(data.path(UTILITY).asBoolean(car.isUtility()));
@@ -599,30 +576,75 @@ public class JsonOperationsHttpService extends JsonHttpService {
      */
     public ObjectNode postRollingStock(@Nonnull RollingStock rs, JsonNode data, Locale locale, int id)
             throws JsonException {
-        String name = rs.getId();
         // make changes that can throw an exception first
-        JsonNode node = data.path(LOCATION);
+        String name = rs.getId();
+        //handle removal (only) from Train
+        JsonNode node = data.path(TRAIN_ID);
         if (!node.isMissingNode()) {
-            Location location = locationManager().getLocationById(node.path(NAME).asText());
-            if (location != null) {
-                String trackId = node.path(TRACK).path(NAME).asText();
-                Track track = location.getTrackById(trackId);
-                if (trackId.isEmpty() || track != null) {
-                    if (!rs.setLocation(location, track).equals(Track.OKAY)) {
-                        throw new JsonException(HttpServletResponse.SC_CONFLICT,
-                                Bundle.getMessage(locale, "ErrorMovingCar",
-                                        rs.getId(), LOCATION, location.getId(), trackId),
-                                id);
+            //new value must be null, adding or changing train not supported here
+            if (node.isNull()) {
+                if (rs.getTrain() != null) {
+                    rs.setTrain(null);
+                    rs.setDestination(null, null);
+                    rs.setRouteLocation(null);
+                    rs.setRouteDestination(null);
+                }
+            } else {
+                throw new JsonException(HttpServletResponse.SC_CONFLICT,
+                        Bundle.getMessage(locale, "ErrorRemovingTrain", rs.getId()), id);                 
+            }
+        }
+        //handle change in Location
+        node = data.path(LOCATION);
+        if (!node.isMissingNode()) {
+            //can't move a car that is on a train
+            if (rs.getTrain() != null) {
+                throw new JsonException(HttpServletResponse.SC_CONFLICT,
+                        Bundle.getMessage(locale, "ErrorIsOnTrain", rs.getId(), rs.getTrainName()), id);                 
+            }
+            if (!node.isNull()) {
+                //move car to new location and track
+                Location location = locationManager().getLocationById(node.path(NAME).asText());
+                if (location != null) {
+                    String trackId = node.path(TRACK).path(NAME).asText();
+                    Track track = location.getTrackById(trackId);
+                    if (trackId.isEmpty() || track != null) {
+                        String status = rs.setLocation(location, track);
+                        if (!status.equals(Track.OKAY)) {
+                            throw new JsonException(HttpServletResponse.SC_CONFLICT,
+                                    Bundle.getMessage(locale, "ErrorMovingCar",
+                                            rs.getId(), LOCATION, location.getId(), trackId, status), id);
+                        }
+                    } else {
+                        throw new JsonException(HttpServletResponse.SC_NOT_FOUND,
+                                Bundle.getMessage(locale, "ErrorNotFound", TRACK, trackId), id);
                     }
                 } else {
                     throw new JsonException(HttpServletResponse.SC_NOT_FOUND,
-                            Bundle.getMessage(locale, "ErrorNotFound", TRACK, trackId), id);
+                            Bundle.getMessage(locale, "ErrorNotFound", LOCATION, node.path(NAME).asText()), id);
                 }
-            } else {
-                throw new JsonException(HttpServletResponse.SC_NOT_FOUND,
-                        Bundle.getMessage(locale, "ErrorNotFound", LOCATION, node.path(NAME).asText()), id);
+            } else { 
+                //if new location is null, remove car from current location
+                String status = rs.setLocation(null, null);
+                if (!status.equals(Track.OKAY)) {
+                    throw new JsonException(HttpServletResponse.SC_CONFLICT,
+                            Bundle.getMessage(locale, "ErrorMovingCar",
+                                    rs.getId(), LOCATION, null, null, status), id);
+                }                
             }
         }
+        //handle change in LocationUnknown
+        node = data.path(LOCATION_UNKNOWN);
+        if (!node.isMissingNode()) {
+            //can't move a car that is on a train
+            if (rs.getTrain() != null) {
+                throw new JsonException(HttpServletResponse.SC_CONFLICT,
+                        Bundle.getMessage(locale, "ErrorIsOnTrain", rs.getId(), rs.getTrainName()), id);                 
+            }            
+            //set LocationUnknown flag to new value
+            rs.setLocationUnknown(data.path(LOCATION_UNKNOWN).asBoolean()); 
+        }
+        //handle change in DESTINATION
         node = data.path(DESTINATION);
         if (!node.isMissingNode()) {
             Location location = locationManager().getLocationById(node.path(NAME).asText());
@@ -630,10 +652,11 @@ public class JsonOperationsHttpService extends JsonHttpService {
                 String trackId = node.path(TRACK).path(NAME).asText();
                 Track track = location.getTrackById(trackId);
                 if (trackId.isEmpty() || track != null) {
-                    if (!rs.setDestination(location, track).equals(Track.OKAY)) {
+                    String status = rs.setDestination(location, track);
+                    if (!status.equals(Track.OKAY)) {
                         throw new JsonException(HttpServletResponse.SC_CONFLICT,
                                 Bundle.getMessage(locale, "ErrorMovingCar", rs.getId(),
-                                        DESTINATION, location.getId(), trackId),
+                                        DESTINATION, location.getId(), trackId, status),
                                 id);
                     }
                 } else {
@@ -646,22 +669,18 @@ public class JsonOperationsHttpService extends JsonHttpService {
             }
         }
         // set properties using the existing property as the default
-        rs.setRoadName(data.path(ROAD).asText(rs.getRoadName()));
-        rs.setNumber(data.path(NUMBER).asText(rs.getNumber()));
-        rs.setColor(data.path(COLOR).asText(rs.getColor()));
-        rs.setComment(data.path(COMMENT).asText(rs.getComment()));
-        rs.setOwner(data.path(OWNER).asText(rs.getOwner()));
+        rs.setRoadName(data.path(JsonOperations.ROAD).asText(rs.getRoadName()));
+        rs.setNumber(data.path(JsonOperations.NUMBER).asText(rs.getNumber()));
+        rs.setColorName(data.path(COLOR).asText(rs.getColorName()));
+        rs.setComment(data.path(JsonOperations.COMMENT).asText(rs.getComment()));
+        rs.setOwnerName(data.path(JsonOperations.OWNER).asText(rs.getOwnerName()));
         rs.setBuilt(data.path(BUILT).asText(rs.getBuilt()));
-        if (data.path(WEIGHT).isValueNode()) {
-            rs.setWeight(Double.toString(data.path(WEIGHT).asDouble()));
-        }
-        if (data.path(WEIGHT_TONS).isValueNode()) {
-            rs.setWeightTons(Double.toString(data.path(WEIGHT_TONS).asDouble()));
-        }
+
+        rs.setWeightTons(data.path(WEIGHT_TONS).asText());
         rs.setRfid(data.path(RFID).asText(rs.getRfid()));
         rs.setLength(Integer.toString(data.path(LENGTH).asInt(rs.getLengthInteger())));
         rs.setOutOfService(data.path(OUT_OF_SERVICE).asBoolean(rs.isOutOfService()));
-        rs.setTypeName(data.path(CAR_TYPE).asText(rs.getTypeName()));
+        rs.setTypeName(data.path(JsonOperations.TYPE).asText(rs.getTypeName()));
         ObjectNode result = utilities.getRollingStock(rs, locale);
         if (!rs.getId().equals(name)) {
             result.put(RENAME, name);

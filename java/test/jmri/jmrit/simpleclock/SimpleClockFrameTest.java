@@ -24,9 +24,10 @@ public class SimpleClockFrameTest extends jmri.util.JmriJFrameTestBase {
     @AfterEach
     @Override
     public void tearDown() {
+        JUnitUtil.clearShutDownManager();
         super.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(SimpleClockFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(SimpleClockFrameTest.class);
 
 }

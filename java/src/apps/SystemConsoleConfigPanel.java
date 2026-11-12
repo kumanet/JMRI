@@ -2,20 +2,18 @@ package apps;
 
 import apps.SystemConsole.Scheme;
 import apps.systemconsole.SystemConsolePreferencesManager;
+
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.util.ResourceBundle;
-import javax.swing.BoxLayout;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JToggleButton;
-import javax.swing.UIManager;
+
+import javax.swing.*;
+
 import jmri.InstanceManager;
 import jmri.swing.PreferencesPanel;
+import jmri.util.swing.JComboBoxUtil;
+
 import org.openide.util.lookup.ServiceProvider;
 
 /**
@@ -30,7 +28,6 @@ import org.openide.util.lookup.ServiceProvider;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <p>
  *
  * @author Matthew Harris copyright (c) 2010, 2011
  */
@@ -50,7 +47,10 @@ public class SystemConsoleConfigPanel extends JPanel implements PreferencesPanel
         16,
         18,
         20,
-        24};
+        22,
+        24,
+        26,
+        28};
 
     private static final Integer wrapStyles[] = {
         SystemConsole.WRAP_STYLE_NONE,
@@ -108,6 +108,7 @@ public class SystemConsoleConfigPanel extends JPanel implements PreferencesPanel
 
         p.add(schemes);
         add(p);
+        JComboBoxUtil.setupComboBoxMaxRows(schemes);
 
         p = new JPanel(new FlowLayout());
 
@@ -120,6 +121,7 @@ public class SystemConsoleConfigPanel extends JPanel implements PreferencesPanel
 
         p.add(fontSize);
         p.add(fontSizeUoM);
+        JComboBoxUtil.setupComboBoxMaxRows(fontSize);
 
         fontStyleBold.setFont(fontStyleBold.getFont().deriveFont(Font.BOLD));
         fontStyleBold.addActionListener((ActionEvent e) -> {

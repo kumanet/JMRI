@@ -1,17 +1,22 @@
 package jmri.jmrit.display;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.awt.event.WindowListener;
-import java.awt.GraphicsEnvironment;
 
 import javax.swing.JPanel;
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 import javax.swing.JFrame;
 
 import jmri.util.JUnitUtil;
+import jmri.util.ThreadingUtil;
+import jmri.util.junit.annotations.DisabledIfHeadless;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
-import org.junit.Assume;
 
 /**
  * Base class for tests for Positionable objects.
@@ -61,178 +66,181 @@ abstract public class PositionableTestBase {
         editor = null;
         p = null;
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetPositionable() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Defalt Positionable", p.isPositionable());
+        assertTrue( p.isPositionable(), "Default Positionable");
         p.setPositionable(false);
-        Assert.assertFalse("Positionable after set false", p.isPositionable());
+        assertFalse( p.isPositionable(), "Positionable after set false");
         p.setPositionable(true);
-        Assert.assertTrue("Positionable after set true", p.isPositionable());
+        assertTrue( p.isPositionable(), "Positionable after set true");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetEditable() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Defalt Editable", p.isEditable());
+        assertTrue( p.isEditable(), "Default Editable");
         p.setEditable(false);
-        Assert.assertFalse("Editable after set false", p.isEditable());
+        assertFalse( p.isEditable(), "Editable after set false");
         p.setEditable(true);
-        Assert.assertTrue("Editable after set true", p.isEditable());
+        assertTrue( p.isEditable(), "Editable after set true");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetShowToolTip() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Defalt ShowToolTip", p.showToolTip());
+        assertTrue( p.showToolTip(), "Default ShowToolTip");
         p.setShowToolTip(false);
-        Assert.assertFalse("showToolTip after set false", p.showToolTip());
+        assertFalse( p.showToolTip(), "showToolTip after set false");
         p.setShowToolTip(true);
-        Assert.assertTrue("showToolTip after set true", p.showToolTip());
+        assertTrue( p.showToolTip(), "showToolTip after set true");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetToolTip() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertNull("default tool tip", p.getToolTip());
-        p.setToolTip(new ToolTip("hello",0,0));
-        Assert.assertNotNull("tool tip after set", p.getToolTip());
+        assertNull( p.getToolTip(), "default tool tip");
+        p.setToolTip(new ToolTip("hello",0,0,null));
+        assertNotNull( p.getToolTip(), "tool tip after set");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetViewCoordinates() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Default View Coordinates", p.getViewCoordinates());
+        assertTrue( p.getViewCoordinates(), "Default View Coordinates");
         p.setViewCoordinates(false);
-        Assert.assertFalse("View Coordinates after set false", p.getViewCoordinates());
+        assertFalse( p.getViewCoordinates(), "View Coordinates after set false");
         p.setViewCoordinates(true);
-        Assert.assertTrue("View Coordinates after set true", p.getViewCoordinates());
+        assertTrue( p.getViewCoordinates(), "View Coordinates after set true");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetControlling() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Defalt ShowToolTip", p.isControlling());
+        assertTrue( p.isControlling(), "Default ShowToolTip");
         p.setControlling(false);
-        Assert.assertFalse("Controlling after set false", p.isControlling());
+        assertFalse( p.isControlling(), "Controlling after set false");
         p.setControlling(true);
-        Assert.assertTrue("Controlling after set true", p.isControlling());
+        assertTrue( p.isControlling(), "Controlling after set true");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetHidden() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertFalse("Defalt Hidden", p.isHidden());
+        assertFalse( p.isHidden(), "Default Hidden");
         p.setHidden(true);
-        Assert.assertTrue("Hidden after set true", p.isHidden());
+        assertTrue( p.isHidden(), "Hidden after set true");
         p.setHidden(false);
-        Assert.assertFalse("Hidden after set false", p.isHidden());
+        assertFalse( p.isHidden(), "Hidden after set false");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetDisplayLevel(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         p.setDisplayLevel(2);
-        Assert.assertEquals("Display Level",2,p.getDisplayLevel());
+        assertEquals( 2, p.getDisplayLevel(), "Display Level");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetEditor(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         Editor es = new EditorScaffold();
         p.setEditor(es);
-        Assert.assertEquals("Editor",es,p.getEditor());
+        assertEquals( es, p.getEditor(), "Editor");
         JUnitUtil.dispose(es);
     }
 
     @Test
+    @DisabledIfHeadless
     public void testClone() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         p.deepClone();
 
         // this next line is consistently failing (on all object types).
         // It should pass.
         //Assert.assertFalse("clone object (not content) equality", p.equals(p));
 
-        Assert.assertTrue("class type equality", p.getClass().equals(p.getClass()));
+        assertTrue( p.getClass().equals(p.getClass()), "class type equality");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testMaxWidth() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Max Width",0<=p.maxWidth());
+        assertTrue( 0 <= p.maxWidth(), "Max Width");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testMaxHeight() {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Max Height",0<=p.maxHeight());
+        assertTrue( 0 <= p.maxHeight(), "Max Height");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetScale(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertEquals("Default Scale",1.0D,p.getScale(),0.0);
+        assertEquals( 1.0D, p.getScale(), 0.0, "Default Scale");
         p.setScale(5.0D);
-        Assert.assertEquals("Scale",5.0D,p.getScale(),0.0);
+        assertEquals( 5.0D, p.getScale(), 0.0, "Scale");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetAndSetRotationDegrees(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
         p.rotate(50);
-        Assert.assertEquals("Degrees",50,p.getDegrees());
+        assertEquals( 50, p.getDegrees(), "Degrees");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetTextComponent(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertNotNull("text component",p.getTextComponent());
+        assertNotNull( p.getTextComponent(), "text component");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testStoreItem(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Store Item",p.storeItem());
+        assertTrue( p.storeItem(), "Store Item");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testDoViemMenu(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertTrue("Do Viem Menu",p.doViemMenu());
+        assertTrue( p.doViemMenu(), "Do Viem Menu");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testGetNameString(){
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
-        Assert.assertNotNull("Name String",p.getNameString());
+        assertNotNull( p.getNameString(), "Name String");
     }
 
     @Test
+    @DisabledIfHeadless
     public void testShow() throws Positionable.DuplicateIdException {
-        Assume.assumeFalse(GraphicsEnvironment.isHeadless());
 
         JFrame jf = new jmri.util.JmriJFrame("Positionable Target Panel");
         JPanel panel = new JPanel();
         jf.getContentPane().add(panel);
-        jf.pack();
-        jf.setVisible(true);
+        ThreadingUtil.runOnGUI( () -> {
+            jf.pack();
+            jf.setVisible(true);
+        });
 
         editor.putItem(p);
         p.setDisplayLevel(jmri.jmrit.display.Editor.LABELS);
 
-        Assert.assertEquals("Display Level ", p.getDisplayLevel(), jmri.jmrit.display.Editor.LABELS);
+        Assertions.assertEquals(jmri.jmrit.display.Editor.LABELS, p.getDisplayLevel(), "Display Level ");
 
         editor.setLocation(150, 150);
 
         editor.setTitle();
 
-        editor.pack();
-        editor.setVisible(true);
+        ThreadingUtil.runOnGUI( () -> {
+            editor.pack();
+            editor.setVisible(true);
+        });
 
         // close the frame.
         EditorFrameOperator jfo = new EditorFrameOperator(jf);

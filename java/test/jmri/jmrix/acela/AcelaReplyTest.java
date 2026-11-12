@@ -17,12 +17,13 @@ public class AcelaReplyTest extends jmri.jmrix.AbstractMessageTestBase {
         m = new AcelaReply();
     }
 
+    @Override
     @AfterEach
     public void tearDown() {
         m = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(AcelaReplyTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(AcelaReplyTest.class);
 
 }

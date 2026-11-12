@@ -32,7 +32,7 @@ public class JsonSensorHttpService extends JsonNamedBeanHttpService<Sensor> {
     @Override
     public ObjectNode doGet(Sensor sensor, String name, String type, JsonRequest request) throws JsonException {
         ObjectNode root = this.getNamedBean(sensor, name, getType(), request); // throws JsonException if sensor == null
-        ObjectNode data = root.with(JSON.DATA);
+        ObjectNode data = root.withObject(JSON.DATA);
         data.put(JSON.INVERTED, sensor.getInverted());
         switch (sensor.getKnownState()) {
             case Sensor.ACTIVE:
@@ -109,7 +109,7 @@ public class JsonSensorHttpService extends JsonNamedBeanHttpService<Sensor> {
     }
 
     @Override
-    protected ProvidingManager<Sensor> getManager() {
+    protected ProvidingManager<Sensor> getProvidingManager() {
         return InstanceManager.getDefault(SensorManager.class);
     }
 

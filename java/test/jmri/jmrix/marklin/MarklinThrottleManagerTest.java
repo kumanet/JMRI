@@ -1,8 +1,6 @@
 package jmri.jmrix.marklin;
 
 import jmri.util.JUnitUtil;
-import jmri.util.junit.annotations.*;
-
 import org.junit.jupiter.api.*;
 
 /**
@@ -11,18 +9,14 @@ import org.junit.jupiter.api.*;
  */
 public class MarklinThrottleManagerTest extends jmri.managers.AbstractThrottleManagerTestBase {
 
-    private MarklinTrafficController tc;
-    private MarklinSystemConnectionMemo memo;
+    private MarklinTrafficController tc = null;
+    private MarklinSystemConnectionMemo memo = null;
 
     @BeforeEach
     @Override
     public void setUp() {
         JUnitUtil.setUp();
-        tc = new MarklinTrafficController(){
-            @Override
-            public void sendMarklinMessage(MarklinMessage m, MarklinListener reply) {
-            } // prevent requestThrottle to actually send a MarklinMessage
-        };
+        tc = new MarklinTrafficControlScaffold();
         memo = new MarklinSystemConnectionMemo(tc);
         memo.configureManagers();
         tm = memo.getThrottleManager();
@@ -30,15 +24,15 @@ public class MarklinThrottleManagerTest extends jmri.managers.AbstractThrottleMa
 
     @AfterEach
     public void tearDown() {
-        //if (tm != null) {
-        //    tm.dispose();
-        //}
-        tc.terminateThreads();
+        Assertions.assertNotNull(tc);
+        Assertions.assertNotNull(memo);
+        tc.dispose();
         tc = null;
+        memo.dispose();
         memo = null;
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(MarklinThrottleManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(MarklinThrottleManagerTest.class);
 
 }

@@ -16,14 +16,14 @@ public class DefaultCatalogTreeManagerTest extends jmri.managers.AbstractManager
         Assert.assertNotNull("exists", l);
     }
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithNoPrefixNotASystemName() {}
     
-    // No manager-specific system name validation at present
     @Test
     @Override
+    @Disabled("No manager-specific system name validation at present")
     public void testMakeSystemNameWithPrefixNotASystemName() {}
 
     @BeforeEach
@@ -39,6 +39,6 @@ public class DefaultCatalogTreeManagerTest extends jmri.managers.AbstractManager
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(DefaultCatalogTreeManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(DefaultCatalogTreeManagerTest.class);
 
 }

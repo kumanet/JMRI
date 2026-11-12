@@ -56,9 +56,8 @@ public class EditSignalFrameTest {
     public void tearDown() {
         blkMgr.dispose();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EditSignalFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EditSignalFrameTest.class);
 }

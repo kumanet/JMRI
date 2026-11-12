@@ -3,11 +3,15 @@ package jmri.util;
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 import jmri.ShutDownTask;
-import jmri.implementation.QuietShutDownTask;
+import jmri.implementation.AbstractShutDownTask;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
@@ -19,44 +23,56 @@ public class MockShutDownManagerTest {
     @Test
     public void testCTor() {
         MockShutDownManager dsdm = new MockShutDownManager();
-        Assert.assertNotNull("exists", dsdm);
+        assertNotNull( dsdm, "exists");
     }
 
     @Test
     public void testRegister() {
         MockShutDownManager dsdm = new MockShutDownManager();
-        Assert.assertEquals(0, dsdm.tasks().size());
-        ShutDownTask task = new QuietShutDownTask("task") {
+        assertEquals(0, dsdm.getCallables().size());
+        assertEquals(0, dsdm.getRunnables().size());
+        ShutDownTask task = new AbstractShutDownTask("task") {
             @Override
             public void run() {
             }
         };
         dsdm.register(task);
-        Assert.assertEquals(1, dsdm.tasks().size());
+        assertEquals(1, dsdm.getCallables().size());
+        assertEquals(1, dsdm.getRunnables().size());
         dsdm.register(task);
-        Assert.assertEquals(1, dsdm.tasks().size());
-        try {
-            dsdm.register(null);
-            Assert.fail("Expected NullPointerException not thrown");
-        } catch (NullPointerException ex) {
-            // ignore since throwing the NPE is passing
-        }
+        assertEquals(1, dsdm.getCallables().size());
+        assertEquals(1, dsdm.getRunnables().size());
+
+        Exception ex = Assertions.assertThrows(NullPointerException.class, () -> {
+            registerNull(dsdm);
+        },"Expected NullPointerException not thrown");
+        Assertions.assertNotNull(ex);
+
+    }
+
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings( value = "NP_NONNULL_PARAM_VIOLATION",
+        justification = "testing passing null to create exception ")
+    private void registerNull(MockShutDownManager dsdm){
+        dsdm.register(null);
     }
 
     @Test
     public void testDeregister() {
         MockShutDownManager dsdm = new MockShutDownManager();
-        Assert.assertEquals(0, dsdm.tasks().size());
-        ShutDownTask task = new QuietShutDownTask("task") {
+        assertEquals(0, dsdm.getCallables().size());
+        assertEquals(0, dsdm.getRunnables().size());
+        ShutDownTask task = new AbstractShutDownTask("task") {
             @Override
             public void run() {
             }
         };
         dsdm.register(task);
-        Assert.assertEquals(1, dsdm.tasks().size());
-        Assert.assertTrue(dsdm.tasks().contains(task));
+        assertEquals(1, dsdm.getCallables().size());
+        assertEquals(1, dsdm.getRunnables().size());
+        assertTrue(dsdm.getRunnables().contains(task));
         dsdm.deregister(task);
-        Assert.assertEquals(0, dsdm.tasks().size());
+        assertEquals(0, dsdm.getCallables().size());
+        assertEquals(0, dsdm.getRunnables().size());
     }
 
     /**
@@ -69,13 +85,14 @@ public class MockShutDownManagerTest {
     @Test
     public void testIsShuttingDown() {
         MockShutDownManager dsdm = new MockShutDownManager();
+        dsdm.setBlockingShutdown(true);
         Frame frame = null;
         if (!GraphicsEnvironment.isHeadless()) {
             frame = new Frame("Shutdown test frame");
         }
-        Assert.assertFalse(dsdm.isShuttingDown());
+        assertFalse(dsdm.isShuttingDown());
         dsdm.shutdown();
-        Assert.assertTrue(dsdm.isShuttingDown());
+        assertTrue(dsdm.isShuttingDown());
         if (frame != null) {
             JUnitUtil.dispose(frame);
         }
@@ -91,6 +108,6 @@ public class MockShutDownManagerTest {
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(MockShutDownManagerTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(MockShutDownManagerTest.class);
 
 }

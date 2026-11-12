@@ -1,7 +1,15 @@
 package jmri.jmrix.loconet.swing.lncvprog;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.List;
+
+import javax.annotation.Nonnull;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableColumn;
+import javax.swing.table.TableColumnModel;
+
 import jmri.InstanceManager;
-import jmri.LocoAddress;
 import jmri.Programmer;
 import jmri.jmrit.decoderdefn.DecoderFile;
 import jmri.jmrit.decoderdefn.DecoderIndexFile;
@@ -9,27 +17,16 @@ import jmri.jmrit.roster.Roster;
 import jmri.jmrit.roster.RosterEntry;
 import jmri.jmrit.symbolicprog.tabbedframe.PaneOpsProgFrame;
 import jmri.jmrix.ProgrammingTool;
-import jmri.jmrix.loconet.LnProgrammerManager;
 import jmri.jmrix.loconet.LncvDevicesManager;
 import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.jmrix.loconet.uhlenbrock.LncvDevice;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableColumn;
-import javax.swing.table.TableColumnModel;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.util.List;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Table model for the programmed LNCV Modules table.
  * See Sv2f Programing tool
  *
- * @author Egbert Broerse Copyright (C) 2020
+ * @author Egbert Broerse Copyright (C) 2020, 2025
  */
 public class LncvProgTableModel extends AbstractTableModel implements PropertyChangeListener, ProgrammingTool {
 
@@ -38,10 +35,10 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
     public static final int MODADDR_COLUMN = 2;
     public static final int CV_COLUMN = 3;
     public static final int VALUE_COLUMN = 4;
-    public static final int DEVICENAMECOLUMN = 5;
-    public static final int ROSTERENTRYCOLUMN = 6;
-    public static final int OPENPRGMRBUTTONCOLUMN = 7;
-    static public final int NUMCOLUMNS = 8;
+    public static final int DEVICENAME_COLUMN = 5;
+    public static final int ROSTERENTRY_COLUMN = 6;
+    public static final int OPENPRGMRBUTTON_COLUMN = 7;
+    public static final int NUMCOLUMNS = 8;
     private final LncvProgPane parent;
     private final transient LocoNetSystemConnectionMemo memo;
     protected Roster _roster;
@@ -58,7 +55,7 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
     public void initTable(javax.swing.JTable lncvModulesTable) {
        TableColumnModel assignmentColumnModel = lncvModulesTable.getColumnModel();
        TableColumn idColumn = assignmentColumnModel.getColumn(0);
-       idColumn.setMaxWidth(8);
+       idColumn.setMaxWidth(3);
     }
 
    @Override
@@ -72,11 +69,11 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
                return Bundle.getMessage("HeadingCvLastRead");
            case VALUE_COLUMN:
                return Bundle.getMessage("HeadingValue");
-           case DEVICENAMECOLUMN:
+           case DEVICENAME_COLUMN:
                return Bundle.getMessage("HeadingDeviceModel");
-           case ROSTERENTRYCOLUMN:
+           case ROSTERENTRY_COLUMN:
                return Bundle.getMessage("HeadingDeviceId");
-           case OPENPRGMRBUTTONCOLUMN:
+           case OPENPRGMRBUTTON_COLUMN:
                return Bundle.getMessage("ButtonProgram");
            case COUNT_COLUMN:
            default:
@@ -93,10 +90,10 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
            case CV_COLUMN:
            case VALUE_COLUMN:
                return Integer.class;
-           case OPENPRGMRBUTTONCOLUMN:
-               return JButton.class;
-           case DEVICENAMECOLUMN:
-           case ROSTERENTRYCOLUMN:
+           case OPENPRGMRBUTTON_COLUMN:
+               return javax.swing.JButton.class;
+           case DEVICENAME_COLUMN:
+           case ROSTERENTRY_COLUMN:
            default:
                return String.class;
        }
@@ -104,7 +101,7 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
 
    @Override
    public boolean isCellEditable(int r, int c) {
-       return (c == OPENPRGMRBUTTONCOLUMN);
+       return (c == OPENPRGMRBUTTON_COLUMN);
    }
 
    @Override
@@ -138,9 +135,9 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
               case VALUE_COLUMN:
                   assert dev != null;
                   return dev.getCvValue();
-              case DEVICENAMECOLUMN:
+              case DEVICENAME_COLUMN:
                   assert dev != null;
-                  if (dev.getDeviceName().length() == 0) { // not yet filled in, look for a candidate
+                  if (dev.getDeviceName().isEmpty()) { // not yet filled in, look for a candidate
                       List<DecoderFile> l =
                           InstanceManager.getDefault(
                               DecoderIndexFile.class).
@@ -157,11 +154,12 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
                               );
                       //log.debug("found {} possible decoder matches for LNCV device", l.size());
                       String lastModelName = "";
-                      if (l.size() > 0) {
+                      if (!l.isEmpty()) {
                           for (DecoderFile d : l) {
-                              // we do not check for LNCV programmingMode support since we do not expect replies from non-LNCV devices
-                              // (and there is currently no access to supported modes in the DecoderIndexFile)
-                              if (d.getModel().equals("")) {
+                              // we do not check for LNCV programmingMode support
+                              // we do not expect replies from non-LNCV devices
+                              // TODO check using new access to getProgrammingModes() in the DecoderIndexFile
+                              if (d.getModel().isEmpty()) {
                                   log.warn("Empty model(name) in decoderfile {}", d.getFileName());
                                   continue;
                               }
@@ -173,16 +171,19 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
                       return lastModelName;
                   }
                   return dev.getDeviceName();
-              case ROSTERENTRYCOLUMN:
+              case ROSTERENTRY_COLUMN:
                   assert dev != null;
                   return dev.getRosterName();
-              case OPENPRGMRBUTTONCOLUMN:
-                  assert dev != null;
-                  if (dev.getDeviceName().length() != 0) {
-                      if ((dev.getRosterName() != null) && (dev.getRosterName().length() == 0)) {
+              case OPENPRGMRBUTTON_COLUMN:
+                  if (dev != null && !dev.getDeviceName().isEmpty()) {
+                      if ((dev.getRosterName() != null) && (dev.getRosterName().isEmpty())) {
                           return Bundle.getMessage("ButtonCreateEntry");
                       }
-                      return Bundle.getMessage("ButtonProgram");
+                      if (dev.getDecoderFile().isProgrammingMode("LOCONETLNCVMODE")) {
+                          return Bundle.getMessage("ButtonProgram");
+                      } else {
+                          return Bundle.getMessage("ButtonWrongMode");
+                      }
                   }
                   return Bundle.getMessage("ButtonNoMatchInRoster");
               default: // column 1
@@ -201,7 +202,7 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
             return;
         }
         LncvDevice dev = memo.getLncvDevicesManager().getDeviceList().getDevice(r);
-        if (c == OPENPRGMRBUTTONCOLUMN) {
+        if (c == OPENPRGMRBUTTON_COLUMN) {
             if (((String) getValueAt(r, c)).compareTo(Bundle.getMessage("ButtonCreateEntry")) == 0) {
                 createRosterEntry(dev);
                 if (dev.getRosterEntry() != null) {
@@ -211,6 +212,11 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
                 }
             } else if (((String) getValueAt(r, c)).compareTo(Bundle.getMessage("ButtonProgram")) == 0) {
                 openProgrammer(r);
+            } else if (((String) getValueAt(r, c)).compareTo(Bundle.getMessage("ButtonWrongMode")) == 0) {
+                infoNotForLncv(getValueAt(r, 1).toString()); // TODO once we check for LNCV progMode this can be removed
+            } else if (((String) getValueAt(r, c)).compareTo(Bundle.getMessage("ButtonNoMatchInRoster")) == 0){
+                // suggest to rebuild decoderIndex
+                warnRecreate(getValueAt(r, 1).toString());
             }
         } else {
             // no change, so do not fire a property change event
@@ -229,44 +235,44 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
             case SUCCESS_PROGRAMMER_OPENED:
                 return;
             case FAIL_NO_SUCH_DEVICE:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_NO_SUCH_DEVICE"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_NO_APPROPRIATE_PROGRAMMER:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_NO_APPROPRIATE_PROGRAMMER"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_NO_MATCHING_ROSTER_ENTRY:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_NO_MATCHING_ROSTER_ENTRY"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_DESTINATION_ADDRESS_IS_ZERO:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_DESTINATION_ADDRESS_IS_ZERO"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_MULTIPLE_DEVICES_SAME_DESTINATION_ADDRESS:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_MULTIPLE_DEVICES_SAME_DESTINATION_ADDRESS", dev.getDestAddr()),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_NO_ADDRESSED_PROGRAMMER:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_NO_ADDRESSED_PROGRAMMER"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             case FAIL_NO_LNCV_PROGRAMMER:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_NO_LNCV_PROGRAMMER"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
                 return;
             default:
-                JOptionPane.showMessageDialog(parent,
+                JmriJOptionPane.showMessageDialog(parent,
                         Bundle.getMessage("FAIL_UNKNOWN"),
-                        Bundle.getMessage("TitleOpenRosterEntry"), JOptionPane.ERROR_MESSAGE);
+                        Bundle.getMessage("TitleOpenRosterEntry"), JmriJOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -291,28 +297,70 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
 
     private void createRosterEntry(LncvDevice dev) {
         if (dev.getDestAddr() == 0) {
-            JOptionPane.showMessageDialog(parent,
+            JmriJOptionPane.showMessageDialog(parent,
                     Bundle.getMessage("FAIL_ADD_ENTRY_0"),
-                    Bundle.getMessage("ButtonCreateEntry"), JOptionPane.ERROR_MESSAGE);
+                    Bundle.getMessage("ButtonCreateEntry"), JmriJOptionPane.ERROR_MESSAGE);
         } else {
             String s = null;
             while (s == null) {
-                s = JOptionPane.showInputDialog(parent,
-                        Bundle.getMessage("DialogEnterEntryName"), "");
+                s = JmriJOptionPane.showInputDialog(parent,
+                        Bundle.getMessage("DialogEnterEntryName"),
+                        Bundle.getMessage("EnterEntryNameTitle"),JmriJOptionPane.QUESTION_MESSAGE);
                 if (s == null) {
-                    // cancel button hit
+                    // Cancel button hit
                     return;
                 }
             }
 
-            RosterEntry re = new RosterEntry(dev.getDecoderFile().getFileName());
-            re.setDccAddress(Integer.toString(dev.getDestAddr()));
-            re.setDecoderModel(dev.getDecoderFile().getModel());
-            re.setProductID(Integer.toString(dev.getProductID()));
-            re.setId(s);
+            RosterEntry re = getRosterEntry(dev, s);
             _roster.addEntry(re);
             dev.setRosterEntry(re);
         }
+    }
+
+    @Nonnull
+    private static RosterEntry getRosterEntry(LncvDevice dev, String s) {
+        RosterEntry re = new RosterEntry(dev.getDecoderFile().getFileName());
+        re.setDccAddress(Integer.toString(dev.getDestAddr()));
+        re.setDecoderModel(dev.getDecoderFile().getModel());
+        re.setProductID(Integer.toString(dev.getProductID()));
+        // add some details that won't be picked up otherwise from definition
+        re.setDecoderFamily(dev.getDecoderFile().getFileName());
+        re.setProgrammingModes(dev.getDecoderFile().getProgrammingModes());
+        re.setId(s);
+        return re;
+    }
+
+    private void warnRecreate(String address) {
+        // show dialog to inform and allow rebuilding index
+        Object[] dialogBoxButtonOptions = {
+                Bundle.getMessage("ButtonRecreateIndex"),
+                Bundle.getMessage("ButtonCancel")};
+        int userReply = JmriJOptionPane.showOptionDialog(parent,
+                Bundle.getMessage("DialogWarnRecreate", address),
+                Bundle.getMessage("TitleOpenRosterEntry"),
+                JmriJOptionPane.DEFAULT_OPTION, JmriJOptionPane.QUESTION_MESSAGE,
+                null, dialogBoxButtonOptions, dialogBoxButtonOptions[0]);
+        if (userReply == 0) { // array position 0
+            try {
+                DecoderIndexFile.forceCreationOfNewIndex(false); // faster
+            } catch (Exception exq) {
+                log.error("exception updating decoderIndexFile", exq);
+            }
+        }
+    }
+
+    /**
+     * Show dialog to inform that address matched decoder doesn't support LNSV1 mode.
+     */
+    private void infoNotForLncv(String address) {
+        Object[] dialogBoxButtonOptions = {
+                Bundle.getMessage("ButtonOK")};
+        JmriJOptionPane.showOptionDialog(parent,
+                Bundle.getMessage("DialogInfoMatchNotX", address, "LNCV"),
+                Bundle.getMessage("TitleOpenRosterEntry"),
+                JmriJOptionPane.DEFAULT_OPTION, JmriJOptionPane.INFORMATION_MESSAGE,
+                null, dialogBoxButtonOptions, dialogBoxButtonOptions[0]);
     }
 
     /*
@@ -338,6 +386,6 @@ public class LncvProgTableModel extends AbstractTableModel implements PropertyCh
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LncvProgTableModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LncvProgTableModel.class);
 
 }

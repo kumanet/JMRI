@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
  * <p>
  * Keeps track of the controller's "dim count", and if not certain forces it to
  * zero to be sure.
- * <p>
  *
  *
  * @author Dave Duchamp Copyright (C) 2004
@@ -105,7 +104,7 @@ public class SpecificX10Light extends jmri.jmrix.powerline.SerialX10Light {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SpecificX10Light.class);
+    private static final Logger log = LoggerFactory.getLogger(SpecificX10Light.class);
 }
 
 

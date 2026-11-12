@@ -6,13 +6,10 @@ import jmri.util.prefs.JmriPreferencesActionFactory;
 import jmri.web.server.WebServer;
 import jmri.web.server.WebServerPreferences;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import apps.util.Log4JUtil;
-
 /**
  * A simple example of a "Faceless" (no gui) application
+ *
+ * To use it, uncomment the main() method.
  *
  * <hr>
  * This file is part of JMRI.
@@ -31,11 +28,14 @@ public class SampleMinimalProgram {
 
     static String name = "Faceless App";
 
+// Commented out since it's not normally used.
+// It's included as an example for anyone who wants to do their own program to launch JMRI.
+/*
     // Main entry point
     public static void main(String args[]) {
 
         initLog4J();
-        log.info(Log4JUtil.startupInfo(name));
+        log.info("Startup: {}", apps.util.Log4JUtil.startupInfo(name));
 
         new SampleMinimalProgram(args);   // start the application class itself
 
@@ -45,6 +45,7 @@ public class SampleMinimalProgram {
         // for example.  The layout connection
         // is working at this point.
     }
+*/
 
     /**
      * Static method to return a first logging statement. Used for logging
@@ -53,7 +54,7 @@ public class SampleMinimalProgram {
      * @param program the name of the program
      * @return the logging statement including JMRI and Java versions
      */
-    static public String startupInfo(String program) {
+    public static String startupInfo(String program) {
         return (program + " version " + jmri.Version.name()
                 + " starts under Java " + System.getProperty("java.version", "<unknown>"));
     }
@@ -62,20 +63,11 @@ public class SampleMinimalProgram {
      * Static method to get Log4J working before the rest of JMRI starts up. In
      * a non-minimal program, invoke jmri.util.Log4JUtil.initLogging
      */
-    static protected void initLog4J() {
-        // initialize log4j - from logging control file (lcf) only
+    protected static void initLog4J() {
+        // initialize log4j2 - from logging configuration file (lcf) only
         // if can find it!
-        String logFile = "default.lcf";
-        try {
-            if (new java.io.File(logFile).canRead()) {
-                org.apache.log4j.PropertyConfigurator.configure(logFile);
-            } else {
-                org.apache.log4j.BasicConfigurator.configure();
-                org.apache.log4j.Logger.getRootLogger().setLevel(org.apache.log4j.Level.ERROR);
-            }
-        } catch (java.lang.NoSuchMethodError e) {
-            log.error("Exception starting logging: {}", e);
-        }
+        String configFile = "default_lcf.xml";
+        apps.util.Log4JUtil.initLogging(configFile);
         // install default exception handler
         Thread.setDefaultUncaughtExceptionHandler(new jmri.util.exceptionhandler.UncaughtExceptionHandler());
     }
@@ -89,7 +81,7 @@ public class SampleMinimalProgram {
 
         // Load from preference file, by default the DecoderPro
         // one so you can use DecoderPro to load the preferences values.
-        //    setConfigFilename("DecoderProConfig2.xml", args);
+        //    setConfigFilename("DecoderProConfig2.properties", args);
         //    loadFile();
         // load directly via code
         codeConfig(args);
@@ -97,10 +89,8 @@ public class SampleMinimalProgram {
         // and here we're up and running!
     }
 
-    @SuppressWarnings("deprecation") // _Simple_Miniman_Program doesn't need multi-connection support
     protected void codeConfig(String[] args) {
-        jmri.jmrix.SerialPortAdapter adapter = jmri.jmrix.lenz.li100.LI100Adapter.instance();
-        //jmri.jmrix.SerialPortAdapter adapter =  jmri.jmrix.nce.serialdriver.SerialDriverAdapter.instance();
+        jmri.jmrix.SerialPortAdapter adapter = new jmri.jmrix.lenz.li100.LI100Adapter();
 
         String portName = "/dev/cu.Bluetooth-PDA-Sync";
         String baudRate = "9600";
@@ -136,5 +126,6 @@ public class SampleMinimalProgram {
         log.info("Up!");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SampleMinimalProgram.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SampleMinimalProgram.class);
+
 }

@@ -1,11 +1,19 @@
 package jmri.jmrit.roster.swing;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import javax.swing.JTable;
+
 import jmri.jmrit.roster.Roster;
 import jmri.jmrit.roster.RosterEntry;
+import jmri.jmrit.roster.RosterEntryImplementations;
 import jmri.util.JUnitUtil;
+import jmri.util.swing.XTableColumnModel;
 
-import org.jdom2.Element;
-import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
 /**
@@ -16,135 +24,215 @@ import org.junit.jupiter.api.*;
 public class RosterTableModelTest {
 
     @Test
-    public void testTableLength() throws Exception {
+    public void testTableLength() {
         RosterTableModel t = new RosterTableModel();
 
-        Assert.assertEquals(NENTRIES, t.getRowCount());
+        assertEquals(3, t.getRowCount());
+        t.dispose();
     }
 
     @Test
-    public void testTableWidth() throws Exception {
-        RosterTableModel t = new RosterTableModel();
+    public void testColumnCount() {
+        RosterTableModel t = new RosterTableModel(true); // set Editable
 
         // hard-coded value is number of columns expected
-        Assert.assertEquals(t.getColumnCount(), t.getColumnCount());
+        // 14 normal columns + 4 attribute columns
+        assertEquals(18, t.getColumnCount());
+        
+        
+        assertTrue(t.isCellEditable(0, RosterTableModel.IDCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.ADDRESSCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.ICONCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.DECODERMFGCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.DECODERFAMILYCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.DECODERMODELCOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.ROADNAMECOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.ROADNUMBERCOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.MFGCOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.MODELCOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.OWNERCOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.DATEUPDATECOL));
+        assertFalse(t.isCellEditable(0, RosterTableModel.PROTOCOL));
+
+        assertTrue(t.isCellEditable(0, RosterTableModel.NUMCOL));
+        assertTrue(t.isCellEditable(0, RosterTableModel.NUMCOL+1));
+        assertTrue(t.isCellEditable(0, RosterTableModel.NUMCOL+2));
+        assertTrue(t.isCellEditable(0, RosterTableModel.NUMCOL+3));
+        
+        t.dispose();
     }
 
     @Test
-    public void testColumnName() throws Exception {
-        RosterTableModel t = new RosterTableModel();
+    public void testColumnName() {
+        RosterTableModel t = new RosterTableModel(null); // no rosterGroup
 
-        Assert.assertEquals("DCC Address", t.getColumnName(RosterTableModel.ADDRESSCOL));
+        assertEquals(Bundle.getMessage("FieldID"), t.getColumnName( RosterTableModel.IDCOL));
+        assertEquals(Bundle.getMessage("FieldDCCAddress"), t.getColumnName(RosterTableModel.ADDRESSCOL));
+        assertEquals(Bundle.getMessage("FieldIcon"), t.getColumnName(RosterTableModel.ICONCOL));
+        assertEquals(Bundle.getMessage("FieldDecoderModel"), t.getColumnName(RosterTableModel.DECODERMODELCOL));
+        assertEquals(Bundle.getMessage("FieldRoadName"), t.getColumnName(RosterTableModel.ROADNAMECOL));
+        assertEquals(Bundle.getMessage("FieldRoadNumber"), t.getColumnName(RosterTableModel.ROADNUMBERCOL));
+        assertEquals(Bundle.getMessage("FieldManufacturer"), t.getColumnName(RosterTableModel.MFGCOL));
+        assertEquals(Bundle.getMessage("FieldModel"), t.getColumnName(RosterTableModel.MODELCOL));
+        assertEquals(Bundle.getMessage("FieldOwner"), t.getColumnName(RosterTableModel.OWNERCOL));
+        assertEquals(Bundle.getMessage("FieldDateUpdated"), t.getColumnName(RosterTableModel.DATEUPDATECOL));
+        assertEquals(Bundle.getMessage("FieldProtocol"), t.getColumnName(RosterTableModel.PROTOCOL));
+
+        // the roster entries have 4 attributes
+        assertEquals("key a", t.getColumnName(RosterTableModel.NUMCOL));
+        assertEquals("key b", t.getColumnName(RosterTableModel.NUMCOL+1));
+        assertEquals("key c", t.getColumnName(RosterTableModel.NUMCOL+2));
+        assertEquals("key d", t.getColumnName(RosterTableModel.NUMCOL+3));
+
+        assertEquals("<UNKNOWN>", t.getColumnName(RosterTableModel.NUMCOL+4));
+        
+        t.dispose();
     }
 
     @Test
     public void testGetValueAt() {
         RosterTableModel t = new RosterTableModel();
+        var table = new JTable(t);
+        table.setColumnModel(new XTableColumnModel());
+        t.setAssociatedTable(table);
 
-        Assert.assertEquals("id 1", t.getValueAt(0, RosterTableModel.IDCOL));
-        Assert.assertEquals(12, t.getValueAt(0, RosterTableModel.ADDRESSCOL));
-        Assert.assertEquals("33", t.getValueAt(0, RosterTableModel.DECODERCOL));
+        assertEquals("id 1", t.getValueAt(0, RosterTableModel.IDCOL));
+        assertEquals(12, (int)t.getValueAt(0, RosterTableModel.ADDRESSCOL));
+        assertEquals("33", t.getValueAt(0, RosterTableModel.DECODERMODELCOL));
 
-        Assert.assertEquals("id 2", t.getValueAt(1, RosterTableModel.IDCOL));
-        Assert.assertEquals(13, t.getValueAt(1, RosterTableModel.ADDRESSCOL));
-        Assert.assertEquals("34", t.getValueAt(1, RosterTableModel.DECODERCOL));
+        assertEquals("id 2", t.getValueAt(1, RosterTableModel.IDCOL));
+        assertEquals(13,(int) t.getValueAt(1, RosterTableModel.ADDRESSCOL));
+        assertEquals("34", t.getValueAt(1, RosterTableModel.DECODERMODELCOL));
 
-        Assert.assertEquals("id 3", t.getValueAt(2, RosterTableModel.IDCOL));
-        Assert.assertEquals(14, t.getValueAt(2, RosterTableModel.ADDRESSCOL));
-        Assert.assertEquals("35", t.getValueAt(2, RosterTableModel.DECODERCOL));
+        assertEquals("id 3", t.getValueAt(2, RosterTableModel.IDCOL));
+        assertEquals(14, (int)t.getValueAt(2, RosterTableModel.ADDRESSCOL));
+        assertEquals("35", t.getValueAt(2, RosterTableModel.DECODERMODELCOL));
+ 
+        assertEquals("DCC Long", t.getValueAt(2, RosterTableModel.PROTOCOL));
+ 
+ 
+        assertEquals("value 11", t.getValueAt(1, RosterTableModel.NUMCOL));
+        assertEquals("value 12", t.getValueAt(1, RosterTableModel.NUMCOL+1));
+        assertEquals("value 13", t.getValueAt(1, RosterTableModel.NUMCOL+2));
+        assertEquals("value 14", t.getValueAt(1, RosterTableModel.NUMCOL+3));
+
+        t.dispose();
+    }
+
+    @Test
+    public void testSetValueAt() {
+        RosterTableModel t = new RosterTableModel(true); //editable
+        var table = new JTable(t);
+        table.setColumnModel(new XTableColumnModel());
+        t.setAssociatedTable(table);
+
+        assertEquals("id 1", t.getValueAt(0, RosterTableModel.IDCOL));
+        t.setValueAt("A New Id 1", 0, RosterTableModel.IDCOL);
+        t.setValueAt("A New Id 1", 0, RosterTableModel.IDCOL);
+        assertEquals("A New Id 1", t.getValueAt(0, RosterTableModel.IDCOL));
+        
+        assertEquals("SP", t.getValueAt(0, RosterTableModel.ROADNAMECOL));
+        t.setValueAt("A New RoadName", 0, RosterTableModel.ROADNAMECOL);
+        assertEquals("A New RoadName", t.getValueAt(0, RosterTableModel.ROADNAMECOL));
+        
+        assertEquals("431", t.getValueAt(0, RosterTableModel.ROADNUMBERCOL));
+        t.setValueAt("99", 0, RosterTableModel.ROADNUMBERCOL);
+        assertEquals("99", t.getValueAt(0, RosterTableModel.ROADNUMBERCOL));
+        
+        assertEquals("Athearn", t.getValueAt(0, RosterTableModel.MFGCOL));
+        t.setValueAt("My MFG", 0, RosterTableModel.MFGCOL);
+        assertEquals("My MFG", t.getValueAt(0, RosterTableModel.MFGCOL));
+        
+        assertEquals("", t.getValueAt(0, RosterTableModel.MODELCOL));
+        t.setValueAt("Model Ref", 0, RosterTableModel.MODELCOL);
+        assertEquals("Model Ref", t.getValueAt(0, RosterTableModel.MODELCOL));
+        
+        assertEquals("", t.getValueAt(0, RosterTableModel.OWNERCOL));
+        t.setValueAt("Its my train!", 0, RosterTableModel.OWNERCOL);
+        assertEquals("Its my train!", t.getValueAt(0, RosterTableModel.OWNERCOL));
+        
+        
+        assertEquals("value 1", t.getValueAt(0, RosterTableModel.NUMCOL));
+        t.setValueAt("new value 1", 0, RosterTableModel.NUMCOL);
+        assertEquals("new value 1", t.getValueAt(0, RosterTableModel.NUMCOL));
+        
+        assertEquals("", t.getValueAt(0, RosterTableModel.NUMCOL+1));
+        t.setValueAt("new value B1", 0, RosterTableModel.NUMCOL+1);
+        assertEquals("new value B1", t.getValueAt(0, RosterTableModel.NUMCOL+1));
+        
+        assertEquals("", t.getValueAt(0, RosterTableModel.NUMCOL+2));
+        t.setValueAt("new value C2", 0, RosterTableModel.NUMCOL+2);
+        assertEquals("new value C2", t.getValueAt(0, RosterTableModel.NUMCOL+2));
+        
+        t.setValueAt("", 0, RosterTableModel.NUMCOL+2);
+        assertEquals("", t.getValueAt(0, RosterTableModel.NUMCOL+2));
+        
+        assertEquals("", t.getValueAt(0, RosterTableModel.NUMCOL+3));
+        t.setValueAt("new value D3", 0, RosterTableModel.NUMCOL+3);
+        assertEquals("new value D3", t.getValueAt(0, RosterTableModel.NUMCOL+3));
+        
+        t.setValueAt(null, 0, RosterTableModel.NUMCOL+3);
+        assertEquals("", t.getValueAt(0, RosterTableModel.NUMCOL+3));
+
+    }
+
+    @Test
+    public void testLastOperatedAttributes() {
+        Roster.getDefault().getEntry(0).deleteAttribute("key a");
+        Roster.getDefault().getEntry(0).putAttribute(RosterEntry.ATTRIBUTE_LAST_OPERATED, "2022-10-31T06:22:00.000+00:00");
+        Roster.getDefault().getEntry(0).putAttribute(RosterEntry.ATTRIBUTE_OPERATING_DURATION, "54321");
+        
+        Roster.getDefault().getEntry(2).putAttribute(RosterEntry.ATTRIBUTE_LAST_OPERATED, "Not a Date / Time");
+        
+        Roster.getDefault().getEntry(1).deleteAttribute("key a");
+        Roster.getDefault().getEntry(1).deleteAttribute("key b");
+        Roster.getDefault().getEntry(1).deleteAttribute("key c");
+        Roster.getDefault().getEntry(1).deleteAttribute("key d");
+        
+        RosterTableModel t = new RosterTableModel(true); // set editable
+        var table = new JTable(t);
+        table.setColumnModel(new XTableColumnModel());
+        t.setAssociatedTable(table);
+
+        // hard-coded value is number of columns expected
+        // 14 normal columns + 2 attribute columns
+        assertEquals(16, t.getColumnCount());
+        assertTrue(java.util.Date.class == t.getColumnClass(RosterTableModel.NUMCOL));
+
+        assertNotNull(t.getValueAt(0, RosterTableModel.NUMCOL));
+        assertNull(t.getValueAt(1, RosterTableModel.NUMCOL));
+        assertNull(t.getValueAt(2, RosterTableModel.NUMCOL));
+ 
+        assertEquals(Bundle.getMessage(RosterEntry.ATTRIBUTE_LAST_OPERATED),t.getColumnName(RosterTableModel.NUMCOL));
+        assertEquals(Bundle.getMessage(RosterEntry.ATTRIBUTE_OPERATING_DURATION),t.getColumnName(RosterTableModel.NUMCOL+1));
+
+        
+        t.dispose();
+        
+        
     }
 
     // create a standard test roster
-    static int NENTRIES = 3;
-    static int NKEYS = 4;
-
     @BeforeEach
     public void setUp() {
-        jmri.util.JUnitUtil.setUp();
+        JUnitUtil.setUp();
 
-        jmri.util.JUnitUtil.resetProfileManager();
+        JUnitUtil.resetProfileManager();
         JUnitUtil.initRosterConfigManager();
 
         // first entry
-        Element e;
-        RosterEntry r;
-
-        e = new org.jdom2.Element("locomotive")
-                .setAttribute("id", "id 1")
-                .setAttribute("fileName", "file here")
-                .setAttribute("roadNumber", "431")
-                .setAttribute("roadName", "SP")
-                .setAttribute("mfg", "Athearn")
-                .setAttribute("dccAddress", "1234")
-                .addContent(new org.jdom2.Element("decoder")
-                        .setAttribute("family", "91")
-                        .setAttribute("model", "33")
-                )
-                .addContent(new org.jdom2.Element("locoaddress")
-                        .addContent(new org.jdom2.Element("dcclocoaddress")
-                                .setAttribute("number", "12")
-                                .setAttribute("longaddress", "yes")
-                        )
-                ); // end create element
-
-        r = new RosterEntry(e) {
-            @Override
-            protected void warnShortLong(String s) {
-            }
-        };
+        RosterEntry r = RosterEntryImplementations.id1();
         Roster.getDefault().addEntry(r);
         r.putAttribute("key a", "value 1");
 
-        e = new org.jdom2.Element("locomotive")
-                .setAttribute("id", "id 2")
-                .setAttribute("fileName", "file here")
-                .setAttribute("roadNumber", "431")
-                .setAttribute("roadName", "SP")
-                .setAttribute("mfg", "Athearn")
-                .addContent(new org.jdom2.Element("decoder")
-                        .setAttribute("family", "91")
-                        .setAttribute("model", "34")
-                )
-                .addContent(new org.jdom2.Element("locoaddress")
-                        .addContent(new org.jdom2.Element("dcclocoaddress")
-                                .setAttribute("number", "13")
-                                .setAttribute("longaddress", "yes")
-                        )
-                ); // end create element
-
-        r = new RosterEntry(e) {
-            @Override
-            protected void warnShortLong(String s) {
-            }
-        };
+        r = RosterEntryImplementations.id2();
         Roster.getDefault().addEntry(r);
         r.putAttribute("key a", "value 11");
         r.putAttribute("key b", "value 12");
         r.putAttribute("key c", "value 13");
         r.putAttribute("key d", "value 14");
 
-        e = new org.jdom2.Element("locomotive")
-                .setAttribute("id", "id 3")
-                .setAttribute("fileName", "file here")
-                .setAttribute("roadNumber", "431")
-                .setAttribute("roadName", "SP")
-                .setAttribute("mfg", "Athearn")
-                .addContent(new org.jdom2.Element("decoder")
-                        .setAttribute("family", "91")
-                        .setAttribute("model", "35")
-                )
-                .addContent(new org.jdom2.Element("locoaddress")
-                        .addContent(new org.jdom2.Element("dcclocoaddress")
-                                .setAttribute("number", "14")
-                                .setAttribute("longaddress", "yes")
-                        )
-                ); // end create element
-
-        r = new RosterEntry(e) {
-            @Override
-            protected void warnShortLong(String s) {
-            }
-        };
+        r = RosterEntryImplementations.id3();
         Roster.getDefault().addEntry(r);
 
     }

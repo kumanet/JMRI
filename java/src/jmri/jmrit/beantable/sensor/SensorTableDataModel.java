@@ -4,6 +4,7 @@ import jmri.util.gui.GuiLafPreferencesManager;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -24,10 +25,10 @@ import jmri.Manager;
 import jmri.NamedBean;
 import jmri.Sensor;
 import jmri.SensorManager;
+import jmri.managers.ProxySensorManager;
 import jmri.jmrit.beantable.BeanTableDataModel;
 import jmri.util.swing.XTableColumnModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Data model for a SensorTable.
@@ -37,14 +38,15 @@ import org.slf4j.LoggerFactory;
  */
 public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
 
-    static public final int INVERTCOL = BeanTableDataModel.NUMCOLUMN;
-    static public final int EDITCOL = INVERTCOL + 1;
-    static public final int USEGLOBALDELAY = EDITCOL + 1;
-    static public final int ACTIVEDELAY = USEGLOBALDELAY + 1;
-    static public final int INACTIVEDELAY = ACTIVEDELAY + 1;
-    static public final int PULLUPCOL = INACTIVEDELAY + 1;
-    static public final int FORGETCOL = PULLUPCOL + 1;
-    static public final int QUERYCOL = FORGETCOL + 1;
+    public static final int INVERTCOL = BeanTableDataModel.NUMCOLUMN;
+    public static final int EDITCOL = INVERTCOL + 1;
+    public static final int USEGLOBALDELAY = EDITCOL + 1;
+    public static final int ACTIVEDELAY = USEGLOBALDELAY + 1;
+    public static final int INACTIVEDELAY = ACTIVEDELAY + 1;
+    public static final int PULLUPCOL = INACTIVEDELAY + 1;
+    public static final int DETECTSCOL = PULLUPCOL + 1;
+    public static final int FORGETCOL = DETECTSCOL + 1;
+    public static final int QUERYCOL = FORGETCOL + 1;
 
     private Manager<Sensor> senManager = null;
     protected boolean _graphicState = false; // icon state col updated from prefs
@@ -179,6 +181,8 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
                 return Bundle.getMessage("SensorInActiveDebounce");
             case PULLUPCOL:
                 return Bundle.getMessage("SensorPullUp");
+            case DETECTSCOL:
+                return Bundle.getMessage("SensorDetects");
             case FORGETCOL:
                 return Bundle.getMessage("StateForgetHeader");
             case QUERYCOL:
@@ -201,6 +205,7 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
             case INACTIVEDELAY:
                 return Long.class; // if long.class (lowercase) is returned here, cell is NOT editable.
             case PULLUPCOL:
+            case DETECTSCOL:
                 return JComboBox.class;
             case EDITCOL:
             case FORGETCOL:
@@ -230,6 +235,8 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
             case INACTIVEDELAY:
             case PULLUPCOL:
                 return new JTextField(8).getPreferredSize().width;
+            case DETECTSCOL:
+                return new JTextField(10).getPreferredSize().width;
             case EDITCOL:
                 return new JButton(Bundle.getMessage("ButtonEdit")).getPreferredSize().width+4;
             case FORGETCOL:
@@ -256,6 +263,7 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
         switch (col) {
             case EDITCOL:
             case USEGLOBALDELAY:
+            case DETECTSCOL:
             case FORGETCOL:
             case QUERYCOL:
                 return true;
@@ -265,7 +273,11 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
             case INACTIVEDELAY:
                 return !sen.getUseDefaultTimerSettings();
             case PULLUPCOL:
-                return (((SensorManager) getManager()).isPullResistanceConfigurable());
+                if ( getManager() instanceof ProxySensorManager ) {
+                    return ((ProxySensorManager)getManager()).isPullResistanceConfigurable(name);
+                }
+                return (((SensorManager) getManager()).isPullResistanceConfigurable()); // proxymanager always false
+                
             default:
                 return super.isCellEditable(row, col);
         }
@@ -301,6 +313,10 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
                 PullResistanceComboBox c = new PullResistanceComboBox(Sensor.PullResistance.values());
                 c.setSelectedItem(s.getPullResistance());
                 return c;
+            case DETECTSCOL:
+                DetectsComboBox d = new DetectsComboBox(Sensor.Detects.values());
+                d.setSelectedItem(s.getDetects());
+                return d;
             case FORGETCOL:
                 return Bundle.getMessage("StateForgetButton");
             case QUERYCOL:
@@ -313,8 +329,15 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
     /**
      * Small class to ensure type-safety of references otherwise lost to type erasure
      */
-    static private class PullResistanceComboBox extends JComboBox<Sensor.PullResistance> {
-        public PullResistanceComboBox(Sensor.PullResistance[] values) { super(values); }
+    private static class PullResistanceComboBox extends JComboBox<Sensor.PullResistance> {
+        PullResistanceComboBox(Sensor.PullResistance[] values) { super(values); }
+    }
+
+    /**
+     * Small class to ensure type-safety of references otherwise lost to type erasure
+     */
+    private static class DetectsComboBox extends JComboBox<Sensor.Detects> {
+        DetectsComboBox(Sensor.Detects[] values) { super(values); }
     }
 
     /**
@@ -343,28 +366,28 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
                 try {
                     long activeDeBounce = (long) value;
                     if (activeDeBounce < 0 || activeDeBounce > Sensor.MAX_DEBOUNCE) {
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceActOutOfRange")
-                            + "\n\"" + Sensor.MAX_DEBOUNCE + "\"", Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceActOutOfRange")
+                            + "\n\"" + Sensor.MAX_DEBOUNCE + "\"", Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
                     } else {
                         s.setSensorDebounceGoingActiveTimer(activeDeBounce);
                     }
                 } catch (NumberFormatException exActiveDeBounce) {
-                    JOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceActError")
-                        + "\n\"" + value  + "\"" + exActiveDeBounce.getLocalizedMessage(), Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceActError")
+                        + "\n\"" + value  + "\"" + exActiveDeBounce.getLocalizedMessage(), Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
                 }
                 break;
             case INACTIVEDELAY:
                 try {
                     long inactiveDeBounce = (long) value;
                     if (inactiveDeBounce < 0 || inactiveDeBounce > Sensor.MAX_DEBOUNCE) {
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceInActOutOfRange") 
-                            + "\n\"" + Sensor.MAX_DEBOUNCE + "\"", Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceInActOutOfRange") 
+                            + "\n\"" + Sensor.MAX_DEBOUNCE + "\"", Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
                     } else {
                         s.setSensorDebounceGoingInActiveTimer(inactiveDeBounce);
                     }
                 } catch (NumberFormatException exActiveDeBounce) {
-                    JOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceInActError")
-                        + "\n\"" + value + "\"" + exActiveDeBounce.getLocalizedMessage(), Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.showMessageDialog(null, Bundle.getMessage("SensorDebounceInActError")
+                        + "\n\"" + value + "\"" + exActiveDeBounce.getLocalizedMessage(), Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
                 }
                 break;
             case EDITCOL:
@@ -375,6 +398,12 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
             case PULLUPCOL:
                 PullResistanceComboBox cb = (PullResistanceComboBox) value;
                 s.setPullResistance((Sensor.PullResistance) cb.getSelectedItem());
+                break;
+            case DETECTSCOL:
+                Object detects = ((DetectsComboBox) value).getSelectedItem();
+                if (detects instanceof Sensor.Detects) {
+                    s.setDetects((Sensor.Detects) detects);
+                }
                 break;
             case FORGETCOL:
                 try {
@@ -411,10 +440,11 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
     @Override
     protected boolean matchPropertyName(PropertyChangeEvent e) {
         switch (e.getPropertyName()) {
-            case "inverted":
-            case "GlobalTimer":
-            case "ActiveTimer":
-            case "InActiveTimer":
+            case Sensor.PROPERTY_SENSOR_INVERTED:
+            case Sensor.PROPERTY_GLOBAL_TIMER:
+            case Sensor.PROPERTY_ACTIVE_TIMER:
+            case Sensor.PROPERTY_INACTIVE_TIMER:
+            case Sensor.PROPERTY_DETECTS:
                 return true;
             default:
                 return super.matchPropertyName(e);
@@ -447,19 +477,42 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
      * Visualize state in table as a graphic, customized for Sensors (2 states).
      * Renderer and Editor are identical, as the cell contents are not actually
      * edited, only used to toggle state using {@link #clickOn}.
+     * <p>
+     * A single label is reused for every cell and the icons are loaded once
+     * per JVM, so rendering a cell allocates nothing. The label ignores
+     * revalidate/repaint requests and the row height is set once in
+     * {@link #configureTable}: painting a cell must never schedule more
+     * painting, or the table repaints itself forever.
      */
     static class ImageIconRenderer extends AbstractCellEditor implements TableCellEditor, TableCellRenderer {
 
-        protected JLabel label;
-        protected String rootPath = "resources/icons/misc/switchboard/"; // also used in display.switchboardEditor
-        protected char beanTypeChar = 'S'; // for Sensor
-        protected String onIconPath = rootPath + beanTypeChar + "-on-s.png";
-        protected String offIconPath = rootPath + beanTypeChar + "-off-s.png";
-        protected BufferedImage onImage;
-        protected BufferedImage offImage;
-        protected ImageIcon onIcon;
-        protected ImageIcon offIcon;
-        protected int iconHeight = -1;
+        private static final String ROOT_PATH = "resources/icons/misc/switchboard/"; // also used in display.switchboardEditor
+        private static final char BEAN_TYPE_CHAR = 'S'; // for Sensor
+        private static final String ON_ICON_PATH = ROOT_PATH + BEAN_TYPE_CHAR + "-on-s.png";
+        private static final String OFF_ICON_PATH = ROOT_PATH + BEAN_TYPE_CHAR + "-off-s.png";
+        private static ImageIcon onIcon = null;
+        private static ImageIcon offIcon = null;
+        private static int iconHeight = -1;
+
+        private final StateLabel label = new StateLabel();
+        private final Color defaultForeground = label.getForeground();
+        private final String activeText = Bundle.getMessage("SensorStateActive");
+        private final String inactiveText = Bundle.getMessage("SensorStateInactive");
+        private final String unknownText = Bundle.getMessage("BeanStateUnknown");
+        private final String inconsistentText = Bundle.getMessage("BeanStateInconsistent");
+        private int row = -1; // row of the cell last rendered or edited
+
+        ImageIconRenderer() {
+            label.setHorizontalAlignment(JLabel.CENTER);
+            // must stay the only anonymous class in ImageIconRenderer, see jmri.ArchitectureTest
+            label.addMouseListener(new MouseAdapter() {
+                @Override
+                public final void mousePressed(MouseEvent evt) {
+                    log.debug("Clicked on icon in row {}", row);
+                    stopCellEditing();
+                }
+            });
+        }
 
         /**
          * {@inheritDoc}
@@ -469,11 +522,7 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
                 JTable table, Object value, boolean isSelected,
                 boolean hasFocus, int row, int column) {
             log.debug("Renderer Item = {}, State = {}", row, value);
-            if (iconHeight < 0) { // load resources only first time, either for renderer or editor
-                loadIcons();
-                log.debug("icons loaded");
-            }
-            return updateLabel((String) value, row, table);
+            return updateLabel((String) value, row);
         }
 
         /**
@@ -483,48 +532,45 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
         public Component getTableCellEditorComponent(
                 JTable table, Object value, boolean isSelected,
                 int row, int column) {
-            log.debug("Renderer Item = {}, State = {}", row, value);
+            log.debug("Editor Item = {}, State = {}", row, value);
+            return updateLabel((String) value, row);
+        }
+
+        protected JLabel updateLabel(String value, int row) {
+            this.row = row;
             if (iconHeight < 0) { // load resources only first time, either for renderer or editor
                 loadIcons();
                 log.debug("icons loaded");
             }
-            return updateLabel((String) value, row, table);
-        }
-
-        public JLabel updateLabel(String value, int row, JTable table) {
-            if (iconHeight > 0) { // if necessary, increase row height;
-                table.setRowHeight(row, Math.max(table.getRowHeight(), iconHeight - 5)); // adjust table row height for Sensor icon
-            }
-            if (value.equals(Bundle.getMessage("SensorStateInactive")) && offIcon != null) {
-                label = new JLabel(offIcon);
+            label.setForeground(defaultForeground); // reset a foreground left over from an INCONSISTENT cell
+            if (value.equals(inactiveText) && offIcon != null) {
+                label.setIcon(offIcon);
+                label.setText(null);
                 label.setVerticalAlignment(JLabel.BOTTOM);
                 log.debug("offIcon set");
-            } else if (value.equals(Bundle.getMessage("SensorStateActive")) && onIcon != null) {
-                label = new JLabel(onIcon);
+            } else if (value.equals(activeText) && onIcon != null) {
+                label.setIcon(onIcon);
+                label.setText(null);
                 label.setVerticalAlignment(JLabel.BOTTOM);
                 log.debug("onIcon set");
-            } else if (value.equals(Bundle.getMessage("BeanStateInconsistent"))) {
-                label = new JLabel("X", JLabel.CENTER); // centered text alignment
+            } else if (value.equals(inconsistentText)) {
+                label.setIcon(null);
+                label.setText("X");
                 label.setForeground(Color.red);
+                label.setVerticalAlignment(JLabel.CENTER);
                 log.debug("Sensor state inconsistent");
-                iconHeight = 0;
-            } else if (value.equals(Bundle.getMessage("BeanStateUnknown"))) {
-                label = new JLabel("?", JLabel.CENTER); // centered text alignment
+            } else if (value.equals(unknownText)) {
+                label.setIcon(null);
+                label.setText("?");
+                label.setVerticalAlignment(JLabel.CENTER);
                 log.debug("Sensor state unknown");
-                iconHeight = 0;
             } else { // failed to load icon
-                label = new JLabel(value, JLabel.CENTER); // centered text alignment
+                label.setIcon(null);
+                label.setText(value);
+                label.setVerticalAlignment(JLabel.CENTER);
                 log.warn("Error reading icons for SensorTable");
-                iconHeight = 0;
             }
             label.setToolTipText(value);
-            label.addMouseListener(new MouseAdapter() {
-                @Override
-                public final void mousePressed(MouseEvent evt) {
-                    log.debug("Clicked on icon in row {}", row);
-                    stopCellEditing();
-                }
-            });
             return label;
         }
 
@@ -538,16 +584,39 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
         }
 
         /**
-         * Read and buffer graphics. Only called once for this table.
+         * Get the row height needed to fit the state icons, loading them if
+         * required. Used by {@link #configureTable} to size the rows once,
+         * outside of the render path.
          *
-         * @see #getTableCellEditorComponent(JTable, Object, boolean, int, int)
+         * @return required row height in pixels, 0 if the icons could not be read
          */
-        protected void loadIcons() {
+        static int getIconRowHeight() {
+            if (iconHeight < 0) {
+                loadIcons();
+            }
+            return Math.max(iconHeight - 5, 0);
+        }
+
+        /**
+         * Read and buffer graphics. Only called once per JVM, the icons are
+         * shared by all instances of this renderer.
+         */
+        private static synchronized void loadIcons() {
+            if (iconHeight >= 0) { // another instance already loaded the icons
+                return;
+            }
+            BufferedImage onImage = null;
+            BufferedImage offImage = null;
             try {
-                onImage = ImageIO.read(new File(onIconPath));
-                offImage = ImageIO.read(new File(offIconPath));
+                onImage = ImageIO.read(new File(ON_ICON_PATH));
+                offImage = ImageIO.read(new File(OFF_ICON_PATH));
             } catch (IOException ex) {
-                log.error("error reading image from {} or {}", onIconPath, offIconPath, ex);
+                log.error("error reading image from {} or {}", ON_ICON_PATH, OFF_ICON_PATH, ex);
+            }
+            if (onImage == null || offImage == null) { // ImageIO.read returns null for an unreadable file
+                log.error("error reading image from {} or {}", ON_ICON_PATH, OFF_ICON_PATH);
+                iconHeight = 0; // give up: render states as text, don't retry for every cell
+                return;
             }
             log.debug("Success reading images");
             int imageWidth = onImage.getWidth();
@@ -560,6 +629,49 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
             iconHeight = onIcon.getIconHeight();
         }
 
+        /**
+         * Label that ignores revalidate and repaint requests.
+         * <p>
+         * The rendered component stays a child of the table's
+         * CellRendererPane after painting, so a plain JLabel schedules a new
+         * repaint of the whole table each time its icon or text changes
+         * during a paint cycle. Same overrides as DefaultTableCellRenderer,
+         * except firePropertyChange, which BasicLabelUI needs to keep its
+         * view up to date.
+         */
+        private static class StateLabel extends JLabel {
+
+            @Override
+            public void revalidate() {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint() {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(long tm) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(int x, int y, int width, int height) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(long tm, int x, int y, int width, int height) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(Rectangle r) {
+                // ignored, see class comment
+            }
+        }
+
     } // end of ImageIconRenderer class
 
     /**
@@ -567,7 +679,16 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
      */
     @Override
     public void configureTable(JTable table) {
+        // hidden until chosen; super.configureTable then applies the user's saved choice
+        XTableColumnModel tcm = (XTableColumnModel) table.getColumnModel();
+        tcm.setColumnVisible(tcm.getColumnByModelIndex(DETECTSCOL), false);
         super.configureTable(table);
+        if (_graphicState) {
+            // make the rows tall enough for the state icons, once and outside of the
+            // renderer; must come after super.configureTable, which sets the row
+            // height for the buttons
+            table.setRowHeight(Math.max(table.getRowHeight(), ImageIconRenderer.getIconRowHeight()));
+        }
         XTableColumnModel columnModel = (XTableColumnModel) table.getColumnModel();
         columnModel.getColumnByModelIndex(FORGETCOL).setHeaderValue(null);
         columnModel.getColumnByModelIndex(QUERYCOL).setHeaderValue(null);
@@ -655,5 +776,6 @@ public class SensorTableDataModel extends BeanTableDataModel<Sensor> {
         }
     }
 
-    private final static Logger log = LoggerFactory.getLogger(SensorTableDataModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SensorTableDataModel.class);
+
 }

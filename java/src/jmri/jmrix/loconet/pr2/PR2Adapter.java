@@ -3,8 +3,6 @@ package jmri.jmrix.loconet.pr2;
 import jmri.jmrix.loconet.locobuffer.LocoBufferAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import purejavacomm.SerialPort;
-import purejavacomm.UnsupportedCommOperationException;
 
 /**
  * Update the code in jmri.jmrix.loconet.locobuffer so that it refers to the
@@ -21,23 +19,9 @@ public class PR2Adapter extends LocoBufferAdapter {
         options.put(option2Name, new Option(Bundle.getMessage("CommandStationTypeLabel"), commandStationOptions(), false));
     }
 
-    /**
-     * Always use flow control, not considered a user-settable option
-     */
     @Override
-    protected void setSerialPort(SerialPort activeSerialPort) throws UnsupportedCommOperationException {
-        // find the baud rate value, configure comm options
-        int baud = currentBaudNumber(mBaudRate);
-        activeSerialPort.setSerialPortParams(baud, SerialPort.DATABITS_8,
-                SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-
-        // configure flow control from option
-        int flow = SerialPort.FLOWCONTROL_RTSCTS_OUT;
-        if (getOptionState(option1Name).equals(validOption1[1])) {
-            flow = SerialPort.FLOWCONTROL_NONE;
-        }
-        configureLeadsAndFlowControl(activeSerialPort, flow);
-        log.info("PR2 adapter{}{} RTSCTS_OUT=" + SerialPort.FLOWCONTROL_RTSCTS_OUT + " RTSCTS_IN=" + SerialPort.FLOWCONTROL_RTSCTS_IN, activeSerialPort.getFlowControlMode() == SerialPort.FLOWCONTROL_RTSCTS_OUT ? " set hardware flow control, mode=" : " set no flow control, mode=", activeSerialPort.getFlowControlMode());
+    protected void reportOpen(String portName) {
+        log.info("Connecting PR2 via {} {}", portName, currentSerialPort);
     }
 
     /**
@@ -55,13 +39,14 @@ public class PR2Adapter extends LocoBufferAdapter {
         // connect to a packetizing traffic controller
         // that does echoing
         jmri.jmrix.loconet.pr2.LnPr2Packetizer packets = new jmri.jmrix.loconet.pr2.LnPr2Packetizer();
+        packets.setLoconetUpdateSlotOnMessageCreation(Bundle.getMessage("ButtonYes").equals(getOptionState("LoconetUpdateSlotOnMessageCreation")));
         packets.connectPort(this);
 
         // create memo
         this.getSystemConnectionMemo().setLnTrafficController(packets);
         // do the common manager config
         this.getSystemConnectionMemo().configureCommandStation(commandStationType,
-                mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable);
+                mTurnoutNoRetry, mTurnoutExtraSpace, mTranspondingAvailable, mInterrogateAtStart, mLoconetProtocolAutoDetect);
         this.getSystemConnectionMemo().configureManagers();
 
         // start operation
@@ -99,5 +84,5 @@ public class PR2Adapter extends LocoBufferAdapter {
         return new String[]{jmri.jmrix.loconet.LnCommandStationType.COMMAND_STATION_PR2_ALONE.getName()};
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PR2Adapter.class);
+    private static final Logger log = LoggerFactory.getLogger(PR2Adapter.class);
 }

@@ -10,6 +10,8 @@ import jmri.Consist;
 import jmri.LocoAddress;
 import jmri.DccLocoAddress;
 import jmri.implementation.AbstractConsistManager;
+import jmri.jmrix.loconet.SlotMapEntry.SlotType;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +67,7 @@ public class LocoNetConsistManager extends AbstractConsistManager {
         LocoNetConsist consist;
         consist = new LocoNetConsist((DccLocoAddress) address, memo);
         consistTable.put(address, consist);
+        notifyConsistListChanged();
         return consist;
     }
 
@@ -91,38 +94,68 @@ public class LocoNetConsistManager extends AbstractConsistManager {
 
         // in the first pass, check for consists top addresses in the
         // command station slots.
-        for (int i = 0; i < 128; i++) {
-            LocoNetSlot s = sm.slot(i);
-            DccLocoAddress address = new DccLocoAddress(s.locoAddr(), LnThrottleManager.isLongAddress(s.locoAddr()));
-            if (log.isDebugEnabled()) {
-                log.debug(" Slot {} Address {} consist status {}", i, address, LnConstants.CONSIST_STAT(s.consistStatus()));
-            }
-            if (s.consistStatus() == LnConstants.CONSIST_TOP || s.consistStatus() == LnConstants.CONSIST_MID) {
-                // this is a consist top, add it to the list, if it is not there
-                // already.
-                if (!consistTable.containsKey(address)) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Adding Consist with Address {} due to command station read", address);
+        for (int i = 0; i < sm.getNumSlots(); i++) {
+            if (sm.slot(i).getSlotType() == SlotType.LOCO) {
+                LocoNetSlot s = sm.slot(i);
+                DccLocoAddress address = new DccLocoAddress(s.locoAddr(), LnThrottleManager.isLongAddress(s.locoAddr()));
+                if (log.isDebugEnabled()) {
+                    log.debug(" Slot {} Address {} consist status {}", i, address, LnConstants.CONSIST_STAT(s.consistStatus()));
+                }
+                // Only CONSIST_TOP is treated as a consist top here.
+                // CONSIST_MID means a locomotive that has a lead above it
+                // AND another member pointing to it below -- normal for
+                // any chain of 3+ members. It is a MEMBER, never its own
+                // top -- the second pass below handles CONSIST_MID by
+                // following its pointer to its real lead.
+                if (s.consistStatus() == LnConstants.CONSIST_TOP) {
+                    // this is a consist top, add it to the list, if it is not there
+                    // already.
+                    //
+                    // Also skip if this address is already tracked as a
+                    // MEMBER of some other consist -- a locomotive mid-way
+                    // through being linked into a consist can briefly still
+                    // report CONSIST_TOP on the wire before it's linked, so
+                    // this avoids registering a phantom standalone consist
+                    // for an address already claimed elsewhere.
+                    if (!consistTable.containsKey(address) && !isAlreadyConsistMember(address)) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Adding Consist with Address {} due to command station read", address);
+                        }
+                        addConsist(address);
+                        getConsist(address).add(address, true); // add the address to the consist.
                     }
-                    addConsist(address);
-                    getConsist(address).add(address, true); // add the address to the consist.
                 }
             }
         }
 
         // make a second pass, this time looking for locomotives in a consist.
-        for (int i = 0; i < 128; i++) {
-            LocoNetSlot s = sm.slot(i);
-            DccLocoAddress address = new DccLocoAddress(s.locoAddr(), LnThrottleManager.isLongAddress(s.locoAddr()));
-            if (log.isDebugEnabled()) {
-                log.debug(" Slot {} Address {} consist status {}", i, address, LnConstants.CONSIST_STAT(s.consistStatus()));
-            }
-            if (s.consistStatus() == LnConstants.CONSIST_SUB || s.consistStatus() == LnConstants.CONSIST_MID) {
-                // this is a consist member, add it to the consist in the
-                // slot which it has a pointer to (the slot pointer is stored in
-                // the slot's speed).
-                DccLocoAddress lead = new DccLocoAddress(sm.slot(s.speed()).locoAddr(), LnThrottleManager.isLongAddress(sm.slot(s.speed()).locoAddr()));
-                getConsist(lead).add(address, s.isForward() == sm.slot(s.speed()).isForward());
+        for (int i = 0; i < sm.getNumSlots(); i++) {
+            if (sm.slot(i).getSlotType() == SlotType.LOCO) {
+                LocoNetSlot s = sm.slot(i);
+                DccLocoAddress address = new DccLocoAddress(s.locoAddr(), LnThrottleManager.isLongAddress(s.locoAddr()));
+                if (log.isDebugEnabled()) {
+                    log.debug(" Slot {} Address {} consist status {}", i, address, LnConstants.CONSIST_STAT(s.consistStatus()));
+                }
+                if (s.consistStatus() == LnConstants.CONSIST_SUB || s.consistStatus() == LnConstants.CONSIST_MID) {
+                    // this is a consist member, add it to the consist in the
+                    // slot which it has a pointer to (the slot pointer is stored in
+                    // the slot's speed).
+                    //
+                    // Verifies the pointed-to slot is ACTUALLY a live top/mid
+                    // right now before trusting it as this member's real
+                    // lead -- a slot's "speed" pointer can still reference a
+                    // slot number that used to be some earlier, now-defunct
+                    // consist's lead, since the pointer itself doesn't get
+                    // cleared just because that old lead relationship ended.
+                    LocoNetSlot leadSlot = sm.slot(s.speed());
+                    if (leadSlot.consistStatus() == LnConstants.CONSIST_TOP || leadSlot.consistStatus() == LnConstants.CONSIST_MID) {
+                        DccLocoAddress lead = new DccLocoAddress(leadSlot.locoAddr(), LnThrottleManager.isLongAddress(leadSlot.locoAddr()));
+                        getConsist(lead).add(address, s.isForward() == leadSlot.isForward());
+                    } else if (log.isDebugEnabled()) {
+                        log.debug("Slot {} (address {}) claims consist member status but its lead pointer (slot {}) isn't currently a top/mid -- stale pointer, ignoring",
+                                i, address, s.speed());
+                    }
+                }
             }
         }
         requestingUpdate = false;
@@ -132,5 +165,21 @@ public class LocoNetConsistManager extends AbstractConsistManager {
     protected boolean shouldRequestUpdateFromLayout() {
         return !requestingUpdate;
     }
-    private final static Logger log = LoggerFactory.getLogger(LocoNetConsistManager.class);
+
+    /**
+     * Is address already tracked as a MEMBER of some other already-known
+     * consist? See the field report on the CONSIST_TOP check above --
+     * used to avoid registering a phantom standalone consist for an
+     * address that's really just mid-link into an existing one.
+     */
+    private boolean isAlreadyConsistMember(DccLocoAddress address) {
+        for (Consist c : consistTable.values()) {
+            if (!address.equals(c.getConsistAddress()) && c.contains(address)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(LocoNetConsistManager.class);
 }

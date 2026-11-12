@@ -1,5 +1,7 @@
 package jmri.jmrit.logixng.implementation;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyVetoException;
 import java.util.Locale;
@@ -15,17 +17,21 @@ import jmri.jmrit.logixng.actions.ActionTurnout;
 import jmri.jmrit.logixng.actions.DigitalMany;
 import jmri.jmrit.logixng.implementation.DefaultMaleDigitalActionSocket.DigitalActionDebugConfig;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test ExpressionTimer
- * 
+ *
  * @author Daniel Bergqvist 2018
  */
 public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
@@ -35,33 +41,33 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         return InstanceManager.getDefault(DigitalActionManager.class)
                 .getAutoSystemName();
     }
-    
+
     @Test
     public void testCtor() {
         DigitalActionBean action = new DigitalMany("IQDA321", null);
-        Assert.assertNotNull("exists", new DefaultMaleDigitalActionSocket(manager, action));
+        assertNotNull( new DefaultMaleDigitalActionSocket(manager, action), "exists");
     }
-    
+
     @Test
     public void testExecute() throws JmriException {
         ConditionalNG conditionalNG = new DefaultConditionalNGScaffold("IQC1", "A conditionalNG");  // NOI18N;
-        
+
         MyDigitalAction action = new MyDigitalAction("IQDA321");
         action.setParent(conditionalNG);
-        
+
         DefaultMaleDigitalActionSocket socket = new DefaultMaleDigitalActionSocket(manager, action);
-        Assert.assertNotNull("exists", socket);
-        
+        assertNotNull( socket, "exists");
+
         socket.setParent(conditionalNG);
         socket.setEnabled(true);
         socket.setErrorHandlingType(MaleSocket.ErrorHandlingType.ThrowException);
-        
+
         action.je = null;
         action.re = null;
         action._hasExecuted = false;
         socket.execute();
-        Assert.assertTrue(action._hasExecuted);
-        
+        assertTrue(action._hasExecuted);
+
         action.je = new JmriException("Test JmriException");
         action.re = null;
         Throwable thrown = catchThrowable( () -> socket.execute());
@@ -70,7 +76,7 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
                 .isNotNull()
                 .isInstanceOf(JmriException.class)
                 .hasMessage("Test JmriException");
-        
+
         action.je = null;
         action.re = new RuntimeException("Test RuntimeException");
         thrown = catchThrowable( () -> socket.execute());
@@ -79,7 +85,7 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
                 .isNotNull()
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Test RuntimeException");
-        
+
         // If the socket is not enabled, it shouldn't do anything
         socket.setEnabled(false);
         action.re = new RuntimeException("Test RuntimeException");
@@ -87,7 +93,7 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         assertThat(thrown)
                 .withFailMessage("Evaluate does nothing")
                 .isNull();
-        
+
         // Test debug config
         socket.setEnabled(true);
         DigitalActionDebugConfig config = new DigitalActionDebugConfig();
@@ -97,21 +103,21 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         config._dontExecute = true;
         action._hasExecuted = false;
         socket.execute();
-        Assert.assertFalse(action._hasExecuted);
+        assertFalse(action._hasExecuted);
         config._dontExecute = false;
         action._hasExecuted = false;
         socket.execute();
-        Assert.assertTrue(action._hasExecuted);
+        assertTrue(action._hasExecuted);
     }
-    
+
     @Test
     public void testVetoableChange() {
         MyDigitalAction action = new MyDigitalAction("IQDA321");
         DefaultMaleDigitalActionSocket socket = new DefaultMaleDigitalActionSocket(manager, action);
-        Assert.assertNotNull("exists", socket);
-        
+        assertNotNull( socket, "exists");
+
         PropertyChangeEvent evt = new PropertyChangeEvent("Source", "Prop", null, null);
-        
+
         action._vetoChange = true;
         Throwable thrown = catchThrowable( () -> socket.vetoableChange(evt));
         assertThat(thrown)
@@ -119,32 +125,32 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
                 .isNotNull()
                 .isInstanceOf(PropertyVetoException.class)
                 .hasMessage("Veto change");
-        
+
         action._vetoChange = false;
         thrown = catchThrowable( () -> socket.vetoableChange(evt));
         assertThat(thrown)
                 .withFailMessage("vetoableChange() does not throw")
                 .isNull();
     }
-    
+
     @Test
     public void testCompareSystemNameSuffix() {
         MyDigitalAction action1 = new MyDigitalAction("IQDA1");
         DefaultMaleDigitalActionSocket socket1 = new DefaultMaleDigitalActionSocket(manager, action1);
-        
+
         MyDigitalAction action2 = new MyDigitalAction("IQDA01");
         DefaultMaleDigitalActionSocket socket2 = new DefaultMaleDigitalActionSocket(manager, action2);
-        
-        Assert.assertEquals("compareSystemNameSuffix returns correct value",
-                -1, socket1.compareSystemNameSuffix("01", "1", socket2));
-        Assert.assertEquals("compareSystemNameSuffix returns correct value",
-                0, socket1.compareSystemNameSuffix("1", "1", socket2));
-        Assert.assertEquals("compareSystemNameSuffix returns correct value",
-                0, socket1.compareSystemNameSuffix("01", "01", socket2));
-        Assert.assertEquals("compareSystemNameSuffix returns correct value",
-                +1, socket1.compareSystemNameSuffix("1", "01", socket2));
+
+        assertEquals( -1, socket1.compareSystemNameSuffix("01", "1", socket2),
+            "compareSystemNameSuffix returns correct value");
+        assertEquals( 0, socket1.compareSystemNameSuffix("1", "1", socket2),
+            "compareSystemNameSuffix returns correct value");
+        assertEquals( 0, socket1.compareSystemNameSuffix("01", "01", socket2),
+            "compareSystemNameSuffix returns correct value");
+        assertEquals( +1, socket1.compareSystemNameSuffix("1", "01", socket2),
+            "compareSystemNameSuffix returns correct value");
     }
-    
+
     // The minimal setup for log4J
     @BeforeEach
     @Override
@@ -156,44 +162,45 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         JUnitUtil.initInternalSensorManager();
         JUnitUtil.initInternalTurnoutManager();
         JUnitUtil.initLogixNGManager();
-        
+
         DigitalActionBean actionA = new ActionTurnout("IQDA321", null);
-        Assert.assertNotNull("exists", actionA);
+        assertNotNull( actionA, "exists");
         DigitalActionBean actionB = new MyDigitalAction("IQDA322");
-        Assert.assertNotNull("exists", actionA);
-        
+        assertNotNull( actionB, "exists");
+
         manager = InstanceManager.getDefault(DigitalActionManager.class);
-        
+
         maleSocketA =
                 InstanceManager.getDefault(DigitalActionManager.class)
                         .registerAction(actionA);
-        Assert.assertNotNull("exists", maleSocketA);
-        
+        assertNotNull( maleSocketA, "exists");
+
         maleSocketB =
                 InstanceManager.getDefault(DigitalActionManager.class)
                         .registerAction(actionB);
-        Assert.assertNotNull("exists", maleSocketB);
+        assertNotNull( maleSocketB, "exists");
     }
 
     @AfterEach
     @Override
     public void tearDown() {
         jmri.jmrit.logixng.util.LogixNG_Thread.stopAllLogixNGThreads();
+        JUnitUtil.deregisterBlockManagerShutdownTask();
         JUnitUtil.tearDown();
     }
-    
-    
+
+
     /**
      * This action is different from MyStringAction and is used to test the
      * male socket.
      */
-    private class MyDigitalAction extends AbstractDigitalAction {
-        
+    private static class MyDigitalAction extends AbstractDigitalAction {
+
         JmriException je = null;
         RuntimeException re = null;
         boolean _hasExecuted = false;
         boolean _vetoChange = false;
-        
+
         MyDigitalAction(String sysName) {
             super(sysName, null);
         }
@@ -234,13 +241,8 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         }
 
         @Override
-        public Category getCategory() {
-            return Category.COMMON;
-        }
-
-        @Override
-        public boolean isExternal() {
-            return false;
+        public LogixNG_Category getCategory() {
+            return LogixNG_Category.COMMON;
         }
 
         @Override
@@ -249,15 +251,23 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         }
 
         @Override
+        @SuppressFBWarnings( value = "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION",
+            justification="testing exception types")
         public void execute() throws JmriException {
-            if (je != null) throw je;
-            if (re != null) throw re;
+            if (je != null) {
+                throw je;
+            }
+            if (re != null) {
+                throw re;
+            }
             _hasExecuted = true;
         }
-        
+
         @Override
         public void vetoableChange(PropertyChangeEvent evt) throws PropertyVetoException {
-            if (_vetoChange) throw new java.beans.PropertyVetoException("Veto change", evt);
+            if (_vetoChange) {
+                throw new java.beans.PropertyVetoException("Veto change", evt);
+            }
         }
 
         @Override
@@ -269,7 +279,7 @@ public class DefaultMaleDigitalActionSocketTest extends MaleSocketTestBase{
         public Base deepCopyChildren(Base base, Map<String, String> map, Map<String, String> map1) throws JmriException {
             throw new UnsupportedOperationException("Not supported");
         }
-        
+
     }
-    
+
 }

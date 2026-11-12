@@ -2,7 +2,6 @@ package jmri.jmrit.logixng.expressions;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.beans.VetoableChangeListener;
 import java.util.Locale;
 import java.util.Map;
 import jmri.*;
@@ -85,16 +84,10 @@ public class ExpressionReference extends AbstractDigitalExpression
 */    
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return true;
-    }
-    
     /** {@inheritDoc} */
     @Override
     public boolean evaluate() {
@@ -255,6 +248,6 @@ public class ExpressionReference extends AbstractDigitalExpression
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionReference.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpressionReference.class);
     
 }

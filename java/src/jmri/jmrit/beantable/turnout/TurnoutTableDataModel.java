@@ -1,5 +1,9 @@
 package jmri.jmrit.beantable.turnout;
 
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -20,41 +24,38 @@ import javax.swing.table.TableModel;
 import jmri.*;
 import jmri.implementation.SignalSpeedMap;
 import jmri.jmrit.beantable.*;
-import jmri.util.swing.XTableColumnModel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.*;
 
 /**
  * Data model for a Turnout Table.
  * Code originally within TurnoutTableAction.
- * 
+ *
  * @author Bob Jacobsen Copyright (C) 2003, 2004, 2007
  * @author Egbert Broerse Copyright (C) 2017
  * @author Steve Young Copyright (C) 2021
  */
 public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
-    
-    static public final int INVERTCOL = BeanTableDataModel.NUMCOLUMN;
-    static public final int LOCKCOL = INVERTCOL + 1;
-    static public final int EDITCOL = LOCKCOL + 1;
-    static public final int KNOWNCOL = EDITCOL + 1;
-    static public final int MODECOL = KNOWNCOL + 1;
-    static public final int SENSOR1COL = MODECOL + 1;
-    static public final int SENSOR2COL = SENSOR1COL + 1;
-    static public final int OPSONOFFCOL = SENSOR2COL + 1;
-    static public final int OPSEDITCOL = OPSONOFFCOL + 1;
-    static public final int LOCKOPRCOL = OPSEDITCOL + 1;
-    static public final int LOCKDECCOL = LOCKOPRCOL + 1;
-    static public final int STRAIGHTCOL = LOCKDECCOL + 1;
-    static public final int DIVERGCOL = STRAIGHTCOL + 1;
-    static public final int FORGETCOL = DIVERGCOL + 1;
-    static public final int QUERYCOL = FORGETCOL + 1;
-    
+
+    public static final int INVERTCOL = BeanTableDataModel.NUMCOLUMN;
+    public static final int LOCKCOL = INVERTCOL + 1;
+    public static final int EDITCOL = LOCKCOL + 1;
+    public static final int KNOWNCOL = EDITCOL + 1;
+    public static final int MODECOL = KNOWNCOL + 1;
+    public static final int SENSOR1COL = MODECOL + 1;
+    public static final int SENSOR2COL = SENSOR1COL + 1;
+    public static final int OPSONOFFCOL = SENSOR2COL + 1;
+    public static final int OPSEDITCOL = OPSONOFFCOL + 1;
+    public static final int LOCKOPRCOL = OPSEDITCOL + 1;
+    public static final int LOCKDECCOL = LOCKOPRCOL + 1;
+    public static final int STRAIGHTCOL = LOCKDECCOL + 1;
+    public static final int DIVERGCOL = STRAIGHTCOL + 1;
+    public static final int FORGETCOL = DIVERGCOL + 1;
+    public static final int QUERYCOL = FORGETCOL + 1;
+
     private boolean _graphicState;
     private TurnoutManager turnoutManager;
-    
-    
+
+
     String closedText;
     String thrownText;
     public String defaultThrownSpeedText;
@@ -65,34 +66,34 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
     String cabOnlyText = "Cab only";
     String pushbutText = "Pushbutton only";
     String noneText = "None";
-    
+
     public final java.util.Vector<String> speedListClosed = new java.util.Vector<>();
     public final java.util.Vector<String> speedListThrown = new java.util.Vector<>();
-    
-    
+
+
     public TurnoutTableDataModel(){
         super();
         initTable();
     }
-    
+
     public TurnoutTableDataModel(Manager<Turnout> mgr){
         super();
         setManager(mgr);
         initTable();
     }
-    
+
     private void initTable() {
-        
+
         // load graphic state column display preference
         _graphicState = InstanceManager.getDefault(jmri.util.gui.GuiLafPreferencesManager.class).isGraphicTableState();
-        
+
         closedText = turnoutManager.getClosedText();
         thrownText = turnoutManager.getThrownText();
 
         //This following must contain the word Global for a correct match in the abstract turnout
         defaultThrownSpeedText = (Bundle.getMessage("UseGlobal", "Global") + " " + turnoutManager.getDefaultThrownSpeed());
         defaultClosedSpeedText = (Bundle.getMessage("UseGlobal", "Global") + " " + turnoutManager.getDefaultClosedSpeed());
-        
+
         //This following must contain the word Block for a correct match in the abstract turnout
         useBlockSpeed = Bundle.getMessage("UseGlobal", "Block Speed");
 
@@ -109,9 +110,9 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                 speedListThrown.add(s);
             }
         }
-        
+
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -135,9 +136,9 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             case MODECOL:
                 return Bundle.getMessage("ModeLabel");
             case SENSOR1COL:
-                return Bundle.getMessage("BlockSensor") + "1";
+                return Bundle.getMessage("BlockSensor") + " 1";
             case SENSOR2COL:
-                return Bundle.getMessage("BlockSensor") + "2";
+                return Bundle.getMessage("BlockSensor") + " 2";
             case OPSONOFFCOL:
                 return Bundle.getMessage("TurnoutAutomationMenu");
             case OPSEDITCOL:
@@ -158,6 +159,27 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                 return "";
             default:
                 return super.getColumnName(col);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected String getHeaderTooltip(int col) {
+        switch (col) {
+            case SENSOR1COL:
+                return Bundle.getMessage("Sensor1Tip", turnoutManager.getThrownText());
+            case SENSOR2COL:
+                return Bundle.getMessage("Sensor2Tip", turnoutManager.getClosedText());
+            case OPSONOFFCOL:
+                return Bundle.getMessage("TurnoutAutomationTip");
+            case KNOWNCOL:
+                return Bundle.getMessage("FeedbackTip");
+            case MODECOL:
+                return Bundle.getMessage("FeedbackModeTip");
+            default:
+                return super.getHeaderTooltip(col);
         }
     }
 
@@ -312,7 +334,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             c.setSelectedItem(t.getDecoderName());
             return c;
         } else if (col == LOCKOPRCOL) {
-            
+
             java.util.Vector<String> lockOperations = new java.util.Vector<>();  // Vector is a JComboBox ctor; List is not
             int modes = t.getPossibleLockModes();
             if ((modes & Turnout.CABLOCKOUT) != 0 && (modes & Turnout.PUSHBUTTONLOCKOUT) != 0) {
@@ -346,6 +368,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             JComboBox<String> c = new JComboBox<>(speedListClosed);
             c.setEditable(true);
             c.setSelectedItem(speed);
+            JComboBoxUtil.setupComboBoxMaxRows(c);
             return c;
         } else if (col == DIVERGCOL) {
 
@@ -356,6 +379,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             JComboBox<String> c = new JComboBox<>(speedListThrown);
             c.setEditable(true);
             c.setSelectedItem(speed);
+            JComboBoxUtil.setupComboBoxMaxRows(c);
             return c;
             // } else if (col == VALUECOL && _graphicState) { // not neeeded as the
             //  graphic ImageIconRenderer uses the same super.getValueAt(row, col) as
@@ -377,7 +401,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         Turnout t = turnoutManager.getBySystemName(name);
         if (t == null) {
             NullPointerException ex = new NullPointerException("Unexpected null turnout in turnout table");
-            log.error(ex.getMessage(), ex); // log with stack trace
+            log.error("No Turnout with system name \"{}\" exists ", name , ex); // log with stack trace
             throw ex;
         }
         if (col == INVERTCOL) {
@@ -396,14 +420,14 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                 Sensor sensor = (Sensor) value;
                 t.provideFirstFeedbackSensor(sensor != null ? sensor.getDisplayName() : null);
             } catch (jmri.JmriException e) {
-                JOptionPane.showMessageDialog(null, e.toString());
+                JmriJOptionPane.showMessageDialog(null, e.toString());
             }
         } else if (col == SENSOR2COL) {
             try {
                 Sensor sensor = (Sensor) value;
                 t.provideSecondFeedbackSensor(sensor != null ? sensor.getDisplayName() : null);
             } catch (jmri.JmriException e) {
-                JOptionPane.showMessageDialog(null, e.toString());
+                JmriJOptionPane.showMessageDialog(null, e.toString());
             }
         } else if (col == OPSONOFFCOL) {
             // do nothing as this is handled by the combo box listener
@@ -447,7 +471,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             try {
                 t.setStraightSpeed(speed);
             } catch (jmri.JmriException ex) {
-                JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
+                JmriJOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
                 return;
             }
             if ((!speedListClosed.contains(speed))) {
@@ -463,7 +487,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             try {
                 t.setDivergingSpeed(speed);
             } catch (jmri.JmriException ex) {
-                JOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
+                JmriJOptionPane.showMessageDialog(null, ex.getMessage() + "\n" + speed);
                 return;
             }
             if ((!speedListThrown.contains(speed))) {
@@ -482,7 +506,9 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             fireTableRowsUpdated(row, row);
         } else {
             super.setValueAt(value, row, col);
-            fireTableRowsUpdated(row, row);
+            if (row < getRowCount()) {
+                fireTableRowsUpdated(row, row);
+            }
         }
     }
 
@@ -508,7 +534,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         }
         return turnoutManager;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -544,9 +570,10 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
 
     @Override
     protected String getMasterClassName() {
-        return getClassName();
+        // Force message grouping
+        return jmri.jmrit.beantable.TurnoutTableAction.class.getName();
     }
-    
+
     protected String getClassName() {
         return jmri.jmrit.beantable.TurnoutTableAction.class.getName();
     }
@@ -558,10 +585,10 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
 
     @Override
     public void configureTable(JTable tbl) {
-        
+
         setColumnToHoldButton(tbl, EDITCOL, editButton());
         setColumnToHoldButton(tbl, OPSEDITCOL, editButton());
-        
+
         //Hide the following columns by default
         XTableColumnModel columnModel = (XTableColumnModel) tbl.getColumnModel();
         TableColumn column = columnModel.getColumnByModelIndex(STRAIGHTCOL);
@@ -588,30 +615,38 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         columnModel.setColumnVisible(column, false);
         column = columnModel.getColumnByModelIndex(QUERYCOL);
         columnModel.setColumnVisible(column, false);
-        
-        
+
+
         // and then set user prefs
         super.configureTable(tbl);
-        
+
+        if (_graphicState) {
+            // make the rows tall enough for the state icons, once and outside of the
+            // renderer; must come after super.configureTable, which sets the row
+            // height for the buttons
+            tbl.setRowHeight(Math.max(tbl.getRowHeight(), ImageIconRenderer.getIconRowHeight()));
+        }
+
         columnModel.getColumnByModelIndex(FORGETCOL).setHeaderValue(null);
         columnModel.getColumnByModelIndex(QUERYCOL).setHeaderValue(null);
-        
+
     }
 
     // update table if turnout lock or feedback changes
     @Override
     protected boolean matchPropertyName(java.beans.PropertyChangeEvent e) {
         switch (e.getPropertyName()) {
-            case "locked":
-            case "inverted":
-            case "feedbackchange": // feedback type setting change, NOT Turnout feedback status
-            case "TurnoutDivergingSpeedChange":
-            case "TurnoutStraightSpeedChange":
-            case "turnoutFeedbackFirstSensorChange":
-            case "turnoutFeedbackSecondSensorChange":
-            case "decoderNameChange":
-            case "TurnoutOperationState":
-            case "KnownState":
+            case Turnout.PROPERTY_LOCKED:
+            case Turnout.PROPERTY_INVERTED:
+            case Turnout.PROPERTY_FEEDBACK_MODE: // feedback type setting change, NOT Turnout feedback status
+            case Turnout.PROPERTY_TURNOUT_DIVERGING_SPEED:
+            case Turnout.PROPERTY_TURNOUT_STRAIGHT_SPEED:
+            case Turnout.PROPERTY_TURNOUT_FEEDBACK_FIRST_SENSOR:
+            case Turnout.PROPERTY_TURNOUT_FEEDBACK_SECOND_SENSOR:
+            case Turnout.PROPERTY_DECODER_NAME:
+            case Turnout.PROPERTY_TURNOUT_OPERATION_STATE:
+            case Turnout.PROPERTY_KNOWN_STATE:
+            case Turnout.PROPERTY_COMMANDED_STATE:
                 return true;
             default:
                 return super.matchPropertyName(e);
@@ -621,10 +656,10 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
     @Override
     public void propertyChange(java.beans.PropertyChangeEvent e) {
         switch (e.getPropertyName()) {
-            case "DefaultTurnoutClosedSpeedChange":
+            case TurnoutManager.PROPERTY_DEFAULT_CLOSED_SPEED:
                 updateClosedList();
                 break;
-            case "DefaultTurnoutThrownSpeedChange":
+            case TurnoutManager.PROPERTY_DEFAULT_THROWN_SPEED:
                 updateThrownList();
                 break;
             default:
@@ -648,8 +683,8 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         // add extras, override BeanTableDataModel
         log.debug("Turnout configValueColumn (I am {})", super.toString());
         if (_graphicState) { // load icons, only once
-            table.setDefaultEditor(JLabel.class, new ImageIconRenderer()); // editor
-            table.setDefaultRenderer(JLabel.class, new ImageIconRenderer()); // item class copied from SwitchboardEditor panel
+            table.setDefaultEditor(JLabel.class, new ImageIconRenderer(closedText, thrownText)); // editor
+            table.setDefaultRenderer(JLabel.class, new ImageIconRenderer(closedText, thrownText)); // item class copied from SwitchboardEditor panel
         } else {
             super.configValueColumn(table); // classic text style state indication
         }
@@ -662,7 +697,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         }
         return configureJTable(name, new TurnoutTableJTable((TurnoutTableDataModel)model), sorter);
     }
-    
+
     @Override
     protected void setColumnIdentities(JTable table) {
         super.setColumnIdentities(table);
@@ -681,6 +716,12 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                 case QUERYCOL:
                     column.setIdentifier("QueryState");
                     break;
+                case SENSOR1COL:
+                    column.setIdentifier("Sensor1");
+                    break;
+                case SENSOR2COL:
+                    column.setIdentifier("Sensor2");
+                    break;
                 default:
                 // use existing value
             }
@@ -693,7 +734,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
      * @param t   turnout
      * @param box JComboBox that triggered the edit
      */
-    protected void editTurnoutOperation(Turnout t, JComboBox<String> box) {
+    protected void editTurnoutOperation( @Nonnull Turnout t, JComboBox<String> box) {
         if (!editingOps.getAndSet(true)) { // don't open a second edit ops pane
             TurnoutOperation op = t.getTurnoutOperation();
             if (op == null) {
@@ -706,18 +747,20 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
             if (op != null) {
                 if (!op.isNonce()) {
                     op = op.makeNonce(t);
+                    t.setTurnoutOperation(op); // without this the turnout keeps using the old operation and edits are lost
                 }
                 // make and show edit dialog
                 log.debug("TurnoutOpsEditDialog starting");
-                TurnoutOperationEditorDialog dialog = new TurnoutOperationEditorDialog(op, t, box);
+                java.awt.Window w = JmriJOptionPane.findWindowForObject(box);
+                TurnoutOperationEditorDialog dialog = new TurnoutOperationEditorDialog(op, t, w);
                 dialog.setVisible(true);
             } else {
-                JOptionPane.showMessageDialog(box, Bundle.getMessage("TurnoutOperationErrorDialog"),
-                        Bundle.getMessage("ErrorTitle"), JOptionPane.ERROR_MESSAGE);
+                JmriJOptionPane.showMessageDialog(box, Bundle.getMessage("TurnoutOperationErrorDialog"),
+                        Bundle.getMessage("ErrorTitle"), JmriJOptionPane.ERROR_MESSAGE);
             }
         }
     }
-    
+
     /**
      * Create a {@literal JComboBox<String>} containing all the options for
      * turnout automation parameters for this turnout.
@@ -741,14 +784,14 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         });
         return cb;
     }
-    
+
     /**
      * Set the turnout's operation info based on the contents of the combo box.
      *
      * @param t  turnout being configured
      * @param cb JComboBox for ops for t in the TurnoutTable
      */
-    protected void setTurnoutOperation(Turnout t, JComboBox<String> cb) {
+    protected void setTurnoutOperation( @Nonnull Turnout t, JComboBox<String> cb) {
         switch (cb.getSelectedIndex()) {
             case 0:   // Off
                 t.setInhibitOperation(true);
@@ -765,7 +808,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                 break;
         }
     }
-    
+
     /**
      * Create action to edit a turnout in Edit pane. (also used in windowTest)
      *
@@ -785,7 +828,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
     protected JButton editButton() {
         return new JButton(Bundle.getMessage("EditTurnoutOperation"));
     }
-    
+
     private void updateClosedList() {
         speedListClosed.remove(defaultClosedSpeedText);
         defaultClosedSpeedText = (Bundle.getMessage("UseGlobal", "Global") + " " + turnoutManager.getDefaultClosedSpeed());
@@ -799,7 +842,7 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         speedListThrown.add(0, defaultThrownSpeedText);
         fireTableDataChanged();
     }
-    
+
     public void showFeedbackChanged(boolean visible, JTable table ) {
         XTableColumnModel columnModel = (XTableColumnModel) table.getColumnModel();
         TableColumn column = columnModel.getColumnByModelIndex(KNOWNCOL);
@@ -840,79 +883,43 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         columnModel.setColumnVisible(column, visible);
     }
 
-    
+
     /**
      * Visualize state in table as a graphic, customized for Turnouts (4
-     * states). 
+     * states).
      * Renderer and Editor are identical, as the cell contents
      * are not actually edited, only used to toggle state using
      * {@link #clickOn(Turnout)}.
-     *
+     * <p>
+     * A single label is reused for every cell and the icons are loaded once
+     * per JVM, so rendering a cell allocates nothing. The label ignores
+     * revalidate/repaint requests and the row height is set once in
+     * {@link #configureTable}: painting a cell must never schedule more
+     * painting, or the table repaints itself forever.
      */
-    class ImageIconRenderer extends AbstractCellEditor implements TableCellEditor, TableCellRenderer {
+    static class ImageIconRenderer extends AbstractCellEditor implements TableCellEditor, TableCellRenderer {
 
-        protected JLabel label;
-        protected String rootPath = "resources/icons/misc/switchboard/"; // also used in display.switchboardEditor
-        protected char beanTypeChar = 'T'; // for Turnout
-        protected String onIconPath = rootPath + beanTypeChar + "-on-s.png";
-        protected String offIconPath = rootPath + beanTypeChar + "-off-s.png";
-        protected BufferedImage onImage;
-        protected BufferedImage offImage;
-        protected ImageIcon onIcon;
-        protected ImageIcon offIcon;
-        protected int iconHeight = -1;
+        private static final String ROOT_PATH = "resources/icons/misc/switchboard/"; // also used in display.switchboardEditor
+        private static final char BEAN_TYPE_CHAR = 'T'; // for Turnout
+        private static final String ON_ICON_PATH = ROOT_PATH + BEAN_TYPE_CHAR + "-on-s.png";
+        private static final String OFF_ICON_PATH = ROOT_PATH + BEAN_TYPE_CHAR + "-off-s.png";
+        private static ImageIcon onIcon = null;
+        private static ImageIcon offIcon = null;
+        private static int iconHeight = -1;
 
-        @Override
-        public java.awt.Component getTableCellRendererComponent(
-                JTable table, Object value, boolean isSelected,
-                boolean hasFocus, int row, int column) {
-            log.debug("Renderer Item = {}, State = {}", row, value);
-            if (iconHeight < 0) { // load resources only first time, either for renderer or editor
-                loadIcons();
-                log.debug("icons loaded");
-            }
-            return updateLabel((String) value, row, table);
-        }
+        private final StateLabel label = new StateLabel();
+        private final Color defaultForeground = label.getForeground();
+        private final String closedText;
+        private final String thrownText;
+        private final String unknownText = Bundle.getMessage("BeanStateUnknown");
+        private final String inconsistentText = Bundle.getMessage("BeanStateInconsistent");
+        private int row = -1; // row of the cell last rendered or edited
 
-        @Override
-        public java.awt.Component getTableCellEditorComponent(
-                JTable table, Object value, boolean isSelected,
-                int row, int column) {
-            log.debug("Renderer Item = {}, State = {}", row, value);
-            if (iconHeight < 0) { // load resources only first time, either for renderer or editor
-                loadIcons();
-                log.debug("icons loaded");
-            }
-            return updateLabel((String) value, row, table);
-        }
-
-        public JLabel updateLabel(String value, int row, JTable table) {
-            if (iconHeight > 0) { // if necessary, increase row height;
-                table.setRowHeight(row, Math.max(table.getRowHeight(), iconHeight - 5));
-            }
-            if (value.equals(closedText) && onIcon != null) {
-                label = new JLabel(onIcon);
-                label.setVerticalAlignment(JLabel.BOTTOM);
-                log.debug("onIcon set");
-            } else if (value.equals(thrownText) && offIcon != null) {
-                label = new JLabel(offIcon);
-                label.setVerticalAlignment(JLabel.BOTTOM);
-                log.debug("offIcon set");
-            } else if (value.equals(Bundle.getMessage("BeanStateInconsistent"))) {
-                label = new JLabel("X", JLabel.CENTER); // centered text alignment
-                label.setForeground(java.awt.Color.red);
-                log.debug("Turnout state inconsistent");
-                iconHeight = 0;
-            } else if (value.equals(Bundle.getMessage("BeanStateUnknown"))) {
-                label = new JLabel("?", JLabel.CENTER); // centered text alignment
-                log.debug("Turnout state unknown");
-                iconHeight = 0;
-            } else { // failed to load icon
-                label = new JLabel(value, JLabel.CENTER); // centered text alignment
-                log.warn("Error reading icons for TurnoutTable");
-                iconHeight = 0;
-            }
-            label.setToolTipText(value);
+        ImageIconRenderer(String closedText, String thrownText) {
+            this.closedText = closedText;
+            this.thrownText = thrownText;
+            label.setHorizontalAlignment(JLabel.CENTER);
+            // must stay the only anonymous class in ImageIconRenderer, see jmri.ArchitectureTest
             label.addMouseListener(new MouseAdapter() {
                 @Override
                 public final void mousePressed(MouseEvent evt) {
@@ -920,6 +927,65 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
                     stopCellEditing();
                 }
             });
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+            log.debug("Renderer Item = {}, State = {}", row, value);
+            return updateLabel((String) value, row);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Component getTableCellEditorComponent(
+                JTable table, Object value, boolean isSelected,
+                int row, int column) {
+            log.debug("Editor Item = {}, State = {}", row, value);
+            return updateLabel((String) value, row);
+        }
+
+        protected JLabel updateLabel(String value, int row) {
+            this.row = row;
+            if (iconHeight < 0) { // load resources only first time, either for renderer or editor
+                loadIcons();
+                log.debug("icons loaded");
+            }
+            label.setForeground(defaultForeground); // reset a foreground left over from an INCONSISTENT cell
+            if (value.equals(closedText) && onIcon != null) {
+                label.setIcon(onIcon);
+                label.setText(null);
+                label.setVerticalAlignment(JLabel.BOTTOM);
+                log.debug("onIcon set");
+            } else if (value.equals(thrownText) && offIcon != null) {
+                label.setIcon(offIcon);
+                label.setText(null);
+                label.setVerticalAlignment(JLabel.BOTTOM);
+                log.debug("offIcon set");
+            } else if (value.equals(inconsistentText)) {
+                label.setIcon(null);
+                label.setText("X");
+                label.setForeground(Color.red);
+                label.setVerticalAlignment(JLabel.CENTER);
+                log.debug("Turnout state inconsistent");
+            } else if (value.equals(unknownText)) {
+                label.setIcon(null);
+                label.setText("?");
+                label.setVerticalAlignment(JLabel.CENTER);
+                log.debug("Turnout state unknown");
+            } else { // failed to load icon
+                label.setIcon(null);
+                label.setText(value);
+                label.setVerticalAlignment(JLabel.CENTER);
+                log.warn("Error reading icons for TurnoutTable");
+            }
+            label.setToolTipText(value);
             return label;
         }
 
@@ -930,33 +996,98 @@ public class TurnoutTableDataModel extends BeanTableDataModel<Turnout>{
         }
 
         /**
-         * Read and buffer graphics. Only called once for this table.
+         * Get the row height needed to fit the state icons, loading them if
+         * required. Used by {@link #configureTable} to size the rows once,
+         * outside of the render path.
          *
-         * @see #getTableCellEditorComponent(JTable, Object, boolean,
-         * int, int)
+         * @return required row height in pixels, 0 if the icons could not be read
          */
-        protected void loadIcons() {
+        static int getIconRowHeight() {
+            if (iconHeight < 0) {
+                loadIcons();
+            }
+            return Math.max(iconHeight - 5, 0);
+        }
+
+        /**
+         * Read and buffer graphics. Only called once per JVM, the icons are
+         * shared by all instances of this renderer.
+         */
+        private static synchronized void loadIcons() {
+            if (iconHeight >= 0) { // another instance already loaded the icons
+                return;
+            }
+            BufferedImage onImage = null;
+            BufferedImage offImage = null;
             try {
-                onImage = ImageIO.read(new File(onIconPath));
-                offImage = ImageIO.read(new File(offIconPath));
+                onImage = ImageIO.read(new File(ON_ICON_PATH));
+                offImage = ImageIO.read(new File(OFF_ICON_PATH));
             } catch (IOException ex) {
-                log.error("error reading image from {} or {}", onIconPath, offIconPath, ex);
+                log.error("error reading image from {} or {}", ON_ICON_PATH, OFF_ICON_PATH, ex);
+            }
+            if (onImage == null || offImage == null) { // ImageIO.read returns null for an unreadable file
+                log.error("error reading image from {} or {}", ON_ICON_PATH, OFF_ICON_PATH);
+                iconHeight = 0; // give up: render states as text, don't retry for every cell
+                return;
             }
             log.debug("Success reading images");
             int imageWidth = onImage.getWidth();
             int imageHeight = onImage.getHeight();
             // scale icons 50% to fit in table rows
-            java.awt.Image smallOnImage = onImage.getScaledInstance(imageWidth / 2, imageHeight / 2, java.awt.Image.SCALE_DEFAULT);
-            java.awt.Image smallOffImage = offImage.getScaledInstance(imageWidth / 2, imageHeight / 2, java.awt.Image.SCALE_DEFAULT);
+            Image smallOnImage = onImage.getScaledInstance(imageWidth / 2, imageHeight / 2, Image.SCALE_DEFAULT);
+            Image smallOffImage = offImage.getScaledInstance(imageWidth / 2, imageHeight / 2, Image.SCALE_DEFAULT);
             onIcon = new ImageIcon(smallOnImage);
             offIcon = new ImageIcon(smallOffImage);
             iconHeight = onIcon.getIconHeight();
+        }
+
+        /**
+         * Label that ignores revalidate and repaint requests.
+         * <p>
+         * The rendered component stays a child of the table's
+         * CellRendererPane after painting, so a plain JLabel schedules a new
+         * repaint of the whole table each time its icon or text changes
+         * during a paint cycle. Same overrides as DefaultTableCellRenderer,
+         * except firePropertyChange, which BasicLabelUI needs to keep its
+         * view up to date.
+         */
+        private static class StateLabel extends JLabel {
+
+            @Override
+            public void revalidate() {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint() {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(long tm) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(int x, int y, int width, int height) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(long tm, int x, int y, int width, int height) {
+                // ignored, see class comment
+            }
+
+            @Override
+            public void repaint(Rectangle r) {
+                // ignored, see class comment
+            }
         }
 
     } // end of ImageIconRenderer class
 
     protected static java.util.concurrent.atomic.AtomicBoolean editingOps = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    private final static Logger log = LoggerFactory.getLogger(TurnoutTableDataModel.class);
-    
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TurnoutTableDataModel.class);
+
 }

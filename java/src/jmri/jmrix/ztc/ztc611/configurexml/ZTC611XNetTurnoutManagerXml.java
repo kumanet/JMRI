@@ -1,8 +1,6 @@
 package jmri.jmrix.ztc.ztc611.configurexml;
 
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides load and store functionality for configuring XNetTurnoutManagers
@@ -30,6 +28,6 @@ public class ZTC611XNetTurnoutManagerXml extends jmri.managers.configurexml.Abst
         return loadTurnouts(shared, perNode);
     }
 
-//    private final static Logger log = LoggerFactory.getLogger(ZTC611XNetTurnoutManagerXml.class);
+//    private static final Logger log = LoggerFactory.getLogger(ZTC611XNetTurnoutManagerXml.class);
 
 }

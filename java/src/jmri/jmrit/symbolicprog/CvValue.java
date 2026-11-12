@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory;
  * the operation is complete, and the Value and State are stable. During a read
  * operation, Value changes before State, so you can assume that Value is stable
  * if notified of a State change.
+ * <p>
+ * CVs track their states, as shown below.<br>
+ * <a href="doc-files/VariableStates.png"><img src="doc-files/VariableStates.png" alt="States for variables and their colors" height="33%" width="33%"></a>
  *
  * @author Bob Jacobsen Copyright (C) 2001, 2003, 2004, 2013
  * @author Howard G. Penny Copyright (C) 2005
@@ -32,7 +35,7 @@ public class CvValue extends AbstractValue implements ProgListener {
         mProgrammer = pProgrammer;
         _tableEntry = new JTextField("0", 3);
         _defaultColor = _tableEntry.getBackground();
-        _tableEntry.setBackground(COLOR_UNKNOWN);
+        _tableEntry.setBackground(ValueState.UNKNOWN.getColor());
     }
 
     public CvValue(String num, String cvName, Programmer pProgrammer) {
@@ -44,7 +47,7 @@ public class CvValue extends AbstractValue implements ProgListener {
         mProgrammer = pProgrammer;
         _tableEntry = new JTextField("0", 3);
         _defaultColor = _tableEntry.getBackground();
-        _tableEntry.setBackground(COLOR_UNKNOWN);
+        _tableEntry.setBackground(ValueState.UNKNOWN.getColor());
     }
 
     @Override
@@ -86,8 +89,9 @@ public class CvValue extends AbstractValue implements ProgListener {
         prop.firePropertyChange("Value", null, value);
     }
 
+
     /**
-     * Edit a new value into the CV.
+     * Edit a new value into the CV. Fires listeners
      * <p>
      * Only use this for external edits, e.g. set from a GUI.
      * Not for internal uses, as it sets the state to EDITED.
@@ -96,7 +100,7 @@ public class CvValue extends AbstractValue implements ProgListener {
     public void setValue(int value) {
         log.debug("CV {} value changed from {} to {}", number(), _value, value); // NOI18N
 
-        setState(EDITED);
+        setState(ValueState.EDITED);
         if (_value != value) {
             _value = value;
             _tableEntry.setText("" + value);
@@ -116,7 +120,7 @@ public class CvValue extends AbstractValue implements ProgListener {
 
     private int _decoderValue = 0;
 
-    public int getState() {
+    public ValueState getState() {
         return _state;
     }
 
@@ -124,70 +128,19 @@ public class CvValue extends AbstractValue implements ProgListener {
      * Set state value and send notification.Also sets GUI color as needed.
      * @param state new state, e.g READ, UNKNOWN, SAME.
      */
-    public void setState(int state) {
+    public void setState(ValueState state) {
         if (log.isDebugEnabled()) {  // stateToString overhead
-            log.debug("cv {} set state from {} to {}", number(), stateToString(_state), stateToString(state)); // NOI18N
+            log.debug("cv {} set state from {} to {}", number(), _state.name(), state.name()); // NOI18N
         }
-        int oldstate = _state;
+        ValueState oldstate = _state;
         _state = state;
-        switch (state) {
-            case UNKNOWN:
-                setColor(COLOR_UNKNOWN);
-                break;
-            case EDITED:
-                setColor(COLOR_EDITED);
-                break;
-            case READ:
-                setColor(COLOR_READ);
-                break;
-            case STORED:
-                setColor(COLOR_STORED);
-                break;
-            case FROMFILE:
-                setColor(COLOR_FROMFILE);
-                break;
-            case SAME:
-                setColor(COLOR_SAME);
-                break;
-            case DIFF:
-                setColor(COLOR_DIFF);
-                break;
-            default:
-                log.error("Inconsistent state: {}", _state); // NOI18N
-        }
+        setColor(state.getColor());
         if (oldstate != state) {
-            prop.firePropertyChange("State", Integer.valueOf(oldstate), Integer.valueOf(state));
+            prop.firePropertyChange("State", oldstate, state);
         }
     }
 
-    /**
-     * Intended for debugging only, don't translate.
-     * @param state State to translate to text
-     * @return Text (human readable) representation of state
-     */
-    String stateToString(int state) {
-        switch (state) {
-            case UNKNOWN:
-                return "UNKNOWN";
-            case EDITED:
-                return "EDITED";
-            case READ:
-                return "READ";
-            case STORED:
-                return "STORED";
-            case FROMFILE:
-                return "FROMFILE";
-            case SAME:
-                return "SAME";
-            case DIFF:
-                return "DIFF";
-            default:
-                log.error("Inconsistent state: {}", _state); // NOI18N
-                return "ERROR!!";
-        }
-    }
-
-    private int _state = 0;
+    private ValueState _state = ValueState.UNKNOWN;
 
     // read, write operations
     public boolean isBusy() {
@@ -336,6 +289,9 @@ public class CvValue extends AbstractValue implements ProgListener {
     private boolean _confirm = false;
 
     public void read(JLabel status) {
+        read(status,0,0,0);
+    }
+    public void read(JLabel status, long number, long total, long cvReadStartTime) {
         log.debug("read call with Cv number {} and programmer {}", _num, mProgrammer); // NOI18N
 
         setToRead(false);
@@ -343,10 +299,24 @@ public class CvValue extends AbstractValue implements ProgListener {
         _status = status;
 
         if (status != null) {
-            status.setText(
-                    java.text.MessageFormat.format(
-                            Bundle.getMessage("StateReadingCV"),
-                            new Object[]{"" + _num}));
+            if (total == 0) {
+                status.setText(
+                        java.text.MessageFormat.format(
+                                Bundle.getMessage("StateReadingCV"),
+                                new Object[]{"" + _num}));
+
+            } else {
+                long remaining = ((System.currentTimeMillis() - cvReadStartTime) / number * (total - number)) / 1000;
+                String units = "seconds";
+                if (remaining > 60) {
+                    remaining = remaining / 60;
+                    units = "minutes";
+                }
+                status.setText(
+                        java.text.MessageFormat.format(
+                                Bundle.getMessage("StateReadingCVincltime"),
+                                new Object[]{"" + _num, number, total, remaining, units}));
+            }
         }
 
         if (mProgrammer != null) {
@@ -354,7 +324,6 @@ public class CvValue extends AbstractValue implements ProgListener {
             _reading = true;
             _confirm = false;
             try {
-                //mProgrammer.readCV(_num, this);
                 mProgrammer.readCV(_num, this, this.getValue());
             } catch (Exception e) {
                 if (status != null) {
@@ -364,7 +333,7 @@ public class CvValue extends AbstractValue implements ProgListener {
                                     new Object[]{e.toString()}));
                 }
 
-                log.warn("Exception during CV read: {}", e); // NOI18N
+                log.warn("Exception during CV read", e); // NOI18N
                 setBusy(false);
             }
         } else {
@@ -401,7 +370,7 @@ public class CvValue extends AbstractValue implements ProgListener {
                                     Bundle.getMessage("StateExceptionDuringConfirm"),
                                     new Object[]{e.toString()}));
                 }
-                log.warn("Exception during CV confirm: {}", e); // NOI18N
+                log.warn("Exception during CV confirm", e); // NOI18N
                 setBusy(false);
             }
         } else {
@@ -430,10 +399,10 @@ public class CvValue extends AbstractValue implements ProgListener {
             _reading = false;
             _confirm = false;
             try {
-                setState(UNKNOWN);
+                setState(ValueState.UNKNOWN);
                 mProgrammer.writeCV(_num, _value, this);
             } catch (Exception e) {
-                setState(UNKNOWN);
+                setState(ValueState.UNKNOWN);
                 if (status != null) {
                     status.setText(
                             java.text.MessageFormat.format(
@@ -469,23 +438,23 @@ public class CvValue extends AbstractValue implements ProgListener {
                 _value = value;
                 _tableEntry.setText(Integer.toString(value));
                 notifyValueChange(value);
-                setState(READ);
+                setState(ValueState.READ);
                 log.debug("CV setting not busy on end read"); // NOI18N
                 _busy = false;
                 notifyBusyChange(oldBusy, _busy);
             } else if (_confirm) {
-                // _value doesn't change, just the state, and save the value read 
+                // _value doesn't change, just the state, and save the value read
                 _decoderValue = value;
                 // does the decoder value match the file value
                 if (value == _value) {
-                    setState(SAME);
+                    setState(ValueState.SAME);
                 } else {
-                    setState(DIFF);
+                    setState(ValueState.DIFFERENT);
                 }
                 _busy = false;
                 notifyBusyChange(oldBusy, _busy);
             } else {  // writing
-                setState(STORED);
+                setState(ValueState.STORED);
                 _busy = false;
                 notifyBusyChange(oldBusy, _busy);
             }
@@ -508,12 +477,12 @@ public class CvValue extends AbstractValue implements ProgListener {
             timer.setRepeats(false);
             timer.start();
         }
-            
+
         log.debug("CV progOpReply end of handling CV {}", _num); // NOI18N
     }
 
     void errorTimeout() {
-        setState(UNKNOWN);
+        setState(ValueState.UNKNOWN);
         log.debug("CV setting not busy on error reply"); // NOI18N
         _busy = false;
         notifyBusyChange(true, _busy);
@@ -525,6 +494,6 @@ public class CvValue extends AbstractValue implements ProgListener {
     }
 
     // initialize logging
-    private final static Logger log = LoggerFactory.getLogger(CvValue.class);
+    private static final Logger log = LoggerFactory.getLogger(CvValue.class);
 
 }

@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
+
 import org.openlcb.EventID;
 import org.openlcb.implementations.EventTable;
 import org.slf4j.Logger;
@@ -14,22 +16,21 @@ import org.slf4j.LoggerFactory;
 import jmri.JmriException;
 import jmri.Sensor;
 import jmri.jmrix.can.CanMessage;
+import jmri.util.junit.annotations.ToDo;
 import jmri.util.JUnitUtil;
 import jmri.util.NamedBeanComparator;
 import jmri.util.PropertyChangeListenerScaffold;
 import jmri.util.ThreadingUtil;
-import jmri.util.junit.rules.RetryRule;
 
 /**
  * Tests for the jmri.jmrix.openlcb.OlcbSensor class.
- *
+ * These tests are run separately because they leave a lot of threads behind.
  * @author Bob Jacobsen Copyright 2008, 2010
  */
+@DisabledIfSystemProperty(named ="jmri.skipTestsRequiringSeparateRunning", matches ="true")
 public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
 
-    public RetryRule retryRule = new RetryRule(3);  // allow 3 retries of tests
-
-    private final static Logger log = LoggerFactory.getLogger(OlcbSensorTest.class);
+    private static final Logger log = LoggerFactory.getLogger(OlcbSensorTest.class);
     protected PropertyChangeListenerScaffold l;
 
     @Override
@@ -39,26 +40,26 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
 
     @Override
     public void checkActiveMsgSent() {
-        Assert.assertTrue(new OlcbAddress("1.2.3.4.5.6.7.8").match(ti.tc.rcvMessage));
+        Assert.assertTrue(new OlcbAddress("1.2.3.4.5.6.7.8", null).match(ti.tc.rcvMessage));
     }
 
     @Override
     public void checkInactiveMsgSent() {
-        Assert.assertTrue(new OlcbAddress("1.2.3.4.5.6.7.9").match(ti.tc.rcvMessage));
+        Assert.assertTrue(new OlcbAddress("1.2.3.4.5.6.7.9", null).match(ti.tc.rcvMessage));
     }
-    
-    @org.junit.jupiter.api.Disabled("Test requires further setup")
-    @jmri.util.junit.annotations.ToDo("Check checkActiveMsgSent() producing correct result")
+
+    @Disabled("Test requires further setup")
+    @ToDo("Check checkActiveMsgSent() producing correct result")
     @Test
     @Override
     public void testCommandSentActive() {}
 
-    @org.junit.jupiter.api.Disabled("Test requires further setup")
-    @jmri.util.junit.annotations.ToDo("Check checkInactiveMsgSent() producing correct result")
+    @Disabled("Test requires further setup")
+    @ToDo("Check checkInactiveMsgSent() producing correct result")
     @Test
     @Override
     public void testCommandSentInactive() {}
-    
+
     @Override
     public void checkStatusRequestMsgSent() {
         ti.flush();
@@ -81,13 +82,13 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
         mInactive.setExtended(true);
 
         // check states
-        Assert.assertEquals(t.getKnownState(), Sensor.UNKNOWN);
+        Assert.assertEquals(Sensor.UNKNOWN, t.getKnownState());
 
         ti.sendMessage(mActive);
-        Assert.assertEquals(t.getKnownState(), Sensor.ACTIVE);
+        Assert.assertEquals(Sensor.ACTIVE,t.getKnownState());
 
         ti.sendMessage(mInactive);
-        Assert.assertEquals(t.getKnownState(), Sensor.INACTIVE);
+        Assert.assertEquals(Sensor.INACTIVE, t.getKnownState());
 
     }
 
@@ -115,18 +116,18 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
         mStateInactive.setExtended(true);
 
         // check states
-        Assert.assertEquals(t.getKnownState(), Sensor.UNKNOWN);
+        Assert.assertEquals(Sensor.UNKNOWN, t.getKnownState());
 
         ti.sendMessage(mStateActive);
-        Assert.assertEquals(t.getKnownState(), Sensor.ACTIVE);
+        Assert.assertEquals(Sensor.ACTIVE,t.getKnownState());
 
         ti.sendMessage(mStateInactive);
-        Assert.assertEquals(t.getKnownState(), Sensor.INACTIVE);
+        Assert.assertEquals(Sensor.INACTIVE, t.getKnownState());
     }
 
     @Test
     public void testMomentarySensor() {
-        OlcbSensor s = new OlcbSensor("M", "1.2.3.4.5.6.7.8", ti.iface);
+        OlcbSensor s = new OlcbSensor("M", "1.2.3.4.5.6.7.8", ti.systemConnectionMemo);
         s.finishLoad();
         // message for Active and Inactive
         CanMessage mActive = new CanMessage(
@@ -136,26 +137,26 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
         mActive.setExtended(true);
 
         // check states
-        Assert.assertEquals(s.getKnownState(), Sensor.UNKNOWN);
+        Assert.assertEquals(Sensor.UNKNOWN, s.getKnownState());
 
         ti.sendMessage(mActive);
-        Assert.assertEquals(s.getKnownState(), Sensor.ACTIVE);
+        Assert.assertEquals(Sensor.ACTIVE,s.getKnownState());
 
-        JUnitUtil.waitFor( ()-> (s.getKnownState() != Sensor.ACTIVE));
+        JUnitUtil.waitFor( ()-> (s.getKnownState() != Sensor.ACTIVE),"wait sensor not active");
 
         Assert.assertEquals(Sensor.INACTIVE, s.getKnownState());
 
         // local flip
         s.setKnownState(Sensor.ACTIVE);
-        Assert.assertEquals(s.getKnownState(), Sensor.ACTIVE);
+        Assert.assertEquals(Sensor.ACTIVE,s.getKnownState());
 
-        JUnitUtil.waitFor( ()-> (s.getKnownState() != Sensor.ACTIVE));
+        JUnitUtil.waitFor( ()-> (s.getKnownState() != Sensor.ACTIVE),"wait sensor not active local flip");
 
         Assert.assertEquals(Sensor.INACTIVE, s.getKnownState());
     }
 
     @Test
-    public void testLocalChange() throws jmri.JmriException {
+    public void testLocalChange() throws JmriException {
         ti.tc.rcvMessage = null;
         t.setKnownState(Sensor.ACTIVE);
         Assert.assertEquals(Sensor.ACTIVE, t.getKnownState());
@@ -178,7 +179,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
     }
 
     @Test
-    public void testAuthoritative() throws jmri.JmriException {
+    public void testAuthoritative() throws JmriException {
         t.setState(Sensor.ACTIVE);
         ti.flush();
 
@@ -211,7 +212,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
     @Test
     public void testForgetState() throws JmriException {
         t.dispose(); // dispose of the existing sensor.
-        OlcbSensor s = new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.iface);
+        OlcbSensor s = new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.systemConnectionMemo);
         s.setProperty(OlcbUtils.PROPERTY_LISTEN, Boolean.FALSE.toString());
         s.finishLoad();
 
@@ -239,7 +240,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
 
         // Resets the turnout to unknown state
         s.setState(Sensor.UNKNOWN);
-        JUnitUtil.waitFor( () -> l.getPropertyChanged());
+        JUnitUtil.waitFor( () -> l.getPropertyChanged(),"listener property changed");
         Assert.assertEquals("called once",1,l.getCallCount());
         l.resetPropertyChanged();
         ti.assertNoSentMessages();
@@ -249,7 +250,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
                 ":X19547C4CN0102030405060708;");
         // getting a state notify will change state
         ti.sendMessage(":X19544123N0102030405060709;");
-        JUnitUtil.waitFor( () -> l.getPropertyChanged());
+        JUnitUtil.waitFor( () -> l.getPropertyChanged(),"listener property changed");
         Assert.assertEquals("called once",1,l.getCallCount());
         l.resetPropertyChanged();
         Assert.assertEquals(Sensor.INACTIVE, s.getKnownState());
@@ -266,7 +267,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
     }
 
     @Test
-    public void testQueryState() throws Exception {
+    public void testQueryState() throws JmriException {
         OlcbSensor s = (OlcbSensor) t;
         ti.tc.rcvMessage = null;
         Assert.assertEquals(Sensor.UNKNOWN, s.getState());
@@ -295,7 +296,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
     }
 
     @Test
-    public void testQueryStateNotAlwaysListen() throws Exception {
+    public void testQueryStateNotAlwaysListen() throws JmriException {
         OlcbSensor s = (OlcbSensor) t;
         s.setListeningToStateMessages(false);
         ti.flush();
@@ -336,7 +337,7 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
      */
     @Test
     public void testListenerOutOfOrder() {
-        final OlcbSensor u = new OlcbSensor("M", "1.2.3.4.5.6.7.a;1.2.3.4.5.6.7.b", ti.iface);
+        final OlcbSensor u = new OlcbSensor("M", "1.2.3.4.5.6.7.a;1.2.3.4.5.6.7.b", ti.systemConnectionMemo);
         final OlcbSensor v = (OlcbSensor)t;
         u.finishLoad();
         v.setKnownState(Sensor.INACTIVE);
@@ -388,10 +389,10 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
         // test by putting into a tree set, then extracting and checking order
         TreeSet<Sensor> set = new TreeSet<>(new NamedBeanComparator<>());
 
-        set.add(new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.iface));
-        set.add(new OlcbSensor("M", "X0501010114FF2000;X0501010114FF2011", ti.iface));
-        set.add(new OlcbSensor("M", "X0501010114FF2000;X0501010114FF2001", ti.iface));
-        set.add(new OlcbSensor("M", "1.2.3.4.5.6.7.9;1.2.3.4.5.6.7.9", ti.iface));
+        set.add(new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.systemConnectionMemo));
+        set.add(new OlcbSensor("M", "X0501010114FF2000;X0501010114FF2011", ti.systemConnectionMemo));
+        set.add(new OlcbSensor("M", "X0501010114FF2000;X0501010114FF2001", ti.systemConnectionMemo));
+        set.add(new OlcbSensor("M", "1.2.3.4.5.6.7.9;1.2.3.4.5.6.7.9", ti.systemConnectionMemo));
 
         Iterator<Sensor> it = set.iterator();
 
@@ -409,19 +410,23 @@ public class OlcbSensorTest extends jmri.implementation.AbstractSensorTestBase {
         JUnitUtil.setUp();
         l = new PropertyChangeListenerScaffold();
         // load dummy TrafficController
-        ti = new OlcbTestInterface();
+        ti = new OlcbTestInterface(new OlcbTestInterface.CreateConfigurationManager());
         ti.waitForStartup();
-        t = new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.iface);
+        t = new OlcbSensor("M", "1.2.3.4.5.6.7.8;1.2.3.4.5.6.7.9", ti.systemConnectionMemo);
         ((OlcbSensor) t).finishLoad();
     }
 
     @AfterEach
     @Override
     public void tearDown() {
+
         t.dispose();
+        t = null;
         l.resetPropertyChanged();
         l = null;
         ti.dispose();
+        ti = null;
+
         JUnitUtil.clearShutDownManager(); // put in place because AbstractMRTrafficController implementing subclass was not terminated properly
         JUnitUtil.tearDown();
 

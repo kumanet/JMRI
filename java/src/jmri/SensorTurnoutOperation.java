@@ -12,17 +12,22 @@ import jmri.implementation.SensorTurnoutOperator;
 public class SensorTurnoutOperation extends CommonTurnoutOperation {
 
     // This class can deal with explicit feedback modes
-    final int feedbackModes = AbstractTurnout.ONESENSOR | AbstractTurnout.TWOSENSOR | AbstractTurnout.EXACT | AbstractTurnout.INDIRECT;
+    static final int SUPPORTED_FEEDBACK_MODES
+            = AbstractTurnout.ONESENSOR
+            | AbstractTurnout.TWOSENSOR
+            | AbstractTurnout.EXACT
+            | AbstractTurnout.INDIRECT
+            | AbstractTurnout.LNALTERNATE ;
 
     /*
      * Default values and constraints.
      */
-    static public final int defaultInterval = 300;
-    static public final int defaultMaxTries = 3;
+    public static final int defaultInterval = 300;
+    public static final int defaultMaxTries = 3;
 
     public SensorTurnoutOperation(String n, int i, int mt) {
         super(n, i, mt);
-        setFeedbackModes(feedbackModes);
+        setFeedbackModes(SUPPORTED_FEEDBACK_MODES);
     }
 
     /**
@@ -59,6 +64,11 @@ public class SensorTurnoutOperation extends CommonTurnoutOperation {
     @Override
     public TurnoutOperator getOperator(AbstractTurnout t) {
         return new SensorTurnoutOperator(t, interval, maxTries);
+    }
+
+    @Override
+    public String getToolTip(){
+        return Bundle.getMessage("TurnoutOperationSensorTip");
     }
 
 }

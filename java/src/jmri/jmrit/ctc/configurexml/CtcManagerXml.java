@@ -1,6 +1,5 @@
 package jmri.jmrit.ctc.configurexml;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 import jmri.*;
@@ -777,5 +776,5 @@ public class CtcManagerXml extends jmri.managers.configurexml.AbstractNamedBeanM
         return InstanceManager.getDefault(jmri.jmrit.ctc.CtcManager.class).getXMLOrder();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CtcManagerXml.class);
+    private static final Logger log = LoggerFactory.getLogger(CtcManagerXml.class);
 }

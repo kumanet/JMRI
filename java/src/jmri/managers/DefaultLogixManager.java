@@ -96,6 +96,10 @@ public class DefaultLogixManager extends AbstractManager<Logix>
         // delete the Logix
         deregister(x);
         x.dispose();
+        jmri.ConditionalManager cm = InstanceManager.getNullableDefault(jmri.ConditionalManager.class);
+        if (cm != null) {
+            cm.forgetParentLogix(x);
+        }
     }
 
     /**
@@ -160,16 +164,6 @@ public class DefaultLogixManager extends AbstractManager<Logix>
         loadDisabled = s;
     }
 
-    /**
-     * 
-     * @return the default instance of the DefaultLogixManager
-     * @deprecated since 4.17.3; use {@link jmri.InstanceManager#getDefault(java.lang.Class)} instead
-     */
-    @Deprecated
-    static public DefaultLogixManager instance() {
-        return InstanceManager.getDefault(DefaultLogixManager.class);
-    }
-
     @Override
     @Nonnull
     public String getBeanTypeHandled(boolean plural) {
@@ -184,6 +178,6 @@ public class DefaultLogixManager extends AbstractManager<Logix>
         return Logix.class;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DefaultLogixManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DefaultLogixManager.class);
 
 }

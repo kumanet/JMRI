@@ -2,7 +2,6 @@ package jmri.jmrit.display.layoutEditor;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
 import java.awt.geom.*;
 import static java.lang.Float.POSITIVE_INFINITY;
 import java.text.MessageFormat;
@@ -16,6 +15,7 @@ import javax.swing.*;
 import jmri.*;
 import jmri.jmrit.display.layoutEditor.LayoutTurntable.RayTrack;
 import jmri.util.MathUtil;
+import jmri.util.swing.JmriMouseEvent;
 
 /**
  * MVC View component for the LayoutTurntable class.
@@ -44,9 +44,9 @@ public class LayoutTurntableView extends LayoutTrackView {
         editor = new jmri.jmrit.display.layoutEditor.LayoutEditorDialogs.LayoutTurntableEditor(layoutEditor);
     }
 
-    final private LayoutTurntable turntable;
+    private final LayoutTurntable turntable;
 
-    final public LayoutTurntable getTurntable() { return turntable; }
+    public final LayoutTurntable getTurntable() { return turntable; }
 
     /**
      * Get a string that represents this object. This should only be used for
@@ -128,6 +128,43 @@ public class LayoutTurntableView extends LayoutTrackView {
             result.add(getRayCoordsOrdered(k));
         }
         return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The bridge is drawn in the turntable's block's colours, and each ray in
+     * the colours of the block of the track joined to it.
+     */
+    @Override
+    public boolean usesLayoutBlock(@Nonnull LayoutBlock layoutBlock) {
+        if (getLayoutBlock() == layoutBlock) {
+            return true;
+        }
+        for (int k = 0; k < getNumberRays(); k++) {
+            TrackSegment ts = getRayConnectOrdered(k);
+            if ((ts != null) && (ts.getLayoutBlock() == layoutBlock)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The bridge turns about the centre, and can point away from every ray, so
+     * this is the square round the circle that holds the pit and all the rays.
+     */
+    @Override
+    @Nonnull
+    public Rectangle2D getRepaintBounds() {
+        Point2D centre = getCoordsCenter();
+        double reach = getRadius();
+        for (int k = 0; k < getNumberRays(); k++) {
+            reach = Math.max(reach, centre.distance(getRayCoordsOrdered(k)));
+        }
+        return new Rectangle2D.Double(centre.getX() - reach, centre.getY() - reach, 2 * reach, 2 * reach);
     }
 
     /**
@@ -559,8 +596,6 @@ public class LayoutTurntableView extends LayoutTrackView {
         return result;
     }
 
-    public String tLayoutBlockName = "";
-
     /**
      * Is this turntable turnout controlled?
      *
@@ -586,7 +621,7 @@ public class LayoutTurntableView extends LayoutTrackView {
      */
     @Override
     @Nonnull
-    protected JPopupMenu showPopup(@Nonnull MouseEvent mouseEvent) {
+    protected JPopupMenu showPopup(@Nonnull JmriMouseEvent mouseEvent) {
         if (popupMenu != null) {
             popupMenu.removeAll();
         } else {
@@ -635,7 +670,7 @@ public class LayoutTurntableView extends LayoutTrackView {
         popupMenu.add(new AbstractAction(Bundle.getMessage("ButtonDelete")) {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (layoutEditor.removeTurntable(turntable)) {
+                if (removeInlineLogixNG() && layoutEditor.removeTurntable(turntable)) {
                     // Returned true if user did not cancel
                     remove();
                     dispose();
@@ -643,13 +678,14 @@ public class LayoutTurntableView extends LayoutTrackView {
             }
         });
         layoutEditor.setShowAlignmentMenu(popupMenu);
+        addCommonPopupItems(mouseEvent, popupMenu);
         popupMenu.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
         return popupMenu;
     }
 
     private JPopupMenu rayPopup = null;
 
-    protected void showRayPopUp(MouseEvent e, int index) {
+    protected void showRayPopUp(JmriMouseEvent e, int index) {
         if (rayPopup != null) {
             rayPopup.removeAll();
         } else {
@@ -829,10 +865,9 @@ public class LayoutTurntableView extends LayoutTrackView {
     protected void draw1(Graphics2D g2, boolean isMain, boolean isBlock) {
         log.trace("LayoutTurntable:draw1 at {}", getCoordsCenter());
         float trackWidth = 2.F;
-        float halfTrackWidth = trackWidth / 2.f;
         double diameter = 2.f * getRadius();
 
-        if (isBlock && isMain) {
+        if (isBlock && (getTurntable().isMainline() == isMain)) {
             double radius2 = Math.max(getRadius() / 4.f, trackWidth * 2);
             double diameter2 = radius2 * 2.f;
             Stroke stroke = g2.getStroke();
@@ -873,7 +908,17 @@ public class LayoutTurntableView extends LayoutTrackView {
             if (main == isMain) {
                 g2.draw(new Line2D.Double(pt1, pt2));
             }
-            if (isMain && isTurnoutControlled() && (getPosition() == j)) {
+
+            int knownPosition = getPosition();
+            int commandedPosition = turntable.getCommandedPosition();
+
+            // Don't draw the bridge if animating and position is changing
+            if (layoutEditor.isAnimating() && isTurnoutControlled() && knownPosition != commandedPosition) {
+                continue;
+            }
+
+            int currentPositionIndex = (knownPosition != -1) ? getRayIndex(knownPosition) : -1;
+            if ((getTurntable().isMainline() == isMain) && isTurnoutControlled() && (currentPositionIndex == j) ) {
                 if (isBlock) {
                     LayoutBlock lb = getLayoutBlock();
                     if (lb != null) {
@@ -883,9 +928,12 @@ public class LayoutTurntableView extends LayoutTrackView {
                         g2.setColor(layoutEditor.getDefaultTrackColorColor());
                     }
                 }
-                delta = MathUtil.normalize(delta, getRadius() - halfTrackWidth);
-                pt1 = MathUtil.subtract(getCoordsCenter(), delta);
-                g2.draw(new Line2D.Double(pt1, pt2));
+                // Draw an asymmetric bridge to act as a pointer.
+                // The long end (pt2) points toward the selected ray.
+                // The short end (short_pt1) points away from it, at 0.8 * radius.
+                Point2D short_delta = MathUtil.normalize(delta, getRadius() * 0.8);
+                Point2D short_pt1 = MathUtil.subtract(getCoordsCenter(), short_delta);
+                g2.draw(new Line2D.Double(short_pt1, pt2));
             }
             if (color != null) {
                 g2.setColor(color); /// restore previous color
@@ -929,7 +977,9 @@ public class LayoutTurntableView extends LayoutTrackView {
                 g2.draw(new Line2D.Double(pt1L, pt2L));
                 g2.draw(new Line2D.Double(pt1R, pt2R));
             }
-            if (isMain && isTurnoutControlled() && (getPosition() == j)) {
+            // getPosition() will return -1 if no ray is selected (all turnouts are closed).
+            int currentPositionIndex = (getPosition() != -1) ? getRayIndex(getPosition()) : -1;
+            if ((getTurntable().isMainline() == isMain) && isTurnoutControlled() && (currentPositionIndex == j)) {
 //                LayoutBlock lb = getLayoutBlock();
 //                if (lb != null) {
 //                    c = g2.getColor();
@@ -964,7 +1014,7 @@ public class LayoutTurntableView extends LayoutTrackView {
             {
                 if (getRayConnectOrdered(j) == null) {
                     Point2D pt = getRayCoordsOrdered(j);
-                    log.trace("   draw at {} {}, {} {}", pt);
+                    log.trace("   draw at {}", pt);
                     g2.fill(trackControlCircleAt(pt));
                 }
             }
@@ -1168,5 +1218,5 @@ public class LayoutTurntableView extends LayoutTrackView {
     }
 
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurntableView.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LayoutTurntableView.class);
 }

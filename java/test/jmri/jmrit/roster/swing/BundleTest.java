@@ -1,5 +1,6 @@
 package jmri.jmrit.roster.swing;
 
+import java.util.Locale;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.*;
 public class BundleTest  {
 
     @Test public void testGoodKeys() {
-        Assert.assertEquals("Roster", Bundle.getMessage("MenuItemRoster"));
+        Assert.assertEquals("Open DecoderPro", Bundle.getMessage("MenuItemRoster"));
         Assert.assertEquals("Tools", Bundle.getMessage("MenuTools"));
         Assert.assertEquals("Turnout", Bundle.getMessage("BeanNameTurnout"));
     }
@@ -22,5 +23,23 @@ public class BundleTest  {
         Assert.assertThrows(java.util.MissingResourceException.class, () -> Bundle.getMessage("FFFFFTTTTTTT"));
     }
 
+    @Test public void testGoodKeyMessageArg() {
+        Assert.assertEquals("Turnout", Bundle.getMessage("BeanNameTurnout", new Object[]{}));
+        Assert.assertEquals("About Test", Bundle.getMessage("TitleAbout", "Test"));
+    }    
+
+    @Test
+    public void testBadKeyMessageArg() {
+        Assert.assertThrows(java.util.MissingResourceException.class, () -> Bundle.getMessage("FFFFFTTTTTTT", new Object[]{}));
+    }
+
+    @Test public void testLocaleMessage() {
+        Assert.assertEquals("Scambio", Bundle.getMessage(Locale.ITALY, "BeanNameTurnout"));
+    }
+
+    @Test public void testLocaleMessageArg() {
+        Assert.assertEquals("Scambio", Bundle.getMessage(Locale.ITALY, "BeanNameTurnout", new Object[]{}));
+        Assert.assertEquals("Informazioni su Test", Bundle.getMessage(Locale.ITALY, "TitleAbout", "Test"));
+    }
 
 }

@@ -140,12 +140,12 @@ public class AudioUtil {
         return formats;
     }
 
-    static public boolean isAudioRunning() {
+    public static boolean isAudioRunning() {
         AudioFactory af = jmri.InstanceManager.getDefault(jmri.AudioManager.class).getActiveAudioFactory();
         if (af == null) {
             return false;
         } else {
-            return ((jmri.jmrit.audio.AudioThread) af.getCommandThread()).alive();
+            return ((jmri.jmrit.audio.AudioThread) af.getCommandThread()).isThreadAlive();
         }
     }
 

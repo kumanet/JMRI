@@ -37,14 +37,8 @@ public class StringExpressionConstant extends AbstractStringExpression {
     
     /** {@inheritDoc} */
     @Override
-    public Category getCategory() {
-        return Category.ITEM;
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public boolean isExternal() {
-        return false;
+    public LogixNG_Category getCategory() {
+        return LogixNG_Category.ITEM;
     }
     
     public void setValue(String value) {
@@ -115,6 +109,6 @@ public class StringExpressionConstant extends AbstractStringExpression {
     }
     
     
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringExpressionConstant.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StringExpressionConstant.class);
     
 }

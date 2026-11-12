@@ -1,9 +1,10 @@
 package jmri.util.usb;
 
-import javax.usb.*;
-import javax.usb.event.UsbDeviceListener;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
+
+import javax.usb.*;
+import javax.usb.event.UsbDeviceListener;
 /**
  * Provide a mock USB device used for tests.
  *
@@ -50,7 +51,7 @@ public class UsbDeviceScaffold implements UsbDevice {
     }
 
     @Override
-    public List getUsbConfigurations() {
+    public List<?> getUsbConfigurations() {
         return null;
     }
 
@@ -104,11 +105,13 @@ public class UsbDeviceScaffold implements UsbDevice {
 
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public void syncSubmit(List list) throws UsbException, IllegalArgumentException, UsbDisconnectedException {
 
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public void asyncSubmit(List list) throws UsbException, IllegalArgumentException, UsbDisconnectedException {
 

@@ -62,7 +62,7 @@ public class InitiateSound extends SdfMacro {
         return "(trigger = 0x" + jmri.util.StringUtil.twoHexFromInt(trigger) + ")"; // NOI18N
     }
 
-    static public SdfMacro match(SdfBuffer buff) {
+    public static SdfMacro match(SdfBuffer buff) {
         if ((buff.getAtIndex() & 0xF8) != 0x90) {
             return null;
         }
@@ -132,13 +132,14 @@ public class InitiateSound extends SdfMacro {
 
     @Override
     public String allInstructionString(String indent) {
-        String output = indent + oneInstructionString();
+        StringBuilder output = new StringBuilder(indent);
+        output.append(oneInstructionString());
         if (children == null) {
-            return output;
+            return output.toString();
         }
         for (int i = 0; i < children.size(); i++) {
-            output += children.get(i).allInstructionString(indent + "  ");
+            output.append(children.get(i).allInstructionString(indent + "  "));
         }
-        return output;
+        return output.toString();
     }
 }

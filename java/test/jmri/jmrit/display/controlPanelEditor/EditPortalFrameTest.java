@@ -57,11 +57,10 @@ public class EditPortalFrameTest {
     public void tearDown() {
         blkMgr.dispose();
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         //JUnitUtil.clearShutDownManager();  // only needed intermittently; better to find and remove, but that would require lots o' refactoring
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(EditPortalFrameTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(EditPortalFrameTest.class);
 
 }

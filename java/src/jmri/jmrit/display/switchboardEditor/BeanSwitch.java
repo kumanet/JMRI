@@ -2,11 +2,14 @@ package jmri.jmrit.display.switchboardEditor;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
 import java.io.File;
 import java.io.IOException;
+
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.imageio.ImageIO;
@@ -15,16 +18,17 @@ import javax.swing.*;
 import jmri.InstanceManager;
 import jmri.JmriException;
 import jmri.Light;
+import jmri.LightManager;
+import jmri.Manager;
 import jmri.NamedBean;
 import jmri.NamedBeanHandle;
 import jmri.Sensor;
+import jmri.SensorManager;
 import jmri.Turnout;
+import jmri.TurnoutManager;
 import jmri.jmrit.beantable.AddNewDevicePanel;
-import jmri.jmrit.display.Positionable;
-import jmri.util.JmriJFrame;
-import jmri.util.SystemType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.*;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Class for a switchboard interface object.
@@ -43,7 +47,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     private int square = 75; // outside dimension of graphic, normally < 2*radius
     private int radius = 50; // max distance in px from center of switch canvas, unit used for relative scaling
     private double popScale = 1.0d;
-    private Boolean showUserName = true;
+    private SwitchBoardLabelDisplays showUserName = SwitchBoardLabelDisplays.BOTH_NAMES;
     private Color activeColor = Color.RED; // for testing a separate BeanSwitch
     private Color inactiveColor = Color.GREEN;
     Color textColor = Color.BLACK;
@@ -59,10 +63,11 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     protected String stateThrown = Bundle.getMessage("StateThrownShort");
 
     private final SwitchboardEditor _editor;
-    private char beanTypeChar = 'T';
+    private char beanTypeChar = 'T'; // initialize now to allow testing
     private String switchTypeName = "Turnout";
     private String manuPrefix = "I";
     private final String _switchSysName;
+    private String _switchDisplayName;
     boolean showToolTip = true;
     boolean allControlling = true;
     boolean panelEditable = false;
@@ -71,7 +76,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     private NamedBeanHandle<?> namedBean = null; // can be Turnout, Sensor or Light
     protected jmri.NamedBeanHandleManager nbhm = jmri.InstanceManager.getDefault(jmri.NamedBeanHandleManager.class);
     private String _uName = "unconnected";
-    private String _uLabel = ""; // for display, empty if userName == null
+    private String _uLabel = ""; // for display, empty if userName == null or showUserName != BOTH_NAMES
 
     /**
      * Ctor.
@@ -86,6 +91,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     public BeanSwitch(int index, @CheckForNull NamedBean bean, @Nonnull String switchName, int shapeChoice, @CheckForNull SwitchboardEditor editor) {
         log.debug("Name = [{}]", switchName);
         _switchSysName = switchName;
+        _switchDisplayName = switchName; // updated later on if a user name is available
         _editor = editor;
         _bname = bean;
         _shape = shapeChoice;
@@ -105,7 +111,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             allControlling = editor.allControlling();
             panelEditable = editor.isEditable();
             showToolTip = editor.showToolTip();
-            showUserName = editor.showUserName().equals("yes");
+            showUserName = editor.nameDisplay();
             radius = editor.getTileSize()/2; // max WxH of canvas inside cell, used as relative unit to draw
             square = editor.getIconScale();
             // get colors
@@ -120,8 +126,10 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             log.debug("Switch userName from bean: {}", _uName);
             if (_uName == null) {
                 _uName = Bundle.getMessage("NoUserName");
-            } else if (showUserName) {
+            } else if (showUserName == SwitchBoardLabelDisplays.BOTH_NAMES) { // (menu option setting)
                 _uLabel = _uName;
+            } else if (showUserName == SwitchBoardLabelDisplays.USER_NAME) {
+                _switchDisplayName = _uName; // replace system name
             }
         }
 
@@ -132,9 +140,9 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         // check for space char which might be caused by connection name > 2 chars and/or space in name
         if (beanTypeChar != 'T' && beanTypeChar != 'S' && beanTypeChar != 'L') { // add if more bean types are supported
             log.error("invalid char in Switchboard Button \"{}\". Check connection name.", _switchSysName);
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("ErrorSwitchAddFailed"),
+            JmriJOptionPane.showMessageDialog(editor, Bundle.getMessage("ErrorSwitchAddFailed"),
                     Bundle.getMessage("WarningTitle"),
-                    JOptionPane.ERROR_MESSAGE);
+                    JmriJOptionPane.ERROR_MESSAGE);
             return;
         }
 
@@ -157,15 +165,15 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             case SwitchboardEditor.SLIDER: // slider shape
                 iconSwitch = new IconSwitch(_shape, beanTypeChar); // draw as Graphic2D
                 iconSwitch.setPreferredSize(new Dimension(2*radius, 2*radius)); // tweak layout
-                iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, Math.max(12, radius/4));
-                iconSwitch.positionSubLabel(0, radius/-5, Component.CENTER_ALIGNMENT, Math.max(9, radius/5)); // smaller (system name)
+                iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, getLabelFontSize(radius, _switchDisplayName));
+                iconSwitch.positionSubLabel(0, radius/-5, Component.CENTER_ALIGNMENT, getSubLabelFontSize(radius, _uName)); // smaller (system name)
                 this.add(iconSwitch);
                 break;
             case SwitchboardEditor.KEY: // Maerklin style keyboard
                 iconSwitch = new IconSwitch(_shape, beanTypeChar); // draw as Graphic2D
                 iconSwitch.setPreferredSize(new Dimension(2*radius, 2*radius)); // tweak layout
-                iconSwitch.positionLabel(0, 0, Component.CENTER_ALIGNMENT, Math.max(12, radius/4));
-                iconSwitch.positionSubLabel(0, 3*radius/10, Component.CENTER_ALIGNMENT, Math.max(9, radius/5)); // smaller (system name)
+                iconSwitch.positionLabel(0, 0, Component.CENTER_ALIGNMENT, getLabelFontSize(radius, _switchDisplayName));
+                iconSwitch.positionSubLabel(0, 3*radius/10, Component.CENTER_ALIGNMENT, getSubLabelFontSize(radius, _uName)); // smaller (system name)
                 // provide x, y offset, depending on image size and free space
                 this.add(iconSwitch);
                 break;
@@ -177,14 +185,14 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                 iconSwitch.setPreferredSize(new Dimension(2*radius, 2*radius));
                 switch (beanTypeChar) {
                     case 'T' :
-                        iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, Math.max(12, radius/4));
-                        iconSwitch.positionSubLabel(0, radius/-4, Component.CENTER_ALIGNMENT, Math.max(9, radius/5));
+                        iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, getLabelFontSize(radius, _switchDisplayName));
+                        iconSwitch.positionSubLabel(0, radius/-4, Component.CENTER_ALIGNMENT, getSubLabelFontSize(radius, _uName));
                         break;
                     case 'S' :
                     case 'L' :
                     default :
-                        iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, Math.max(12, radius/4));
-                        iconSwitch.positionSubLabel(0, radius/-3, Component.CENTER_ALIGNMENT, Math.max(9, radius/5));
+                        iconSwitch.positionLabel(0, 5*radius/-8, Component.CENTER_ALIGNMENT, getLabelFontSize(radius, _switchDisplayName));
+                        iconSwitch.positionSubLabel(0, radius/-3, Component.CENTER_ALIGNMENT, getSubLabelFontSize(radius, _uName));
                 }
                 // common (in)activecolor etc defined in SwitchboardEditor, retrieved by Servlet
                 this.setBorder(BorderFactory.createLineBorder(backgroundColor, 3));
@@ -193,14 +201,15 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             case SwitchboardEditor.BUTTON: // 0 = "Button" shape
             default:
                 _icon = false;
-                beanButton.setText(getSwitchButtonLabel(_switchSysName + ": ?")); // initial text to display
+                beanButton.setText(getSwitchButtonLabel(_switchDisplayName + ": ?")); // initial text to display
+                beanButton.setToolTipText(getSwitchButtonToolTip(switchLabel));
                 beanButton.setForeground(textColor);
                 beanButton.setOpaque(true); // to show color from the start
                 this.setBorder(BorderFactory.createLineBorder(backgroundColor, 2));
                 beanButton.addComponentListener(new ComponentAdapter() {
                     @Override
                     public void componentResized(ComponentEvent e) {
-                        if (showUserName && beanButton.getHeight() < 50) {
+                        if ((showUserName == SwitchBoardLabelDisplays.BOTH_NAMES) && (beanButton.getHeight() < 50)) {
                             beanButton.setVerticalAlignment(JLabel.TOP);
                         } else {
                             beanButton.setVerticalAlignment(JLabel.CENTER); //default
@@ -295,6 +304,33 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         log.debug("Created switch {}", index);
     }
 
+    static final AffineTransform affinetransform = new AffineTransform();
+    static final FontRenderContext frc = new FontRenderContext(affinetransform,true,true);
+
+    int getLabelFontSize(int radius, String text) {
+        int fontSize = Math.max(12, radius/4);
+        // see if that fits using font metrics
+        if (text != null) {
+            Font font = new Font(Font.SANS_SERIF, Font.BOLD, fontSize);
+            int textwidth = (int)(font.getStringBounds(text, frc).getWidth());
+            fontSize = Math.min(fontSize, fontSize*2*radius*9/textwidth/10); // integer arithmetic: fit in 90% of radius*2
+            log.trace("calculate fontsize {} from radius {} and textwidth {} for string \"{}\"", fontSize, radius, textwidth, text);
+        }
+        return Math.max(fontSize, 5); // but go no smaller than 6 point
+    }
+
+    int getSubLabelFontSize(int radius, String text) {
+        int fontSize = Math.max(9, radius/5);
+        // see if text fits using font metrics, if not correct it with a smaller font size
+        if (text != null) {
+            Font font = new Font(Font.SANS_SERIF, Font.BOLD, fontSize);
+            int textwidth = (int)(font.getStringBounds(text, frc).getWidth());
+            fontSize = Math.min(fontSize, fontSize*2*radius*9/textwidth/10); // integer arithmetic: fit in 90% of radius*2
+            log.trace("calculate fontsize {} from radius {} and textwidth {} for string \"{}\"", fontSize, radius, textwidth, text);
+        }
+        return Math.max(fontSize, 5); // but go no smaller than 6 point
+    }
+
     public NamedBean getNamedBean() {
         return _bname;
     }
@@ -310,13 +346,17 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         try {
             namedBean = nbhm.getNamedBeanHandle(_switchSysName, bean);
         } catch (IllegalArgumentException e) {
-            log.error("invalid bean name= \"{}\" in Switchboard Button", _switchSysName);
+            log.error("invalid bean name= \"{}\" in Switchboard Button \"{}\"", _switchSysName, _switchDisplayName);
         }
         _uName = bean.getUserName();
         if (_uName == null) {
             _uName = Bundle.getMessage("NoUserName");
         } else {
-            if (showUserName) _uLabel = _uName;
+            if (showUserName == SwitchBoardLabelDisplays.BOTH_NAMES) {
+                _uLabel = _uName;
+            } else if (showUserName == SwitchBoardLabelDisplays.USER_NAME) {
+                switchLabel = _uName;
+            }
         }
         _control = true;
     }
@@ -365,7 +405,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             // Light, Sensor
             _stateSign = "+";         // 1 char abbreviation for StateOff not clear
         }
-        return _switchSysName + ": " + _stateSign;
+        return _switchDisplayName + ": " + _stateSign;
     }
 
     /**
@@ -382,7 +422,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             // Light, Sensor
             _stateSign = "-";         // 1 char abbreviation for StateOff not clear
         }
-        return _switchSysName + ": " + _stateSign;
+        return _switchDisplayName + ": " + _stateSign;
     }
 
     /**
@@ -392,11 +432,11 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
      * @return text to show on unknown state (used on all types of objects)
      */
     public String getUnknownText() {
-        return _switchSysName + ": ?";
+        return _switchDisplayName + ": ?";
     }
 
     public String getInconsistentText() {
-        return _switchSysName + ": X";
+        return _switchDisplayName + ": X";
     }
 
     /**
@@ -419,10 +459,10 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     /**
      * Get the label of this switch.
      *
-     * @return display name including current state
+     * @return display name not including current state
      */
     public String getNameString() {
-        return _switchSysName;
+        return _switchDisplayName;
     }
 
     public String getUserNameString() {
@@ -430,13 +470,28 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     }
 
     private String getSwitchButtonLabel(String label) {
-        if (!showUserName || _uLabel.equals("")) {
-            return label;
-        } else {
+        if ((showUserName == SwitchBoardLabelDisplays.SYSTEM_NAME) || (_uLabel.equals(""))) {
+            String subLabel = label.substring(0, (Math.min(label.length(), 35))); // reasonable max. to display 2 lines on tile
+            return "<html><center>" + subLabel + "</center></html>"; // lines of text
+        } else if (showUserName == SwitchBoardLabelDisplays.USER_NAME) {
+            String subLabel = label.substring(0, (Math.min(label.length(), 35))); // reasonable max. to display 2 lines on tile
+            return "<html><center>" + subLabel + "</center></html>"; // lines of text
+        } else { // BOTH_NAMES case
             String subLabel = _uLabel.substring(0, (Math.min(_uLabel.length(), 35))); // reasonable max. to display 2 lines on tile
-            return "<html><center>" + label + "</center><br><center><i>" + subLabel + "</i></center></html>"; // 2 lines of text
+            return "<html><center>" + label + "</center><center><i>" + subLabel + "</i></center></html>"; // lines of text
         }
     }
+
+    private String getSwitchButtonToolTip(String label) {
+        if ((showUserName == SwitchBoardLabelDisplays.SYSTEM_NAME) || (_uLabel.equals(""))) {
+            return label;
+        } else if (showUserName == SwitchBoardLabelDisplays.USER_NAME) {
+            return label;
+        } else { // BOTH_NAMES case
+            return _uLabel+" "+label;
+        }
+    }
+
 
     /**
      * Drive the current state of the display from the state of the
@@ -448,7 +503,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         String switchLabel;
         Color switchColor;
         if (getNamedBean() == null) {
-            switchLabel = _switchSysName; // unconnected, doesn't show state using : and ?
+            switchLabel = _switchDisplayName; // unconnected, doesn't show state using : and ?
             switchColor = Color.GRAY;
             log.debug("Switch label {} state {}, disconnected", switchLabel, newState);
         } else {
@@ -477,8 +532,9 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             }
         }
         if (isText() && !isIcon()) { // to allow text buttons on web switchboard.
-            log.debug("Label = {}", getSwitchButtonLabel(switchLabel));
+            log.debug("Label = {}, setText", getSwitchButtonLabel(switchLabel));
             beanButton.setText(getSwitchButtonLabel(switchLabel));
+            beanButton.setToolTipText(getSwitchButtonToolTip(switchLabel));
             beanButton.setBackground(switchColor); // only the color is visible on macOS
             // TODO get access to bg color of JButton?
             beanButton.setOpaque(true);
@@ -521,18 +577,18 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         if (log.isDebugEnabled()) {
             log.debug("property change: {} {} is now: {}", _switchSysName, e.getPropertyName(), e.getNewValue());
         }
-        if (e.getPropertyName().equals("KnownState")) {
+        if ( NamedBean.PROPERTY_KNOWN_STATE.equals(e.getPropertyName())) {
             int now = ((Integer) e.getNewValue());
             displayState(now);
             log.debug("Item state changed");
         }
-        if (e.getPropertyName().equals("UserName")) {
+        if ( NamedBean.PROPERTY_USERNAME.equals(e.getPropertyName())) {
             // update tooltip
             String newUserName;
             if (showToolTip) {
                 newUserName = ((String) e.getNewValue());
                 _uLabel = (newUserName == null ? "" : newUserName); // store for display on icon
-                if (newUserName == null || newUserName.equals("")) {
+                if (newUserName == null || newUserName.isEmpty()) {
                     newUserName = Bundle.getMessage("NoUserName"); // longer for tooltip
                 }
                 setToolTipText(_switchSysName + " (" + newUserName + ")");
@@ -562,8 +618,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
 
     /**
      * Show pop-up on a switch with its unique attributes including the
-     * (un)connected bean. Derived from
-     * {@link jmri.jmrit.display.switchboardEditor.SwitchboardEditor#showPopUp(Positionable, MouseEvent)}
+     * (un)connected bean.
      *
      * @param e unused because we now our own location
      * @return true when pop up displayed
@@ -630,21 +685,15 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
      */
     public void renameBeanDialog() {
         String oldName = _uName;
-        JTextField name = new JTextField(oldName);
-        // show input dialog, build by hand so that Jemmy can reach it in test
-        JOptionPane pane = new JOptionPane(
-                new Object[]{Bundle.getMessage("EnterNewName", _switchSysName), name},
-                JOptionPane.INFORMATION_MESSAGE, JOptionPane.YES_NO_OPTION, null,
-                new Object[]{Bundle.getMessage("ButtonOK"), Bundle.getMessage("ButtonCancel")}, 0);
-        JDialog dialog = pane.createDialog(null, Bundle.getMessage("EditNameTitle", ""));
-        dialog.setVisible(true);
-        if (pane.getValue().equals(Bundle.getMessage("ButtonCancel"))) {
+        String newUserName = (String)JmriJOptionPane.showInputDialog(this, Bundle.getMessage("EnterNewName", _switchSysName), Bundle.getMessage("EditNameTitle", ""),
+            JmriJOptionPane.QUESTION_MESSAGE, null, null, oldName);
+
+        if (newUserName == null) {
             return;
         }
-        String newUserName = name.getText();
-        if (newUserName == null || newUserName.equals(Bundle.getMessage("NoUserName")) || newUserName.isEmpty()) { // user cancelled
+        if (newUserName.equals(Bundle.getMessage("NoUserName")) || newUserName.isEmpty()) { // user cancelled
             log.debug("new user name was empty");
-            JOptionPane.showMessageDialog(null, Bundle.getMessage("WarningEmptyUserName"), Bundle.getMessage("WarningTitle"), JOptionPane.ERROR_MESSAGE);
+            JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("WarningEmptyUserName"), Bundle.getMessage("WarningTitle"), JmriJOptionPane.ERROR_MESSAGE);
             return;
         }
         renameBean(newUserName, oldName);
@@ -678,9 +727,9 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             if (nb != null) {
                 log.error("User name is not unique {}", newUserName);
                 String msg = Bundle.getMessage("WarningUserName", newUserName);
-                JOptionPane.showMessageDialog(null, msg,
+                JmriJOptionPane.showMessageDialog(this, msg,
                         Bundle.getMessage("WarningTitle"),
-                        JOptionPane.ERROR_MESSAGE);
+                        JmriJOptionPane.ERROR_MESSAGE);
                 return;
             }
         }
@@ -690,10 +739,10 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                 return; // no problem, so stop
             }
             String msg = Bundle.getMessage("UpdateToUserName", switchTypeName, newUserName, _switchSysName);
-            int optionPane = JOptionPane.showConfirmDialog(null,
+            int optionPane = JmriJOptionPane.showConfirmDialog(this,
                     msg, Bundle.getMessage("UpdateToUserNameTitle"),
-                    JOptionPane.YES_NO_OPTION);
-            if (optionPane == JOptionPane.YES_OPTION) {
+                    JmriJOptionPane.YES_NO_OPTION);
+            if (optionPane == JmriJOptionPane.YES_OPTION) {
                 //This will update the bean reference from the systemName to the userName
                 try {
                     nbhm.updateBeanFromSystemToUser(_bname);
@@ -813,7 +862,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                             getSensor().setKnownState(jmri.Sensor.INACTIVE);
                         }
                     } catch (jmri.JmriException reason) {
-                        log.warn("Exception flipping sensor: {}", (Object) reason);
+                        log.warn("Exception flipping sensor", (Object) reason);
                     }
                     break;
                 default:
@@ -862,14 +911,16 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             switchConnect.setOK(); // activate OK button on Add new device pane
             addFrame.add(switchConnect);
         }
-        addFrame.pack();
-        addFrame.setLocationRelativeTo(this);
-        addFrame.setVisible(true);
+        ThreadingUtil.runOnGUI( () -> {
+            addFrame.pack();
+            addFrame.setLocationRelativeTo(this);
+            addFrame.setVisible(true);
+        });
     }
 
     protected void cancelAddPressed(ActionEvent e) {
         if (addFrame != null) {
-            addFrame.setVisible(false);
+            ThreadingUtil.runOnGUI( () -> addFrame.setVisible(false) );
             addFrame.dispose();
             addFrame = null;
         }
@@ -878,7 +929,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
     protected void okAddPressed(ActionEvent e) {
         NamedBean nb;
         String user = userName.getText();
-        if (user.trim().equals("")) {
+        if (user.isBlank()) {
             user = null;
         }
         // systemName can't be changed, fixed
@@ -889,6 +940,9 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         }
         switch (_switchSysName.charAt(manuPrefix.length())) {
             case 'T':
+                if ( existingUserName(InstanceManager.getDefault(TurnoutManager.class), user, e)) {
+                    return;
+                }
                 Turnout t;
                 try {
                     // add turnout to JMRI (w/appropriate manager)
@@ -896,12 +950,15 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                     t.setUserName(user);
                 } catch (IllegalArgumentException ex) {
                     // user input no good
-                    handleCreateException(_switchSysName);
+                    handleCreateException(_switchSysName, ex);
                     return; // without creating
                 }
                 nb = jmri.InstanceManager.turnoutManagerInstance().getTurnout(_switchSysName);
                 break;
             case 'S':
+                if ( existingUserName(InstanceManager.getDefault(SensorManager.class), user, e)) {
+                    return;
+                }
                 Sensor s;
                 try {
                     // add Sensor to JMRI (w/appropriate manager)
@@ -909,12 +966,15 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                     s.setUserName(user);
                 } catch (IllegalArgumentException ex) {
                     // user input no good
-                    handleCreateException(_switchSysName);
+                    handleCreateException(_switchSysName, ex);
                     return; // without creating
                 }
                 nb = jmri.InstanceManager.sensorManagerInstance().getSensor(_switchSysName);
                 break;
             case 'L':
+                if ( existingUserName(InstanceManager.getDefault(LightManager.class), user, e)) {
+                    return;
+                }
                 Light l;
                 try {
                     // add Light to JMRI (w/appropriate manager)
@@ -922,7 +982,7 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                     l.setUserName(user);
                 } catch (IllegalArgumentException ex) {
                     // user input no good
-                    handleCreateException(_switchSysName);
+                    handleCreateException(_switchSysName, ex);
                     return; // without creating
                 }
                 nb = jmri.InstanceManager.lightManagerInstance().getLight(_switchSysName);
@@ -943,10 +1003,21 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
                     _editor.updatePressed();
                 }
             } catch (NullPointerException npe) {
-                handleCreateException(_switchSysName);
+                handleCreateException(_switchSysName, npe);
                 // exit without updating
             }
         }
+    }
+
+    private boolean existingUserName(Manager<?> mgr, String userName, Object e){
+        NamedBean nb = mgr.getByUserName(userName == null ? "" : userName);
+        if ( nb != null ) {
+            JmriJOptionPane.showMessageDialog( JmriJOptionPane.findWindowForObject(e),
+                Bundle.getMessage("InvalidUserNameAlreadyExists",nb.getBeanType(),userName),
+                Bundle.getMessage("WarningUserName", userName), JmriJOptionPane.ERROR_MESSAGE);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -973,12 +1044,11 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         }
     }
 
-    void handleCreateException(String sysName) {
-        javax.swing.JOptionPane.showMessageDialog(addFrame,
-                java.text.MessageFormat.format(
-                        Bundle.getMessage("ErrorSwitchAddFailed"), sysName),
-                Bundle.getMessage("ErrorTitle"),
-                javax.swing.JOptionPane.ERROR_MESSAGE);
+    void handleCreateException(String sysName, Exception ex) {
+        JmriJOptionPane.showMessageDialog(addFrame,
+            "<html>" + Bundle.getMessage("ErrorSwitchAddFailed") + "<br>" + ex.getLocalizedMessage()+"</html>",
+            Bundle.getMessage("ErrorTitle") + " : " + sysName,
+            JmriJOptionPane.ERROR_MESSAGE);
     }
 
     String rootPath = "resources/icons/misc/switchboard/";
@@ -994,14 +1064,17 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         private BufferedImage image2;
         private String tag = "tag";
         private String subTag = "";
+
         private int labelX = 16;
         private int labelY = 53;
+        private int textSize = 12;
+        private float textAlign = 0.0f;
+
         private int subLabelX = 16;
         private int subLabelY = 53;
-        private int textSize = 12;
-        private int subTextSize = 10;
-        private float textAlign = 0.0f;
+        private int subTextSize = 12;
         private float subTextAlign = 0.0f;
+
         private float ropOffset = 0f;
         private int r = 10; // radius of circle fitting inside tile rect in px drawing units
         private int _shape = SwitchboardEditor.BUTTON;
@@ -1031,17 +1104,6 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             _shape = SwitchboardEditor.SYMBOL;
             if (radius > 10) r = radius;
             log.debug("radius={} size={}", r, getWidth());
-        }
-
-        /**
-         * Ctor with fixed scale of image at 100%. Original public ctor.
-         *
-         * @param filepath1 the ON image
-         * @param filepath2 the OFF image
-         */
-        @Deprecated
-        public IconSwitch(String filepath1, String filepath2) {
-            this(filepath1, filepath2, Color.GRAY);
         }
 
         /**
@@ -1207,13 +1269,14 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
             }
             g.drawString(tag, labelX, labelY); // draw name on top of button image (vertical, horizontal offset from top left)
 
-            if (showUserName) {
-                g.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, Math.max(subTextSize, 6)));
+            if (showUserName == SwitchBoardLabelDisplays.BOTH_NAMES) {
+                g.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, subTextSize));
                 if (Math.abs(subTextAlign - Component.CENTER_ALIGNMENT) < .0001) {
-                    FontMetrics metrics2 = g.getFontMetrics(); // figure out where the center of the string is
-                    subLabelX = metrics2.stringWidth(subTag)/-2;
+                    FontMetrics metrics = g.getFontMetrics(); // figure out where the center of the string is
+                    subLabelX = metrics.stringWidth(subTag)/-2;
                 }
                 g.drawString(subTag, subLabelX, subLabelY); // draw user name at bottom
+            } else {
             }
         }
     }
@@ -1249,6 +1312,6 @@ public class BeanSwitch extends JPanel implements java.beans.PropertyChangeListe
         return bimg;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(BeanSwitch.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BeanSwitch.class);
 
 }

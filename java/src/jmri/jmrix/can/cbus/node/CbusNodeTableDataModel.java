@@ -16,16 +16,14 @@ import jmri.jmrix.can.cbus.CbusSend;
 import jmri.jmrix.can.cbus.swing.nodeconfig.NodeConfigToolPane;
 import jmri.util.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Table data model for display of CBUS Nodes
  *
  * @author Steve Young (c) 2019
  * 
  */
-public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements CanListener, PropertyChangeListener {
+public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch
+    implements CanListener, PropertyChangeListener, jmri.Disposable {
 
     private final CbusSend send;
     private ArrayList<Integer> _nodesFound;
@@ -33,21 +31,33 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
     protected CbusPreferences preferences;
 
     public CbusNodeTableDataModel(@Nonnull CanSystemConnectionMemo memo, int row, int column) {
-        super(memo,row,column);
-        log.debug("Starting MERG CBUS Node Table");
-        _mainArray = new ArrayList<>();
-        _nodesFound = new ArrayList<>();
+        this(memo,row);
+    }
 
+    /**
+     * Create a new CbusNodeTableDataModel.
+     * @param memo system connection.
+     * @param initialArraySize initial Array Size.
+     */
+    public CbusNodeTableDataModel(@Nonnull CanSystemConnectionMemo memo, int initialArraySize ) {
+        super(memo, initialArraySize, 0);
+        log.debug("Starting MERG CBUS Node Table memo \"{}\" ",memo);
+        _nodesFound = new ArrayList<>(initialArraySize);
         // connect to the CanInterface
         addTc(memo);
         
         send = new CbusSend(memo);
 
+        startup();
     }
     
-    public void startup(){
-        
-        preferences = jmri.InstanceManager.getDefault(CbusPreferences.class);
+    private void startup(){
+
+        preferences = _memo.get(CbusPreferences.class);
+        if (preferences == null ) {
+            log.error("no prefs");
+            return;
+        }
         
         setBackgroundAllocateListener( preferences.getAllocateNNListener() );
         if ( preferences.getStartupSearchForCs() ) {
@@ -130,7 +140,7 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
             case CbusConstants.CBUS_NNREL:
                 // from node advising releasing node number
                 if ( getNodeRowFromNodeNum(nodenum) >-1 ) {
-                    log.info( Bundle.getMessage("NdRelease", getNodeName(nodenum), nodenum ) );
+                    log.info("{} : NNREL",Bundle.getMessage("NdRelease", getNodeName(nodenum), nodenum ) );
                     removeRow( getNodeRowFromNodeNum(nodenum),false );
                 }
                 break;
@@ -154,6 +164,7 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
             switch (ev.getPropertyName()) {
                 case "SINGLENVUPDATE":
                 case "ALLNVUPDATE":
+                    log.debug("Table data model recieves property change row: {}", evRow);
                     fireTableCellUpdated(evRow, BYTES_REMAINING_COLUMN);
                     fireTableCellUpdated(evRow, NODE_TOTAL_BYTES_COLUMN);
                     break;
@@ -242,7 +253,7 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
      * @param timeout value in msec to wait for responses
      */
     private void setSearchForNodesTimeout( int timeout) {
-        _nodesFound = new ArrayList<>();
+        _nodesFound = new ArrayList<>(5);
         searchForNodesTask = new TimerTask() {
             @Override
             public void run() {
@@ -274,10 +285,10 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
      */
     public void startupSearchNodeXmlFile() {
         // ensure preferences will be found for read
-        FileUtil.createDirectory(CbusNodeBackupFile.getFileLocation());
+        FileUtil.createDirectory(new CbusNodeBackupFile(_memo).getFileLocation());
         // create an array of file names from node dir in preferences, then loop
-        List<String> names = new ArrayList<>();
-        File fp = new File(CbusNodeBackupFile.getFileLocation());
+        List<String> names = new ArrayList<>(5);
+        File fp = new File(new CbusNodeBackupFile(_memo).getFileLocation());
         if (fp.exists()) {
             String[] fpList = fp.list(new XmlFilenameFilter());
             if (fpList !=null ) {
@@ -305,6 +316,7 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
      * <p>
      * Cancel outstanding Timers
      */
+    @Override
     public void dispose() {
         
         clearSearchForNodesTimeout();
@@ -325,5 +337,5 @@ public class CbusNodeTableDataModel extends CbusBasicNodeTableFetch implements C
         
     }
 
-    private final static Logger log = LoggerFactory.getLogger(CbusNodeTableDataModel.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusNodeTableDataModel.class);
 }

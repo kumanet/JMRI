@@ -69,6 +69,7 @@ public class OakTreeSystemConnectionMemo extends DefaultSystemConnectionMemo imp
         return new NamedBeanComparator<>();
     }
 
+    @Override
     public void configureManagers(){
         setTurnoutManager(new SerialTurnoutManager(this));
         InstanceManager.setTurnoutManager(getTurnoutManager());
@@ -126,6 +127,6 @@ public class OakTreeSystemConnectionMemo extends DefaultSystemConnectionMemo imp
         store(l,LightManager.class);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(OakTreeSystemConnectionMemo.class);
+    private static final Logger log = LoggerFactory.getLogger(OakTreeSystemConnectionMemo.class);
 
 }

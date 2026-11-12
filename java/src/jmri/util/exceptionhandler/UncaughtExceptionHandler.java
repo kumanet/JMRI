@@ -1,12 +1,8 @@
 package jmri.util.exceptionhandler;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.GraphicsEnvironment;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import javax.swing.JOptionPane;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import jmri.util.swing.ExceptionContext;
 
 /**
  * Class to log exceptions that rise to the top of threads, including to the top
@@ -22,11 +18,15 @@ import org.slf4j.LoggerFactory;
 public class UncaughtExceptionHandler implements Thread.UncaughtExceptionHandler {
 
     @Override
-    @SuppressFBWarnings(value="DM_EXIT", justification="Errors should terminate the application")
     public void uncaughtException(Thread t, Throwable e) {
 
         // see http://docs.oracle.com/javase/7/docs/api/java/lang/ThreadDeath.html
-        if (e instanceof java.lang.ThreadDeath) {
+        // 
+        // The type ThreadDeath has been deprecated since version 20 and marked for removal
+        // and the warning cannot be suppressed in Java 21. But external libraries might
+        // throw the exception outside of JMRI control. So check the name of the exception
+        // instead of using "instanceof".
+        if ("java.lang.ThreadDeath".equals(e.getClass().getName())) {
             log.info("Thread has stopped: {}", t.getName());
             return;
         }
@@ -35,20 +35,32 @@ public class UncaughtExceptionHandler implements Thread.UncaughtExceptionHandler
 
         if (e instanceof Error) {
             if (!GraphicsEnvironment.isHeadless()) {
-                JOptionPane.showMessageDialog(null,
-                        Bundle.getMessage("UnrecoverableErrorMessage", generateStackTrace(e)),
-                        Bundle.getMessage("UnrecoverableErrorTitle"),
-                        JOptionPane.ERROR_MESSAGE);
+                jmri.util.swing.ExceptionDisplayFrame.displayExceptionDisplayFrame(null,
+                    new ErrorContext(e));
             }
-            System.exit(126);
+            log.error("System Exiting");
+            systemExit();
         }
     }
 
-    static protected String generateStackTrace(Throwable e) {
-        StringWriter writer = new StringWriter();
-        e.printStackTrace(new PrintWriter(writer));
-        return writer.toString();
+    protected void systemExit(){
+        System.exit(126);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(UncaughtExceptionHandler.class);
+    private static class ErrorContext extends ExceptionContext {
+
+        public ErrorContext(@javax.annotation.Nonnull Throwable ex) {
+            super(ex, "", "");
+            this.prefaceString = Bundle.getMessage("UnrecoverableErrorMessage");
+        }
+
+        @Override
+        public String getTitle() {
+            return Bundle.getMessage("UnrecoverableErrorTitle");
+        }
+
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UncaughtExceptionHandler.class);
+
 }

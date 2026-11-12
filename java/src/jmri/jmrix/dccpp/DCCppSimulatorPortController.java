@@ -5,7 +5,6 @@ import java.io.DataOutputStream;
 
 /**
  * Abstract base for classes representing a DCCpp communications port
- * <p>
  *
  * @author Bob Jacobsen Copyright (C) 2001, 2008
  * @author Paul Bender Copyright (C) 2004,2010
@@ -52,6 +51,15 @@ public abstract class DCCppSimulatorPortController extends jmri.jmrix.AbstractSe
     @Override
     public DCCppSystemConnectionMemo getSystemConnectionMemo() {
         return (DCCppSystemConnectionMemo) super.getSystemConnectionMemo();
+    }
+
+    // Legacy "DCC++" remap for saved configs prior to the DCC++ -> DCC-EX rename (issue #15136).
+    @Override
+    public void setManufacturer(String manufacturer) {
+        if ("DCC++".equals(manufacturer)) {
+            manufacturer = DCCppConnectionTypeList.DCCPP;
+        }
+        super.setManufacturer(manufacturer);
     }
 
 }

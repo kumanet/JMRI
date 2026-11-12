@@ -25,7 +25,7 @@ public abstract class AbstractLightManager extends AbstractManager<Light>
 
     /**
      * Create a new LightManager instance.
-     * 
+     *
      * @param memo the system connection
      */
     public AbstractLightManager(SystemConnectionMemo memo) {
@@ -79,7 +79,7 @@ public abstract class AbstractLightManager extends AbstractManager<Light>
     public Light newLight(@Nonnull String systemName, @CheckForNull String userName) throws IllegalArgumentException {
         Objects.requireNonNull(systemName, "SystemName cannot be null. UserName was " + ((userName == null) ? "null" : userName));  // NOI18N
         log.debug("newLight: {};{}", systemName, userName);
-        
+
         systemName = validateSystemNameFormat(systemName);
         // return existing if there is one
         Light l;
@@ -118,6 +118,7 @@ public abstract class AbstractLightManager extends AbstractManager<Light>
      * @param systemName the system name to use for this light
      * @param userName   the user name to use for this light
      * @return the new light or null if unsuccessful
+     * @throws IllegalArgumentException something failed in the names
      */
     @Nonnull
     abstract protected Light createNewLight(@Nonnull String systemName, String userName) throws IllegalArgumentException;
@@ -152,14 +153,6 @@ public abstract class AbstractLightManager extends AbstractManager<Light>
     }
 
     /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean allowMultipleAdditions(@Nonnull String systemName) {
-        return false;
-    }
-
-    /**
      * Get bean type handled.
      *
      * @return a string for the type of object handled by this manager
@@ -187,6 +180,6 @@ public abstract class AbstractLightManager extends AbstractManager<Light>
         return Bundle.getMessage("EnterNumber1to9999ToolTip");
     }
 
-    private final static Logger log = LoggerFactory.getLogger(AbstractLightManager.class);
+    private static final Logger log = LoggerFactory.getLogger(AbstractLightManager.class);
 
 }

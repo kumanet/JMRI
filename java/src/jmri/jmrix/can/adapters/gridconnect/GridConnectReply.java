@@ -16,14 +16,20 @@ import org.slf4j.LoggerFactory;
  * :XhhhhhhhhNd0d1d2d3d4d5d6d7; The X indicates an extended CAN frame N or R
  * indicates a normal or remote frame, in position 6 or 10 d0 - d7 are the (up
  * to) 8 data bytes
- * <p>
  *
  * @author Andrew Crosland Copyright (C) 2008, 2009
  * @author Bob Jacobsen Copyright (C) 2008
  */
 public class GridConnectReply extends AbstractMRReply {
 
+    // The longest valid frame, an extended frame with 8 data bytes,
+    // :X12345678N0102030405060708; is 28 characters. Its ';' is not stored,
+    // but all of its data is, and the ';' left in the stream is skipped while
+    // looking for the ':' of the next frame.
     static final int MAXLEN = 27;
+
+    // Maximum number of data bytes in a CAN frame
+    private static final int MAX_DATA_BYTES = 8;
 
     /**
      * Creates a new instance of GridConnectReply.
@@ -60,6 +66,17 @@ public class GridConnectReply extends AbstractMRReply {
             return ret;
         }
 
+        // Is the header terminated by N or R, and is the data valid ?
+        // A corrupt frame, eg. two frames merged after a lost ';', is dropped
+        // rather than being passed on with incorrect content.
+        getHeader(); // sets _RTRoffset
+        if (!dataFormatCheck()) {
+            log.warn("Invalid GridConnect frame dropped: {}", this);
+            ret.setHeader(0);
+            ret.setNumDataElements(0);
+            return ret;
+        }
+
         // Is it an Extended frame?
         if (isExtended()) {
             ret.setExtended(true);
@@ -88,6 +105,60 @@ public class GridConnectReply extends AbstractMRReply {
      */
     protected boolean basicFormatCheck() {
         return !((getElement(1) != 'X') && (getElement(1) != 'S'));
+    }
+
+    /**
+     * Check the header is terminated by 'N' or 'R', and the data section is an
+     * even number of hex digits, no more than 8 bytes, and nothing follows it
+     * except an optional ';'.
+     * <p>
+     * Must be called after getHeader(), which locates the 'N' or 'R'.
+     * @return true if the frame is valid, else false.
+     */
+    protected boolean dataFormatCheck() {
+        if ((_RTRoffset < 2) || (_RTRoffset >= _nDataChars)
+                || ((_dataChars[_RTRoffset] != 'N') && (_dataChars[_RTRoffset] != 'R'))) {
+            return false; // no N or R following the header
+        }
+        // The header is 1 to 4 (standard) or 1 to 8 (extended) hex digits
+        // between the 'S' or 'X' and the 'N' or 'R'.
+        int headerDigits = _RTRoffset - 2;
+        if ((headerDigits < 1) || (headerDigits > (isExtended() ? 8 : 4))) {
+            return false;
+        }
+        for (int i = 2; i < _RTRoffset; i++) {
+            if (!isHexDigit(_dataChars[i])) {
+                return false;
+            }
+        }
+        int nChars = numDataChars();
+        if ((nChars < 0) || (nChars % 2 != 0) || (nChars > (MAX_DATA_BYTES * 2))) {
+            return false;
+        }
+        int start = _RTRoffset + 1;
+        for (int i = start; i < (start + nChars); i++) {
+            if (!isHexDigit(_dataChars[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get the number of data characters, ie. following the 'N' or 'R', excluding
+     * a trailing ';'.
+     * @return number of data characters
+     */
+    private int numDataChars() {
+        int end = _nDataChars;
+        if ((end > 0) && (_dataChars[end - 1] == ';')) {
+            end--;
+        }
+        return end - (_RTRoffset + 1);
+    }
+
+    private static boolean isHexDigit(int b) {
+        return ((b >= '0') && (b <= '9')) || ((b >= 'A') && (b <= 'F')) || ((b >= 'a') && (b <= 'f'));
     }
 
     /**
@@ -167,9 +238,7 @@ public class GridConnectReply extends AbstractMRReply {
      */
     public void setData(int[] d) {
         int len = (d.length <= MAXLEN) ? d.length : MAXLEN;
-        for (int i = 0; i < len; i++) {
-            _dataChars[i] = d[i];
-        }
+        System.arraycopy(d, 0, _dataChars, 0, len);
     }
 
     // pointer to the N or R character
@@ -203,7 +272,8 @@ public class GridConnectReply extends AbstractMRReply {
      */
     public int getNumBytes() {
         // subtract framing and ID bytes, etc and each byte is two ASCII hex digits
-        return (_nDataChars - (_RTRoffset + 1)) / 2;
+        int n = numDataChars() / 2;
+        return Math.max(0, Math.min(n, MAX_DATA_BYTES)); // never more than a CAN frame can hold
     }
 
     /**
@@ -229,8 +299,7 @@ public class GridConnectReply extends AbstractMRReply {
 
     // Get a single hex digit. returns 0 if digit is invalid
     private int getHexDigit(int index) {
-        int b = 0;
-        b = _dataChars[index];
+        int b = _dataChars[index];
         if ((b >= '0') && (b <= '9')) {
             b = b - '0';
         } else if ((b >= 'A') && (b <= 'F')) {
@@ -243,7 +312,7 @@ public class GridConnectReply extends AbstractMRReply {
         return (byte) b;
     }
 
-    private final static Logger log = LoggerFactory.getLogger(GridConnectReply.class);
+    private static final Logger log = LoggerFactory.getLogger(GridConnectReply.class);
 }
 
 

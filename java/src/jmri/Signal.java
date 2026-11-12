@@ -42,11 +42,20 @@ package jmri;
  * JMRI is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * <p>
  *
  * @author Bob Jacobsen Copyright (C) 2002, 2008, 2017
  */
 public interface Signal extends NamedBean {
+
+    /**
+     * Constant property for lit.
+     */
+    String PROPERTY_LIT = "Lit";
+
+    /**
+     * Constant property for held.
+     */
+    String PROPERTY_HELD = "Held";
 
     /**
      * Determine whether this signal shows an aspect or appearance that allows
@@ -55,7 +64,7 @@ public interface Signal extends NamedBean {
      *
      * @return true if the signal is showing a clear indication; false otherwise
      */
-    public boolean isCleared();
+    boolean isCleared();
 
     /**
      * Determine whether this signal shows an aspect or appearance that allows
@@ -65,7 +74,7 @@ public interface Signal extends NamedBean {
      * @return true if the signal is showing a restricting indication; false
      *         otherwise
      */
-    public boolean isShowingRestricting();
+    boolean isShowingRestricting();
 
     /**
      * Determine whether this signal shows an aspect or appearance that forbid
@@ -74,7 +83,7 @@ public interface Signal extends NamedBean {
      *
      * @return true if the signal is showing a stop indication; false otherwise
      */
-    public boolean isAtStop();
+    boolean isAtStop();
 
     /**
      * Get whether the signal is lit or dark. Changes to this value can be
@@ -82,9 +91,9 @@ public interface Signal extends NamedBean {
      *
      * @return true if lit; false if dark
      */
-    public boolean getLit();
+    boolean getLit();
 
-    public void setLit(boolean newLit);
+    void setLit(boolean newLit);
 
     /**
      * Get whether the signal is held. Changes to this value can be listened to
@@ -94,8 +103,8 @@ public interface Signal extends NamedBean {
      *
      * @return true if held; false otherwise
      */
-    public boolean getHeld();
+    boolean getHeld();
 
-    public void setHeld(boolean newHeld);
+    void setHeld(boolean newHeld);
 
 }

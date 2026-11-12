@@ -2,11 +2,11 @@ package jmri.jmrix.loconet.streamport;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
 import jmri.jmrix.loconet.LnCommandStationType;
 import jmri.jmrix.loconet.LnConnectionTypeList;
+import jmri.jmrix.loconet.LocoNetSystemConnectionMemo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base for classes representing a LocoNet communications port connected via
@@ -59,7 +59,7 @@ public class LnStreamPortController extends jmri.jmrix.AbstractStreamPortControl
         this.getSystemConnectionMemo().setLnTrafficController(packets);
         // do the common manager config
         this.getSystemConnectionMemo().configureCommandStation(commandStationType,
-                mTurnoutNoRetry, mTurnoutExtraSpace, false); // never transponding
+                mTurnoutNoRetry, mTurnoutExtraSpace, false, false, false); // never transponding or XPSlots
         this.getSystemConnectionMemo().configureManagers();
 
         // start operation
@@ -82,6 +82,7 @@ public class LnStreamPortController extends jmri.jmrix.AbstractStreamPortControl
 
     protected boolean mTurnoutNoRetry = false;
     protected boolean mTurnoutExtraSpace = false;
+    protected boolean mInterrogateAtStart = false;
 
     /**
      * Set config info from the Command Station type enum.
@@ -108,11 +109,22 @@ public class LnStreamPortController extends jmri.jmrix.AbstractStreamPortControl
         log.debug("turnout extra space: {}", mTurnoutExtraSpace); // NOI18N
     }
 
+    /**
+     * Set whether to interrogate at startup
+     *
+     * @param value either yes or no
+     */
+    public void setInterrogateOnStart(String value) {
+        // default (most common state) is on, so just check for No
+        mInterrogateAtStart = !(value.equals("No") || value.equals(Bundle.getMessage("ButtonNo")));
+        log.debug("Interrogate at StartUp: {}", mInterrogateAtStart); // NOI18N
+    }
+
     @Override
     public LocoNetSystemConnectionMemo getSystemConnectionMemo() {
         return (LocoNetSystemConnectionMemo) super.getSystemConnectionMemo();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(LnStreamPortController.class);
+    private static final Logger log = LoggerFactory.getLogger(LnStreamPortController.class);
 
 }

@@ -1,11 +1,9 @@
 package jmri.jmrit.picker;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ResourceBundle;
-import java.util.TreeSet;
+import java.util.*;
+
 import javax.annotation.CheckForNull;
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
@@ -13,13 +11,19 @@ import javax.swing.SortOrder;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
+
 import jmri.*;
 import jmri.jmrit.beantable.BeanTableDataModel;
 import jmri.jmrit.entryexit.*;
 import jmri.jmrit.logix.*;
+import jmri.jmrit.logixng.GlobalVariable;
+import jmri.jmrit.logixng.GlobalVariableManager;
+import jmri.jmrit.logixng.NamedTable;
+import jmri.jmrit.logixng.NamedTableManager;
 import jmri.swing.RowSorterUtil;
 import jmri.util.*;
 import jmri.util.swing.XTableColumnModel;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +65,7 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
 
     static HashMap<String, Integer> _listMap = new HashMap<String, Integer>();
 
-    static public int getNumInstances(@Nonnull String type) {
+    public static int getNumInstances(@Nonnull String type) {
         Integer num = _listMap.get(type.toLowerCase());
         log.debug("getNumInstances of {} num={}", type, num);
         if (num != null) {
@@ -100,6 +104,10 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
         return -1;
     }
 
+    /**
+     * This method is overridden if only a limited set of the beans should be retrieved.
+     * @return the list of beans
+     */
     @Nonnull
     public List<E> getBeanList() {
         return _pickList;
@@ -113,6 +121,12 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
         makePickList();
     }
 
+    @CheckReturnValue
+    @Nonnull
+    protected SortedSet<E> getNamedBeanSet() {
+        return getManager().getNamedBeanSet();
+    }
+
     private void makePickList() {
         // Don't know who is added or deleted so remove all name change listeners
         if (_pickList != null) {
@@ -121,9 +135,9 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
             }
         }
         TreeSet<E> ts = new TreeSet<>(new NamedBeanComparator<>());
-        ts.addAll(getManager().getNamedBeanSet());
+        ts.addAll(getNamedBeanSet());
 
-        _pickList = new ArrayList<>(getManager().getNamedBeanSet().size());
+        _pickList = new ArrayList<>(getNamedBeanSet().size());
 
         _pickList.addAll(ts);
         // add name change listeners
@@ -419,6 +433,28 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
     }
 
     @Nonnull
+    public static PickListModel<GlobalVariable> globalVariablePickModelInstance() {
+        Integer num = _listMap.get("globalVariable");
+        if (num != null) {
+            _listMap.put("globalVariable", num + 1);
+        } else {
+            _listMap.put("globalVariable", 1);
+        }
+        return new GlobalVariablePickModel();
+    }
+
+    @Nonnull
+    public static PickListModel<NamedTable> namedTablePickModelInstance() {
+        Integer num = _listMap.get("namedTable");
+        if (num != null) {
+            _listMap.put("namedTable", num + 1);
+        } else {
+            _listMap.put("namedTable", 1);
+        }
+        return new NamedTablePickModel();
+    }
+
+    @Nonnull
     public static PickListModel<Block> blockPickModelInstance() {
         Integer num = _listMap.get("block");
         if (num != null) {
@@ -494,7 +530,18 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
         return new LogixPickModel();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(PickListModel.class);
+    @Nonnull
+    public static PickListModel<Audio> audioPickModelInstance() {
+        Integer num = _listMap.get("audio");
+        if (num != null) {
+            _listMap.put("audio", num + 1);
+        } else {
+            _listMap.put("audio", 1);
+        }
+        return new AudioPickModel();
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(PickListModel.class);
 
     static class TurnoutPickModel extends PickListModel<Turnout> {
 
@@ -702,6 +749,76 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
         @Override
         public boolean canAddBean() {
             return true;
+        }
+    }
+
+    static class GlobalVariablePickModel extends PickListModel<GlobalVariable> {
+
+        GlobalVariableManager manager = InstanceManager.getDefault(GlobalVariableManager.class);
+
+        GlobalVariablePickModel() {
+            _name = rb.getString("TitleLogixNGGlobalVariablesTable");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        @Nonnull
+        public Manager<GlobalVariable> getManager() {
+            manager = InstanceManager.getDefault(GlobalVariableManager.class);
+            return manager;
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public GlobalVariable addBean(@Nonnull String name) throws IllegalArgumentException {
+            throw new UnsupportedOperationException("Not supported");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public GlobalVariable addBean(@Nonnull String sysName, String userName) throws IllegalArgumentException {
+            throw new UnsupportedOperationException("Not supported");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean canAddBean() {
+            return false;
+        }
+    }
+
+    static class NamedTablePickModel extends PickListModel<NamedTable> {
+
+        NamedTableManager manager = InstanceManager.getDefault(NamedTableManager.class);
+
+        NamedTablePickModel() {
+            _name = rb.getString("TitleLogixNGTableTable");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        @Nonnull
+        public Manager<NamedTable> getManager() {
+            manager = InstanceManager.getDefault(NamedTableManager.class);
+            return manager;
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public NamedTable addBean(@Nonnull String name) throws IllegalArgumentException {
+            throw new UnsupportedOperationException("Not supported");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public NamedTable addBean(@Nonnull String sysName, String userName) throws IllegalArgumentException {
+            throw new UnsupportedOperationException("Not supported");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean canAddBean() {
+            return false;
         }
     }
 
@@ -958,6 +1075,60 @@ public abstract class PickListModel<E extends NamedBean> extends BeanTableDataMo
         @Override
         public boolean canAddBean() {
             return false;
+        }
+    }
+
+    static class AudioPickModel extends PickListModel<Audio> {
+
+        AudioManager manager = InstanceManager.getDefault(AudioManager.class);
+
+        AudioPickModel() {
+            _name = rb.getString("TitleAudioTable");
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        @Nonnull
+        public Manager<Audio> getManager() {
+            manager = InstanceManager.getDefault(AudioManager.class);
+            return manager;
+        }
+
+        @CheckReturnValue
+        @Nonnull
+        @Override
+        protected SortedSet<Audio> getNamedBeanSet() {
+            java.util.function.Predicate<Audio> filter = (bean) -> { return bean.getSubType() == Audio.SOURCE; };
+            TreeSet<Audio> namedBeanSet = new TreeSet<>(new NamedBeanComparator<>());
+            namedBeanSet.addAll(manager.getNamedBeanSet().stream().filter(filter)
+                            .collect(java.util.stream.Collectors.toSet()));
+            return Collections.unmodifiableSortedSet(namedBeanSet);
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public Audio addBean(@Nonnull String name) throws IllegalArgumentException {
+            try {
+                return manager.provideAudio(name);
+            } catch (AudioException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public Audio addBean(@Nonnull String sysName, String userName) throws IllegalArgumentException {
+            try {
+                return manager.newAudio(sysName, userName);
+            } catch (AudioException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean canAddBean() {
+            return true;
         }
     }
 

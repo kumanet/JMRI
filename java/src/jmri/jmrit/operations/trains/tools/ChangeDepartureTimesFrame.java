@@ -3,48 +3,63 @@ package jmri.jmrit.operations.trains.tools;
 import java.awt.Dimension;
 import java.awt.GridBagLayout;
 import java.util.List;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JPanel;
+
+import javax.swing.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jmri.InstanceManager;
 import jmri.jmrit.operations.OperationsFrame;
-import jmri.jmrit.operations.routes.RouteLocation;
+import jmri.jmrit.operations.OperationsPanel;
+import jmri.jmrit.operations.routes.*;
 import jmri.jmrit.operations.setup.Control;
 import jmri.jmrit.operations.trains.Train;
 import jmri.jmrit.operations.trains.TrainManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jmri.util.swing.JmriJOptionPane;
 
 /**
  * Change Departure Time frame for operations.
  *
  * @author Bob Jacobsen Copyright (C) 2001
- * @author Daniel Boudreau Copyright (C) 2013
+ * @author Daniel Boudreau Copyright (C) 2013, 2026
  */
 public class ChangeDepartureTimesFrame extends OperationsFrame {
 
     // major buttons
-    javax.swing.JButton changeButton = new javax.swing.JButton(Bundle.getMessage("Change"));
+    JButton changeButton = new JButton(Bundle.getMessage("Change"));
 
     // combo boxes
-    javax.swing.JComboBox<String> hourBox = new javax.swing.JComboBox<>();
+    JComboBox<Integer> hourBox = new JComboBox<>();
+    JComboBox<Integer> dayBox = new JComboBox<>();
+
+    JCheckBox routesCheckBox = new JCheckBox(Bundle.getMessage("ModifyRouteTimes"));
 
     public ChangeDepartureTimesFrame() {
         // general GUI config
 
         getContentPane().setLayout(new BoxLayout(getContentPane(), BoxLayout.Y_AXIS));
 
-        // Set up the panels
-        // Layout the panel by rows
-        for (int i = 1; i < 24; i++) {
-            hourBox.addItem(Integer.toString(i));
+        // load day combobox
+        for (int i = 0; i < Control.numberOfDays; i++) {
+            dayBox.addItem(i);
         }
+
+        // load hour combobox
+        for (int i = 0; i < 24; i++) {
+            hourBox.addItem(i);
+        }
+
+        OperationsPanel.padComboBox(dayBox, 3);
+        OperationsPanel.padComboBox(hourBox, 3);
 
         // row 2
         JPanel pHour = new JPanel();
         pHour.setLayout(new GridBagLayout());
         pHour.setBorder(BorderFactory.createTitledBorder(Bundle.getMessage("SelectHours")));
-        addItem(pHour, hourBox, 0, 0);
+        addItem(pHour, dayBox, 0, 0);
+        addItem(pHour, hourBox, 1, 0);
+        addItem(pHour, routesCheckBox, 2, 0);
 
         // row 4
         JPanel pButton = new JPanel();
@@ -56,13 +71,12 @@ public class ChangeDepartureTimesFrame extends OperationsFrame {
         // add help menu to window
         addHelpMenu("package.jmri.jmrit.operations.Operations_ChangeTrainDepartureTimes", true); // NOI18N
 
-        pack();
-        setMinimumSize(new Dimension(Control.panelWidth400, Control.panelHeight200));
-
         setTitle(Bundle.getMessage("TitleChangeDepartureTime"));
 
         // setup buttons
         addButtonAction(changeButton);
+
+        initMinimumSize(new Dimension(Control.panelWidth500, Control.panelHeight200));
     }
 
     @Override
@@ -70,27 +84,48 @@ public class ChangeDepartureTimesFrame extends OperationsFrame {
         if (ae.getSource() == changeButton) {
             log.debug("change button activated");
             TrainManager trainManager = InstanceManager.getDefault(TrainManager.class);
-            List<Train> trains = trainManager.getTrainsByIdList();
-            for (Train train : trains) {
-                train.setDepartureTime(adjustHour(train.getDepartureTimeHour()), train.getDepartureTimeMinute());
-                // now check the train's route to see if there are any departure times that need to be modified
-                if (train.getRoute() == null)
-                    continue;
-                for (RouteLocation rl : train.getRoute().getLocationsBySequenceList()) {
-                    if (!rl.getDepartureTime().equals(RouteLocation.NONE))
-                        rl.setDepartureTime(adjustHour(rl.getDepartureTimeHour()), rl.getDepartureTimeMinute());
+            if (trainManager.isAnyTrainBuilt()) {
+                JmriJOptionPane.showMessageDialog(this, Bundle.getMessage("CanNotChangeTime"),
+                        Bundle.getMessage("MustTerminateOrReset"), JmriJOptionPane.ERROR_MESSAGE);
+            } else {
+                List<Train> trains = trainManager.getTrainsByIdList();
+                for (Train train : trains) {
+                    train.setDepartureTime(adjustDay(train.getDepartureTimeDay()),
+                            adjustHour(train.getDepartureTimeHour()), train.getDepartureTimeMinute());
+                }
+                // now check every route to see if there are any departure times that need
+                // adjustment
+                if (routesCheckBox.isSelected()) {
+                    RouteManager routeManager = InstanceManager.getDefault(RouteManager.class);
+                    List<Route> routes = routeManager.getRoutesByNameList();
+                    for (Route route : routes) {
+                        for (RouteLocation rl : route.getLocationsBySequenceList()) {
+                            if (!rl.getDepartureTimeHourMinutes().equals(RouteLocation.NONE)) {
+                                rl.setDepartureTime(adjustDay(rl.getDepartureTimeDay()),
+                                        adjustHour(rl.getDepartureTimeHour()), rl.getDepartureTimeMinute());
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-    
+
+    private String adjustDay(String day) {
+        int d = (int) dayBox.getSelectedItem() + Integer.parseInt(day);
+        if (d > Control.numberOfDays - 1) {
+            d = d - Control.numberOfDays;
+        }
+        return Integer.toString(d);
+    }
+
     private String adjustHour(String time) {
-        int hour = Integer.parseInt((String) hourBox.getSelectedItem()) + Integer.parseInt(time);
+        int hour = (int) hourBox.getSelectedItem() + Integer.parseInt(time);
         if (hour > 23) {
             hour = hour - 24;
         }
         return Integer.toString(hour);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ChangeDepartureTimesFrame.class);
+    private static final Logger log = LoggerFactory.getLogger(ChangeDepartureTimesFrame.class);
 }

@@ -25,7 +25,7 @@ public class ChannelStart extends SdfMacro {
         return 2;
     }
 
-    static public SdfMacro match(SdfBuffer buff) {
+    public static SdfMacro match(SdfBuffer buff) {
         if ((buff.getAtIndex() & 0xFF) != 0x81) {
             return null;
         }
@@ -79,13 +79,14 @@ public class ChannelStart extends SdfMacro {
 
     @Override
     public String allInstructionString(String indent) {
-        String output = indent + oneInstructionString();
+        StringBuilder output = new StringBuilder(indent);
+        output.append(oneInstructionString());
         if (children == null) {
-            return output;
+            return output.toString();
         }
         for (int i = 0; i < children.size(); i++) {
-            output += children.get(i).allInstructionString(indent + "  ");
+            output.append(children.get(i).allInstructionString(indent + "  "));
         }
-        return output;
+        return output.toString();
     }
 }

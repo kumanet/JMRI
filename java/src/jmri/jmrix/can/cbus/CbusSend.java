@@ -1,15 +1,19 @@
 package jmri.jmrix.can.cbus;
 
+import java.util.PriorityQueue;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import jmri.jmrix.can.CanMessage;
 import jmri.jmrix.can.CanReply;
 import jmri.jmrix.can.CanSystemConnectionMemo;
 import jmri.jmrix.can.TrafficController;
+import jmri.jmrix.can.cbus.node.CbusNodeTableDataModel;
 import jmri.util.swing.TextAreaFIFO;
 import jmri.util.ThreadingUtil;
-
-// import org.slf4j.Logger;
-// import org.slf4j.LoggerFactory;
+import jmri.util.TimerUtil;
 
 /**
  * Class to send CAN Frames.
@@ -21,24 +25,27 @@ import jmri.util.ThreadingUtil;
 public class CbusSend {
     
     private TrafficController tc;
+    private final CanSystemConnectionMemo memo;
     private final TextAreaFIFO ta;
     private final String newLine = System.getProperty("line.separator");
     
     /**
      * Constructor
-     * @param memo System Connection
+     * @param systemMemo System Connection
      * @param txta a Text Area for any feedback messages
      */
-    public CbusSend( @Nonnull CanSystemConnectionMemo memo, TextAreaFIFO txta){
+    public CbusSend( @Nonnull CanSystemConnectionMemo systemMemo, TextAreaFIFO txta){
+        memo = systemMemo;
         tc = memo.getTrafficController();
         ta = txta;
     }
 
     /**
      * Constructor
-     * @param memo System Connection
+     * @param systemMemo System Connection
      */
-    public CbusSend(CanSystemConnectionMemo memo){
+    public CbusSend(CanSystemConnectionMemo systemMemo){
+        memo = systemMemo;
         if (memo!=null) {
             tc = memo.getTrafficController();
         }
@@ -47,6 +54,13 @@ public class CbusSend {
     
     /**
      * Sends an outgoing CanMessage or incoming CanReply from a CanReply with a specified delay
+     * <p>
+     * As a connection's receive thread does, the frame is taken as received
+     * when the delay ends, off the layout thread, and an incoming CanReply is
+     * given that received time before it waits for the layout thread.
+     * <p>
+     * As on a bus, frames arrive in the order they are due, and frames due at
+     * the same moment arrive in the order they were sent.
      * @param r A CanReply Can Frame which will be sent
      * @param sendReply true to send as incoming CcanReply
      * @param sendMessage true to send as outgoing CanMessage
@@ -55,15 +69,149 @@ public class CbusSend {
     public void sendWithDelay( CanReply r, Boolean sendReply, Boolean sendMessage, int delay ){
         CbusMessage.setId(r, tc.getCanid() );
         CbusMessage.setPri(r, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
-        ThreadingUtil.runOnLayoutDelayed( () -> {
-            if (sendReply) {
-                tc.sendCanReply(r, null);
+        DelayedFrames.Frame frame = DelayedFrames.add(tc, r, sendReply, sendMessage, delay);
+        TimerUtil.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                DelayedFrames.deliverUpTo(frame);
             }
-            if (sendMessage) {
-                CanMessage m = new CanMessage(r);
-                tc.sendCanMessage(m, null);
+        }, delay);
+    }
+
+    /**
+     * Queue a frame to arrive as received from the bus at a given time. The
+     * frame is given that received time, and is delivered in its place among
+     * the frames sent with {@link #sendWithDelay}: after every frame due before
+     * that time, and before every frame due after it. A time already past is
+     * delivered at once; a time to come, when it comes.
+     * <p>
+     * For simulations, which use it through
+     * {@link jmri.jmrix.can.cbus.simulator.CbusSimulatedSend#receiveAt}; it is
+     * here because it shares the queue of {@link #sendWithDelay}.
+     * @param r A CanReply Can Frame which will arrive as an incoming frame
+     * @param receivedNanos when it is received, on the {@link System#nanoTime()} scale
+     * @since 5.19.1
+     */
+    protected void queueReceivedAt(@Nonnull CanReply r, long receivedNanos) {
+        CbusMessage.setId(r, tc.getCanid() );
+        CbusMessage.setPri(r, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
+        DelayedFrames.Frame frame = DelayedFrames.addAt(tc, r, receivedNanos);
+        long wait = receivedNanos - System.nanoTime();
+        if (wait <= 0) {
+            DelayedFrames.deliverUpTo(frame);
+            return;
+        }
+        TimerUtil.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                DelayedFrames.deliverUpTo(frame);
             }
-        },delay );
+        }, TimeUnit.NANOSECONDS.toMillis(wait) + 1);
+    }
+
+    /**
+     * Frames waiting for their delay to end, kept in the order a bus would
+     * deliver them: by when they are due, then by the order they were sent.
+     * <p>
+     * java.util.Timer does not keep tasks due at the same moment in the order
+     * they were scheduled, and it schedules by the millisecond clock, so a
+     * task may run slightly before its frame's due time. So no task delivers
+     * just its own frame, and none compares clocks: each delivers its own
+     * frame and every frame ordered before it. A frame is then never delivered
+     * after one ordered behind it, and none is left waiting.
+     */
+    static final class DelayedFrames {
+
+        private static final PriorityQueue<Frame> waiting = new PriorityQueue<>();
+        private static long sent = 0;
+
+        private DelayedFrames() {}
+
+        static final class Frame implements Comparable<Frame> {
+            private final long due;
+            private final long sequence;
+            private final TrafficController tc;
+            private final CanReply reply;
+            private final boolean sendReply;
+            private final boolean sendMessage;
+            /** True if received at its due time exactly, as given to queueReceivedAt. */
+            private final boolean receivedWhenDue;
+
+            private Frame(long due, long sequence, TrafficController tc, CanReply reply,
+                    boolean sendReply, boolean sendMessage, boolean receivedWhenDue) {
+                this.due = due;
+                this.sequence = sequence;
+                this.tc = tc;
+                this.reply = reply;
+                this.sendReply = sendReply;
+                this.sendMessage = sendMessage;
+                this.receivedWhenDue = receivedWhenDue;
+            }
+
+            @Override
+            public int compareTo(Frame other) {
+                // compare nanoTime values by their difference, as System.nanoTime() advises
+                long d = due - other.due;
+                if (d != 0) {
+                    return d < 0 ? -1 : 1;
+                }
+                return Long.compare(sequence, other.sequence);
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                return (o instanceof Frame) && ((Frame) o).sequence == sequence;
+            }
+
+            @Override
+            public int hashCode() {
+                return Long.hashCode(sequence);
+            }
+        }
+
+        static Frame add(TrafficController tc, CanReply reply, boolean sendReply, boolean sendMessage, int delay) {
+            synchronized (waiting) {
+                Frame f = new Frame(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(delay), sent++,
+                    tc, reply, sendReply, sendMessage, false);
+                waiting.add(f);
+                return f;
+            }
+        }
+
+        static Frame addAt(TrafficController tc, CanReply reply, long due) {
+            synchronized (waiting) {
+                Frame f = new Frame(due, sent++, tc, reply, true, false, true);
+                waiting.add(f);
+                return f;
+            }
+        }
+
+        /**
+         * Deliver the given frame, unless an earlier task has, and every frame
+         * ordered before it, in order. Each incoming frame is given its
+         * received time and handed to the layout thread, which runs them in
+         * the order handed over.
+         * @param last the frame whose delay has ended
+         */
+        static void deliverUpTo(Frame last) {
+            synchronized (waiting) {
+                while (!waiting.isEmpty() && waiting.peek().compareTo(last) <= 0) {
+                    Frame f = waiting.poll();
+                    if (f.sendReply) {
+                        f.reply.setReceivedTime(f.receivedWhenDue ? f.due : System.nanoTime());
+                    }
+                    ThreadingUtil.runOnLayoutEventually( () -> {
+                        if (f.sendReply) {
+                            f.tc.sendCanReply(f.reply, null);
+                        }
+                        if (f.sendMessage) {
+                            CanMessage m = new CanMessage(f.reply);
+                            f.tc.sendCanMessage(m, null);
+                        }
+                    });
+                }
+            }
+        }
     }
 
     /**
@@ -240,11 +388,19 @@ public class CbusSend {
 
     /**
      * Sends NVSET OPC , Node set individual NV.
+     * If (contrary to CBUS spec), the node is required to be in Event Learn Mode
+     * before setting a NV, this will be done within this function,
+     * assuming that the node is visible to the memo CbusNodeTableDataModel .
      * @param nodeinsetup Node Number
      * @param nv Node variable number
      * @param newval Node variable number value
      */
     public void nVSET(int nodeinsetup,int nv,int newval ) {
+
+        if ( getNvWriteLearnMode(nodeinsetup) ) {
+            nodeEnterLearnEvMode(nodeinsetup);
+        }
+
         CanMessage m = new CanMessage(tc.getCanid());
         m.setNumDataElements(5);
         CbusMessage.setPri(m, CbusConstants.DEFAULT_DYNAMIC_PRIORITY * 4 + CbusConstants.DEFAULT_MINOR_PRIORITY);
@@ -253,7 +409,35 @@ public class CbusSend {
         m.setElement(2, nodeinsetup & 0xff);
         m.setElement(3, nv);
         m.setElement(4, newval);
-        tc.sendCanMessage(m, null);           
+        tc.sendCanMessage(m, null);
+
+        if ( getNvWriteLearnMode(nodeinsetup) ) {
+            nodeExitLearnEvMode(nodeinsetup);
+        }
+    }
+
+    /**
+     * Test if Node needs to be in learn mode for teaching NVs.
+     * @param nodeinsetup node number
+     * @return if required, else false.
+     */
+    private boolean getNvWriteLearnMode(int nodeinsetup) {
+        CbusNodeTableDataModel model = getNodeModel();
+        if ( model !=null ) {
+            jmri.jmrix.can.cbus.node.CbusNode nd = model.getNodeByNodeNum(nodeinsetup);
+            if ( nd !=null ) {
+                return nd.getnvWriteInLearnOnly();
+            }
+        }
+        return false;
+    }
+
+    @CheckForNull
+    private CbusNodeTableDataModel getNodeModel(){
+        if ( memo != null ) {
+            return memo.getFromMap(CbusNodeTableDataModel.class);
+        }
+        return null;
     }
 
     /**
@@ -359,5 +543,5 @@ public class CbusSend {
         tc.sendCanMessage(m, null);  
     }
     
-    // private final static Logger log = LoggerFactory.getLogger(CbusSend.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CbusSend.class);
 }

@@ -77,12 +77,193 @@ public class DCCppCommandStationTest {
         Assert.assertFalse("v3+ does not require function refresh", c.isFunctionRefreshRequired());
 
         //verify < v3 does need refresh
-        c = new DCCppCommandStation();
         r = DCCppReply.parseDCCppReply(
                 "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
         c.setCommandStationInfo(r);
         log.debug("Version: {}", c.getVersion());
         Assert.assertTrue("< v3 requires function refresh", c.isFunctionRefreshRequired());
+    }
+
+    @Test
+    public void testIsMaxNumSlotsMsgSupported() {
+        //verify v3+ supports the MaxNumSlots message
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.0.1 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v3+ supports the MaxNumSlots message", c.isMaxNumSlotsMsgSupported());
+
+        //verify < v3 does need refresh
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v3 does not support the MaxNumSlots message", c.isMaxNumSlotsMsgSupported());
+    }
+
+    @Test
+    public void testIsReadStartValSupported() {
+        //verify v3+ supports start val
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.0.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v3+ supports start val", c.isReadStartValSupported());
+
+        //verify < v3+ does not support start val
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v3 does not support start val", c.isReadStartValSupported());
+    }
+
+    @Test
+    public void testIsThrottleRegisterRequired() {
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-4.0.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("v4+ doesn't need registers", c.isThrottleRegisterRequired());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("unknown version requires throttle registers", c.isThrottleRegisterRequired());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("< v4 requires throttle registers", c.isThrottleRegisterRequired());
+    }
+
+    @Test
+    public void testIsFunctionV4Supported() {
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-4.0.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v4+ supports new function msg", c.isFunctionV4Supported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("unknown version does not support new function msg", c.isFunctionV4Supported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v4 does not support new function msg", c.isFunctionV4Supported());
+    }
+
+
+    @Test
+    public void testIsProgramV4Supported() {
+        DCCppCommandStation c = new DCCppCommandStation();
+        Assert.assertFalse("when no version, do not support new program msgs", c.isProgramV4Supported());
+
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-4.0.2 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        Assert.assertTrue("v4.0.2+ supports new program msgs", c.isProgramV4Supported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        Assert.assertFalse("unknown version does not support new program msgs", c.isProgramV4Supported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        Assert.assertFalse("< v4.0.2 does not support new program msgs", c.isProgramV4Supported());
+    }
+
+    @Test
+    public void testIsServoTurnoutCreationSupported() {
+        //added at 3.2.0
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.2.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v3.2.0+ supports the servo turnout creation", c.isServoTurnoutCreationSupported());
+
+        //verify < v3 does not support the new format
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v3.2.0 does not support the servo turnout creation", c.isServoTurnoutCreationSupported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.7 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v3.2.0 does not support the servo turnout creation", c.isServoTurnoutCreationSupported());
+
+    }
+
+    @Test
+    public void testIsTurnoutIDsMessageRequired() {
+        //added at 5.0.0
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-5.0.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v5.0.0+ supports the servo turnout creation", c.isTurnoutIDsMessageRequired());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v5.0.0 does not support the servo turnout creation", c.isTurnoutIDsMessageRequired());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.7 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v5.0.0 does not support the servo turnout creation", c.isTurnoutIDsMessageRequired());
+
+    }
+
+    @Test
+    public void testIsCurrentListSupported() {
+        //added at 4.2.20
+        DCCppCommandStation c = new DCCppCommandStation();
+        DCCppReply r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-4.3.0 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v4.2.20+ supports the Current lists", c.isCurrentListSupported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC++ BASE STATION FOR ARDUINO MEGA / ARDUINO MOTOR SHIELD: BUILD 23 Feb 2015 09:23:57");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v4.2.20 does not support the Current lists", c.isCurrentListSupported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-3.1.7 / FireBoxMK1 / FIREBOX_MK1 / G-9db6d36");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertFalse("< v4.2.20 does not support the Current lists", c.isCurrentListSupported());
+
+        r = DCCppReply.parseDCCppReply(
+                "iDCC-EX V-5.5.15 / MEGA / EX8874 G-devel-202503022043Z");
+        c.setCommandStationInfo(r);
+        log.debug("Version: {}", c.getVersion());
+        Assert.assertTrue("v4.2.20+ supports the Current lists", c.isCurrentListSupported());
+
+
     }
 
     @Test
@@ -231,6 +412,6 @@ public class DCCppCommandStationTest {
         JUnitUtil.tearDown();
     }
 
-    private final static Logger log = LoggerFactory.getLogger(DCCppCommandStationTest.class);
+    private static final Logger log = LoggerFactory.getLogger(DCCppCommandStationTest.class);
 
 }

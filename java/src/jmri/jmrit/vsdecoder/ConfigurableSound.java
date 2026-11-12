@@ -4,8 +4,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import jmri.util.PhysicalLocation;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Configurable Sound initial version.
@@ -13,17 +11,18 @@ import org.slf4j.LoggerFactory;
  * <hr>
  * This file is part of JMRI.
  * <p>
- * JMRI is free software; you can redistribute it and/or modify it under 
- * the terms of version 2 of the GNU General Public License as published 
+ * JMRI is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published
  * by the Free Software Foundation. See the "COPYING" file for a copy
  * of this license.
  * <p>
- * JMRI is distributed in the hope that it will be useful, but WITHOUT 
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+ * JMRI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
  * @author Mark Underwood Copyright (C) 2011
+ * @author Klaus Killinger Copyright (C) 2025
  */
 class ConfigurableSound extends VSDSound {
 
@@ -48,14 +47,13 @@ class ConfigurableSound extends VSDSound {
 
     public ConfigurableSound(String name) {
         super(name);
-        is_playing = false;
     }
 
     public boolean init() {
         return this.init(null);
     }
 
-    public boolean init(VSDFile vf) {
+    boolean init(VSDFile vf) {
         if (!initialized) {
             if (use_start_sound) {
                 start_sound = new SoundBite(vf, start_file, name + "_Start", name + "_Start");
@@ -102,15 +100,9 @@ class ConfigurableSound extends VSDSound {
     }
 
     @Override
-    public boolean isPlaying() {
-        return is_playing;
-    }
-
-    @Override
     public void play() {
         if (use_short_sound) {
             short_sound.play();
-            is_playing = false; // short sound, won't be playing long...
         } else {
             if (use_start_sound) {
                 t = newTimer(start_sound.getLengthAsInt(), false, new ActionListener() {
@@ -122,7 +114,6 @@ class ConfigurableSound extends VSDSound {
                 start_sound.play();
                 if (use_mid_sound) {
                     t.start();
-                    is_playing = true;
                 }
             } else if (use_mid_sound) {
                 mid_sound.setLooped(true);
@@ -149,7 +140,6 @@ class ConfigurableSound extends VSDSound {
             mid_sound.setLooped(true);
             mid_sound.play();
         }
-        is_playing = true;
     }
 
     // Catch the timer pop after the start sound is played and trigger the (looped) sustain sound.
@@ -192,7 +182,6 @@ class ConfigurableSound extends VSDSound {
             end_sound.setLooped(false);
             end_sound.play();
         }
-        is_playing = false;
     }
 
     @Override
@@ -258,15 +247,27 @@ class ConfigurableSound extends VSDSound {
         super.setPosition(p);
         if (use_start_sound) {
             start_sound.setPosition(p);
+            setTunnelEffect(start_sound);
         }
         if (use_mid_sound) {
             mid_sound.setPosition(p);
+            setTunnelEffect(mid_sound);
         }
         if (use_end_sound) {
             end_sound.setPosition(p);
+            setTunnelEffect(end_sound);
         }
         if (use_short_sound) {
             short_sound.setPosition(p);
+            setTunnelEffect(short_sound);
+        }
+    }
+
+    private void setTunnelEffect(SoundBite sb) {
+        if (this.getTunnel()) {
+            sb.attachSourcesToEffects();
+        } else {
+            sb.detachSourcesToEffects();
         }
     }
 
@@ -345,7 +346,7 @@ class ConfigurableSound extends VSDSound {
         }
 
         /*
-         log.debug("Use:  start: {}, mid: {}, end: {}, short: {}", use_start_sound, 
+         log.debug("Use:  start: {}, mid: {}, end: {}, short: {}", use_start_sound,
          use_mid_sound, use_end_sound, use_short_sound);
          */
         // Reboot the sound
@@ -353,6 +354,6 @@ class ConfigurableSound extends VSDSound {
         this.init(vf);
     }
 
-    private final static Logger log = LoggerFactory.getLogger(ConfigurableSound.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfigurableSound.class);
 
 }

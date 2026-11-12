@@ -11,11 +11,10 @@ import jmri.jmrix.bachrus.SpeedoSystemConnectionMemo;
 import jmri.jmrix.bachrus.SpeedoTrafficController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import purejavacomm.CommPortIdentifier;
-import purejavacomm.NoSuchPortException;
-import purejavacomm.PortInUseException;
-import purejavacomm.SerialPort;
-import purejavacomm.UnsupportedCommOperationException;
+import jmri.jmrix.purejavacomm.CommPortIdentifier;
+import jmri.jmrix.purejavacomm.NoSuchPortException;
+import jmri.jmrix.purejavacomm.PortInUseException;
+import jmri.jmrix.purejavacomm.UnsupportedCommOperationException;
 
 /**
  * Implements SerialPortAdapter for the Bachrus speedo.
@@ -40,7 +39,7 @@ public class SerialDriverAdapter extends SpeedoPortController {
         this.getSystemConnectionMemo().setSpeedoTrafficController(new SpeedoTrafficController(this.getSystemConnectionMemo()));
     }
 
-    SerialPort activeSerialPort = null;
+    jmri.jmrix.purejavacomm.SerialPort activeSerialPort = null;
 
     @Override
     public String openPort(String portName, String appName) {
@@ -49,14 +48,17 @@ public class SerialDriverAdapter extends SpeedoPortController {
             // get and open the primary port
             CommPortIdentifier portID = CommPortIdentifier.getPortIdentifier(portName);
             try {
-                activeSerialPort = (SerialPort) portID.open(appName, 2000);  // name of program, msec to wait
+                activeSerialPort = portID.open(getSystemConnectionMemo(), 2000);  // name of program, msec to wait
             } catch (PortInUseException p) {
                 return handlePortBusy(p, portName, log);
             }
 
             // try to set it for communication via SerialDriver
             try {
-                activeSerialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+                activeSerialPort.setSerialPortParams(9600,
+                        jmri.jmrix.purejavacomm.SerialPort.DATABITS_8,
+                        jmri.jmrix.purejavacomm.SerialPort.STOPBITS_1,
+                        jmri.jmrix.purejavacomm.SerialPort.PARITY_NONE);
             } catch (UnsupportedCommOperationException e) {
                 log.error("Cannot set serial parameters on port {}: {}", portName, e.getMessage());
                 return "Cannot set serial parameters on port " + portName + ": " + e.getMessage();
@@ -146,7 +148,7 @@ public class SerialDriverAdapter extends SpeedoPortController {
         try {
             return new DataOutputStream(activeSerialPort.getOutputStream());
         } catch (java.io.IOException e) {
-            log.error("getOutputStream exception: {}", e);
+            log.error("getOutputStream exception", e);
         }
         return null;
     }
@@ -181,6 +183,6 @@ public class SerialDriverAdapter extends SpeedoPortController {
     private boolean opened = false;
     InputStream serialStream = null;
 
-    private final static Logger log = LoggerFactory.getLogger(SerialDriverAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(SerialDriverAdapter.class);
 
 }

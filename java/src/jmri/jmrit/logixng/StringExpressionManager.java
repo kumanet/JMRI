@@ -2,11 +2,14 @@ package jmri.jmrit.logixng;
 
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
+
+import jmri.Category;
 
 /**
  * Manager for Expression
- * 
+ *
  * @author Dave Duchamp       Copyright (C) 2007
  * @author Daniel Bergqvist   Copyright (C) 2018
  */
@@ -20,14 +23,14 @@ public interface StringExpressionManager extends BaseManager<MaleStringExpressio
      * @return the male socket for this expression
      * @throws IllegalArgumentException if the expression has an invalid system name
      */
-    public MaleStringExpressionSocket registerExpression(@Nonnull StringExpressionBean expression)
+    MaleStringExpressionSocket registerExpression(@Nonnull StringExpressionBean expression)
             throws IllegalArgumentException;
-    
+
     /**
      * Create a new system name for an Expression.
      * @return a new system name
      */
-    public String getAutoSystemName();
+    String getAutoSystemName();
 
     /**
      * Create a female socket for analog expressions
@@ -36,15 +39,15 @@ public interface StringExpressionManager extends BaseManager<MaleStringExpressio
      * @param socketName the name of the new socket
      * @return the new female socket
      */
-    public FemaleStringExpressionSocket createFemaleSocket(
+    FemaleStringExpressionSocket createFemaleSocket(
             Base parent, FemaleSocketListener listener, String socketName);
-    
+
     /**
      * Get a set of classes that implements the DigitalAction interface.
-     * 
+     *
      * @return a set of entries with category and class
      */
-    public Map<Category, List<Class<? extends Base>>> getExpressionClasses();
+    Map<Category, List<Class<? extends Base>>> getExpressionClasses();
 
     /*.*
      * Add an Expression.
@@ -52,7 +55,7 @@ public interface StringExpressionManager extends BaseManager<MaleStringExpressio
      * @param expression the expression to add
      * @throws IllegalArgumentException if the expression has an invalid system name
      */
-//    public void addExpression(Expression expression)
+//    void addExpression(Expression expression)
 //            throws IllegalArgumentException;
 
     /*.*
@@ -62,20 +65,20 @@ public interface StringExpressionManager extends BaseManager<MaleStringExpressio
      * @param name User name or system name to match
      * @return null if no match found
      */
-//    public Expression getExpression(String name);
+//    Expression getExpression(String name);
 
-//    public Expression getByUserName(String s);
+//    Expression getByUserName(String s);
 
-//    public Expression getBySystemName(String s);
+//    Expression getBySystemName(String s);
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * The sub system prefix for the StringExpressionManager is
      * {@link #getSystemNamePrefix() } and "SE";
      */
     @Override
-    public default String getSubSystemNamePrefix() {
+    default String getSubSystemNamePrefix() {
         return getSystemNamePrefix() + "SE";
     }
 
@@ -85,6 +88,6 @@ public interface StringExpressionManager extends BaseManager<MaleStringExpressio
      *
      * @param x the StringExpression to delete
      */
-    public void deleteStringExpression(MaleStringExpressionSocket x);
+    void deleteStringExpression(MaleStringExpressionSocket x);
 
 }

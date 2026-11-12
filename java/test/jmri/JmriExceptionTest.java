@@ -6,47 +6,47 @@ import java.util.List;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Tests for JmriException class.
  *
  * @author Paul Bender Copyright (C) 2016
  **/
-
 public class JmriExceptionTest {
 
-   @Test
-   public void ConstructorTest(){
-      Assert.assertNotNull("JmriException constructor",new JmriException());
-   }
-
-   @Test
-   public void StringConstructorTest(){
-      Assert.assertNotNull("JmriException string constructor",new JmriException("test exception"));
-   }
+    @Test
+    public void testConstructor(){
+        assertNotNull( new JmriException(), "JmriException constructor");
+    }
 
     @Test
-    public void ArrayConstructorTest() {
+    public void testStringConstructor(){
+        assertNotNull( new JmriException("test exception"), "JmriException string constructor");
+    }
+
+    @Test
+    public void testArrayConstructor() {
         List<String> list = new ArrayList<>();
         list.add("First row");
         list.add("Second row");
         list.add("Third row");
         list.add("Forth row");
         JmriException obj = new JmriException("The error", list);
-        Assert.assertNotNull(obj);
+        assertNotNull(obj);
     }
     
-   @BeforeEach
-   public void setUp() {
+    @BeforeEach
+    public void setUp() {
         JUnitUtil.setUp();
 
-        jmri.util.JUnitUtil.initDefaultUserMessagePreferences();
-   }
+        JUnitUtil.initDefaultUserMessagePreferences();
+    }
 
-   @AfterEach
-   public void tearDown(){
+    @AfterEach
+    public void tearDown(){
         JUnitUtil.tearDown();
-   }
+    }
 
 }

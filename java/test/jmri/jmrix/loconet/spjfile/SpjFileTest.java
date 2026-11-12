@@ -13,11 +13,11 @@ import org.junit.Assert;
 public class SpjFileTest {
 
     @Test
-    public void testCreate() {
-        new SpjFile(new java.io.File("ac4400.spj"));
+    public void testSpjFileCTor() {
+        Assertions.assertNotNull( new SpjFile(new java.io.File("ac4400.spj")) );
     }
 
-    SpjFile testFile = null;
+    private SpjFile testFile = null;
 
     void loadFile() throws java.io.IOException {
         if (testFile == null) {
@@ -67,5 +67,5 @@ public class SpjFileTest {
         jmri.util.JUnitUtil.tearDown();
     }
 
-    // private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SpjFileTest.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SpjFileTest.class);
 }

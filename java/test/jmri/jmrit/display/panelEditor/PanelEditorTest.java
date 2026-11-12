@@ -48,10 +48,9 @@ public class PanelEditorTest extends AbstractEditorTestBase<PanelEditor> {
             e = null;
         }
         JUnitUtil.deregisterBlockManagerShutdownTask();
-        JUnitUtil.deregisterEditorManagerShutdownTask();
         JUnitUtil.tearDown();
     }
 
-    // private final static Logger log = LoggerFactory.getLogger(PanelEditorTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(PanelEditorTest.class);
 
 }

@@ -24,7 +24,7 @@ public class HexFileSystemConnectionMemo extends jmri.jmrix.loconet.LocoNetSyste
         if (getDisabled()) {
             return null;
         }
-        return (LnSensorManager) classObjectMap.computeIfAbsent(jmri.SensorManager.class, (Class c) -> new LnSensorManager(this));
+        return (LnSensorManager) classObjectMap.computeIfAbsent(jmri.SensorManager.class, (Class<?> c) -> new LnSensorManager(this, false));
     }
 
     /**
@@ -47,7 +47,7 @@ public class HexFileSystemConnectionMemo extends jmri.jmrix.loconet.LocoNetSyste
     @OverridingMethodsMustInvokeSuper
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T get(Class<?> type) {
+    public <T> T get(Class<T> type) {
         if (type.equals(GlobalProgrammerManager.class)) {
             log.debug("Hex memo returned Global(Ops)ModeProgrammer");
             return (T) getProgrammerManager();
@@ -56,6 +56,6 @@ public class HexFileSystemConnectionMemo extends jmri.jmrix.loconet.LocoNetSyste
         }
     }
 
-    private final static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(HexFileSystemConnectionMemo.class);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(HexFileSystemConnectionMemo.class);
 
 }

@@ -4,8 +4,6 @@ import jmri.swing.PreferencesPanelTestBase;
 import jmri.util.JUnitUtil;
 
 import org.junit.jupiter.api.*;
-import org.junit.Assert;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -26,6 +24,6 @@ public class StartupActionsPreferencesPanelTest extends PreferencesPanelTestBase
     public void isPersistant(){
         assertThat(prefsPanel.isPersistant()).isTrue();
     }
-    // private final static Logger log = LoggerFactory.getLogger(StartupActionsPreferencesPanelTest.class);
+    // private static final Logger log = LoggerFactory.getLogger(StartupActionsPreferencesPanelTest.class);
 
 }
