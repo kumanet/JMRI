@@ -5,6 +5,7 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import jmri.Block;
 import jmri.EntryPoint;
@@ -74,7 +75,7 @@ public class AllocatedSection {
             handleSectionChange(e);
         });
         setStoppingSensors();
-        if ((mActiveTrain.getAutoActiveTrain() == null) && !(InstanceManager.getDefault(DispatcherFrame.class).getSupportVSDecoder())) {
+        if ((mActiveTrain.getAutoActiveTrain() == null) && !supportVSDecoder()) {
             // for manual running, monitor block occupancy for selected Blocks only
             if (mActiveTrain.getReverseAtEnd()
                     && ((mSequence == mActiveTrain.getEndBlockSectionSequenceNumber())
@@ -315,7 +316,8 @@ public class AllocatedSection {
                 mExited = true;
                 // set colour to still allocated.
                 // release will reset the colour to unoccupied.
-                if (InstanceManager.getDefault(DispatcherFrame.class).getExtraColorForAllocated()) {
+                DispatcherFrame dispatcher = dispatcher();
+                if (dispatcher != null && dispatcher.getExtraColorForAllocated()) {
                     mSection.setAlternateColorFromActiveBlock(true);
                 }
             }
@@ -327,7 +329,34 @@ public class AllocatedSection {
                 mActiveTrain.getAutoActiveTrain().handleSectionOccupancyChange(this);
             }
         }
-        InstanceManager.getDefault(DispatcherFrame.class).sectionOccupancyChanged();
+        DispatcherFrame dispatcher = dispatcher();
+        if (dispatcher != null) {
+            dispatcher.sectionOccupancyChanged();
+        }
+    }
+
+    /**
+     * Get the Dispatcher that runs the train: the one that made it active,
+     * else the default Dispatcher if there is one. A Dispatcher is never made
+     * here. A Section change can come after the Dispatcher has gone, e.g. from
+     * a release the allocation thread finishes after the Dispatcher was
+     * disposed. Making a new one then would read the Dispatcher options, and
+     * could show a dialog while the InstanceManager is making it.
+     *
+     * @return the Dispatcher, or null if there is none
+     */
+    @CheckForNull
+    private DispatcherFrame dispatcher() {
+        DispatcherFrame dispatcher = mActiveTrain.getDispatcher();
+        if (dispatcher == null && InstanceManager.containsDefault(DispatcherFrame.class)) {
+            dispatcher = InstanceManager.getDefault(DispatcherFrame.class);
+        }
+        return dispatcher;
+    }
+
+    private boolean supportVSDecoder() {
+        DispatcherFrame dispatcher = dispatcher();
+        return dispatcher != null && dispatcher.getSupportVSDecoder();
     }
 
     public synchronized final void initializeMonitorBlockOccupancy() {
@@ -356,10 +385,12 @@ public class AllocatedSection {
 
             Block b = mBlockList.get(index);
             // Handle every change, with the state it changed to, in the order the
-            // changes happen; all the train's Blocks share one queue.
+            // changes happen; all the train's Blocks share one queue. The Block is
+            // in the active Block list until its change has been handled.
             int occ = (e.getNewValue() instanceof Integer) ? (Integer) e.getNewValue() : b.getState();
+            addToActiveBlockList(b);
             mActiveTrain.queueBlockStateChange(new RespondToBlockStateChange(b, occ, this));
-            if (InstanceManager.getDefault(DispatcherFrame.class).getSupportVSDecoder()) {
+            if (supportVSDecoder()) {
                 firePropertyChangeEvent("BlockStateChange", null, b.getSystemName()); // NOI18N
             }
         }
@@ -388,8 +419,8 @@ public class AllocatedSection {
         return null;
     }
 
-    // The active Block list is no longer used by Dispatcher, which now queues every
-    // Block change; these methods are kept for compatibility.
+    // The active Block list holds each Block with a change waiting to be handled, or
+    // being handled, once for each such change.
     protected synchronized void addToActiveBlockList(Block b) {
         if (b != null) {
             mActiveBlockList.add(b);
@@ -441,6 +472,14 @@ public class AllocatedSection {
 
         @Override
         public void run() {
+            try {
+                respond();
+            } finally {
+                removeFromActiveBlockList(_block);
+            }
+        }
+
+        private void respond() {
             // delay to insure that change is not a short spike
             // The forced delay has been removed. The delay can be controlled by the debounce
             // values in the sensor table. The use of an additional fixed 250 milliseconds

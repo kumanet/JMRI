@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ServiceLoader;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -21,6 +22,7 @@ import jmri.InstanceManager;
 import jmri.InvokeOnLayoutThread;
 import jmri.NamedBean;
 import jmri.Path;
+import jmri.Reporter;
 import jmri.Sensor;
 import jmri.TrainRecord;
 import jmri.TrainRecordManager;
@@ -46,6 +48,9 @@ import jmri.jmrit.roster.RosterSpeedProfile;
  * be followed into or out of it;</li>
  * <li>a path from one Block to another with no path back;</li>
  * <li>a sensor used by two Blocks;</li>
+ * <li>a Block that takes its value from its Reporter's current report, so
+ * the value is cleared while the train is still in the Block, as soon as the
+ * Reporter stops seeing its tag;</li>
  * <li>a Block with no detector whose paths depend on a turnout with no
  * feedback, so the way a train takes through it is only what was
  * commanded;</li>
@@ -53,6 +58,8 @@ import jmri.jmrit.roster.RosterSpeedProfile;
  * than one shortest way that no turnout chooses between, as with parallel
  * tracks sharing a detector, so which way a train went can't be told.</li>
  * </ul>
+ * Other parts of JMRI add their own checks as {@link SetUpCheck}s, such as
+ * settings of theirs that disagree with others train tracking relies on.
  *
  * @author Keith Bruce Copyright (C) 2026
  * @since 5.19.1
@@ -78,10 +85,26 @@ public final class TrainTrackingChecks {
         PATH_ONE_WAY,
         /** A sensor used by more than one Block. */
         SENSOR_SHARED,
+        /**
+         * Two routes from a turnout or crossover that lead into the same
+         * Block, from a {@link SetUpCheck}: which a train took can't be
+         * told from detection.
+         *
+         * @since 5.19.2
+         */
+        ROUTES_INTO_ONE_BLOCK,
+        /**
+         * A Block that takes its value from its Reporter's current report.
+         *
+         * @since 5.19.2
+         */
+        REPORTER_CURRENT_REPORT,
         /** A Block with no detector whose paths depend on a turnout with no feedback. */
         DARK_BLOCK_TURNOUT_NO_FEEDBACK,
         /** Detected Blocks joined through dark Blocks by several ways no turnout chooses between. */
-        DARK_RUN_SEVERAL_WAYS
+        DARK_RUN_SEVERAL_WAYS,
+        /** Settings in different parts of JMRI that disagree, from a {@link SetUpCheck}. */
+        SETTINGS_DISAGREE
     }
 
     /**
@@ -97,8 +120,9 @@ public final class TrainTrackingChecks {
 
         /**
          * @param kind    the kind of problem
-         * @param subject what it is about: a {@link TrainRecord} or a
-         *                {@link NamedBean}
+         * @param subject what it is about: a {@link TrainRecord}, a
+         *                {@link NamedBean}, or the name of the part of JMRI
+         *                whose settings it is about
          * @param related other items it involves, for "Show me"
          * @param message what is wrong, in the user's terms
          */
@@ -119,8 +143,9 @@ public final class TrainTrackingChecks {
         }
 
         /**
-         * @return what it is about: a {@link TrainRecord} or a
-         *         {@link NamedBean}
+         * @return what it is about: a {@link TrainRecord}, a
+         *         {@link NamedBean}, or the name of the part of JMRI whose
+         *         settings it is about
          */
         @Nonnull
         public Object getSubject() {
@@ -150,15 +175,21 @@ public final class TrainTrackingChecks {
     }
 
     /**
-     * Check the layout's Blocks and the train records.
+     * Check the layout's Blocks and the train records, and run every
+     * {@link SetUpCheck}.
      *
      * @return the findings, by kind, then by name
      */
     @Nonnull
     @InvokeOnLayoutThread
     public static List<Finding> run() {
-        return run(InstanceManager.getDefault(BlockManager.class).getNamedBeanSet(),
-                InstanceManager.getDefault(TrainRecordManager.class).getRecords());
+        List<Finding> found = new ArrayList<>(run(InstanceManager.getDefault(BlockManager.class).getNamedBeanSet(),
+                InstanceManager.getDefault(TrainRecordManager.class).getRecords()));
+        for (SetUpCheck check : ServiceLoader.load(SetUpCheck.class)) {
+            found.addAll(check.check());
+        }
+        sort(found);
+        return found;
     }
 
     /**
@@ -194,8 +225,12 @@ public final class TrainTrackingChecks {
             }
         });
         checkDarkRuns(blocks, found);
-        found.sort(Comparator.comparing(Finding::getKind).thenComparing(f -> nameOf(f.getSubject())));
+        sort(found);
         return found;
+    }
+
+    private static void sort(List<Finding> found) {
+        found.sort(Comparator.comparing(Finding::getKind).thenComparing(f -> nameOf(f.getSubject())));
     }
 
     private static void checkTrain(TrainRecord r, List<Finding> found) {
@@ -221,6 +256,13 @@ public final class TrainTrackingChecks {
 
     private static void checkBlock(Block b, List<Finding> found) {
         List<Block> neighbours = neighbours(b);
+        Reporter reporter = b.getReporter();
+        if (reporter != null && b.isReportingCurrent()) {
+            // the current report goes null when the tag leaves the reader,
+            // and the Block's value with it (Block.handleReporterChange)
+            found.add(new Finding(Kind.REPORTER_CURRENT_REPORT, b, List.of(reporter),
+                    Bundle.getMessage("CheckReporterCurrentReport", b.getDisplayName(), reporter.getDisplayName())));
+        }
         if (!neighbours.isEmpty() && !(b.getLengthMm() > 0)) {
             found.add(new Finding(Kind.BLOCK_NO_LENGTH, b, List.of(), Bundle.getMessage(
                     b.getSensor() == null ? "CheckDarkBlockNoLength" : "CheckBlockNoLength", b.getDisplayName())));

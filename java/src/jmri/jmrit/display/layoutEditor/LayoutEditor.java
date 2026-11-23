@@ -410,6 +410,9 @@ public final class LayoutEditor extends PanelEditor implements MouseWheelListene
         super.setDefaultToolTip(new ToolTip(null, 0, 0, new Font("SansSerif", Font.PLAIN, 12),
                 Color.black, new Color(215, 225, 255), Color.black, null));
 
+        // measure trains as they run while panels are open
+        InstanceManager.getDefault(jmri.jmrit.trainrecord.TrainTrackingMeasurements.class);
+
         // setup help bar
         helpBar.setLayout(new BoxLayout(helpBar, BoxLayout.PAGE_AXIS));
         JTextArea helpTextArea1 = new JTextArea(Bundle.getMessage("Help1"));
@@ -3714,9 +3717,16 @@ public final class LayoutEditor extends PanelEditor implements MouseWheelListene
         popup.add(new AbstractAction(jmri.jmrit.trainrecord.swing.BlockDialog.menuItemText(block)) {
             @Override
             public void actionPerformed(ActionEvent e) {
-                jmri.jmrit.trainrecord.swing.BlockDialog.open(block, true);
+                jmri.jmrit.trainrecord.swing.BlockDialog.open(block, true, allControlling());
             }
         });
+        if (allControlling()) {
+            for (TrackMarkerDropHandler handler : java.util.ServiceLoader.load(TrackMarkerDropHandler.class)) {
+                if (handler.isActive()) {
+                    handler.addBlockMenuItems(popup, block);
+                }
+            }
+        }
         popup.show(event.getComponent(), event.getX(), event.getY());
     }
 
@@ -3734,6 +3744,52 @@ public final class LayoutEditor extends PanelEditor implements MouseWheelListene
             }
         }
         return null;
+    }
+
+    /**
+     * In operating mode, a loco marker was dragged onto the track of a
+     * Block. An active {@link TrackMarkerDropHandler} takes it, and says
+     * whether train tracking is told as well; with none, the train is there,
+     * for train tracking.
+     *
+     * @param marker the marker
+     * @param loc    where it was dropped, in panel coordinates
+     */
+    void markerDropped(@Nonnull LocoIcon marker, @Nonnull Point2D loc) {
+        jmri.Block block = blockOfTrackAt(loc);
+        if (block == null) {
+            return;
+        }
+        for (TrackMarkerDropHandler handler : java.util.ServiceLoader.load(TrackMarkerDropHandler.class)) {
+            if (handler.isActive()) {
+                handler.markerDropped(marker, block, this, () -> markerTrainIsIn(marker, block));
+                return;
+            }
+        }
+        markerTrainIsIn(marker, block);
+    }
+
+    /**
+     * Tell train tracking that a loco marker's train is in a Block.
+     *
+     * @param marker the marker
+     * @param block  the Block
+     */
+    private void markerTrainIsIn(@Nonnull LocoIcon marker, @Nonnull jmri.Block block) {
+        if (!jmri.jmrit.trainrecord.PermissionsTrainTracking.mayCorrect()) {
+            return;
+        }
+        String name = marker.getText();
+        if (name == null || name.isEmpty()) {
+            name = marker.getUnRotatedText();
+        }
+        String text = name;
+        jmri.util.ThreadingUtil.runOnLayout(() -> {
+            jmri.TrainRecord r = jmri.jmrit.trainrecord.TrainCorrections.recordForMarker(marker.getRosterEntry(), text);
+            if (r != null) {
+                jmri.jmrit.trainrecord.TrainCorrections.trainIsHere(r, block);
+            }
+        });
     }
 
     private TrackSegment checkTrackSegmentPopUps(@Nonnull Point2D loc) {
@@ -4348,6 +4404,11 @@ public final class LayoutEditor extends PanelEditor implements MouseWheelListene
             if (!selections.isEmpty()) {
                 selections.get(0).doMouseDragged(event);
             }
+        }
+
+        if (!isEditable() && isDragging && selectedHitPointType == HitPointType.MARKER
+                && selectedObject instanceof LocoIcon && allControlling()) {
+            markerDropped((LocoIcon) selectedObject, dLoc);
         }
 
         if (selectedObject != null) {

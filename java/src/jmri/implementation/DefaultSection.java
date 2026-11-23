@@ -695,6 +695,20 @@ public class DefaultSection extends AbstractNamedBean implements Section {
             mReverseEntryPoints.remove(i - 1);
         }
         initializationNeeded = false;
+        // the occupancy and end Blocks belonged to the old Blocks; work the
+        // occupancy out again from whatever Blocks are added next
+        mFirstBlock = null;
+        mLastBlock = null;
+        mOccupancyInitialized = false;
+    }
+
+    /**
+     * Stop listening to this Section's Blocks, then dispose of it.
+     */
+    @Override
+    public void dispose() {
+        removeAllBlocksFromSection();
+        super.dispose();
     }
     /**
      * Gets Blocks in order. If state is FREE or FORWARD, returns Blocks in
@@ -2661,10 +2675,11 @@ public class DefaultSection extends AbstractNamedBean implements Section {
      * @param name the value to set all blocks to
      */
     @Override
+    @Deprecated(since="5.19.1", forRemoval=true)
+    @SuppressWarnings("removal")    // We need to keep this method until Section.setNameInBlocks() is removed.
     public void setNameInBlocks(String name) {
-        for (Block b : mBlockEntries) {
-            b.setValue(name);
-        }
+        jmri.util.LoggingUtil.deprecationWarning(log, "Section.setNameInBlocks");
+        setValueInBlocks(name);
     }
 
     /**
@@ -2673,7 +2688,14 @@ public class DefaultSection extends AbstractNamedBean implements Section {
      * @param value the name to set block values to
      */
     @Override
+    @Deprecated(since="5.19.1", forRemoval=true)
+    @SuppressWarnings("removal")    // We need to keep this method until Section.setNameInBlocks() is removed.
     public void setNameInBlocks(Object value) {
+        jmri.util.LoggingUtil.deprecationWarning(log, "Section.setNameInBlocks");
+        setValueInBlocks(value);
+    }
+
+    private void setValueInBlocks(Object value) {
         for (Block b : mBlockEntries) {
             b.setValue(value);
         }
@@ -2688,11 +2710,12 @@ public class DefaultSection extends AbstractNamedBean implements Section {
      */
     @Override
     @Deprecated(since="5.19.1", forRemoval=true)
+    @SuppressWarnings("removal")    // We need to keep this method until Section.setNameFromActiveBlock() is removed.
     public void setNameFromActiveBlock(Object value) {
         jmri.util.LoggingUtil.deprecationWarning(log, "Section.setNameFromActiveBlock");
         boolean beenSet = false;
         if (value == null || getState() == FREE || getState() == UNKNOWN) {
-            setNameInBlocks(value);
+            setValueInBlocks(value);
         } else if (getState() == FORWARD) {
             for (Block b : mBlockEntries) {
                 if (b.getState() == Block.OCCUPIED) {
@@ -2715,7 +2738,17 @@ public class DefaultSection extends AbstractNamedBean implements Section {
             }
         }
         if (!beenSet) {
-            setNameInBlocks(value);
+            setValueInBlocks(value);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setAllocatedValue(@CheckForNull Object value) {
+        for (Block b : mBlockEntries) {
+            b.setAllocatedValue(value);
         }
     }
 
@@ -2739,6 +2772,7 @@ public class DefaultSection extends AbstractNamedBean implements Section {
      */
     @Override
     @Deprecated(since="5.19.1", forRemoval=true)
+    @SuppressWarnings("removal")    // We need to keep this method until Section.suppressNameUpdate() is removed.
     public void suppressNameUpdate(boolean set) {
         jmri.util.LoggingUtil.deprecationWarning(log, "Section.suppressNameUpdate");
         for (Block b : mBlockEntries) {
